@@ -102,6 +102,51 @@ export interface ListRunsOptions {
   to?: string
 }
 
+/** Every axis that can park a run. `reasonSql` is the SQL expression for its reason: the
+ * preparation axis stores its own reason in a column; the other two have exactly one way to park,
+ * so theirs is a quoted literal. All values are module literals, never caller input. */
+const PARKED_AXES = [
+  {
+    table: 'preparations',
+    axis: 'preparation',
+    reasonSql: 'disconnect_reason'
+  },
+  {
+    table: 'executions',
+    axis: 'execution',
+    reasonSql: "'SUBMISSION_RECOVERY_EXHAUSTED'"
+  },
+  {
+    table: 'publications',
+    axis: 'publication',
+    reasonSql: "'PUBLICATION_RECONCILIATION_EXHAUSTED'"
+  }
+] as const
+
+/** One axis' parked rows. `parked_at` is the latest transition into `disconnected`, falling back
+ * to `updated_at` when no such event exists; generating every axis from this one
+ * template keeps that rule from drifting between them. */
+function parkedAxisSelect({
+  table,
+  axis,
+  reasonSql
+}: (typeof PARKED_AXES)[number]): string {
+  return `SELECT run_id, '${axis}' AS axis, ${reasonSql} AS reason,
+           COALESCE((
+             SELECT e.occurred_at FROM review_run_events e
+             WHERE e.run_id = ${table}.run_id
+               AND e.connector_id = ${table}.connector_id
+               AND e.axis = '${axis}'
+               -- The axis row's own transition. A publication step event shares the axis, and a
+               -- second step parking later must not move the axis' parked_at forward.
+               AND e.step_key IS NULL
+               AND e.to_status = 'disconnected'
+             ORDER BY e.occurred_at DESC LIMIT 1
+           ), updated_at) AS parked_at
+         FROM ${table}
+         WHERE connector_id=$1 AND status='disconnected'`
+}
+
 export class ReviewRunQueries {
   /** The pool, guarded by the database's readiness check. */
   protected get pool(): Pool {
@@ -281,48 +326,21 @@ export class ReviewRunQueries {
   }
 
   async listParkedRuns(): Promise<ParkedRun[]> {
-    const result = await this.pool.query<ParkedRun>(
+    const result = await this.pool.query<
+      Omit<ParkedRun, 'parked_at'> & { parked_at: Date }
+    >(
       `SELECT run_id, axis, reason, parked_at FROM (
-         SELECT run_id, 'preparation' AS axis, disconnect_reason AS reason,
-           COALESCE((
-             SELECT e.occurred_at FROM review_run_events e
-             WHERE e.run_id = preparations.run_id
-               AND e.connector_id = preparations.connector_id
-               AND e.axis = 'preparation'
-               AND e.to_status = 'disconnected'
-             ORDER BY e.occurred_at DESC LIMIT 1
-           ), updated_at) AS parked_at
-         FROM preparations
-         WHERE connector_id=$1 AND status='disconnected'
-         UNION ALL
-         SELECT run_id, 'execution' AS axis, 'SUBMISSION_RECOVERY_EXHAUSTED' AS reason,
-           COALESCE((
-             SELECT e.occurred_at FROM review_run_events e
-             WHERE e.run_id = executions.run_id
-               AND e.connector_id = executions.connector_id
-               AND e.axis = 'execution'
-               AND e.to_status = 'disconnected'
-             ORDER BY e.occurred_at DESC LIMIT 1
-           ), updated_at) AS parked_at
-         FROM executions
-         WHERE connector_id=$1 AND status='disconnected'
-         UNION ALL
-         SELECT run_id, 'publication' AS axis, 'PUBLICATION_RECONCILIATION_EXHAUSTED' AS reason,
-           COALESCE((
-             SELECT e.occurred_at FROM review_run_events e
-             WHERE e.run_id = publications.run_id
-               AND e.connector_id = publications.connector_id
-               AND e.axis = 'publication'
-               AND e.to_status = 'disconnected'
-             ORDER BY e.occurred_at DESC LIMIT 1
-           ), updated_at) AS parked_at
-         FROM publications
-         WHERE connector_id=$1 AND status='disconnected'
+         ${PARKED_AXES.map(parkedAxisSelect).join('\n         UNION ALL\n         ')}
        ) parked
        ORDER BY parked_at, run_id`,
       [this.connectorId]
     )
-    return result.rows
+    // `parked_at` is a timestamptz, which node-pg hands back as a Date; the contract declares a
+    // date-time string.
+    return result.rows.map((row) => ({
+      ...row,
+      parked_at: row.parked_at.toISOString()
+    }))
   }
 
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {

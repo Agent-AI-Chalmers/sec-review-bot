@@ -6,7 +6,13 @@ import {
   IconMinus,
   IconPlayerPlay
 } from '@tabler/icons-react'
-import { type ArtifactStorage, type PublicationStep, type Run } from './api.js'
+import {
+  type ArtifactStorage,
+  type PublicationStep,
+  type Run,
+  type RunEvent
+} from './api.js'
+import type { CoordinationAxis } from './state-machines.generated.js'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
@@ -202,7 +208,16 @@ export function preparationStateLabel(
  * An unrecognised axis renders as its raw value rather than as some other axis' label, so a
  * mismatch is visible instead of being presented as a plausible-looking history.
  */
-export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
+/** Label for what an audit event moved: its axis, or the named step of that axis. One run can
+ * have several publication steps, so the timeline must say which one moved. */
+export function eventAxisLabel(
+  event: Pick<RunEvent, 'axis' | 'step_key'>,
+  t: ReturnType<typeof useMessages>
+): string {
+  if (event.step_key !== null)
+    return t('axisPublicationStep', { step: event.step_key })
+  return axisLabel(event.axis, t)
+}
 
 export function axisLabel(
   axis: CoordinationAxis,

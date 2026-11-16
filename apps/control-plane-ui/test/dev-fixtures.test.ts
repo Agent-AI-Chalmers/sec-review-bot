@@ -673,3 +673,70 @@ test('fixture event responses preserve the contract reason for a failed transiti
     await fixture.close()
   }
 })
+
+test('fixture events show a step that failed and was retried inside a publication that succeeded', async () => {
+  // Step events are what tell a publication's own history apart from its steps': without one
+  // run whose step failed and recovered, every step event in the fixtures would be a clean
+  // success and the console would never show the difference locally.
+  const { runs, stepsByRun } =
+    await import('../scripts/dev-fixtures/runs/generate.js')
+  const run = runs.find((value) =>
+    (stepsByRun.get(value.run_id) ?? []).some(
+      (step) => step.status === 'succeeded' && step.attempt_count > 1
+    )
+  )
+  assert.ok(run, 'one fixture run retries a step')
+  assert.equal(run.publication.status, 'published')
+  const fixture = await startFixtureServer()
+  try {
+    const response = await fetch(
+      `${fixture.base}/api/runs/${run.run_id}/events`
+    )
+    const { events } = (await response.json()) as {
+      events: Array<{
+        axis: string
+        step_key: string | null
+        from_status: string | null
+        to_status: string
+        occurred_at: string
+      }>
+    }
+    const publication = events.filter(
+      (event) => event.axis === 'publication' && event.step_key === null
+    )
+    const steps = events.filter(
+      (event) => event.step_key !== null && event.from_status !== null
+    )
+    const retried = steps.filter((event) =>
+      steps.some(
+        (other) =>
+          other.step_key === event.step_key && other.to_status === 'failed'
+      )
+    )
+    assert.deepEqual(
+      retried.map((event) => `${event.from_status}->${event.to_status}`),
+      [
+        'pending->running',
+        'running->failed',
+        'failed->running',
+        'running->succeeded'
+      ]
+    )
+    // The publication brackets its steps: it starts before the first and concludes after the last.
+    const started = publication.find(
+      (event) => event.to_status === 'publishing'
+    )
+    const concluded = publication.find(
+      (event) => event.to_status === 'published'
+    )
+    assert.ok(started && concluded)
+    for (const step of steps) {
+      assert.ok(Date.parse(step.occurred_at) > Date.parse(started.occurred_at))
+      assert.ok(
+        Date.parse(step.occurred_at) < Date.parse(concluded.occurred_at)
+      )
+    }
+  } finally {
+    await fixture.close()
+  }
+})

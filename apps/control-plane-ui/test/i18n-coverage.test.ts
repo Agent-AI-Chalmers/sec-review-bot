@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { diagrammedMachines } from '../browser/features/runs/detail/transitions.js'
+import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
 import { messages } from '../browser/shared/i18n.js'
 
 test('an edge pair the contract has not split is worded for all of its decisions', () => {
@@ -22,7 +22,7 @@ test('an edge pair the contract has not split is worded for all of its decisions
   // itself. This pins the set of pairs known to be collapsed, so a future decision added to an
   // existing pair shows up here instead of silently losing its label.
   const collapsed: string[] = []
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const decisions = new Map<string, number>()
     for (const edge of machine.transitions) {
       const pair = `${machine.axis} ${edge.from}->${edge.to}`
@@ -39,7 +39,7 @@ test('an edge pair the contract has not split is worded for all of its decisions
 test('every state-machine label has a key in both languages', () => {
   for (const language of ['en', 'zh'] as const) {
     const table = messages[language] as Record<string, string>
-    for (const machine of diagrammedMachines()) {
+    for (const machine of STATE_MACHINES) {
       const required = [
         `machine_${machine.axis}_title`,
         ...machine.states.flatMap((state) => [
@@ -55,6 +55,33 @@ test('every state-machine label has a key in both languages', () => {
         missing,
         [],
         `${language} is missing ${missing.length} key(s) for the ${machine.axis} machine`
+      )
+    }
+  }
+})
+
+test('every step-machine label the timeline shows has a key in both languages', () => {
+  // Step machines are not drawn, but the timeline labels each step event's states and edge, so
+  // a missing key would fall back to English in a Chinese console without any visible failure.
+  for (const language of ['en', 'zh'] as const) {
+    const table = messages[language] as Record<string, string>
+    for (const machine of STATE_MACHINES) {
+      if (machine.step === undefined) continue
+      const prefix = `${machine.axis}_step`
+      const required = [
+        ...machine.step.states.flatMap((state) => [
+          `state_${prefix}_${state}_label`,
+          `state_${prefix}_${state}_desc`
+        ]),
+        ...machine.step.transitions.map(
+          (edge) => `edge_${prefix}_${edge.from}_${edge.to}`
+        )
+      ]
+      const missing = required.filter((key) => !(key in table))
+      assert.deepStrictEqual(
+        missing,
+        [],
+        `${language} is missing ${missing.length} key(s) for the ${prefix} machine`
       )
     }
   }

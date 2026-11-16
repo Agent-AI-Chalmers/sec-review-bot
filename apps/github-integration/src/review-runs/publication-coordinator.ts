@@ -114,6 +114,33 @@ export async function withPublicationHeartbeat(
   }
 }
 
+/** The steps that kept the publication from completing, for its failure message. A step skipped
+ * without a claim (a delivery whose reconciliation got a 404) has no failure of its own on record,
+ * so this is where the run says which one. Falls back to the generic sentence if unreadable. */
+async function incompleteStepsMessage(
+  store: PublicationCoordinatorStore,
+  runId: string
+): Promise<string> {
+  const generic = 'Publication completed without all required steps succeeding.'
+  try {
+    const unsettled = (await store.listPublicationSteps(runId)).filter(
+      (step) => step.status !== 'succeeded'
+    )
+    if (unsettled.length === 0) return generic
+    const described = unsettled.map(
+      (step) =>
+        `${step.step_key} (${step.status}${step.failure_code === null ? '' : `, ${step.failure_code}`})`
+    )
+    return `${generic} Not succeeded: ${described.join('; ')}.`
+  } catch (error) {
+    logWarn('review_publication_incomplete_steps_unavailable', {
+      error,
+      run_id: runId
+    })
+    return generic
+  }
+}
+
 /** Claims only terminal work; Execution Gateway observation is owned by Review Runs. */
 export async function publishReviewRunsOnce({
   app,
@@ -149,22 +176,16 @@ export async function publishReviewRunsOnce({
         work.claim_token,
         {
           code: 'PUBLICATION_STEPS_INCOMPLETE',
-          message:
-            'Publication completed without all required steps succeeding.'
+          message: await incompleteStepsMessage(store, work.run_id)
         },
         { retry: false }
       )
-      if (!committed)
-        logWarn('review_publication_claim_lost', {
-          run_id: work.run_id,
-          workflow: work.workflow
-        })
+      if (!committed) await logRefusedConclusion(store, work)
       else
         logError('review_publication_failed', {
           run_id: work.run_id,
           workflow: work.workflow,
-          retry: false,
-          claim_committed: true
+          retry: false
         })
       return
     }
@@ -192,14 +213,49 @@ export async function publishReviewRunsOnce({
       },
       { retry: classification.retry }
     )
+    // The publish error is logged whether or not its failure could be recorded: it is the
+    // diagnosis, and a refused conclusion explains only why the run did not change.
     logError('review_publication_failed', {
       error,
       run_id: work.run_id,
       workflow: work.workflow,
-      retry: classification.retry,
-      claim_committed: committed
+      retry: classification.retry
+    })
+    if (!committed) await logRefusedConclusion(store, work)
+  }
+}
+
+/** Log why Review Runs refused to conclude: a parked step means the run was handed to an operator,
+ * otherwise the claim is presumed lost. This is inferred from the steps after the refusal, not
+ * confirmed; a parked run cannot be claimed again, so the two are not expected together. */
+async function logRefusedConclusion(
+  store: PublicationCoordinatorStore,
+  work: PublicationWork
+): Promise<void> {
+  let parked: string[] = []
+  try {
+    parked = (await store.listPublicationSteps(work.run_id))
+      .filter((step) => step.status === 'disconnected')
+      .map((step) => step.step_key)
+  } catch (error) {
+    logWarn('review_publication_refusal_unexplained', {
+      error,
+      run_id: work.run_id,
+      workflow: work.workflow
     })
   }
+  if (parked.length > 0) {
+    logInfo('review_publication_left_for_operator', {
+      run_id: work.run_id,
+      workflow: work.workflow,
+      parked_steps: parked.join(',')
+    })
+    return
+  }
+  logWarn('review_publication_claim_lost', {
+    run_id: work.run_id,
+    workflow: work.workflow
+  })
 }
 
 export function startPublicationCoordinator({

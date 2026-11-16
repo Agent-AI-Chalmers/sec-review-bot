@@ -415,6 +415,9 @@ CREATE TABLE review_run_events (
   run_id text NOT NULL,
   connector_id text NOT NULL,
   axis text NOT NULL CHECK (axis IN ('execution', 'preparation', 'publication')),
+  -- Null when the axis row itself moved. Only publication is made of steps, so only a
+  -- publication event can name the step that moved instead.
+  step_key text CHECK (step_key IS NULL OR axis = 'publication'),
   from_status text,
   to_status text NOT NULL,
   reason_code text,
@@ -432,7 +435,9 @@ COMMENT ON COLUMN review_run_events.run_id IS
 COMMENT ON COLUMN review_run_events.connector_id IS
   'Connector namespace that owns the run, kept so reads can be fenced per connector.';
 COMMENT ON COLUMN review_run_events.axis IS
-  'Which coordination state machine the transition belongs to: execution, preparation, or publication.';
+  'Which coordination axis the transition belongs to: execution, preparation, or publication.';
+COMMENT ON COLUMN review_run_events.step_key IS
+  'NULL when the axis row moved; on the publication axis, the publication step that moved instead.';
 COMMENT ON COLUMN review_run_events.from_status IS
   'State before the transition; NULL for the first event on an axis (for example admission).';
 COMMENT ON COLUMN review_run_events.to_status IS

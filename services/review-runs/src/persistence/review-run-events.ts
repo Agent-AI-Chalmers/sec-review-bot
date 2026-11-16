@@ -11,28 +11,32 @@ import type { ReviewRunEvent } from '../shapes.js'
 
 export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
 
-export interface AppendEventArgs {
+export interface AppendEventFields {
   runId: string
   connectorId: string
-  axis: CoordinationAxis
   fromStatus: string | null
   toStatus: string
   reasonCode?: string | null
 }
+
+/** Only publication is made of steps, so only a publication event may name one; the union keeps
+ * the other combinations unrepresentable, matching the table's CHECK. */
+export type AppendEventArgs = AppendEventFields &
+  (
+    | { axis: Exclude<CoordinationAxis, 'publication'>; stepKey?: never }
+    | { axis: 'publication'; stepKey?: string }
+  )
 
 export interface ReviewRunEventRow {
   event_id: string
   run_id: string
   connector_id: string
   axis: CoordinationAxis
+  step_key: string | null
   from_status: string | null
   to_status: string
   reason_code: string | null
-  occurred_at: Date | string
-}
-
-function iso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value
+  occurred_at: Date
 }
 
 /** Append one transition. Callers run this on the same client as the snapshot UPDATE, so the
@@ -43,13 +47,14 @@ export async function appendEvent(
 ): Promise<string> {
   const result = await client.query<{ event_id: string }>(
     `INSERT INTO review_run_events
-       (run_id, connector_id, axis, from_status, to_status, reason_code)
-     VALUES ($1, $2, $3, $4, $5, $6)
+       (run_id, connector_id, axis, step_key, from_status, to_status, reason_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING event_id`,
     [
       args.runId,
       args.connectorId,
       args.axis,
+      args.stepKey ?? null,
       args.fromStatus,
       args.toStatus,
       args.reasonCode ?? null
@@ -69,7 +74,7 @@ export async function listEvents(
   connectorId: string
 ): Promise<ReviewRunEvent[]> {
   const result = await client.query<ReviewRunEventRow>(
-    `SELECT event_id, run_id, connector_id, axis, from_status, to_status,
+    `SELECT event_id, run_id, connector_id, axis, step_key, from_status, to_status,
             reason_code, occurred_at
      FROM review_run_events
      WHERE run_id=$1 AND connector_id=$2
@@ -79,9 +84,10 @@ export async function listEvents(
   return result.rows.map((row) => ({
     event_id: Number(row.event_id),
     axis: row.axis,
+    step_key: row.step_key,
     from_status: row.from_status,
     to_status: row.to_status,
     reason_code: row.reason_code,
-    occurred_at: iso(row.occurred_at)
+    occurred_at: row.occurred_at.toISOString()
   }))
 }

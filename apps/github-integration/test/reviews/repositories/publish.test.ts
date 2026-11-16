@@ -37,6 +37,7 @@ function step(
     status: 'pending',
     attempt_count: 1,
     last_attempt_at: '2026-01-01T00:00:00.000Z',
+    recovery_attempt_count: 0,
     remote_object_id: null,
     remote_object_url: null,
     failure_code: null,
@@ -416,4 +417,271 @@ test('an exhausted delivery step is concluded from the draft PR a previous owner
     published.map((item) => item.html_url),
     ['https://example.test/pull/77']
   )
+})
+
+test('a delivery reconciliation that cannot reach GitHub is recorded once and settles nothing', async () => {
+  // Settling a failed lookup would claim the PR is absent, so nothing is settled. The failure is
+  // recorded on the step exactly once, retryable, which spends its reconciliation budget, and the
+  // GitHub error propagates so the publication retries.
+  const steps = [step('repository:delivery:delivery-a')]
+  const writes: string[] = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => steps,
+    requirePublicationStepClaim: async () => {
+      throw Object.assign(new Error('no attempts left'), {
+        code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      })
+    },
+    completePublicationStep: async () => {
+      writes.push('complete')
+      return true
+    },
+    settleExhaustedPublicationStep: async () => {
+      writes.push('settle')
+      return true
+    },
+    failPublicationStep: async (
+      _runId: string,
+      _token: string,
+      _stepKey: string,
+      _error: unknown,
+      options: { retry?: boolean } = {}
+    ) => {
+      writes.push(`fail retry=${String(options.retry)}`)
+      return true
+    }
+  } satisfies PublicationStepStore
+
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+      return githubJson({ message: 'Bad Gateway' }, 502)
+    return githubJson({})
+  })
+
+  const errors: string[] = []
+  const restore = console.error
+  console.error = (line: unknown) => {
+    errors.push(String(line))
+  }
+  try {
+    await assert.rejects(
+      publishDeliveryDraftPrs({
+        octokit,
+        repo: {
+          owner_login: 'octo',
+          repo_name: 'example',
+          repo_full_name: 'octo/example',
+          default_branch: 'main'
+        },
+        run_id: 'run-1',
+        workspace_ref: 'main',
+        deliveries: [delivery('delivery-a')],
+        case_results: [],
+        event_type: 'manual',
+        store,
+        claim_token: 'claim-1',
+        assert_publication_claim: async () => {},
+        create_delivery_draft_pr: async () => {
+          throw new Error('an unreconciled step must not create a pull request')
+        }
+      }),
+      /Bad Gateway/
+    )
+  } finally {
+    console.error = restore
+  }
+  assert.deepStrictEqual(writes, ['fail retry=true'])
+  assert.ok(
+    errors.some(
+      (line) =>
+        line.includes('delivery_draft_pr_failed') && line.includes('delivery-a')
+    ),
+    'the reconciliation failure is logged with its delivery id'
+  )
+})
+
+test('a deterministic reconciliation failure skips only its delivery', async () => {
+  // A 404 on the lookup (the repository or branch is gone) will not change on retry, so it must
+  // not stop the publication: the other deliveries still publish. The failed lookup is recorded on
+  // its step as a non-retryable failure, once, and the step is not settled as absent.
+  const steps = [
+    step('repository:delivery:delivery-a'),
+    step('repository:delivery:delivery-b')
+  ]
+  const writes: string[] = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => steps,
+    requirePublicationStepClaim: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
+      if (stepKey === 'repository:delivery:delivery-a')
+        throw Object.assign(new Error('no attempts left'), {
+          code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+        })
+    },
+    completePublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
+      writes.push(`complete ${stepKey}`)
+      return true
+    },
+    settleExhaustedPublicationStep: async () => {
+      writes.push('settle')
+      return true
+    },
+    failPublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string,
+      _error: unknown,
+      options: { retry?: boolean } = {}
+    ) => {
+      writes.push(`fail ${stepKey} retry=${String(options.retry)}`)
+      return true
+    }
+  } satisfies PublicationStepStore
+
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+      return githubJson({ message: 'Not Found' }, 404)
+    return githubJson({})
+  })
+
+  const restore = console.error
+  console.error = () => {}
+  try {
+    const published = await publishDeliveryDraftPrs({
+      octokit,
+      repo: {
+        owner_login: 'octo',
+        repo_name: 'example',
+        repo_full_name: 'octo/example',
+        default_branch: 'main'
+      },
+      run_id: 'run-1',
+      workspace_ref: 'main',
+      deliveries: [delivery('delivery-a'), delivery('delivery-b')],
+      case_results: [],
+      event_type: 'manual',
+      store,
+      claim_token: 'claim-1',
+      assert_publication_claim: async () => {},
+      create_delivery_draft_pr: async () => ({
+        title: 'b',
+        number: 2,
+        html_url: 'https://example.test/pull/2',
+        branch_name: 'sec-review-bot/repo-scan/run-1/delivery-b',
+        body: 'Delivery body',
+        reused: false
+      })
+    })
+    assert.deepStrictEqual(
+      published.map((item) => item.html_url),
+      ['https://example.test/pull/2']
+    )
+  } finally {
+    console.error = restore
+  }
+  assert.deepStrictEqual(writes, [
+    'fail repository:delivery:delivery-a retry=false',
+    'complete repository:delivery:delivery-b'
+  ])
+})
+
+test('a transient reconciliation failure still lets later deliveries publish before the retry', async () => {
+  // The failed lookup belongs to its own step and is already recorded there. Stopping the loop on
+  // it would skip the deliveries after it on every pass until that step parks, so they are
+  // attempted first and the publication is still returned for retry afterwards.
+  const steps = [
+    step('repository:delivery:delivery-a'),
+    step('repository:delivery:delivery-b')
+  ]
+  const writes: string[] = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => steps,
+    requirePublicationStepClaim: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
+      if (stepKey === 'repository:delivery:delivery-a')
+        throw Object.assign(new Error('no attempts left'), {
+          code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+        })
+    },
+    completePublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
+      writes.push(`complete ${stepKey}`)
+      return true
+    },
+    settleExhaustedPublicationStep: async () => {
+      writes.push('settle')
+      return true
+    },
+    failPublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string,
+      _error: unknown,
+      options: { retry?: boolean } = {}
+    ) => {
+      writes.push(`fail ${stepKey} retry=${String(options.retry)}`)
+      return true
+    }
+  } satisfies PublicationStepStore
+
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+      return githubJson({ message: 'Bad Gateway' }, 502)
+    return githubJson({})
+  })
+
+  const restore = console.error
+  console.error = () => {}
+  try {
+    await assert.rejects(
+      publishDeliveryDraftPrs({
+        octokit,
+        repo: {
+          owner_login: 'octo',
+          repo_name: 'example',
+          repo_full_name: 'octo/example',
+          default_branch: 'main'
+        },
+        run_id: 'run-1',
+        workspace_ref: 'main',
+        deliveries: [delivery('delivery-a'), delivery('delivery-b')],
+        case_results: [],
+        event_type: 'manual',
+        store,
+        claim_token: 'claim-1',
+        assert_publication_claim: async () => {},
+        create_delivery_draft_pr: async () => ({
+          title: 'b',
+          number: 2,
+          html_url: 'https://example.test/pull/2',
+          branch_name: 'sec-review-bot/repo-scan/run-1/delivery-b',
+          body: 'Delivery body',
+          reused: false
+        })
+      }),
+      /delivery-a.*Bad Gateway/
+    )
+  } finally {
+    console.error = restore
+  }
+  assert.deepStrictEqual(writes, [
+    'fail repository:delivery:delivery-a retry=true',
+    'complete repository:delivery:delivery-b'
+  ])
 })

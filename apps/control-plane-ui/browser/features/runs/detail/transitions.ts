@@ -1,56 +1,66 @@
 import type { Run, RunEvent } from '../api.js'
 import {
-  STATE_MACHINES,
-  type StateAxis,
+  machineForEvent,
+  type CoordinationAxis,
+  type MachineBody,
   type StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
 import type { Message, Translator } from '../../../shared/i18n.js'
-import {
-  isDiagrammedAxis,
-  type DiagrammedAxis
-} from './state-machine-layout.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12
 
-function stateKey(
-  axis: StateAxis,
-  state: string,
-  field: 'label' | 'desc'
-): Message | null {
-  const key = `state_${axis}_${state}_${field}`
-  return key as Message
+/** A machine the console labels: an axis, or an axis' step machine. Its translation keys are
+ * the axis name, or `<axis>_step` for the steps (`state_publication_step_running_label`). */
+export interface LabelledMachine {
+  key: string
+  body: MachineBody
+}
+
+export function axisMachine(machine: StateMachineDefinition): LabelledMachine {
+  return { key: machine.axis, body: machine }
+}
+
+/** The machine an audit event's states belong to, or undefined for a step event on an axis the
+ * contract declares no steps for. */
+export function eventMachine(event: RunEvent): LabelledMachine | undefined {
+  const body = machineForEvent(event)
+  if (body === undefined) return undefined
+  return {
+    key: event.step_key === null ? event.axis : `${event.axis}_step`,
+    body
+  }
 }
 
 export function stateLabel(
-  machine: StateMachineDefinition,
+  machine: LabelledMachine,
   state: string,
   t: Translator
 ): string {
-  const key = stateKey(machine.axis, state, 'label')
-  const translated = key === null ? undefined : t(key)
+  const key = `state_${machine.key}_${state}_label` as Message
+  const translated = t(key)
   return translated && translated !== key
     ? translated
-    : (machine.details[state]?.label ?? state)
+    : (machine.body.details[state]?.label ?? state)
 }
 
 export function stateDescription(
-  machine: StateMachineDefinition,
+  machine: LabelledMachine,
   state: string,
   t: Translator
 ): string {
-  const key = stateKey(machine.axis, state, 'desc')
-  const translated = key === null ? undefined : t(key)
+  const key = `state_${machine.key}_${state}_desc` as Message
+  const translated = t(key)
   return translated && translated !== key
     ? translated
-    : (machine.details[state]?.description ?? '')
+    : (machine.body.details[state]?.description ?? '')
 }
 
 export function edgeLabel(
-  machine: StateMachineDefinition,
-  edge: StateMachineDefinition['transitions'][number],
+  machine: LabelledMachine,
+  edge: MachineBody['transitions'][number],
   t: Translator
 ): string {
-  const key = `edge_${machine.axis}_${edge.from}_${edge.to}` as Message
+  const key = `edge_${machine.key}_${edge.from}_${edge.to}` as Message
   const translated = t(key)
   if (translated && translated !== key) return translated
   if (edge.label !== undefined) return edge.label
@@ -70,7 +80,7 @@ export function actualTransitions(events: RunEvent[]): RunEvent[] {
   return events.filter((event) => event.from_status !== null)
 }
 
-export function latestTransitionAxis(events: RunEvent[]): DiagrammedAxis {
+export function latestTransitionAxis(events: RunEvent[]): CoordinationAxis {
   let latest: RunEvent | undefined
   for (const event of events) {
     if (event.from_status === null) continue
@@ -85,30 +95,28 @@ export function latestTransitionAxis(events: RunEvent[]): DiagrammedAxis {
 
 export function stateLabelForEvent(
   event: RunEvent,
-  machines: readonly StateMachineDefinition[],
   state: string | null,
   t: Translator
 ): string {
   if (state === null) return '—'
-  const machine = machines.find((candidate) => candidate.axis === event.axis)
+  const machine = eventMachine(event)
   return machine === undefined ? state : stateLabel(machine, state, t)
 }
 
 export function transitionExplanation(
   event: RunEvent,
-  machines: readonly StateMachineDefinition[],
   t: Translator
 ): string | null {
-  const machine = machines.find((candidate) => candidate.axis === event.axis)
+  const machine = eventMachine(event)
   if (machine === undefined) return null
   const edge =
-    machine.transitions.find(
+    machine.body.transitions.find(
       (candidate) =>
         candidate.from === event.from_status &&
         candidate.to === event.to_status &&
         (event.reason_code === null || candidate.reason === event.reason_code)
     ) ??
-    machine.transitions.find(
+    machine.body.transitions.find(
       (candidate) =>
         candidate.from === event.from_status && candidate.to === event.to_status
     )
@@ -121,11 +129,13 @@ export function transitionDuration(
   event: RunEvent,
   transitions: RunEvent[],
   run: Run,
-  machines: readonly StateMachineDefinition[],
   now: number
 ): { kind: 'duration'; ms: number } | { kind: 'final' } {
+  // A step's timeline is its own: the next event of another step says nothing about how long
+  // this one stayed put.
   const axisEvents = transitions.filter(
-    (candidate) => candidate.axis === event.axis
+    (candidate) =>
+      candidate.axis === event.axis && candidate.step_key === event.step_key
   )
   const index = axisEvents.findIndex(
     (candidate) => candidate.event_id === event.event_id
@@ -140,10 +150,10 @@ export function transitionDuration(
       )
     }
   }
-  const machine = machines.find((candidate) => candidate.axis === event.axis)
-  const summary = run[event.axis]
+  // A step has no summary of its own on the run; it is final once its axis is.
+  const machine = machineForEvent(event)
   if (
-    summary.finished_at !== null ||
+    run[event.axis].finished_at !== null ||
     (machine !== undefined && machine.terminal.includes(event.to_status))
   )
     return { kind: 'final' }
@@ -151,15 +161,4 @@ export function transitionDuration(
     kind: 'duration',
     ms: Math.max(0, now - Date.parse(event.occurred_at))
   }
-}
-
-export type DiagrammedMachine = StateMachineDefinition & {
-  axis: DiagrammedAxis
-}
-
-/** The machines the console draws, in presentation order. */
-export function diagrammedMachines(): readonly DiagrammedMachine[] {
-  return STATE_MACHINES.filter((machine): machine is DiagrammedMachine =>
-    isDiagrammedAxis(machine.axis)
-  )
 }

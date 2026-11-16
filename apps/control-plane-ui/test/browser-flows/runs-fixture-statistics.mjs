@@ -302,8 +302,9 @@ export async function runFixtureRunStatisticsFlow({
   await statisticsDetails.waitFor({ state: 'hidden' })
 
   // Transitions are the run's actual state changes, not the synthetic initialization events
-  // (which have no from_status). The section starts collapsed, explains each edge, and hides
-  // pagination until there is more than one page.
+  // (which have no from_status). The section starts collapsed and explains each edge. Whether
+  // pagination appears depends on the fixture's transition count, so the run errors flow checks
+  // it against synthetic transitions instead.
   const transitions = page.locator('.run-transitions')
   await transitions.locator('.transitions-entry').click()
   await transitions.locator('.transitions-body').waitFor()
@@ -326,11 +327,6 @@ export async function runFixtureRunStatisticsFlow({
     (await transitionRows.first().textContent()) ?? '',
     /In this state for|Final state/,
     `${name} a transition must explain how long the resulting state lasted`
-  )
-  assert.strictEqual(
-    await transitions.locator('.mantine-Pagination-root').count(),
-    0,
-    `${name} a single page of transitions must not render pagination`
   )
   await transitions.getByText('100%', { exact: true }).click()
   await transitions.locator('.state-machine.is-actual').waitFor()

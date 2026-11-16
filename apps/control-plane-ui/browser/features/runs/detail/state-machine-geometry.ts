@@ -7,8 +7,7 @@ import type { StateMachine } from '../state-machines.generated.js'
 import {
   STATE_LAYOUT,
   isReturnEdge,
-  selfLoopSide,
-  type DiagrammedAxis
+  selfLoopSide
 } from './state-machine-layout.js'
 
 export const NODE_W = 118
@@ -153,9 +152,7 @@ function selfLoop(
 
 /** Lay out one diagrammed machine. Throws when a state has no cell, so a contract change that
  * adds a state is caught by the layout test rather than drawn at an arbitrary position. */
-export function diagramGeometry(
-  machine: StateMachine & { axis: DiagrammedAxis }
-): DiagramGeometry {
+export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const layout = STATE_LAYOUT[machine.axis]
   const centers = new Map<string, Point>()
   for (const state of machine.states) {

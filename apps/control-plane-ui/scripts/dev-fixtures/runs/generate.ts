@@ -447,10 +447,12 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
     from: string | null,
     to: string,
     at: string,
-    reason: string | null = null
+    reason: string | null = null,
+    stepKey: string | null = null
   ): ReturnType<typeof eventsFor>[number] => ({
     event_id: ++eventId,
     axis,
+    step_key: stepKey,
     from_status: from,
     to_status: to,
     reason_code: reason,
@@ -525,18 +527,22 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
       push('execution', 'pending', 'skipped', run.execution.updated_at)
     )
   }
-  if (['publishing', 'published', 'failed'].includes(run.publication.status)) {
+  if (run.publication.started_at !== null) {
+    // A started publication was claimed first; its steps run between the claim and the
+    // conclusion, so the axis brackets them on the timeline.
     events.push(
-      push(
-        'publication',
-        'pending',
-        run.publication.status,
-        run.publication.finished_at ??
-          run.publication.started_at ??
-          run.created_at,
-        run.publication.status === 'failed' ? run.failure_code : null
-      )
+      push('publication', 'pending', 'publishing', run.publication.started_at)
     )
+    if (run.publication.status !== 'publishing')
+      events.push(
+        push(
+          'publication',
+          'publishing',
+          run.publication.status,
+          run.publication.finished_at ?? run.publication.updated_at,
+          run.publication.status === 'failed' ? run.failure_code : null
+        )
+      )
   } else if (run.publication.status === 'skipped') {
     events.push(
       push(
@@ -547,10 +553,102 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
       )
     )
   }
+  events.push(
+    ...stepEventsFor(run, stepsByRun.get(run.run_id) ?? []).map((event) =>
+      push(
+        'publication',
+        event.from,
+        event.to,
+        event.at,
+        event.reason,
+        event.step_key
+      )
+    )
+  )
+  // Ties keep insertion order, so a step's own transitions stay in the order they happened.
   return events.sort(
     (left, right) =>
       Date.parse(left.occurred_at) - Date.parse(right.occurred_at)
   )
+}
+
+interface StepTransition {
+  step_key: string
+  from: string | null
+  to: string
+  at: string
+  reason: string | null
+}
+
+/** The transitions that leave each step in the state its row shows, as Review Runs records them:
+ * one event per step transition on the publication axis, named by `step_key`.
+ *
+ * Steps run in publication order, each a few seconds after the previous one. A step that spent
+ * more than one attempt shows those attempts failing and being retried before its last state, so
+ * the timeline explains its `attempt_count` instead of leaving it to the reader to infer. */
+function stepEventsFor(
+  run: FixtureRun,
+  steps: readonly FixtureStep[]
+): StepTransition[] {
+  if (run.publication.started_at === null) return []
+  const start = Date.parse(run.publication.started_at)
+  // Every step is created when the claim initializes the step set, like an axis at admission.
+  const transitions: StepTransition[] = steps.map((step) => ({
+    step_key: step.step_key,
+    from: null,
+    to: 'pending',
+    at: iso(start + 1_000),
+    reason: null
+  }))
+  let clock = start + 1_000
+  const next = (): string => {
+    clock += 4_000
+    return iso(clock)
+  }
+  for (const step of steps) {
+    const add = (
+      from: string,
+      to: string,
+      reason: string | null = null
+    ): void => {
+      transitions.push({
+        step_key: step.step_key,
+        from,
+        to,
+        at: next(),
+        reason
+      })
+    }
+    if (step.status === 'pending') continue
+    // Every attempt but the last failed and was retried.
+    for (let attempt = 1; attempt < step.attempt_count; attempt += 1) {
+      add(attempt === 1 ? 'pending' : 'failed', 'running')
+      add('running', 'failed', 'GITHUB_TIMEOUT')
+    }
+    const lastFrom = step.attempt_count > 1 ? 'failed' : 'pending'
+    if (step.status === 'running') {
+      add(lastFrom, 'running')
+    } else if (step.status === 'succeeded') {
+      add(lastFrom, 'running')
+      add('running', 'succeeded')
+    } else if (step.status === 'failed') {
+      add(lastFrom, 'running')
+      add('running', 'failed', step.failure_code)
+    } else {
+      // `uncertain`, `disconnected` and `terminal_failed` are reached by spending the last attempt
+      // and then reconciling: the refused claim sends the step to `uncertain`.
+      add(lastFrom, 'running')
+      add('running', 'failed', 'GITHUB_TIMEOUT')
+      add('failed', 'uncertain')
+      if (step.status === 'disconnected') {
+        add('uncertain', 'uncertain', 'GITHUB_TIMEOUT')
+        add('uncertain', 'disconnected', step.failure_code)
+      } else if (step.status === 'terminal_failed') {
+        add('uncertain', 'terminal_failed', step.failure_code)
+      }
+    }
+  }
+  return transitions
 }
 
 /**
@@ -881,6 +979,20 @@ export const stepsByRun = new Map<string, FixtureStep[]>(
     stepsFor(SCENARIOS[index % SCENARIOS.length]!, run.workflow, index)
   ])
 )
+
+// One published run shows a step that failed once and succeeded on its retry, so the timeline has
+// a step-level failure that did not fail the publication. Without it every step event in the
+// fixtures would be a clean first-attempt success, and the difference between a step's history
+// and the publication's would not be visible.
+const retriedRun = runs.find(
+  (run) =>
+    run.publication.status === 'published' &&
+    (stepsByRun.get(run.run_id)?.length ?? 0) >= 2
+)
+if (retriedRun !== undefined) {
+  const retriedStep = stepsByRun.get(retriedRun.run_id)![1]!
+  retriedStep.attempt_count = 2
+}
 
 const BLOCKED_SCENARIO_INDEXES = SCENARIOS.map((scenario, index) =>
   scenario.execution_status === 'succeeded' &&

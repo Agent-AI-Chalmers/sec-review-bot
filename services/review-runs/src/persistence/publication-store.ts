@@ -18,8 +18,8 @@ import {
   DeterministicReviewRunError,
   PUBLICATION_STEP_ERROR_CODES
 } from '../errors.js'
-import type { PublicationStepRecord } from '../shapes.js'
-import { appendEvent } from './review-run-events.js'
+import type { PublicationStatus, PublicationStepRecord } from '../shapes.js'
+import { appendEvent, type AppendEventFields } from './review-run-events.js'
 import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 
 /**
@@ -53,6 +53,11 @@ import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
  * step write that skipped the lock would look correct on its own while disagreeing with the
  * other two.
  *
+ * The same lock is why step reads need no `FOR UPDATE` of their own. Once it is held no other
+ * transaction can write this run's steps, so a step status read earlier in the transaction (a
+ * `FROM (SELECT status ...) previous` subquery, or a list read before the UPDATE) is exactly the
+ * status the UPDATE replaces, and its event may name it.
+ *
  * Note on discovery: this is not reproducible by adding concurrency pressure. Interleavings are
  * only observable when one writer's UPDATE is deliberately left uncommitted while the other
  * proceeds, so a stress test tends to report "no deadlock, no errors" and prove nothing. The
@@ -60,6 +65,29 @@ import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
  * merely disagree. Verify a change here by forcing the interleaving (hold the publication
  * UPDATE open in a second session and assert the step write waits), not by raising the load.
  */
+
+/** The publication states a claim token can own, passed as a `text[]` parameter. Ownership is
+ * the token: `uncertain` and `disconnected` describe what a step is doing, not who may act, so
+ * token-fenced writes use this set to keep acting on the step that put the axis there.
+ * Concluding the axis itself uses the narrower CONCLUDABLE_PUBLICATION_STATUSES.
+ *
+ * A publication write that admits several statuses must not name a literal `fromStatus` in its
+ * event: it reads the prior status back with `WITH previous AS (SELECT ... FROM publications ...
+ * FOR UPDATE) ... RETURNING previous.status`. The `FOR UPDATE` there locks the publication row
+ * itself; step writes rely on that lock instead (see the module note). */
+const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
+  'publishing',
+  'uncertain',
+  'disconnected'
+]
+
+/** The states in which an owner may conclude the publication itself. A `disconnected` axis is
+ * excluded: automation handed it to an operator, and concluding it would leave a disconnected
+ * step that refuses every claim on a run that has left the parked queue. */
+const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
+  'publishing',
+  'uncertain'
+]
 
 /** How many times one side effect may be attempted before the step is given up on.
  *
@@ -111,7 +139,7 @@ async function derivePublicationStatus(
     WITH previous AS (
       SELECT run_id, status FROM publications
       WHERE run_id=$1 AND connector_id=$2
-        AND status IN ('publishing','uncertain','disconnected')
+        AND status = ANY($3::text[])
       FOR UPDATE
     ),
     -- The axis reports the strongest step-level uncertainty. When no step is in either state, an
@@ -141,7 +169,7 @@ async function derivePublicationStatus(
       AND derived.from_status <> derived.to_status
     RETURNING derived.from_status, p.status AS to_status
   `,
-    [runId, connectorId]
+    [runId, connectorId, OWNED_PUBLICATION_STATUSES]
   )
   const changed = result.rows[0]
   if (changed === undefined) return
@@ -196,8 +224,8 @@ export class PublicationStore {
     const result = await this.pool.query(
       `UPDATE publications SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3`,
-      [runId, this.connectorId, token]
+           AND status = ANY($4::text[]) AND claim_token=$3`,
+      [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
     )
     return result.rowCount === 1
   }
@@ -205,7 +233,7 @@ export class PublicationStore {
   /** Hand a publication back to automatic recovery, on an operator's decision.
    *
    * A publication is excluded from every claim while any step is `disconnected`
-   * (`claimPublication`/`claimNextPublication`), which is correct for automation: the step's
+   * (`PublicationClaimStore.claim`/`claimNext`), which is correct for automation: the step's
    * remote outcome is unknown, so re-running it unsupervised could duplicate a side effect. It
    * also means nothing can ever retry the run, so an operator needs a way to hand the work back.
    *
@@ -216,77 +244,88 @@ export class PublicationStore {
     client: PoolClient,
     runId: string
   ): Promise<boolean> {
-    {
-      const result = await client.query<{ from_status: string }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM publications
-           WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
-           FOR UPDATE
-         )
-         UPDATE publications p
-         SET status='pending', claim_token=NULL, claimed_at=NULL,
-             updated_at=clock_timestamp()
-         FROM previous
-         WHERE p.run_id=previous.run_id
-         RETURNING previous.status AS from_status`,
-        [runId, this.connectorId]
-      )
-      const row = result.rows[0]
-      if (row === undefined) return false
-      // The resume returns the attempt budget, which is what makes it "published again" rather
-      // than "keep publishing": a spent budget refuses the write, so without this the connector
-      // could only ever reconcile, and would conclude a step it found absent as failed.
-      //
-      // There is deliberately no cap on how often this can be granted. The caller is an operator
-      // holding the admin token, and that authority is theirs: capping it here would replace their
-      // judgment with a constant, while still leaving the same power available to whoever can
-      // change the constant. What the system owes them instead is a record - every resume appends
-      // its own event - so the decision is visible after the fact rather than blocked in advance.
-      // Parked steps become attemptable and reconcilable again: the status returns to `pending`
-      // so a claim can start the side effect, and both budgets are refreshed. Steps that already
-      // succeeded are untouched - the run continues from where it stopped, it does not start over.
-      await client.query(
-        `UPDATE publication_steps
-         SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
-             updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId]
-      )
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: row.from_status,
+    const result = await client.query<{ from_status: string }>(
+      `WITH previous AS (
+         SELECT run_id, status FROM publications
+         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
+         FOR UPDATE
+       )
+       UPDATE publications p
+       SET status='pending', claim_token=NULL, claimed_at=NULL,
+           updated_at=clock_timestamp()
+       FROM previous
+       WHERE p.run_id=previous.run_id
+       RETURNING previous.status AS from_status`,
+      [runId, this.connectorId]
+    )
+    const row = result.rows[0]
+    if (row === undefined) return false
+    // The resume returns the attempt budget, which is what makes it "published again" rather
+    // than "keep publishing": a spent budget refuses the write, so without this the connector
+    // could only ever reconcile, and would conclude a step it found absent as failed.
+    //
+    // Resumes are deliberately uncapped: the operator decides, and each resume appends an event.
+    // Parked steps become attemptable and reconcilable again: the status returns to `pending`
+    // so a claim can start the side effect, and both budgets are refreshed. Steps that already
+    // succeeded are untouched - the run continues from where it stopped, it does not start over.
+    const resumedSteps = await client.query<{ step_key: string }>(
+      `UPDATE publication_steps
+       SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
+           updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
+       RETURNING step_key`,
+      [runId, this.connectorId]
+    )
+    await appendEvent(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'publication',
+      fromStatus: row.from_status,
+      toStatus: 'pending',
+      reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
+    })
+    for (const step of resumedSteps.rows.toSorted((a, b) =>
+      a.step_key.localeCompare(b.step_key)
+    ))
+      await this.appendStepEvent(client, runId, step.step_key, {
+        fromStatus: 'disconnected',
         toStatus: 'pending',
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
       })
-      await supersedeRunAttentionNotices(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication'
-      })
-      return true
-    }
+    await supersedeRunAttentionNotices(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'publication'
+    })
+    return true
   }
 
   async complete(runId: string, token: string): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE publications SET status='published', claim_token=NULL,
+      const result = await client.query<{ from_status: string }>(
+        `WITH previous AS (
+           SELECT run_id, status FROM publications
+           WHERE run_id=$1 AND connector_id=$2
+             AND status = ANY($4::text[]) AND claim_token=$3
+           FOR UPDATE
+         )
+         UPDATE publications p SET status='published', claim_token=NULL,
            finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+         FROM previous
+         WHERE p.run_id=previous.run_id
            AND NOT EXISTS (SELECT 1 FROM publication_steps
-             WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded')`,
-        [runId, this.connectorId, token]
+             WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded')
+         RETURNING previous.status AS from_status`,
+        [runId, this.connectorId, token, CONCLUDABLE_PUBLICATION_STATUSES]
       )
-      if (result.rowCount !== 1) return false
+      const completed = result.rows[0]
+      if (completed === undefined) return false
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
         axis: 'publication',
-        fromStatus: 'publishing',
+        fromStatus: completed.from_status,
         toStatus: 'published'
       })
       return true
@@ -306,31 +345,41 @@ export class PublicationStore {
   ): Promise<boolean> {
     const toStatus = options.retry ? 'pending' : 'failed'
     return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE publications SET status=$4, claim_token=NULL, failure_code=$5,
+      // Only CONCLUDABLE_PUBLICATION_STATUSES may conclude; a refused `disconnected` axis returns
+      // false, which the caller already treats as nothing committed.
+      const result = await client.query<{ from_status: string }>(
+        `WITH previous AS (
+           SELECT run_id, status FROM publications
+           WHERE run_id=$1 AND connector_id=$2
+             AND status = ANY($7::text[]) AND claim_token=$3
+           FOR UPDATE
+         )
+         UPDATE publications p SET status=$4, claim_token=NULL, failure_code=$5,
            failure_message=$6,
            finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3`,
+         FROM previous
+         WHERE p.run_id=previous.run_id
+         RETURNING previous.status AS from_status`,
         [
           runId,
           this.connectorId,
           token,
           toStatus,
           error.code ?? null,
-          error.message
+          error.message,
+          CONCLUDABLE_PUBLICATION_STATUSES
         ]
       )
-      if (result.rowCount !== 1) return false
-      // A terminal publication failure ends the run. The requester is told about it here, not
-      // only when an individual step happens to be marked terminal: the coordinator can conclude
-      // the whole publication without going through `failPublicationStep`.
+      const failed = result.rows[0]
+      if (failed === undefined) return false
+      // A terminal publication failure ends the run, and this is the only place it is concluded,
+      // so the requester is told about it here.
       const publicationEventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
         axis: 'publication',
-        fromStatus: 'publishing',
+        fromStatus: failed.from_status,
         toStatus,
         reasonCode: error.code ?? null
       })
@@ -363,10 +412,10 @@ export class PublicationStore {
         `
         SELECT 1 FROM publications
         WHERE run_id=$1 AND connector_id=$2
-          AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+          AND status = ANY($4::text[]) AND claim_token=$3
         FOR UPDATE
       `,
-        [runId, this.connectorId, token]
+        [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
       )
       if (owner.rowCount !== 1)
         throw new Error(
@@ -389,6 +438,12 @@ export class PublicationStore {
           `,
             [this.connectorId, runId, stepKey]
           )
+          // A step's creation is recorded like an axis' admission: `null -> pending`, so the log
+          // shows every step that existed, including one that was never attempted.
+          await this.appendStepEvent(client, runId, stepKey, {
+            fromStatus: null,
+            toStatus: 'pending'
+          })
         }
         return
       }
@@ -418,11 +473,11 @@ export class PublicationStore {
   ): Promise<PublicationStepRecord[]> {
     const result = await client.query<
       Omit<PublicationStepRecord, 'last_attempt_at'> & {
-        last_attempt_at: Date | string | null
+        last_attempt_at: Date | null
       }
     >(
       `
-      SELECT step_key,status,attempt_count,last_attempt_at,
+      SELECT step_key,status,attempt_count,last_attempt_at,recovery_attempt_count,
              remote_object_id,remote_object_url,failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
@@ -434,12 +489,7 @@ export class PublicationStore {
     // declares it a date-time string like every other timestamp on the read surface.
     return result.rows.map((row) => ({
       ...row,
-      last_attempt_at:
-        row.last_attempt_at === null
-          ? null
-          : row.last_attempt_at instanceof Date
-            ? row.last_attempt_at.toISOString()
-            : row.last_attempt_at
+      last_attempt_at: row.last_attempt_at?.toISOString() ?? null
     }))
   }
   /** Lock the publication that owns this claim token, or answer false.
@@ -447,6 +497,25 @@ export class PublicationStore {
    * Callers must hold the returned lock before writing `publication_steps`; see the module-level
    * note on why a single `UPDATE ... FROM publications` is not sufficient. Kept in one place so
    * the claim, complete, and fail paths cannot diverge in the order they take these locks. */
+  /** Record one publication step transition on this connector's audit trail. */
+  private async appendStepEvent(
+    client: PoolClient,
+    runId: string,
+    stepKey: string,
+    transition: Pick<
+      AppendEventFields,
+      'fromStatus' | 'toStatus' | 'reasonCode'
+    >
+  ): Promise<void> {
+    await appendEvent(client, {
+      axis: 'publication',
+      runId,
+      connectorId: this.connectorId,
+      stepKey,
+      ...transition
+    })
+  }
+
   private async lockPublicationOwnership(
     client: PoolClient,
     runId: string,
@@ -458,9 +527,9 @@ export class PublicationStore {
          -- Ownership is the token. uncertain and disconnected describe what a step is doing, not
          -- who may act: the publisher holding the claim must still be able to settle the very
          -- step that put the axis in that state.
-         AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+         AND status = ANY($4::text[]) AND claim_token=$3
        FOR UPDATE`,
-      [runId, this.connectorId, token]
+      [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
     )
     return owner.rowCount === 1
   }
@@ -479,11 +548,15 @@ export class PublicationStore {
       // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
       if (!(await this.lockPublicationOwnership(client, runId, token)))
         return false
-      const result = await client.query(
+      // `previous` reads the row before this UPDATE, so the event names the state the claim left.
+      const result = await client.query<{ from_status: string }>(
         `
         UPDATE publication_steps s
         SET status='running', claimed_by=$3, attempt_count=s.attempt_count+1,
             last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
+        -- Step reads need no FOR UPDATE under the publication lock; see the module note.
+        FROM (SELECT status FROM publication_steps
+              WHERE run_id=$1 AND connector_id=$2 AND step_key=$4) previous
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$4
           -- Every claimable state shares one condition: the budget is checked on the effective
           -- attempt number, which is the stored count plus the claim about to happen. Testing
@@ -500,10 +573,17 @@ export class PublicationStore {
             OR (s.status='running' AND s.claimed_by IS DISTINCT FROM $3::uuid)
             OR s.status='failed'
           )
+        RETURNING previous.status AS from_status
       `,
         [runId, this.connectorId, token, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
       )
-      return result.rowCount === 1
+      const claimed = result.rows[0]
+      if (claimed === undefined) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: claimed.from_status,
+        toStatus: 'running'
+      })
+      return true
     })
   }
   async requirePublicationStepClaim(
@@ -527,13 +607,19 @@ export class PublicationStore {
           current.status === 'running' ||
           current.status === 'uncertain')
       if (needsReconciliation && current.status !== 'uncertain') {
-        await client.query(
+        const moved = await client.query(
           `UPDATE publication_steps SET status='uncertain', claimed_by=NULL,
              updated_at=clock_timestamp()
            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
              AND status IN ('failed','running') AND attempt_count >= $4`,
           [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
         )
+        // `current` was read under the publication lock, so it is the status this UPDATE left.
+        if (moved.rowCount === 1)
+          await this.appendStepEvent(client, runId, stepKey, {
+            fromStatus: current.status,
+            toStatus: 'uncertain'
+          })
       }
       await derivePublicationStatus(client, this.connectorId, runId)
       return needsReconciliation
@@ -586,35 +672,44 @@ export class PublicationStore {
     return await transaction(this.pool, async (client) => {
       if (!(await this.lockPublicationOwnership(client, runId, token)))
         return false
+      // Both answers share one guard and one parameter prefix: $1-$3 name the step and $4 is the
+      // attempt ceiling, so the two statements cannot drift apart on what "still exhausted" means.
+      const exhaustedStep = `WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
+              AND status='uncertain' AND attempt_count>=$4`
+      const stepParams = [
+        runId,
+        this.connectorId,
+        stepKey,
+        MAX_PUBLICATION_STEP_ATTEMPTS
+      ]
       const result = outcome.found
         ? await client.query(
             `
             UPDATE publication_steps
-            SET status='succeeded', claimed_by=NULL, remote_object_id=$4,
-                remote_object_url=$5, failure_code=NULL, failure_message=NULL,
+            SET status='succeeded', claimed_by=NULL, remote_object_id=$5,
+                remote_object_url=$6, failure_code=NULL, failure_message=NULL,
                 updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
-              AND status='uncertain' AND attempt_count>=$6
+            ${exhaustedStep}
           `,
             [
-              runId,
-              this.connectorId,
-              stepKey,
+              ...stepParams,
               outcome.remote.id ?? null,
-              outcome.remote.url ?? null,
-              MAX_PUBLICATION_STEP_ATTEMPTS
+              outcome.remote.url ?? null
             ]
           )
         : await client.query(
             `
             UPDATE publication_steps
             SET status='terminal_failed', claimed_by=NULL, updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
-              AND status='uncertain' AND attempt_count>=$4
+            ${exhaustedStep}
           `,
-            [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
+            stepParams
           )
       if (result.rowCount !== 1) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: 'uncertain',
+        toStatus: outcome.found ? 'succeeded' : 'terminal_failed'
+      })
       // Settling is what clears a step-level uncertainty, so the axis has to follow it back.
       await derivePublicationStatus(client, this.connectorId, runId)
       return true
@@ -648,7 +743,12 @@ export class PublicationStore {
           remote.url ?? null
         ]
       )
-      return result.rowCount === 1
+      if (result.rowCount !== 1) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: 'running',
+        toStatus: 'succeeded'
+      })
+      return true
     })
   }
   async failPublicationStep(
@@ -656,18 +756,37 @@ export class PublicationStore {
     token: string,
     stepKey: string,
     error: { code?: string | null; message: string },
-    options: { retry?: boolean } = {}
+    options: { retry?: boolean; expectedRecoveryAttemptCount?: number } = {}
   ): Promise<boolean> {
     const terminal = options.retry === false
+    const expected = options.expectedRecoveryAttemptCount ?? null
     return await transaction(this.pool, async (client) => {
       // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
       if (!(await this.lockPublicationOwnership(client, runId, token)))
         return false
+      // A reconciliation failure names the count it was reported against, the way an activity
+      // failure carries its attempt number. If the count has already moved past it, this exact
+      // failure was recorded by an earlier call whose response was lost: answer that it is
+      // recorded instead of spending the budget again. The step may have parked since, so this is
+      // decided before the status guard below, which would refuse a `disconnected` step.
+      if (expected !== null) {
+        const current = await client.query<{ recovery_attempt_count: number }>(
+          `SELECT recovery_attempt_count FROM publication_steps
+           WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
+          [runId, this.connectorId, stepKey]
+        )
+        const stored = current.rows[0]?.recovery_attempt_count
+        if (stored !== undefined && stored > expected) return true
+      }
       // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
-      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step. Swapping
+      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step, $7-$9 the
+      // retry flag, the recovery budget, and the count this failure was reported against. Swapping
       // $3 and $4 would silently store the message as the code (both are text), which no
       // status-only assertion would catch.
-      const result = await client.query(
+      const result = await client.query<{
+        from_status: string
+        to_status: string
+      }>(
         `
         UPDATE publication_steps s
         SET status=CASE
@@ -683,8 +802,13 @@ export class PublicationStore {
               ELSE s.recovery_attempt_count
             END,
             failure_code=$3, failure_message=$4, updated_at=clock_timestamp()
+        -- Step reads need no FOR UPDATE under the publication lock; see the module note.
+        FROM (SELECT status FROM publication_steps
+              WHERE run_id=$1 AND connector_id=$2 AND step_key=$6) previous
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$6
           AND s.status IN ('running','uncertain')
+          AND ($9::integer IS NULL OR s.recovery_attempt_count = $9)
+        RETURNING previous.status AS from_status, s.status AS to_status
       `,
         [
           runId,
@@ -694,55 +818,24 @@ export class PublicationStore {
           terminal ? 'terminal_failed' : 'failed',
           stepKey,
           options.retry === true,
-          MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS
+          MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS,
+          expected
         ]
       )
-      if (result.rowCount !== 1) return false
+      const moved = result.rows[0]
+      if (moved === undefined) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: moved.from_status,
+        toStatus: moved.to_status,
+        reasonCode: error.code ?? null
+      })
       // A reconciliation that could not reach an answer moves the step to `disconnected`; the
       // axis reports that so the run surfaces in the operator queue instead of looking active.
+      // A terminal step failure ends only that step. Whether the publication goes on is the
+      // connector's decision: it may publish its other steps and then conclude through `complete`
+      // (refused while any step has not succeeded) or `fail`. Concluding the publication here
+      // would take the claim away from steps the connector still means to publish.
       await derivePublicationStatus(client, this.connectorId, runId)
-      if (!terminal) return true
-      // The step update above already moved the axis by re-deriving it from the steps, so the
-      // terminal failure has to name the state it is actually leaving: `uncertain` when this step
-      // was the uncertain one, `disconnected` when another step parked the axis. Recording a
-      // hardcoded `publishing` would put an edge in the log the snapshot never held.
-      const publication = await client.query<{ from_status: string }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM publications
-           WHERE run_id=$1 AND connector_id=$2
-             AND status IN ('publishing','uncertain','disconnected') AND claim_token=$5
-           FOR UPDATE
-         )
-         UPDATE publications p
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code=$3, failure_message=$4, finished_at=clock_timestamp(),
-             updated_at=clock_timestamp()
-         FROM previous
-         WHERE p.run_id=previous.run_id
-         RETURNING previous.status AS from_status`,
-        [runId, this.connectorId, error.code ?? null, error.message, token]
-      )
-      const failedFrom = publication.rows[0]?.from_status
-      if (failedFrom === undefined)
-        throw new Error(
-          `Publication ${runId} changed while its terminal step failed.`
-        )
-      const eventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: failedFrom,
-        toStatus: 'failed',
-        reasonCode: error.code ?? null
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: eventId,
-        kind: 'failure',
-        axis: 'publication',
-        reasonCode: error.code ?? null
-      })
       return true
     })
   }

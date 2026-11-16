@@ -3,8 +3,7 @@
 // this file is its TypeScript view. Regenerate it with
 // `pnpm --dir contracts/review-runs-api/tools run generate`.
 
-export type StateAxis =
-  'preparation' | 'execution' | 'publication' | 'publication_step'
+export type CoordinationAxis = 'preparation' | 'execution' | 'publication'
 
 export interface StateTransition {
   from: string
@@ -18,10 +17,7 @@ export interface StateDetail {
   description: string
 }
 
-export interface StateMachine {
-  axis: StateAxis
-  order: number
-  title: string
+export interface MachineBody {
   field: string
   initial: string
   terminal: string[]
@@ -30,8 +26,15 @@ export interface StateMachine {
   transitions: StateTransition[]
 }
 
-/** Every declared state machine. Which of them the console draws is a presentation decision
- * that lives in the console, not here. */
+export interface StateMachine extends MachineBody {
+  axis: CoordinationAxis
+  order: number
+  title: string
+  step?: MachineBody
+}
+
+/** The three axis machines, in lifecycle order. A machine's steps, when it has them, are its
+ * `step` member. */
 export const STATE_MACHINES: readonly StateMachine[] = [
   {
     axis: 'preparation',
@@ -386,6 +389,16 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'terminal failure'
       },
       {
+        from: 'uncertain',
+        to: 'pending',
+        label: 'retryable failure'
+      },
+      {
+        from: 'uncertain',
+        to: 'failed',
+        label: 'terminal failure'
+      },
+      {
         from: 'pending',
         to: 'skipped',
         label: 'execution not published'
@@ -396,137 +409,147 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         reason: 'PUBLICATION_ABANDONED',
         label: 'execution failed'
       }
-    ]
-  },
-  {
-    axis: 'publication_step',
-    order: 4,
-    title: 'Publication step',
-    field: 'ObservedPublicationStep.status',
-    initial: 'pending',
-    terminal: ['succeeded', 'terminal_failed'],
-    states: [
-      'pending',
-      'running',
-      'failed',
-      'uncertain',
-      'disconnected',
-      'succeeded',
-      'terminal_failed'
     ],
-    details: {
-      pending: {
-        label: 'Pending',
-        description:
-          'Not attempted yet, or returned to the queue with fresh budgets by an operator.'
+    step: {
+      field: 'ObservedPublicationStep.status',
+      initial: 'pending',
+      terminal: ['succeeded', 'terminal_failed'],
+      states: [
+        'pending',
+        'running',
+        'failed',
+        'uncertain',
+        'disconnected',
+        'succeeded',
+        'terminal_failed'
+      ],
+      details: {
+        pending: {
+          label: 'Pending',
+          description:
+            'Not attempted yet, or returned to the queue with fresh budgets by an operator.'
+        },
+        running: {
+          label: 'Running',
+          description:
+            'An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened.'
+        },
+        failed: {
+          label: 'Failed',
+          description:
+            'The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.'
+        },
+        uncertain: {
+          label: 'Uncertain',
+          description:
+            'The attempt budget is spent, but any started attempt may have taken effect remotely, so the connector must reconcile against the remote system before the step can conclude.'
+        },
+        disconnected: {
+          label: 'Disconnected',
+          description:
+            'Reconciliation used its budget without an answer. An operator has to establish what is on the remote system.'
+        },
+        succeeded: {
+          label: 'Succeeded',
+          description:
+            'The side effect exists, either written by an attempt or found by reconciliation.'
+        },
+        terminal_failed: {
+          label: 'Terminal failure',
+          description:
+            'The step will not be attempted again: an attempt failed terminally, or reconciliation confirmed that the side effect is absent.'
+        }
       },
-      running: {
-        label: 'Running',
-        description:
-          'An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened.'
-      },
-      failed: {
-        label: 'Failed',
-        description:
-          'The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.'
-      },
-      uncertain: {
-        label: 'Uncertain',
-        description:
-          'The attempt budget is spent, but any started attempt may have taken effect remotely, so the connector must reconcile against the remote system before the step can conclude.'
-      },
-      disconnected: {
-        label: 'Disconnected',
-        description:
-          'Reconciliation used its budget without an answer. An operator has to establish what is on the remote system.'
-      },
-      succeeded: {
-        label: 'Succeeded',
-        description:
-          'The side effect exists, either written by an attempt or found by reconciliation.'
-      },
-      terminal_failed: {
-        label: 'Terminal failure',
-        description:
-          'The step will not be attempted again: an attempt failed terminally, or reconciliation confirmed that the side effect is absent.'
-      }
-    },
-    transitions: [
-      {
-        from: 'pending',
-        to: 'running',
-        label: 'attempt started'
-      },
-      {
-        from: 'running',
-        to: 'running',
-        label: 'taken over by a new owner'
-      },
-      {
-        from: 'failed',
-        to: 'running',
-        label: 'retry started'
-      },
-      {
-        from: 'running',
-        to: 'succeeded',
-        label: 'side effect written'
-      },
-      {
-        from: 'running',
-        to: 'failed',
-        label: 'retryable failure'
-      },
-      {
-        from: 'running',
-        to: 'terminal_failed',
-        label: 'terminal failure'
-      },
-      {
-        from: 'running',
-        to: 'uncertain',
-        label: 'attempts exhausted'
-      },
-      {
-        from: 'failed',
-        to: 'uncertain',
-        label: 'attempts exhausted'
-      },
-      {
-        from: 'uncertain',
-        to: 'succeeded',
-        label: 'reconciled present'
-      },
-      {
-        from: 'uncertain',
-        to: 'terminal_failed',
-        label: 'reconciled absent or terminal failure'
-      },
-      {
-        from: 'uncertain',
-        to: 'uncertain',
-        label: 'reconciliation inconclusive'
-      },
-      {
-        from: 'uncertain',
-        to: 'disconnected',
-        label: 'reconciliation budget spent'
-      },
-      {
-        from: 'uncertain',
-        to: 'failed',
-        label: 'failure reported without retry'
-      },
-      {
-        from: 'disconnected',
-        to: 'pending',
-        label: 'resumed by an operator'
-      }
-    ]
+      transitions: [
+        {
+          from: 'pending',
+          to: 'running',
+          label: 'attempt started'
+        },
+        {
+          from: 'running',
+          to: 'running',
+          label: 'taken over by a new owner'
+        },
+        {
+          from: 'failed',
+          to: 'running',
+          label: 'retry started'
+        },
+        {
+          from: 'running',
+          to: 'succeeded',
+          label: 'side effect written'
+        },
+        {
+          from: 'running',
+          to: 'failed',
+          label: 'retryable failure'
+        },
+        {
+          from: 'running',
+          to: 'terminal_failed',
+          label: 'terminal failure'
+        },
+        {
+          from: 'running',
+          to: 'uncertain',
+          label: 'attempts exhausted'
+        },
+        {
+          from: 'failed',
+          to: 'uncertain',
+          label: 'attempts exhausted'
+        },
+        {
+          from: 'uncertain',
+          to: 'succeeded',
+          label: 'reconciled present'
+        },
+        {
+          from: 'uncertain',
+          to: 'terminal_failed',
+          label: 'reconciled absent or terminal failure'
+        },
+        {
+          from: 'uncertain',
+          to: 'uncertain',
+          label: 'reconciliation inconclusive'
+        },
+        {
+          from: 'uncertain',
+          to: 'disconnected',
+          label: 'reconciliation budget spent'
+        },
+        {
+          from: 'uncertain',
+          to: 'failed',
+          label: 'failure reported without retry'
+        },
+        {
+          from: 'disconnected',
+          to: 'pending',
+          reason: 'PUBLICATION_RESUMED_BY_OPERATOR',
+          label: 'resumed by an operator'
+        }
+      ]
+    }
   }
 ] as const
 
-/** The machine for one axis, or undefined if the axis is unknown. */
-export function stateMachine(axis: StateAxis): StateMachine | undefined {
-  return STATE_MACHINES.find((machine) => machine.axis === axis)
+/** The machine for one axis. */
+export function stateMachine(axis: CoordinationAxis): StateMachine {
+  const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
+  if (machine === undefined) throw new Error(`no state machine for ${axis}`)
+  return machine
+}
+
+/** The machine whose states an audit event's `from_status` and `to_status` name: the axis
+ * itself, or its step machine when the event names a step. */
+export function machineForEvent(event: {
+  axis: CoordinationAxis
+  step_key: string | null
+}): MachineBody | undefined {
+  const machine = stateMachine(event.axis)
+  return event.step_key === null ? machine : machine.step
 }

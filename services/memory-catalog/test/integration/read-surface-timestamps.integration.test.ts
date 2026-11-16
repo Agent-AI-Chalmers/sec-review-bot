@@ -1,0 +1,133 @@
+// Every timestamp on the read surface must leave the store as the contract's ISO date-time
+// string. node-pg parses a bare timestamptz column into a Date, and the JSON serializer hides
+// the difference on the wire, so a row type that claims `string` for such a column type-checks
+// and passes HTTP tests while the in-process value is still a Date. This file reads each surface
+// through the store itself and checks the runtime value, which is where that drift shows up.
+import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
+import test from 'node:test'
+
+import { Pool } from 'pg'
+
+import { PostgresMemoryCatalogStore } from '../../src/catalog-store.js'
+import type {
+  Actor,
+  ArtifactReference,
+  ExtractionRegistration,
+} from '../../src/contract-types-generated.js'
+import { learningReport } from '../maintenance-report.js'
+
+const databaseUrl = process.env.TEST_DATABASE_URL
+if (databaseUrl === undefined)
+  throw new Error('TEST_DATABASE_URL is required for integration tests.')
+
+function artifact(name: string, digestCharacter: string): ArtifactReference {
+  return {
+    uri: `s3://sec-review/memory/${name}`,
+    digest: `sha256:${digestCharacter.repeat(64)}`,
+    media_type: 'application/zstd',
+    size_bytes: 42,
+  }
+}
+
+function assertIsoTimestamp(value: unknown, field: string): void {
+  assert.equal(typeof value, 'string', `${field} must be a string`)
+  assert.equal(
+    new Date(value as string).toISOString(),
+    value,
+    `${field} must be a canonical ISO date-time`,
+  )
+}
+
+await test('store reads return contract timestamps as ISO strings, not Dates', async () => {
+  const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
+  const administrator = new Pool({ connectionString: databaseUrl })
+  await administrator.query(`create schema ${schema}`)
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    options: `-c search_path=${schema},public`,
+  })
+  const store = new PostgresMemoryCatalogStore('unused', pool)
+  const extraction: ExtractionRegistration = {
+    extraction_id: 'extraction-1',
+    source_workflow: 'issue-review',
+    source_run_id: 'run-1',
+    source_unit_id: 'review',
+    execution_archive_digest: `sha256:${'d'.repeat(64)}`,
+    trajectory_reference: artifact(
+      'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
+      'c',
+    ),
+    observations: [
+      { observation_id: 'extraction-1', body_markdown: 'A fact.' },
+    ],
+  }
+  const actor: Actor = { kind: 'user', id: 'reviewer@example.com' }
+
+  try {
+    await store.initialize()
+    const publication = { registration: extraction, summary: 'Observed.' }
+    await store.reserveExtractionPublication(publication)
+    await store.confirmExtractionPublication(publication)
+    await store.registerExtraction(extraction)
+
+    // Read while the observation is still pending, so the backlog has an oldest timestamp.
+    const backlog = await store.queries.getObservationBacklog()
+    assertIsoTimestamp(
+      backlog.oldest_pending_created_at,
+      'backlog.oldest_pending_created_at',
+    )
+    const stored = await store.queries.getExtraction(extraction.extraction_id)
+    assertIsoTimestamp(stored?.created_at, 'extraction.created_at')
+    const extractions = await store.queries.listExtractions(undefined, 10, {})
+    assertIsoTimestamp(
+      extractions.extractions[0]?.created_at,
+      'listExtractions.created_at',
+    )
+    const observations = await store.queries.listObservations(undefined, 10, {})
+    assertIsoTimestamp(
+      observations.observations[0]?.created_at,
+      'observation.created_at',
+    )
+
+    const revisionInput = {
+      expected_active_revision: 0,
+      memory_tree_reference: artifact('trees/memory-tree.v1.tar.zst', 'a'),
+      source: {
+        kind: 'learning' as const,
+        operation_id: 'maintenance-1',
+        observation_ids: [extraction.extraction_id],
+        trajectory_reference: artifact(
+          'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
+          'b',
+        ),
+        maintenance_report: learningReport([extraction.extraction_id]),
+      },
+    }
+    await store.reserveRevisionPublication(revisionInput)
+    await store.confirmRevisionPublication(revisionInput)
+    await store.createMemoryTreeRevision(revisionInput)
+    assertIsoTimestamp(
+      (await store.queries.getMemoryTreeRevision(1))?.created_at,
+      'revision.created_at',
+    )
+    const history = await store.queries.listMemoryTreeRevisions(undefined, 10)
+    assertIsoTimestamp(
+      history.revisions[0]?.created_at,
+      'listMemoryTreeRevisions.created_at',
+    )
+
+    const paused = await store.changeMemoryTreeAutomation('paused', {
+      operation_id: 'pause-automation',
+      expected_generation: 0,
+      actor,
+    })
+    assertIsoTimestamp(paused.automation.changed_at, 'changed automation')
+    const automation = await store.queries.getMemoryTreeAutomation()
+    assertIsoTimestamp(automation.changed_at, 'automation.changed_at')
+  } finally {
+    await pool.end()
+    await administrator.query(`drop schema if exists ${schema} cascade`)
+    await administrator.end()
+  }
+})

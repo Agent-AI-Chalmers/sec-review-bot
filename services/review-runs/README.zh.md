@@ -79,7 +79,7 @@ run 主干和各条生命周期轴分别存放在不同的表中。`review_runs`
 | `publication_steps`           | 可恢复的单个 connector 副作用                                          | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
 | `execution_statistics`        | 统计 reconciliation 状态与 run totals                                  | `pending`、`reconciling`、`settled`、`unavailable`                                            |
 | `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | —                                                                                             |
-| `review_run_events`           | 每条轴状态转换的只追加审计日志                                         | —                                                                                             |
+| `review_run_events`           | 各轴和 publication step 状态转换的只追加审计日志                       | —                                                                                             |
 
 `preparations.status`：
 
@@ -148,7 +148,9 @@ flowchart LR
   stepdisconnected -->|操作员恢复| steppending
 ```
 
-_图中省略了四条不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）只记录审计事件；publication step 的 `running → running`（新 owner 接管）和 `uncertain → uncertain`（核对无结论）只推进尝试或核对计数。_
+publication 轴跟随它的步骤：在被持有期间，它报告步骤中最强的状态，顺序是 `disconnected`、`uncertain`、`publishing`。因此已停放的步骤优先于仍在核对的步骤，因为运维队列需要先看到它。`published` 和 `failed` 是持有者自己的结论，从不由步骤推导。
+
+_图中省略了四条不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）只记录审计事件；publication step 的 `running → running`（新 owner 接管）和 `uncertain → uncertain`（核对无结论）推进尝试或核对计数，并记录审计事件。_
 
 各轴之间由三个跨轴触发连接。它们是 orchestration trigger，不是同一张表内的状态迁移：
 
@@ -162,6 +164,10 @@ _图中省略了四条不改变状态的自环：execution 的 `uncertain → un
 | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------ |
 | `attempt_count`          | 写入副作用的尝试，也就是重试预算 | 尝试启动时就消耗，所以中途死亡的 publisher 与一次失败的尝试消耗同样的额度      |
 | `recovery_attempt_count` | 确认远端结果的尝试               | 一次确认没能得出结论时。查询远端不会重复写入副作用，所以不推进 `attempt_count` |
+
+<!-- doc-default: MAX_PUBLICATION_STEP_ATTEMPTS, MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS; source=services/review-runs/src/persistence/publication-store.ts -->
+
+两个预算当前都是三次。`attempt_count` 用尽的步骤不再获准新的尝试，而是交给 connector 核对；`recovery_attempt_count` 用尽的步骤进入 `disconnected`。
 
 能否再试一次只看 `attempt_count`，不看失败次数、崩溃次数或经过的时间。系统也不另存失败次数：每次 `failed` 迁移已经由 `failure_code`、`failure_message` 和 run 的事件日志记录下来。
 

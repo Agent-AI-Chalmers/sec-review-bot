@@ -43,7 +43,7 @@ Memory-tree automation supports `enabled` and `paused`, initially `enabled`. Thi
 
 Only one maintenance task may run at a time, enforced by Temporal's fixed workflow ID and `SKIP` overlap policy.
 
-A worker can abandon existing unselected automatic revision publications with `POST /v1/memory-tree/revisions/publications/abandon`. The `abandoned` state is final for those candidates: reserve and confirm retries preserve it, while commit returns HTTP 409 with `PUBLICATION_ABANDONED`. A paused automatic commit atomically abandons the existing unselected publications for its source kind and operation ID before returning `AUTOMATION_PAUSED`. Maintenance workflows also abandon on a pause observed during preparation and exit without backlog continuation. Selected publications remain replayable; artifact objects are retained.
+A worker can abandon existing unselected automatic revision publications with `POST /v1/memory-tree/revisions/publications/abandon`. The `abandoned` state is final for those candidates: reserve and confirm retries preserve it, while commit returns HTTP 409 with `PUBLICATION_ABANDONED`. A paused automatic commit atomically abandons the existing unselected publications for its source kind and operation ID before returning `AUTOMATION_PAUSED`. Maintenance workflows also abandon on a pause observed during preparation and exit without backlog continuation. Selected publications remain replayable; artifact objects are retained. Each abandoned candidate records `abandon_reason` (`worker_cleanup` or `automation_paused`) and `status_changed_at`, so an operator can tell which path abandoned it and when.
 
 ### Publication And Retries
 
@@ -51,7 +51,7 @@ To publish an extraction result or memory revision, first record a publication i
 
 After an interruption, retries check recorded intents and storage objects before deciding whether to rerun the model. A storage access failure does not mean an object is missing. If an object referenced by a registered result is lost, recovery must fail rather than replace it with a new result.
 
-Manual edit retries reuse the operation ID and original expected revision. Identical content returns the original result; changed content conflicts. The protocol does not automatically clean up unreferenced objects or complete publications after retries are exhausted. See [SYSTEM_ARCHITECTURE](../../docs/architecture/SYSTEM_ARCHITECTURE.md#artifact-publication-and-recovery) for the detailed flow.
+Manual edit retries reuse the operation ID and original expected revision. Identical content returns the original result; changed content conflicts. The protocol does not automatically clean up unreferenced objects or complete publications after retries are exhausted.
 
 ## Run Locally
 

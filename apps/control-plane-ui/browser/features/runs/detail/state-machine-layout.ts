@@ -8,16 +8,7 @@
 // Every drawn axis places every state explicitly. A computed grid cannot know which path is the
 // normal one, and a state added to the contract without a cell here would otherwise land
 // wherever a heuristic put it; `test/state-machine-layout.test.ts` fails instead.
-import type { StateAxis } from '../state-machines.generated.js'
-
-/** Which lifecycle axes the console draws, in lifecycle order. */
-export const DIAGRAMMED_AXES = [
-  'preparation',
-  'execution',
-  'publication'
-] as const satisfies readonly StateAxis[]
-
-export type DiagrammedAxis = (typeof DIAGRAMMED_AXES)[number]
+import type { CoordinationAxis } from '../state-machines.generated.js'
 
 export interface StatePosition {
   col: number
@@ -32,7 +23,7 @@ export interface StatePosition {
  * right is progress, down is trouble, up is recovery.
  */
 export const STATE_LAYOUT: Record<
-  DiagrammedAxis,
+  CoordinationAxis,
   Record<string, StatePosition>
 > = {
   preparation: {
@@ -72,7 +63,7 @@ export const STATE_LAYOUT: Record<
  * This is a statement about meaning, so it is listed rather than inferred from geometry: an
  * edge that happens to point left or up is not a retry by virtue of its direction.
  */
-export const RETURN_EDGES: Record<DiagrammedAxis, readonly string[]> = {
+export const RETURN_EDGES: Record<CoordinationAxis, readonly string[]> = {
   preparation: [
     'preparing->pending',
     'uncertain->preparing',
@@ -82,6 +73,7 @@ export const RETURN_EDGES: Record<DiagrammedAxis, readonly string[]> = {
   publication: [
     'publishing->pending',
     'uncertain->publishing',
+    'uncertain->pending',
     'disconnected->pending'
   ]
 }
@@ -93,12 +85,8 @@ export const SELF_LOOP_SIDE: Record<string, 'above' | 'below'> = {
   'execution:uncertain': 'below'
 }
 
-export function isDiagrammedAxis(axis: StateAxis): axis is DiagrammedAxis {
-  return (DIAGRAMMED_AXES as readonly string[]).includes(axis)
-}
-
 export function isReturnEdge(
-  axis: DiagrammedAxis,
+  axis: CoordinationAxis,
   from: string,
   to: string
 ): boolean {
@@ -106,7 +94,7 @@ export function isReturnEdge(
 }
 
 export function selfLoopSide(
-  axis: StateAxis,
+  axis: CoordinationAxis,
   state: string
 ): 'above' | 'below' {
   return SELF_LOOP_SIDE[`${axis}:${state}`] ?? 'above'

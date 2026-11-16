@@ -576,7 +576,7 @@ class HttpReviewRunsClient {
     token: string,
     stepKey: string,
     failure: { code?: string | null; message: string },
-    options: { retry?: boolean } = {}
+    options: { retry?: boolean; expectedRecoveryAttemptCount?: number } = {}
   ): Promise<boolean> {
     return await this.request(
       'failPublicationStep',
@@ -584,7 +584,13 @@ class HttpReviewRunsClient {
       {
         token,
         failure,
-        ...(options.retry === undefined ? {} : { retry: options.retry })
+        ...(options.retry === undefined ? {} : { retry: options.retry }),
+        ...(options.expectedRecoveryAttemptCount === undefined
+          ? {}
+          : {
+              expected_recovery_attempt_count:
+                options.expectedRecoveryAttemptCount
+            })
       }
     )
   }

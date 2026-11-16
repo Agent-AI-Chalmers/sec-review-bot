@@ -427,6 +427,12 @@ export type PublicationStepRecord = {
    * @type string
    */
   last_attempt_at: string | null
+  /**
+   * @description How many reconciliations of this `uncertain` step failed without an answer. A caller reporting the next one sends it back as `expected_recovery_attempt_count`, so a repeated report of the same failure is not counted twice.
+   * @minimum 0
+   * @type integer
+   */
+  recovery_attempt_count: number
   remote_object_id: string | null
   /**
    * @description
@@ -674,6 +680,11 @@ export type ReviewRunEvent = {
   event_id: number
   axis: 'execution' | 'preparation' | 'publication'
   /**
+   * @description Null when the axis itself moved. On the `publication` axis, names the publication step that moved instead; its states are those of `x-state-machines.publication.step`.
+   * @type string
+   */
+  step_key: string | null
+  /**
    * @description State before the transition; null for the first event on an axis.
    * @type string
    */
@@ -779,7 +790,13 @@ export type ListRunsQuery = {
       | 'skipped'
       | 'failed'
     publication_status?:
-      'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      | 'pending'
+      | 'publishing'
+      | 'uncertain'
+      | 'disconnected'
+      | 'published'
+      | 'failed'
+      | 'skipped'
     /**
      * @description Matches the run's redacted preparation summary by state. Every readable run carries that summary, so the filter never has to decide what a missing one means: a stored run that lacks its preparation row is corrupt, is dropped from list reads, and therefore cannot appear under any value of this filter.
      * @type string | undefined
@@ -1528,6 +1545,12 @@ export type FailPublicationStepBody = {
     message: string
   }
   retry?: boolean
+  /**
+   * @description The step's `recovery_attempt_count` the caller saw before the reconciliation it is reporting. The failure is applied only while the stored count still equals it. A larger stored count means this failure was already recorded (the earlier response was lost), so nothing is written and the call answers true.
+   * @minimum 0
+   * @type integer | undefined
+   */
+  expected_recovery_attempt_count?: number
 }
 
 export type FailPublicationStepOptions = {

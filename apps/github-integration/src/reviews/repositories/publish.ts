@@ -29,7 +29,9 @@ import { asErrorMessage } from '../../utils/error-utils.js'
 import {
   findOpenPullRequestByHeadBranch,
   isPublicationStepExhausted,
-  settleExhaustedStep
+  isRecordedReconciliationFailure,
+  settleExhaustedStep,
+  unrecordedRecoveryAttemptCount
 } from '../shared/settle-exhausted-step.js'
 import { runPublicationStep } from '../shared/publication-step.js'
 import {
@@ -189,6 +191,11 @@ export async function publishDeliveryDraftPrs({
       step
     ])
   )
+  // A reconciliation lookup that could not reach an answer is about its own step: the failure is
+  // already recorded there and spends that step's budget. Stopping the loop on it would starve
+  // the deliveries after it on every pass until the step parks, so it is held until the others
+  // have been attempted and only then rethrown, which still returns the publication for retry.
+  let deferredReconciliationFailure: Error | null = null
 
   for (const delivery of deliveries) {
     const deliveryId = String(delivery.delivery_id ?? '')
@@ -248,16 +255,28 @@ export async function publishDeliveryDraftPrs({
       if (isPublicationClaimLostError(error)) throw error
       const errorMessage = asErrorMessage(error)
       const failure = classifyPublicationFailure(error)
-      await store.failPublicationStep(
-        run_id,
-        claim_token,
-        stepKey,
-        {
-          code: failure.code,
-          message: errorMessage
-        },
-        { retry: failure.retry }
-      )
+      // A failed reconciliation lookup was already recorded on its step by settleExhaustedStep.
+      // One whose recording did not complete is recorded here against the same count, so a write
+      // that did commit is not counted twice.
+      if (!isRecordedReconciliationFailure(error)) {
+        const expectedRecoveryAttemptCount =
+          unrecordedRecoveryAttemptCount(error)
+        await store.failPublicationStep(
+          run_id,
+          claim_token,
+          stepKey,
+          {
+            code: failure.code,
+            message: errorMessage
+          },
+          {
+            retry: failure.retry,
+            ...(expectedRecoveryAttemptCount === undefined
+              ? {}
+              : { expectedRecoveryAttemptCount })
+          }
+        )
+      }
       logError('delivery_draft_pr_failed', {
         delivery_id: delivery?.delivery_id ?? '(unknown)',
         error,
@@ -266,13 +285,17 @@ export async function publishDeliveryDraftPrs({
         repo: repo.repo_full_name
       })
       if (failure.scope === 'publication') {
-        throw new Error(
+        const publicationFailure = new Error(
           `Failed to publish repository delivery ${String(delivery?.delivery_id ?? '(unknown)')}: ${errorMessage}`,
           { cause: error }
         )
+        if (!isRecordedReconciliationFailure(error)) throw publicationFailure
+        deferredReconciliationFailure ??= publicationFailure
       }
     }
   }
+  if (deferredReconciliationFailure !== null)
+    throw deferredReconciliationFailure
 
   return published_delivery_entries
 }

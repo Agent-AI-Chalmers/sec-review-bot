@@ -15,14 +15,16 @@ import { IconChevronDown, IconSitemap } from '@tabler/icons-react'
 import { ICON_SIZE } from '../../../shared/design.js'
 import type { Run, RunEvent } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
-import { axisLabel } from '../status.js'
+import { eventAxisLabel } from '../status.js'
 import { useNow } from '../../../shared/useNow.js'
-import type { DiagrammedAxis } from './state-machine-layout.js'
+import {
+  STATE_MACHINES,
+  type CoordinationAxis
+} from '../state-machines.generated.js'
 import { failureCodeLabel, formatDuration } from '../format.js'
 import {
   TRANSITIONS_PAGE_SIZE,
   actualTransitions,
-  diagrammedMachines,
   latestTransitionAxis,
   machineTitle,
   stateLabelForEvent,
@@ -78,13 +80,13 @@ export function RunTransitions({
   const t = useMessages()
   const { language } = useLanguage()
   const [opened, setOpened] = React.useState(false)
-  const [axis, setAxis] = React.useState<DiagrammedAxis>(() =>
+  const [axis, setAxis] = React.useState<CoordinationAxis>(() =>
     latestTransitionAxis(events)
   )
   const [page, setPage] = React.useState(1)
   const [fit, setFit] = React.useState(initialFit)
   const now = useNow()
-  const machines = diagrammedMachines()
+  const machines = STATE_MACHINES
   const machine =
     machines.find((candidate) => candidate.axis === axis) ?? machines[0]
   if (machine === undefined) return null
@@ -126,7 +128,7 @@ export function RunTransitions({
           <SegmentedControl
             fullWidth
             value={axis}
-            onChange={(value) => setAxis(value as DiagrammedAxis)}
+            onChange={(value) => setAxis(value as CoordinationAxis)}
             data={machines.map((candidate) => ({
               value: candidate.axis,
               label: machineTitle(candidate, t)
@@ -199,34 +201,22 @@ export function RunTransitions({
             ) : (
               <ul className="run-transition-list">
                 {visibleEvents.map((event) => {
-                  const explanation = transitionExplanation(event, machines, t)
+                  const explanation = transitionExplanation(event, t)
                   const duration = transitionDuration(
                     event,
                     transitionEvents,
                     run,
-                    machines,
                     now
                   )
                   return (
                     <li className="run-transition" key={event.event_id}>
                       <Text size="xs" c="dimmed">
                         {formatDate(event.occurred_at, language)} ·{' '}
-                        {axisLabel(event.axis, t)}
+                        {eventAxisLabel(event, t)}
                       </Text>
                       <Text size="sm">
-                        {stateLabelForEvent(
-                          event,
-                          machines,
-                          event.from_status,
-                          t
-                        )}{' '}
-                        →{' '}
-                        {stateLabelForEvent(
-                          event,
-                          machines,
-                          event.to_status,
-                          t
-                        )}
+                        {stateLabelForEvent(event, event.from_status, t)} →{' '}
+                        {stateLabelForEvent(event, event.to_status, t)}
                       </Text>
                       {explanation !== null && (
                         <Text size="xs" c="dimmed">

@@ -4,18 +4,21 @@ import { Tooltip } from '@mantine/core'
 
 import type { Run, RunEvent } from '../api.js'
 import { useMessages } from '../../../shared/i18n.js'
-import type { StateMachine as StateMachineDefinition } from '../state-machines.generated.js'
+import type {
+  CoordinationAxis,
+  StateMachine as StateMachineDefinition
+} from '../state-machines.generated.js'
 import { NODE_H, NODE_W, diagramGeometry } from './state-machine-geometry.js'
-import type { DiagrammedAxis } from './state-machine-layout.js'
 import {
   edgeLabel,
   machineTitle,
   stateDescription,
-  stateLabel
+  stateLabel,
+  axisMachine
 } from './transitions.js'
 
 /** The current state of one drawn axis, read from the run. */
-function currentState(run: Run, axis: DiagrammedAxis): string {
+function currentState(run: Run, axis: CoordinationAxis): string {
   switch (axis) {
     case 'preparation':
       return run.preparation.status
@@ -38,7 +41,7 @@ export function StateMachineDiagram({
   events,
   fit = true
 }: {
-  machine: StateMachineDefinition & { axis: DiagrammedAxis }
+  machine: StateMachineDefinition
   run: Run
   events: RunEvent[]
   fit?: boolean
@@ -50,12 +53,14 @@ export function StateMachineDiagram({
     y: number
   } | null>(null)
   const current = currentState(run, machine.axis)
+  const labelled = axisMachine(machine)
   const geometry = React.useMemo(() => diagramGeometry(machine), [machine])
   const { viewBox } = geometry
 
   const traversed = new Set(
     events
-      .filter((event) => event.axis === machine.axis)
+      // Step events name the step's states, not the axis'; they are not drawn here.
+      .filter((event) => event.axis === machine.axis && event.step_key === null)
       .map((event) => `${event.from_status ?? ''}->${event.to_status}`)
   )
   return (
@@ -99,7 +104,7 @@ export function StateMachineDiagram({
           const label = [
             ...new Set(
               edge.transitions.map((transition) =>
-                edgeLabel(machine, transition, t)
+                edgeLabel(labelled, transition, t)
               )
             )
           ].join(' / ')
@@ -157,7 +162,7 @@ export function StateMachineDiagram({
           return (
             <g key={state} className={className}>
               <Tooltip
-                label={stateDescription(machine, state, t)}
+                label={stateDescription(labelled, state, t)}
                 multiline
                 w={260}
                 withArrow
@@ -166,7 +171,7 @@ export function StateMachineDiagram({
                 <g
                   tabIndex={0}
                   role="img"
-                  aria-label={stateLabel(machine, state, t)}
+                  aria-label={stateLabel(labelled, state, t)}
                 >
                   <rect
                     x={x - NODE_W / 2}
@@ -181,7 +186,7 @@ export function StateMachineDiagram({
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
-                    {stateLabel(machine, state, t)}
+                    {stateLabel(labelled, state, t)}
                   </text>
                 </g>
               </Tooltip>

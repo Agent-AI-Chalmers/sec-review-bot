@@ -153,7 +153,12 @@ create table memory_revision_publications (
   trajectory_digest text not null,
   intent jsonb not null,
   status text not null default 'reserved' check (status in ('reserved', 'present', 'selected', 'abandoned')),
+  -- Why an abandoned candidate was abandoned: an explicit worker cleanup, or a commit refused
+  -- because automation was paused. Null for every other status.
+  abandon_reason text check (abandon_reason in ('worker_cleanup', 'automation_paused')),
   created_at timestamptz not null default clock_timestamp(),
+  status_changed_at timestamptz not null default clock_timestamp(),
+  check ((status = 'abandoned') = (abandon_reason is not null)),
   primary key (source_kind, operation_id, tree_digest, trajectory_digest),
   check (source_kind = intent #>> '{source,kind}'),
   check (operation_id = intent #>> '{source,operation_id}'),
@@ -161,3 +166,7 @@ create table memory_revision_publications (
   check (trajectory_digest = coalesce(intent #>> '{source,trajectory_reference,digest}', ''))
 );
 create unique index memory_revision_publications_selected on memory_revision_publications (operation_id) where status = 'selected';
+comment on column memory_revision_publications.abandon_reason is
+  'Why the candidate was abandoned: worker_cleanup (explicit abandon request) or automation_paused (a commit refused while automation was paused). Null unless status is abandoned.';
+comment on column memory_revision_publications.status_changed_at is
+  'When status last changed. Together with abandon_reason it records when and why a candidate stopped being eligible.';

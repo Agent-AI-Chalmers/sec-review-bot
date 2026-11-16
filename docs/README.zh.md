@@ -28,6 +28,8 @@
 
 - [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md)：各运行组件的职责、部署方式，以及审查执行和异步记忆处理的数据流。
 - [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：阶段与 Agent 分别负责什么，以及临时工作区、连接和 MCP 会话由谁创建、何时关闭。
+- [ARTIFACT_PUBLICATION](architecture/ARTIFACT_PUBLICATION.zh.md)：对象存储中的文件与 PostgreSQL 记录如何在中断后保持一致，以及每类 artifact 如何恢复。
+- [POSTGRES_COORDINATION](architecture/POSTGRES_COORDINATION.zh.md)：Review Runs 和 Memory Catalog 为什么用手写 PostgreSQL 语句协调工作、各自如何落实共同的做法、评估过哪些替代方案，以及如何让这些 SQL 可以放心修改。
 
 ### 包与服务
 

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import type { Run, RunEvent } from '../browser/features/runs/api.js'
-import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
 import {
   TRANSITIONS_PAGE_SIZE,
   actualTransitions,
@@ -18,6 +17,7 @@ function event(overrides: Partial<RunEvent>): RunEvent {
     from_status: 'pending',
     to_status: 'queued',
     reason_code: null,
+    step_key: null,
     occurred_at: '2026-10-28T10:00:00.000Z',
     ...overrides
   } as RunEvent
@@ -92,7 +92,6 @@ test('a transition lasts until the next event on the same axis', () => {
       first,
       [first, second],
       run(),
-      STATE_MACHINES,
       Date.parse('2026-10-28T10:00:10.000Z')
     ),
     { kind: 'duration', ms: 5000 }
@@ -102,10 +101,52 @@ test('a transition lasts until the next event on the same axis', () => {
       second,
       [first, second],
       run(),
-      STATE_MACHINES,
       Date.parse('2026-10-28T10:00:10.000Z')
     ),
     { kind: 'duration', ms: 5000 }
+  )
+})
+
+test('a step transition lasts until the next event of the same step', () => {
+  // Two steps of one publication move independently. Measuring a step against the next event
+  // of a different step would report how long the other step waited, not this one.
+  const step = (id: number, key: string, at: string): RunEvent =>
+    event({
+      event_id: id,
+      axis: 'publication',
+      step_key: key,
+      from_status: 'pending',
+      to_status: 'running',
+      occurred_at: at
+    })
+  const comment = step(1, 'comment', '2026-10-28T10:00:00.000Z')
+  const review = step(2, 'review', '2026-10-28T10:00:02.000Z')
+  const commentDone = step(3, 'comment', '2026-10-28T10:00:07.000Z')
+  assert.deepStrictEqual(
+    transitionDuration(
+      comment,
+      [comment, review, commentDone],
+      run(),
+      Date.parse('2026-10-28T10:01:00.000Z')
+    ),
+    { kind: 'duration', ms: 7000 }
+  )
+})
+
+test('a step event opens its axis diagram', () => {
+  assert.strictEqual(
+    latestTransitionAxis([
+      event({ event_id: 1, occurred_at: '2026-10-28T10:00:00.000Z' }),
+      event({
+        event_id: 2,
+        axis: 'publication',
+        step_key: 'comment',
+        from_status: 'pending',
+        to_status: 'running',
+        occurred_at: '2026-10-28T10:00:05.000Z'
+      })
+    ]),
+    'publication'
   )
 })
 
@@ -123,7 +164,6 @@ test('a terminal transition has no growing duration', () => {
       run({
         execution: { finished_at: '2026-10-28T10:00:06.000Z' }
       } as Partial<Run>),
-      STATE_MACHINES,
       Date.parse('2026-10-28T10:00:10.000Z')
     ),
     { kind: 'final' }
@@ -132,7 +172,7 @@ test('a terminal transition has no growing duration', () => {
 
 test('transition explanations come from the state-machine edge', () => {
   assert.strictEqual(
-    transitionExplanation(event({}), STATE_MACHINES, (key, ...args) => {
+    transitionExplanation(event({}), (key, ...args) => {
       void args
       return String(key)
     }),

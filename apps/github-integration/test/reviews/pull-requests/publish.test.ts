@@ -29,6 +29,7 @@ const stepStore = {
       status: 'pending' as const,
       attempt_count: 0,
       last_attempt_at: null,
+      recovery_attempt_count: 0,
       remote_object_id: null,
       remote_object_url: null,
       failure_code: null,

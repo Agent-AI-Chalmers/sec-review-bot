@@ -425,6 +425,7 @@ components:
         - status
         - attempt_count
         - last_attempt_at
+        - recovery_attempt_count
         - remote_object_id
         - remote_object_url
         - failure_code
@@ -460,6 +461,13 @@ components:
             When the latest claim of this step started; null until the step is claimed once.
             Together with `attempt_count` it distinguishes a step that never started from one
             whose publisher died mid-effect.
+        recovery_attempt_count:
+          type: integer
+          minimum: 0
+          description: >-
+            How many reconciliations of this `uncertain` step failed without an answer. A caller
+            reporting the next one sends it back as `expected_recovery_attempt_count`, so a
+            repeated report of the same failure is not counted twice.
         remote_object_id:
           type:
             - string
@@ -867,6 +875,7 @@ components:
         - from_status
         - to_status
         - reason_code
+        - step_key
         - occurred_at
       properties:
         event_id:
@@ -878,6 +887,13 @@ components:
             - execution
             - preparation
             - publication
+        step_key:
+          type:
+            - string
+            - "null"
+          description: >-
+            Null when the axis itself moved. On the `publication` axis, names the publication step
+            that moved instead; its states are those of `x-state-machines.publication.step`.
         from_status:
           type:
             - string
@@ -1329,6 +1345,10 @@ x-state-machines:
         }
       - { from: publishing, to: pending, label: retryable failure }
       - { from: publishing, to: failed, label: terminal failure }
+      # The owner can conclude the publication while a step is still being reconciled, so the
+      # axis leaves `uncertain` the same two ways it leaves `publishing`.
+      - { from: uncertain, to: pending, label: retryable failure }
+      - { from: uncertain, to: failed, label: terminal failure }
       - { from: pending, to: skipped, label: execution not published }
       # A publication can already be in flight when the execution axis is later found
       # unusable, so the execution-failure paths converge it from `publishing` as well as from
@@ -1340,69 +1360,72 @@ x-state-machines:
           reason: PUBLICATION_ABANDONED,
           label: execution failed,
         }
-  # One connector side effect inside a publication (a comment, a review, a branch). Steps are
-  # not written to the run event log, so the observed edges are pinned by
-  # services/review-runs/test/integration/publication-step-edges.test.ts instead of the
-  # audit-log comparison the run axes use. The publication axis above is derived from these.
-  publication_step:
-    order: 4
-    title: Publication step
-    field: ObservedPublicationStep.status
-    initial: pending
-    terminal: [succeeded, terminal_failed]
-    states:
-      pending:
-        label: Pending
-        description: Not attempted yet, or returned to the queue with fresh budgets by an operator.
-      running:
-        label: Running
-        description: >-
-          An attempt started. Its owner may still be performing the side effect, or may have died
-          after performing it, so a later claim cannot assume nothing happened.
-      failed:
-        label: Failed
-        description: The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.
-      uncertain:
-        label: Uncertain
-        description: >-
-          The attempt budget is spent, but any started attempt may have taken effect remotely, so
-          the connector must reconcile against the remote system before the step can conclude.
-      disconnected:
-        label: Disconnected
-        description: >-
-          Reconciliation used its budget without an answer. An operator has to establish what is
-          on the remote system.
-      succeeded:
-        label: Succeeded
-        description: The side effect exists, either written by an attempt or found by reconciliation.
-      terminal_failed:
-        label: Terminal failure
-        description: >-
-          The step will not be attempted again: an attempt failed terminally, or reconciliation
-          confirmed that the side effect is absent.
-    transitions:
-      - { from: pending, to: running, label: attempt started }
-      # A running step whose owner died is taken over by a different claim token. The status
-      # stays `running`; the attempt count records the new attempt.
-      - { from: running, to: running, label: taken over by a new owner }
-      - { from: failed, to: running, label: retry started }
-      - { from: running, to: succeeded, label: side effect written }
-      - { from: running, to: failed, label: retryable failure }
-      - { from: running, to: terminal_failed, label: terminal failure }
-      # Exhaustion is checked when the next claim is refused: the last attempt may have taken
-      # effect, so the step goes to reconciliation instead of failing.
-      - { from: running, to: uncertain, label: attempts exhausted }
-      - { from: failed, to: uncertain, label: attempts exhausted }
-      - { from: uncertain, to: succeeded, label: reconciled present }
-      # Two decisions share this pair: reconciliation confirmed the effect is absent, or the
-      # connector reported a terminal failure while reconciling.
-      - { from: uncertain, to: terminal_failed, label: reconciled absent or terminal failure }
-      - { from: uncertain, to: uncertain, label: reconciliation inconclusive }
-      - { from: uncertain, to: disconnected, label: reconciliation budget spent }
-      # A failure reported without `retry` while reconciling records a plain failure; the next
-      # refused claim returns the exhausted step to `uncertain`.
-      - { from: uncertain, to: failed, label: failure reported without retry }
-      - { from: disconnected, to: pending, label: resumed by an operator }
+    # One connector side effect inside this publication (a comment, a review, a branch), keyed by
+    # its `step_key`. Every step transition is written to the run event log on the `publication`
+    # axis with that `step_key`, so the observed edges are compared against this machine like the
+    # axes. The publication axis above is derived from these.
+    step:
+      field: ObservedPublicationStep.status
+      initial: pending
+      terminal: [succeeded, terminal_failed]
+      states:
+        pending:
+          label: Pending
+          description: Not attempted yet, or returned to the queue with fresh budgets by an operator.
+        running:
+          label: Running
+          description: >-
+            An attempt started. Its owner may still be performing the side effect, or may have died
+            after performing it, so a later claim cannot assume nothing happened.
+        failed:
+          label: Failed
+          description: The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.
+        uncertain:
+          label: Uncertain
+          description: >-
+            The attempt budget is spent, but any started attempt may have taken effect remotely, so
+            the connector must reconcile against the remote system before the step can conclude.
+        disconnected:
+          label: Disconnected
+          description: >-
+            Reconciliation used its budget without an answer. An operator has to establish what is
+            on the remote system.
+        succeeded:
+          label: Succeeded
+          description: The side effect exists, either written by an attempt or found by reconciliation.
+        terminal_failed:
+          label: Terminal failure
+          description: >-
+            The step will not be attempted again: an attempt failed terminally, or reconciliation
+            confirmed that the side effect is absent.
+      transitions:
+        - { from: pending, to: running, label: attempt started }
+        # A running step whose owner died is taken over by a different claim token. The status
+        # stays `running`; the attempt count records the new attempt.
+        - { from: running, to: running, label: taken over by a new owner }
+        - { from: failed, to: running, label: retry started }
+        - { from: running, to: succeeded, label: side effect written }
+        - { from: running, to: failed, label: retryable failure }
+        - { from: running, to: terminal_failed, label: terminal failure }
+        # Exhaustion is checked when the next claim is refused: the last attempt may have taken
+        # effect, so the step goes to reconciliation instead of failing.
+        - { from: running, to: uncertain, label: attempts exhausted }
+        - { from: failed, to: uncertain, label: attempts exhausted }
+        - { from: uncertain, to: succeeded, label: reconciled present }
+        # Two decisions share this pair: reconciliation confirmed the effect is absent, or the
+        # connector reported a terminal failure while reconciling.
+        - { from: uncertain, to: terminal_failed, label: reconciled absent or terminal failure }
+        - { from: uncertain, to: uncertain, label: reconciliation inconclusive }
+        - { from: uncertain, to: disconnected, label: reconciliation budget spent }
+        # A failure reported without `retry` while reconciling records a plain failure; the next
+        # refused claim returns the exhausted step to `uncertain`.
+        - { from: uncertain, to: failed, label: failure reported without retry }
+        - {
+            from: disconnected,
+            to: pending,
+            reason: PUBLICATION_RESUMED_BY_OPERATOR,
+            label: resumed by an operator,
+          }
 paths:
   /healthz:
     get:
@@ -1510,6 +1533,8 @@ paths:
                 enum:
                   - pending
                   - publishing
+                  - uncertain
+                  - disconnected
                   - published
                   - failed
                   - skipped
@@ -2503,9 +2528,20 @@ paths:
                       type: string
                 retry:
                   type: boolean
+                expected_recovery_attempt_count:
+                  type: integer
+                  minimum: 0
+                  description: >-
+                    The step's `recovery_attempt_count` the caller saw before the reconciliation
+                    it is reporting. The failure is applied only while the stored count still
+                    equals it. A larger stored count means this failure was already recorded
+                    (the earlier response was lost), so nothing is written and the call answers
+                    true.
       responses:
         "200":
-          description: Whether the step failed.
+          description: >-
+            Whether the step's failure is recorded: written by this call, or already recorded
+            for `expected_recovery_attempt_count`.
           content:
             application/json:
               schema:
