@@ -180,14 +180,9 @@ CREATE TABLE executions (
   workflow_result jsonb,
   claim_token uuid,
   claimed_at timestamptz,
-  -- How many recovery replays of an uncertain submission produced another unknown outcome. The
-  -- axis stays `uncertain` on each such replay, so without a budget an Execution provider that keeps timing
-  -- out would be replayed forever and the run would never reach a state anyone is told about.
-  -- Named `attempt_count` like the other two axes: the name says what is counted (attempts), and
-  -- each table has exactly one such counter, so the axis is the qualifier. Counted here rather
-  -- than in memory because the lease lets a different process take over.
-  attempt_count integer NOT NULL DEFAULT 0
-    CHECK (attempt_count >= 0),
+  -- Recovery replays whose acceptance remains unknown; claims alone do not spend this budget.
+  unresolved_recovery_count integer NOT NULL DEFAULT 0
+    CHECK (unresolved_recovery_count >= 0),
   observed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -253,7 +248,7 @@ COMMENT ON COLUMN executions.claim_token IS
   'Fencing token held while reconciling an Execution submission whose acceptance was uncertain. Not a long-running lease: the replay is short and the Execution provider owns request idempotency.';
 COMMENT ON COLUMN executions.claimed_at IS
   'When the current recovery claim was taken; a stale claim is reclaimed after the claim timeout.';
-COMMENT ON COLUMN executions.attempt_count IS
+COMMENT ON COLUMN executions.unresolved_recovery_count IS
   'Number of recovery replays that ended with the outcome still unknown. The row stays uncertain on each one; when this reaches the recovery budget it becomes disconnected, stopping automation without asserting that the Execution did not accept the run. Automatic work never clears it - that is what bounds a run''s automatic recovery rather than one owner''s tenure - and only an operator resume resets it, which grants a fresh budget by design.';
 COMMENT ON COLUMN executions.observed_at IS
   'Last time polling successfully confirmed the run state. Informational: it never drives claim expiry.';

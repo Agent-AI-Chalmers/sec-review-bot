@@ -4,11 +4,13 @@ type SubmissionError = { code?: string | null; message: string }
 
 interface SubmissionRecoveryStore {
   executions: {
-    claimSubmissionRecovery(runId: string): Promise<string | null>
-    submissionRecoveryAttemptCount(runId: string): Promise<number | null>
+    claimSubmissionRecovery(
+      runId: string,
+      maxUnresolvedRecoveries: number
+    ): Promise<string | null>
     disconnectExhaustedSubmissionRecovery(
       runId: string,
-      maxAttempts: number
+      maxUnresolvedRecoveries: number
     ): Promise<boolean>
     recordUnknownRecoveryOutcome(runId: string, token: string): Promise<boolean>
   }
@@ -23,23 +25,16 @@ interface SubmissionRecoveryStore {
 }
 
 export type SubmissionRecoveryResult =
-  | { status: 'claim_unavailable' }
-  | { status: 'input_missing' }
-  | { status: 'recovered' }
-  | { status: 'claim_lost' }
-  | { status: 'deferred'; error: unknown }
-  | { status: 'disconnected' }
-  | { status: 'failed'; error: unknown }
+  | { outcome: 'claim_unavailable' }
+  | { outcome: 'input_missing' }
+  | { outcome: 'recovered' }
+  | { outcome: 'claim_lost' }
+  | { outcome: 'deferred'; error: unknown }
+  | { outcome: 'disconnected' }
+  | { outcome: 'failed'; error: unknown }
 
-/** How many replays may end with the outcome still unknown before automation disconnects.
- *
- * Mirrors `MAX_PREPARATION_ATTEMPTS`: the point is not a particular number, it is that a number
- * exists. The bound limits automatic external traffic; it is not evidence about whether the
- * Execution accepted a prior request. */
-export const MAX_SUBMISSION_RECOVERY_ATTEMPTS = 8
-
-/** The code recorded when the replay budget stops automatic recovery. */
-export const SUBMISSION_RECOVERY_EXHAUSTED = 'SUBMISSION_RECOVERY_EXHAUSTED'
+/** Stop automatic submission recovery after this many replays still have an unknown outcome. */
+export const MAX_UNRESOLVED_SUBMISSION_RECOVERIES = 8
 
 export interface SubmissionRecoveryDependencies {
   submit: (request: {
@@ -50,20 +45,32 @@ export interface SubmissionRecoveryDependencies {
   classifyError: (error: unknown) => SubmissionError & { uncertain: boolean }
 }
 
-/**
- * Replays the persisted request with the original run identity. Execution owns
- * request idempotency; Review Runs owns the recovery claim and durable state.
+/** Process one pending submission recovery, including its budget and ownership checks.
+ * Execution owns request idempotency; Review Runs records the accepted or unresolved outcome.
  */
 export async function recoverReviewRunSubmission(
   store: SubmissionRecoveryStore,
   run: ReviewRunRecord,
   dependencies: SubmissionRecoveryDependencies
 ): Promise<SubmissionRecoveryResult> {
-  const claimToken = await store.executions.claimSubmissionRecovery(run.run_id)
-  if (claimToken === null) return { status: 'claim_unavailable' }
+  if (
+    await store.executions.disconnectExhaustedSubmissionRecovery(
+      run.run_id,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
+  )
+    return { outcome: 'disconnected' }
+
+  // Claiming also checks the budget atomically: another owner may have spent it since the
+  // disconnect check. A live lease or changed state makes either operation a no-op.
+  const claimToken = await store.executions.claimSubmissionRecovery(
+    run.run_id,
+    MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+  )
+  if (claimToken === null) return { outcome: 'claim_unavailable' }
 
   if (run.execution_input === undefined) {
-    await store.submissionTransitions.failSubmissionRecovery(
+    const recorded = await store.submissionTransitions.failSubmissionRecovery(
       run.run_id,
       claimToken,
       {
@@ -72,7 +79,7 @@ export async function recoverReviewRunSubmission(
           'The persisted Execution input is missing; this submission cannot be recovered.'
       }
     )
-    return { status: 'input_missing' }
+    return { outcome: recorded ? 'input_missing' : 'claim_lost' }
   }
 
   try {
@@ -84,53 +91,27 @@ export async function recoverReviewRunSubmission(
   } catch (error) {
     const classified = dependencies.classifyError(error)
     if (classified.uncertain) {
-      // The replay's outcome is unknown, which is exactly what `uncertain` already means: the
-      // Execution may have accepted it, so nothing may be concluded. Counting the attempt only
-      // bounds automatic recovery; exhaustion moves the run to disconnected, never failed.
-      await store.executions.recordUnknownRecoveryOutcome(
+      // Only an unknown replay result spends this budget. Keep the lease to pace the next replay.
+      const recorded = await store.executions.recordUnknownRecoveryOutcome(
         run.run_id,
         claimToken
       )
-      return { status: 'deferred', error }
+      return recorded
+        ? { outcome: 'deferred', error }
+        : { outcome: 'claim_lost' }
     }
-    await store.submissionTransitions.failSubmissionRecovery(
+    const recorded = await store.submissionTransitions.failSubmissionRecovery(
       run.run_id,
       claimToken,
-      {
-        code: classified.code ?? null,
-        message: classified.message
-      }
+      { code: classified.code ?? null, message: classified.message }
     )
-    return { status: 'failed', error }
+    return recorded ? { outcome: 'failed', error } : { outcome: 'claim_lost' }
   }
-  // A local commit failure says nothing about the accepted remote submission.
-  // Let coordination retry after lease expiry instead of recording execution failure.
+  // A local commit failure cannot establish that the accepted remote submission failed.
   return (await store.submissionTransitions.completeSubmissionRecovery(
     run.run_id,
     claimToken
   ))
-    ? { status: 'recovered' }
-    : { status: 'claim_lost' }
-}
-
-/** Disconnect an uncertain run whose replays keep ending unknown.
- *
- * Called before replaying, so the budget is enforced by the row itself rather than inferred from
- * whatever the caller just read. A row that is not over budget — or that another owner has claimed
- * since — leaves this a no-op and the normal replay path proceeds. */
-export async function concludeExhaustedSubmissionRecovery(
-  store: SubmissionRecoveryStore,
-  run: ReviewRunRecord
-): Promise<SubmissionRecoveryResult | null> {
-  const attempts = await store.executions.submissionRecoveryAttemptCount(
-    run.run_id
-  )
-  if (attempts === null || attempts < MAX_SUBMISSION_RECOVERY_ATTEMPTS)
-    return null
-  const disconnected =
-    await store.executions.disconnectExhaustedSubmissionRecovery(
-      run.run_id,
-      MAX_SUBMISSION_RECOVERY_ATTEMPTS
-    )
-  return disconnected ? { status: 'disconnected' } : null
+    ? { outcome: 'recovered' }
+    : { outcome: 'claim_lost' }
 }

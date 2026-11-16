@@ -25,10 +25,7 @@ import {
   REVIEW_RUNS_FASTIFY_OPTIONS,
   registerReviewRunsRoutes
 } from '../http/server-surface.js'
-import {
-  concludeExhaustedSubmissionRecovery,
-  recoverReviewRunSubmission
-} from './submission-recovery.js'
+import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { observeExecutionRun } from './terminal-coordination.js'
 
 const STATUSES_NEEDING_RUN_RECORD = new Set(['succeeded', 'failed'])
@@ -135,19 +132,7 @@ export async function startReviewRunsServer(): Promise<{
             run_id: run.run_id,
             workflow: run.workflow
           })
-          const exhausted = await concludeExhaustedSubmissionRecovery(
-            store,
-            run
-          )
-          if (exhausted !== null) {
-            logEvent('execution_submission_recovery_disconnected', {
-              connector_id: store.connectorId,
-              run_id: run.run_id,
-              workflow: run.workflow
-            })
-            return
-          }
-          await recoverReviewRunSubmission(store, run, {
+          const result = await recoverReviewRunSubmission(store, run, {
             submit: submitExecutionRun,
             classifyError: (error) => ({
               uncertain: error instanceof ExecutionSubmissionUncertainError,
@@ -162,7 +147,8 @@ export async function startReviewRunsServer(): Promise<{
               message: error instanceof Error ? error.message : String(error)
             })
           })
-          logEvent('execution_submission_recovery_completed', {
+          logEvent('execution_submission_recovery_finished', {
+            outcome: result.outcome,
             connector_id: store.connectorId,
             run_id: run.run_id,
             workflow: run.workflow

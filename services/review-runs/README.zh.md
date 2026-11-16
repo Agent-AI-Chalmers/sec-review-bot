@@ -54,13 +54,17 @@ Review Runs 轮询 `queued` 和 `running` run。Execution API 服务成功后，
 
 重放结果按以下方式处理：
 
-<!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
+<!-- doc-default: MAX_UNRESOLVED_SUBMISSION_RECOVERIES; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
 - **被接受：** run 恢复正常推进。
 - **被 Execution API 服务明确拒绝：** run 失败，publication 标为 `skipped`，并创建 failure notice。
-- **重放预算耗尽时结果仍未知**（`executions.attempt_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
+- **重放预算耗尽时结果仍未知**（`executions.unresolved_recovery_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
 
 若没有这个预算，未解决的提交可能无限地产生自动重放。
+
+<!-- doc-default: submission-recovery.outcome; source=services/review-runs/src/runtime/server-runtime.ts -->
+
+恢复日志通过 `execution_submission_recovery_finished` 及其 `outcome` 记录本次恢复调用的结果，而不是执行状态。未认领或已失去所有权的恢复不会报告成功；恢复结果仍未知时保留租约，直到租约到期。仅认领不会增加 `unresolved_recovery_count`。
 
 Preparation 或 Execution API 服务的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
 

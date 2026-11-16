@@ -52,13 +52,17 @@ If Execution API service submission may have succeeded but its response was lost
 
 Replay outcomes are handled as follows:
 
-<!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
+<!-- doc-default: MAX_UNRESOLVED_SUBMISSION_RECOVERIES; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
 - **Accepted:** the run returns to normal progress.
 - **Definitively rejected by the Execution API service:** the run fails, publication becomes `skipped`, and a failure notice is queued.
-- **Still unknown when the replay budget is exhausted** (`executions.attempt_count`, currently eight): execution becomes `disconnected` and queues an attention notice with `SUBMISSION_RECOVERY_EXHAUSTED`. Exhaustion does not establish failure or make publication `skipped`. Automatic replay stops so an operator can investigate the remote outcome and decide whether to resume recovery or give up waiting.
+- **Still unknown when the replay budget is exhausted** (`executions.unresolved_recovery_count`, currently eight): execution becomes `disconnected` and queues an attention notice with `SUBMISSION_RECOVERY_EXHAUSTED`. Exhaustion does not establish failure or make publication `skipped`. Automatic replay stops so an operator can investigate the remote outcome and decide whether to resume recovery or give up waiting.
 
 Without that budget, unresolved submissions could keep generating automatic replays indefinitely.
+
+<!-- doc-default: submission-recovery.outcome; source=services/review-runs/src/runtime/server-runtime.ts -->
+
+Recovery logs record `execution_submission_recovery_finished` with an `outcome` describing that recovery call, rather than an execution status. An unclaimed or superseded recovery does not report success; a recovery whose result is still unknown retains its lease until expiry. Claims alone do not increase `unresolved_recovery_count`.
 
 A terminal preparation or Execution API service failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
 
