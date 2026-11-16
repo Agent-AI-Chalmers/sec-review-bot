@@ -202,8 +202,7 @@ test('operator conclusions retain their reason while absent and unknown reasons 
     const explanations = new Set<string | null>()
     for (const reason of [
       'PREPARATION_GIVEN_UP_BY_OPERATOR',
-      'EXECUTION_ALREADY_ADVANCED',
-      'PREPARATION_ABANDONED'
+      'EXECUTION_ALREADY_ADVANCED'
     ]) {
       const explanation = transitionExplanation(
         { ...base, reason_code: reason },
@@ -222,7 +221,7 @@ test('operator conclusions retain their reason while absent and unknown reasons 
       assert.ok(edge)
       assert.equal(edgeLabel(axisMachine(machine), edge, t), explanation)
     }
-    assert.equal(explanations.size, 3)
+    assert.equal(explanations.size, 2)
     assert.equal(
       transitionExplanation({ ...base, reason_code: 'UNKNOWN_REASON' }, t),
       generic

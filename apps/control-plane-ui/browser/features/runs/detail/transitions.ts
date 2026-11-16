@@ -56,8 +56,7 @@ const PREPARATION_CONCLUSION_MESSAGES = {
   PREPARATION_GIVEN_UP_BY_OPERATOR:
     'edge_preparation_disconnected_failed_given_up',
   EXECUTION_ALREADY_ADVANCED:
-    'edge_preparation_disconnected_failed_execution_advanced',
-  PREPARATION_ABANDONED: 'edge_preparation_disconnected_failed_abandoned'
+    'edge_preparation_disconnected_failed_execution_advanced'
 } as const satisfies Record<string, Message>
 
 export function stateDescription(

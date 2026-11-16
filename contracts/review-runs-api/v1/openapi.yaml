@@ -1135,9 +1135,8 @@ x-state-machines:
           label: cannot be concluded automatically,
         }
       # Operator decisions can resume the preparation, give up on its outcome, or abandon the
-      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED. PREPARATION_ABANDONED remains
-      # declared because stored records may expose it, and every exposed reason must be named by
-      # the contract. Both failure edges end the preparation as `failed`.
+      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED.
+      # Both failure edges end the preparation as `failed`.
       - {
           from: disconnected,
           to: uncertain,
@@ -1154,12 +1153,6 @@ x-state-machines:
           from: disconnected,
           to: failed,
           reason: EXECUTION_ALREADY_ADVANCED,
-          label: abandoned by an operator,
-        }
-      - {
-          from: disconnected,
-          to: failed,
-          reason: PREPARATION_ABANDONED,
           label: abandoned by an operator,
         }
       # Two write paths reach `failed`: a preparer reporting a terminal error (any

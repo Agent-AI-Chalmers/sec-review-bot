@@ -325,8 +325,6 @@ export const messages = {
     // What the system did about it, and what an operator can choose, belongs to the state and the
     // banner around this code; repeating it here says the same thing twice and puts decisions
     // into a vocabulary that is supposed to name facts.
-    failureCodePreparationAbandoned:
-      'An operator ended this run instead of letting it continue, so its preparation was concluded as failed.',
     failureCodeExecutionAlreadyAdvanced:
       'The preparation claim expired while execution was already past pending. A preparation failure means the task never started, which this run contradicts, so the expiry could not be concluded.',
     failureCodeSubmissionUncertain:
@@ -571,8 +569,6 @@ export const messages = {
       'an operator stopped waiting for preparation',
     edge_preparation_disconnected_failed_execution_advanced:
       'an operator concluded preparation whose records conflicted with execution already having advanced',
-    edge_preparation_disconnected_failed_abandoned:
-      'an operator abandoned the run and concluded preparation',
     edge_preparation_disconnected_failed:
       'an operator concluded the run instead of waiting for it',
     edge_preparation_preparing_failed:
@@ -969,8 +965,6 @@ export const messages = {
     failureCodePreparationRetryExhausted: '准备阶段反复失败，重试次数已用完。',
     // 每条只说这个码本身的意思：它命名的事实，以及这件事的后果。系统怎么处理、operator 能怎么选，
     // 属于状态和它周围的横幅；在这里重复会把同一件事说两遍，也会把“决定”塞进一个本该只命名事实的词表里。
-    failureCodePreparationAbandoned:
-      '有人主动结束了这个运行，没有让它继续下去，因此准备阶段按失败收尾。',
     failureCodeExecutionAlreadyAdvanced:
       '准备阶段的认领过期时，执行已经不在「等待中」。准备失败意味着任务从未开始，而这个运行与这一点相矛盾，因此这次过期无法收尾。',
     failureCodeSubmissionUncertain: '执行网关没有确认是否接单。',
@@ -1182,8 +1176,6 @@ export const messages = {
     edge_preparation_disconnected_failed_given_up: '操作员决定不再等待准备结果',
     edge_preparation_disconnected_failed_execution_advanced:
       '执行已经推进，与准备阶段的记录矛盾，操作员将准备阶段收尾',
-    edge_preparation_disconnected_failed_abandoned:
-      '操作员放弃运行，将准备阶段收尾',
     edge_preparation_disconnected_failed:
       'operator 没有继续等待，而是替自动化收尾了这个运行',
 

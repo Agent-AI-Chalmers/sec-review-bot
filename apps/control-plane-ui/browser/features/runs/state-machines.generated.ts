@@ -133,12 +133,6 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'abandoned by an operator'
       },
       {
-        from: 'disconnected',
-        to: 'failed',
-        reason: 'PREPARATION_ABANDONED',
-        label: 'abandoned by an operator'
-      },
-      {
         from: 'preparing',
         to: 'failed',
         label: 'failed'
