@@ -118,8 +118,8 @@ function isStepExhausted(step: PublicationStepRecord): boolean {
  * overrides a step: `uncertain` and `disconnected` describe where reconciliation got stuck, and
  * `published`/`failed` remain the axis' own conclusion.
  *
- * `publishing` is kept whenever a live publisher exists, so this cannot pull a claimed
- * publication out from under its owner.
+ * Re-deriving the axis preserves its claim token, so the same publisher can
+ * continue other steps while an unresolved step keeps the axis uncertain.
  */
 async function derivePublicationStatus(
   client: PoolClient,

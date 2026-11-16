@@ -1291,6 +1291,19 @@ x-state-machines:
         description: There was nothing to publish because execution did not succeed.
     transitions:
       - { from: pending, to: publishing, label: publishing started }
+      # A retry can leave unresolved steps while the axis waits for a new owner.
+      - {
+          from: pending,
+          to: uncertain,
+          label: publishing resumed with an unresolved step,
+        }
+      # Replacing the owner does not settle the remote outcome of an uncertain step.
+      - {
+          from: uncertain,
+          to: uncertain,
+          reason: PUBLICATION_LEASE_EXPIRED,
+          label: reconciliation lease expired,
+        }
       # The axis follows its steps: a step that may have taken effect makes the publication
       # uncertain, and a step whose reconciliation could not conclude makes it disconnected.
       - { from: publishing, to: uncertain, label: a step may have taken effect }

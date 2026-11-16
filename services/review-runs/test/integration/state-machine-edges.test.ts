@@ -479,6 +479,33 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     )
 
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [publishUncertain.runId]
+    )
+    const uncertainTakeover = await store.publicationClaims.claim(
+      publishUncertain.runId
+    )
+    assert.ok(uncertainTakeover)
+    assert.equal(
+      (await store.queries.getRun(publishUncertain.runId))?.publication.status,
+      'uncertain'
+    )
+    await store.publications.fail(
+      publishUncertain.runId,
+      uncertainTakeover,
+      { message: 'retry later' },
+      { retry: true }
+    )
+    const resumedUncertain = await store.publicationClaims.claim(
+      publishUncertain.runId
+    )
+    assert.ok(resumedUncertain)
+    assert.equal(
+      (await store.queries.getRun(publishUncertain.runId))?.publication.status,
+      'uncertain'
+    )
+
     // publication: publishing -> disconnected when a reconciliation itself runs out of budget
     // without an answer. The step is what becomes disconnected; the axis follows it.
     const publishDisconnected = await newPublishingRun()
