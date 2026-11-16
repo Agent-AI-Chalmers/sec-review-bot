@@ -282,6 +282,14 @@ CREATE TABLE publications (
   started_at timestamptz,
   finished_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  -- Step uncertainty changes the axis projection without releasing its publisher.
+  -- Release clears both lease fields; an expired lease keeps them until takeover.
+  CONSTRAINT publications_ownership_check CHECK (
+    (status IN ('publishing', 'uncertain', 'disconnected')
+      AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status NOT IN ('publishing', 'uncertain', 'disconnected')
+      AND claim_token IS NULL AND claimed_at IS NULL)
+  ),
   -- `pending` has no end, but may have a start: a retryable failure returns the row to pending
   -- while the phase is still running. `uncertain` and `disconnected` are mid-phase for the same
   -- reason: they say something about one step, not that the phase ended. `skipped` has an end and

@@ -4009,7 +4009,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
       [runId]
     )
     await pool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -4071,7 +4071,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
       [runId]
     )
     await pool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -4123,7 +4123,7 @@ test('a takeover settles a step its predecessor left uncertain instead of failin
     )
     await pool.query(
       `UPDATE publications SET status='uncertain',
-         claimed_at=clock_timestamp()-($2*interval '1 millisecond'), claim_token=NULL
+         claimed_at=clock_timestamp()-($2*interval '1 millisecond')
        WHERE run_id=$1`,
       [runId, 600_000]
     )
@@ -4212,7 +4212,7 @@ test('an operator resume completes on a pool that has exactly one connection', a
       [runId]
     )
     await smallPool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -5675,6 +5675,121 @@ test('a waiting publication claim reads step uncertainty committed by the lock h
     await pending?.catch(() => undefined)
     holder.release()
     await observer.end()
+    await store.close()
+  }
+})
+
+for (const outcome of ['complete', 'retry', 'fail'] as const) {
+  test(`publication ${outcome} releases its token and lease together`, async () => {
+    const store = await createStore()
+    const pool = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      const runId = await createSuccessfulRun(store)
+      const token = await store.publicationClaims.claim(runId)
+      assert.ok(token)
+      const before = (await store.queries.getRun(runId))?.publication.started_at
+      const changed =
+        outcome === 'complete'
+          ? await store.publications.complete(runId, token)
+          : await store.publications.fail(
+              runId,
+              token,
+              { message: 'publication failed' },
+              { retry: outcome === 'retry' }
+            )
+      assert.equal(changed, true)
+      const row = (
+        await pool.query(
+          'SELECT status, claim_token, claimed_at FROM publications WHERE run_id=$1',
+          [runId]
+        )
+      ).rows[0]
+      assert.deepEqual(row, {
+        status:
+          outcome === 'complete'
+            ? 'published'
+            : outcome === 'retry'
+              ? 'pending'
+              : 'failed',
+        claim_token: null,
+        claimed_at: null
+      })
+      assert.equal(
+        (await store.queries.getRun(runId))?.publication.started_at,
+        before
+      )
+      assert.equal(await store.publications.renewClaim(runId, token), false)
+      if (outcome === 'retry') {
+        const replacement = await store.publicationClaims.claim(runId)
+        assert.ok(replacement)
+        assert.notEqual(replacement, token)
+        assert.equal(await store.publications.complete(runId, token), false)
+        assert.equal(
+          await store.publications.complete(runId, replacement),
+          true
+        )
+      }
+    } finally {
+      await pool.end()
+      await store.close()
+    }
+  })
+}
+
+test('publication ownership constraints reject missing, partial and unexpected leases', async () => {
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    // Probe every status with complete timestamp shapes, so failures identify ownership
+    // protection rather than accidentally exercising the phase timestamp constraint.
+    for (const status of [
+      'pending',
+      'publishing',
+      'uncertain',
+      'disconnected',
+      'published',
+      'failed',
+      'skipped'
+    ]) {
+      const owned = ['publishing', 'uncertain', 'disconnected'].includes(status)
+      for (const hasToken of [false, true]) {
+        for (const hasLease of [false, true]) {
+          const client = await pool.connect()
+          try {
+            await client.query('BEGIN')
+            const update = client.query(
+              `UPDATE publications SET status=$2, claim_token=$3, claimed_at=$4,
+                 started_at=clock_timestamp(),
+                 finished_at=CASE WHEN $2 IN ('published','failed','skipped') THEN clock_timestamp() ELSE NULL END
+               WHERE run_id=$1`,
+              [
+                runId,
+                status,
+                hasToken ? randomUUID() : null,
+                hasLease ? new Date() : null
+              ]
+            )
+            if (hasToken === owned && hasLease === owned) await update
+            else
+              await assert.rejects(
+                update,
+                (error: unknown) =>
+                  error instanceof Error &&
+                  'code' in error &&
+                  error.code === '23514' &&
+                  'constraint' in error &&
+                  error.constraint === 'publications_ownership_check'
+              )
+          } finally {
+            await client.query('ROLLBACK')
+            client.release()
+          }
+        }
+      }
+    }
+  } finally {
+    await pool.end()
     await store.close()
   }
 })

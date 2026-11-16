@@ -308,7 +308,7 @@ export class PublicationStore {
              AND status = ANY($4::text[]) AND claim_token=$3
            FOR UPDATE
          )
-         UPDATE publications p SET status='published', claim_token=NULL,
+         UPDATE publications p SET status='published', claim_token=NULL, claimed_at=NULL,
            finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
          FROM previous
@@ -353,7 +353,7 @@ export class PublicationStore {
              AND status = ANY($7::text[]) AND claim_token=$3
            FOR UPDATE
          )
-         UPDATE publications p SET status=$4, claim_token=NULL, failure_code=$5,
+         UPDATE publications p SET status=$4, claim_token=NULL, claimed_at=NULL, failure_code=$5,
            failure_message=$6,
            finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
