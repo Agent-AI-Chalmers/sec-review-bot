@@ -15,6 +15,7 @@ import { submitPreparedRun } from '../../src/runtime/prepared-submission.js'
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 import type { ExecutionArtifactStorage } from '../../src/contracts.js'
 import { ExecutionSubmissionUncertainError } from '../../src/execution-client.js'
+import { assertPublicationAxesFollowSteps } from './publication-invariants.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -25,9 +26,24 @@ function requireTestDatabase(): string {
   return connectionString
 }
 
+// Every connector a test in this file creates, so the publication invariant below can check all
+// of their runs after each test.
+const connectorIds: string[] = []
+
 function connectorId(): string {
-  return `test:${randomUUID()}`
+  const id = `test:${randomUUID()}`
+  connectorIds.push(id)
+  return id
 }
+
+test.afterEach(async () => {
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    await assertPublicationAxesFollowSteps(pool, connectorIds.splice(0))
+  } finally {
+    await pool.end()
+  }
+})
 
 async function createStore(
   options: { connectorId?: string; claimTimeoutMs?: number } = {}

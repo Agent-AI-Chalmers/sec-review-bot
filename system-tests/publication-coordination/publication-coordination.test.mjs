@@ -145,6 +145,9 @@ test.before(async () => {
       'apps/github-integration/dist/reviews/repositories/publish.js'
     )),
     ...(await load(
+      'apps/github-integration/dist/reviews/shared/settle-exhausted-step.js'
+    )),
+    ...(await load(
       'services/review-runs/dist/persistence/review-run-store.js'
     )),
     ...(await load('services/review-runs/dist/http/server-surface.js'))
@@ -414,4 +417,92 @@ test('a reconciliation lookup that fails for good ends its step without settling
     'a failed lookup is never settled as found'
   )
   assert.equal(steps.find((step) => step.step_key === next).status, 'succeeded')
+})
+
+test('an exhausted delivery whose pull request already exists is settled as published', async (t) => {
+  const store = await startReviewRuns(t)
+  const step = 'repository:delivery:posted'
+  const { runId, token } = await publishingRun(store, [step])
+  await exhaust(store, runId, token, step)
+  const octokit = github((method, url) =>
+    method === 'GET' && url.pathname.endsWith('/pulls')
+      ? {
+          status: 200,
+          body: [
+            { number: 7, html_url: 'https://github.test/octo/example/pull/7' }
+          ]
+        }
+      : { status: 200, body: {} }
+  )
+
+  const published = await publish(
+    octokit,
+    runId,
+    token,
+    [delivery('posted')],
+    async () => {
+      throw new Error('a reconciled step must not create a second pull request')
+    }
+  )
+
+  assert.deepEqual(
+    published.map((entry) => [entry.delivery_id, entry.html_url]),
+    [['posted', 'https://github.test/octo/example/pull/7']]
+  )
+  const [settled] = await store.publications.listPublicationSteps(runId)
+  assert.equal(settled.status, 'succeeded')
+  assert.equal(
+    settled.remote_object_url,
+    'https://github.test/octo/example/pull/7'
+  )
+  assert.equal(
+    (await store.queries.getRun(runId)).publication.status,
+    'publishing',
+    'settling the only uncertain step returns the axis to publishing'
+  )
+})
+
+test('a lookup failure whose report committed but lost its response spends the budget once', async (t) => {
+  const store = await startReviewRuns(t)
+  const step = 'repository:delivery:flaky'
+  const { runId, token } = await publishingRun(store, [step])
+  await exhaust(store, runId, token, step)
+  // The first claim after exhaustion moves the step to `uncertain`; reconciliation starts there.
+  await assert.rejects(
+    store.publications.requirePublicationStepClaim(runId, token, step)
+  )
+  // The first report reaches Review Runs and commits, then its response is lost.
+  let reports = 0
+  const lossy = Object.create(modules.reviewRunsClient)
+  lossy.failPublicationStep = async (...args) => {
+    reports += 1
+    const recorded = await modules.reviewRunsClient.failPublicationStep(...args)
+    if (reports === 1)
+      throw Object.assign(new Error('Review Runs response lost'), {
+        status: 504
+      })
+    return recorded
+  }
+
+  await assert.rejects(
+    modules.settleExhaustedStep({
+      store: lossy,
+      runId,
+      token,
+      stepKey: step,
+      find: async () => {
+        throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
+      }
+    }),
+    /502/
+  )
+
+  assert.equal(reports, 2, 'the lost report is retried')
+  const [after] = await store.publications.listPublicationSteps(runId)
+  assert.equal(after.status, 'uncertain')
+  assert.equal(
+    after.recovery_attempt_count,
+    1,
+    'one failed lookup spends one unit of the reconciliation budget'
+  )
 })
