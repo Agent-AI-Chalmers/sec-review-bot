@@ -567,10 +567,12 @@ export const messages = {
       'the run\u2019s own records contradict concluding it automatically',
     edge_preparation_disconnected_uncertain:
       'an operator handed it back to automatic recovery',
-    // The edge key is the pair, and this axis has three operator decisions that agree on the
-    // pair (the contract separates them by reason). The wording therefore names what all three
-    // have in common: a person concluded a row automation refused to, without claiming that
-    // nothing happened. The per-decision wording is on the run's notice and timeline.
+    edge_preparation_disconnected_failed_given_up:
+      'an operator stopped waiting for preparation',
+    edge_preparation_disconnected_failed_execution_advanced:
+      'an operator concluded preparation whose records conflicted with execution already having advanced',
+    edge_preparation_disconnected_failed_abandoned:
+      'an operator abandoned the run and concluded preparation',
     edge_preparation_disconnected_failed:
       'an operator concluded the run instead of waiting for it',
     edge_preparation_preparing_failed:
@@ -1177,8 +1179,11 @@ export const messages = {
     edge_preparation_preparing_disconnected:
       '运行自身的记录不允许自动收尾，因此停手',
     edge_preparation_disconnected_uncertain: 'operator 把它交回自动恢复',
-    // 该轴的三条 operator 决策共用同一个 from->to 键，契约用 reason 区分；这里只描述三者
-    // 的共性——由人替自动化收尾，且不声称什么都没发生。具体决策在通知与时间线上。
+    edge_preparation_disconnected_failed_given_up: '操作员决定不再等待准备结果',
+    edge_preparation_disconnected_failed_execution_advanced:
+      '执行已经推进，与准备阶段的记录矛盾，操作员将准备阶段收尾',
+    edge_preparation_disconnected_failed_abandoned:
+      '操作员放弃运行，将准备阶段收尾',
     edge_preparation_disconnected_failed:
       'operator 没有继续等待，而是替自动化收尾了这个运行',
 

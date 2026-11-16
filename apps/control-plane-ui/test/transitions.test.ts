@@ -183,3 +183,49 @@ test('transition explanations come from the state-machine edge', () => {
 test('transitions use a twelve-row page', () => {
   assert.strictEqual(TRANSITIONS_PAGE_SIZE, 12)
 })
+
+test('operator conclusions retain their reason while absent and unknown reasons stay generic', async () => {
+  const { translate } = await import('../browser/shared/i18n.js')
+  const { axisMachine, edgeLabel } =
+    await import('../browser/features/runs/detail/transitions.js')
+  const { stateMachine } =
+    await import('../browser/features/runs/state-machines.generated.js')
+  for (const language of ['en', 'zh'] as const) {
+    const t: import('../browser/shared/i18n.js').Translator = (key, ...args) =>
+      translate(language, key, ...args)
+    const base = event({
+      axis: 'preparation',
+      from_status: 'disconnected',
+      to_status: 'failed'
+    })
+    const generic = transitionExplanation(base, t)
+    const explanations = new Set<string | null>()
+    for (const reason of [
+      'PREPARATION_GIVEN_UP_BY_OPERATOR',
+      'EXECUTION_ALREADY_ADVANCED',
+      'PREPARATION_ABANDONED'
+    ]) {
+      const explanation = transitionExplanation(
+        { ...base, reason_code: reason },
+        t
+      )
+      assert.ok(explanation)
+      assert.notEqual(explanation, generic)
+      explanations.add(explanation)
+      const machine = stateMachine('preparation')
+      const edge = machine.transitions.find(
+        (item) =>
+          item.from === 'disconnected' &&
+          item.to === 'failed' &&
+          item.reason === reason
+      )
+      assert.ok(edge)
+      assert.equal(edgeLabel(axisMachine(machine), edge, t), explanation)
+    }
+    assert.equal(explanations.size, 3)
+    assert.equal(
+      transitionExplanation({ ...base, reason_code: 'UNKNOWN_REASON' }, t),
+      generic
+    )
+  }
+})

@@ -6,7 +6,11 @@ import {
   type StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
 import { isStateLabelKey } from '../state-labels.js'
-import type { Message, Translator } from '../../../shared/i18n.js'
+import {
+  messages,
+  type Message,
+  type Translator
+} from '../../../shared/i18n.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12
 
@@ -42,13 +46,27 @@ export function stateLabel(
   return machine.body.details[state]?.label ?? state
 }
 
+function translatedMessage(key: string, t: Translator): string | undefined {
+  if (!Object.hasOwn(messages.en, key) || !Object.hasOwn(messages.zh, key))
+    return undefined
+  return t(key as Message)
+}
+
+const PREPARATION_CONCLUSION_MESSAGES = {
+  PREPARATION_GIVEN_UP_BY_OPERATOR:
+    'edge_preparation_disconnected_failed_given_up',
+  EXECUTION_ALREADY_ADVANCED:
+    'edge_preparation_disconnected_failed_execution_advanced',
+  PREPARATION_ABANDONED: 'edge_preparation_disconnected_failed_abandoned'
+} as const satisfies Record<string, Message>
+
 export function stateDescription(
   machine: LabelledMachine,
   state: string,
   t: Translator
 ): string {
-  const key = `state_${machine.key}_${state}_desc` as Message
-  const translated = t(key)
+  const key = `state_${machine.key}_${state}_desc`
+  const translated = translatedMessage(key, t)
   return translated && translated !== key
     ? translated
     : (machine.body.details[state]?.description ?? '')
@@ -59,8 +77,19 @@ export function edgeLabel(
   edge: MachineBody['transitions'][number],
   t: Translator
 ): string {
-  const key = `edge_${machine.key}_${edge.from}_${edge.to}` as Message
-  const translated = t(key)
+  if (
+    machine.key === 'preparation' &&
+    edge.from === 'disconnected' &&
+    edge.to === 'failed' &&
+    edge.reason !== undefined
+  ) {
+    const entry = Object.entries(PREPARATION_CONCLUSION_MESSAGES).find(
+      ([reason]) => reason === edge.reason
+    )
+    if (entry !== undefined) return t(entry[1])
+  }
+  const key = `edge_${machine.key}_${edge.from}_${edge.to}`
+  const translated = translatedMessage(key, t)
   if (translated && translated !== key) return translated
   if (edge.label !== undefined) return edge.label
   return `${stateLabel(machine, edge.from, t)} → ${stateLabel(machine, edge.to, t)}`
@@ -70,8 +99,8 @@ export function machineTitle(
   machine: StateMachineDefinition,
   t: Translator
 ): string {
-  const key = `machine_${machine.axis}_title` as Message
-  const translated = t(key)
+  const key = `machine_${machine.axis}_title`
+  const translated = translatedMessage(key, t)
   return translated && translated !== key ? translated : machine.title
 }
 
@@ -108,18 +137,26 @@ export function transitionExplanation(
 ): string | null {
   const machine = eventMachine(event)
   if (machine === undefined) return null
-  const edge =
-    machine.body.transitions.find(
-      (candidate) =>
-        candidate.from === event.from_status &&
-        candidate.to === event.to_status &&
-        (event.reason_code === null || candidate.reason === event.reason_code)
-    ) ??
-    machine.body.transitions.find(
-      (candidate) =>
-        candidate.from === event.from_status && candidate.to === event.to_status
+  const candidates = machine.body.transitions.filter(
+    (candidate) =>
+      candidate.from === event.from_status && candidate.to === event.to_status
+  )
+  const exact =
+    event.reason_code === null
+      ? undefined
+      : candidates.find((candidate) => candidate.reason === event.reason_code)
+  if (exact !== undefined) return edgeLabel(machine, exact, t)
+  const generic = candidates.find((candidate) => candidate.reason === undefined)
+  if (generic !== undefined) return edgeLabel(machine, generic, t)
+  if (candidates.length > 0) {
+    // Unknown or absent reasons do not identify one of the operator decisions.
+    return (
+      translatedMessage(
+        `edge_${machine.key}_${event.from_status}_${event.to_status}`,
+        t
+      ) ?? null
     )
-  if (edge !== undefined) return edgeLabel(machine, edge, t)
+  }
   const description = stateDescription(machine, event.to_status, t)
   return description === '' ? null : description
 }
