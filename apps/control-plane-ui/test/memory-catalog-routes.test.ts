@@ -28,7 +28,7 @@ test('memory writes require configured catalog access', async () => {
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({
         operation_id: 'op-1',
-        expected_generation: 1
+        expected_version: 1
       })
     })
     for (const [method, path] of [
@@ -80,8 +80,8 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
     for (const path of [
       '/api/memory/tree',
       '/api/memory/overview?range=90d',
-      '/api/memory/revisions?limit=50',
-      '/api/memory/revisions/2'
+      '/api/memory/versions?limit=50',
+      '/api/memory/versions/2'
     ])
       assert.strictEqual(
         (await fetch(`${base}${path}`, { headers: { cookie } })).status,
@@ -90,8 +90,8 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
     assert.deepStrictEqual(paths, [
       '/v1/memory-tree',
       '/v1/overview?range=90d',
-      '/v1/memory-tree/revisions?limit=50',
-      '/v1/memory-tree/revisions/2'
+      '/v1/memory-tree/versions?limit=50',
+      '/v1/memory-tree/versions/2'
     ])
   } finally {
     await Promise.all([
@@ -101,7 +101,7 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
   }
 })
 
-test('memory edit creates a revision while restore only moves the pointer', async () => {
+test('memory edit creates a version while restore only moves the pointer', async () => {
   const requests: Array<{ path: string; body: Record<string, unknown> }> = []
   const catalog = createServer(async (request, response) => {
     const chunks: Buffer[] = []
@@ -114,7 +114,7 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
       >
     })
     response.writeHead(201, { 'content-type': 'application/json' })
-    response.end('{"revision":3}')
+    response.end('{"version":3}')
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
@@ -153,7 +153,7 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
           headers,
           body: JSON.stringify({
             operation_id: 'edit-1',
-            expected_active_revision: 2,
+            expected_active_version: 2,
             files: { 'MEMORY.md': '# Memory\n' }
           })
         })
@@ -164,9 +164,9 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
     assert.deepStrictEqual(
       requests.map(({ path }) => path),
       [
-        '/v1/memory-tree/revisions/publications/reserve',
-        '/v1/memory-tree/revisions/publications/confirm',
-        '/v1/memory-tree/revisions'
+        '/v1/memory-tree/versions/publications/reserve',
+        '/v1/memory-tree/versions/publications/confirm',
+        '/v1/memory-tree/versions'
       ]
     )
     assert.deepStrictEqual(requests[0]!.body, requests[1]!.body)
@@ -182,8 +182,8 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
           headers,
           body: JSON.stringify({
             operation_id: 'restore-1',
-            expected_active_revision: 3,
-            restored_revision: 1
+            expected_active_version: 3,
+            restored_version: 1
           })
         })
       ).status,
@@ -193,8 +193,8 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
     assert.strictEqual(requests[3]!.path, '/v1/memory-tree/restore')
     assert.deepStrictEqual(requests[3]!.body, {
       operation_id: 'restore-1',
-      expected_active_revision: 3,
-      restored_revision: 1
+      expected_active_version: 3,
+      restored_version: 1
     })
   } finally {
     await Promise.all([
@@ -222,7 +222,7 @@ test('memory writes classify an unreachable catalog as an upstream failure', asy
     const response = await fetch(`${base}/api/memory/tree/automation/pause`, {
       method: 'POST',
       headers: { cookie, origin: base, 'content-type': 'application/json' },
-      body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
+      body: JSON.stringify({ operation_id: 'op-1', expected_version: 1 })
     })
     assert.strictEqual(response.status, 502)
     assert.deepStrictEqual(await response.json(), {
@@ -255,7 +255,7 @@ test('memory writes classify a catalog timeout separately', async () => {
     const response = await fetch(`${base}/api/memory/tree/automation/pause`, {
       method: 'POST',
       headers: { cookie, origin: base, 'content-type': 'application/json' },
-      body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
+      body: JSON.stringify({ operation_id: 'op-1', expected_version: 1 })
     })
     assert.strictEqual(response.status, 504)
     assert.deepStrictEqual(await response.json(), {
@@ -340,7 +340,7 @@ async function memoryWriteFixture(
     response.writeHead(status, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify(
-        status === 409 ? { error: 'revision_conflict' } : { created: true }
+        status === 409 ? { error: 'version_conflict' } : { created: true }
       )
     )
   })
@@ -363,7 +363,7 @@ async function memoryWriteFixture(
             putMemoryArtifact: async (): Promise<void> => {
               assert.equal(
                 writes.at(-1)?.path,
-                '/v1/memory-tree/revisions/publications/reserve'
+                '/v1/memory-tree/versions/publications/reserve'
               )
               uploads += 1
               if (upload === 'fails') throw new Error('storage unavailable')
@@ -393,16 +393,16 @@ async function memoryWriteFixture(
 }
 
 const validMemoryWrites = {
-  pause: { operation_id: 'pause-1', expected_generation: 0 },
-  resume: { operation_id: 'resume-1', expected_generation: 1 },
+  pause: { operation_id: 'pause-1', expected_version: 0 },
+  resume: { operation_id: 'resume-1', expected_version: 1 },
   restore: {
     operation_id: 'restore-1',
-    expected_active_revision: 2,
-    restored_revision: 1
+    expected_active_version: 2,
+    restored_version: 1
   },
   edit: {
     operation_id: 'edit-1',
-    expected_active_revision: 0,
+    expected_active_version: 0,
     files: { 'MEMORY.md': '# Memory\n' }
   }
 }
@@ -463,11 +463,11 @@ test('memory writes require valid operation IDs before any Catalog or storage mu
 test('memory writes reject missing, coerced, fractional, negative, and unsafe counters', async (t) => {
   const fixture = await memoryWriteFixture(t)
   for (const [action, field] of [
-    ['pause', 'expected_generation'],
-    ['resume', 'expected_generation'],
-    ['edit', 'expected_active_revision'],
-    ['restore', 'expected_active_revision'],
-    ['restore', 'restored_revision']
+    ['pause', 'expected_version'],
+    ['resume', 'expected_version'],
+    ['edit', 'expected_active_version'],
+    ['restore', 'expected_active_version'],
+    ['restore', 'restored_version']
   ] as const) {
     const invalid = [
       undefined,
@@ -529,10 +529,10 @@ test('memory edits validate files before reserving or uploading artifacts', asyn
   assert.equal(fixture.uploads(), 0)
 })
 
-test('valid control writes preserve zero generations and ignore client-supplied actor identity', async (t) => {
+test('valid control writes preserve zero versions and ignore client-supplied actor identity', async (t) => {
   const fixture = await memoryWriteFixture(t)
   for (const action of ['pause', 'resume'] as const) {
-    const body = { ...validMemoryWrites[action], expected_generation: 0 }
+    const body = { ...validMemoryWrites[action], expected_version: 0 }
     const response = await fixture.post(
       action,
       JSON.stringify({ ...body, actor: { kind: 'manual', id: 'forged' } })
@@ -546,7 +546,7 @@ test('valid control writes preserve zero generations and ignore client-supplied 
   assert.equal(fixture.uploads(), 0)
 })
 
-test('an initial memory edit accepts revision zero and reserves before uploading', async (t) => {
+test('an initial memory edit accepts version zero and reserves before uploading', async (t) => {
   const fixture = await memoryWriteFixture(t)
   const response = await fixture.post(
     'edit',
@@ -557,14 +557,14 @@ test('an initial memory edit accepts revision zero and reserves before uploading
   assert.deepEqual(
     fixture.writes.map(({ path }) => path),
     [
-      '/v1/memory-tree/revisions/publications/reserve',
-      '/v1/memory-tree/revisions/publications/confirm',
-      '/v1/memory-tree/revisions'
+      '/v1/memory-tree/versions/publications/reserve',
+      '/v1/memory-tree/versions/publications/confirm',
+      '/v1/memory-tree/versions'
     ]
   )
   const body = fixture.writes[0]?.body
-  assert(body && typeof body === 'object' && 'expected_active_revision' in body)
-  assert.equal(body.expected_active_revision, 0)
+  assert(body && typeof body === 'object' && 'expected_active_version' in body)
+  assert.equal(body.expected_active_version, 0)
 })
 
 test('valid edits keep upload capability errors separate from malformed input', async (t) => {
@@ -596,7 +596,7 @@ test('memory edits report upload failures as 502 and do not confirm or commit', 
   assert.equal(fixture.uploads(), 1)
   assert.deepEqual(
     fixture.writes.map(({ path }) => path),
-    ['/v1/memory-tree/revisions/publications/reserve']
+    ['/v1/memory-tree/versions/publications/reserve']
   )
 })
 
@@ -607,7 +607,7 @@ test('valid memory edits relay Catalog conflicts before uploading', async (t) =>
     JSON.stringify(validMemoryWrites.edit)
   )
   assert.equal(response.status, 409)
-  assert.deepEqual(await response.json(), { error: 'revision_conflict' })
+  assert.deepEqual(await response.json(), { error: 'version_conflict' })
   assert.equal(fixture.uploads(), 0)
   assert.equal(fixture.writes.length, 1)
 })
@@ -615,9 +615,9 @@ test('valid memory edits relay Catalog conflicts before uploading', async (t) =>
 for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
   test(`memory edits stop at a failed ${failedPhase} and relay its response`, async (t) => {
     const paths = [
-      '/v1/memory-tree/revisions/publications/reserve',
-      '/v1/memory-tree/revisions/publications/confirm',
-      '/v1/memory-tree/revisions'
+      '/v1/memory-tree/versions/publications/reserve',
+      '/v1/memory-tree/versions/publications/confirm',
+      '/v1/memory-tree/versions'
     ]
     const failedIndex = { reserve: 0, confirm: 1, commit: 2 }[failedPhase]
     const fixture = await memoryWriteFixture(t, {
@@ -629,7 +629,7 @@ for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
       JSON.stringify(validMemoryWrites.edit)
     )
     assert.equal(response.status, 409)
-    assert.deepEqual(await response.json(), { error: 'revision_conflict' })
+    assert.deepEqual(await response.json(), { error: 'version_conflict' })
     assert.equal(fixture.uploads(), failedPhase === 'reserve' ? 0 : 1)
     assert.deepEqual(
       fixture.writes.map(({ path }) => path),

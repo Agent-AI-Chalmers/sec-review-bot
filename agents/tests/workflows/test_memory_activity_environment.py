@@ -9,7 +9,7 @@ import pytest
 
 from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.memory.revision_commit_input import MemoryTreeRevisionCommitInput
+from sec_review_agents.memory.version_commit_input import MemoryTreeVersionCommitInput
 from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionRegistrationPayload,
     MemoryExtractionRequest,
@@ -18,7 +18,7 @@ from sec_review_agents.workflows.memory.extraction import (
 )
 from sec_review_agents.workflows.memory.maintenance import (
     MemoryMaintenanceRequest,
-    commit_memory_tree_revision_activity,
+    commit_memory_tree_version_activity,
     count_pending_memory_observations_activity,
     prepare_memory_maintenance_activity,
 )
@@ -108,10 +108,10 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
                 )
             )
         else:
-            commit_memory_tree_revision_activity(
-                MemoryTreeRevisionCommitInput(
+            commit_memory_tree_version_activity(
+                MemoryTreeVersionCommitInput(
                     operation_id="maintenance-1",
-                    expected_active_revision=0,
+                    expected_active_version=0,
                     observation_ids=("extraction-1",),
                     memory_tree_reference=reference,
                     trajectory_reference=reference,

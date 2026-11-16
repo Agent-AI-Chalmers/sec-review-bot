@@ -6,7 +6,7 @@ import { usePagedResource, type PagedResource } from './usePagedResource.js'
 import type {
   MemoryTreeAutomation,
   MemoryTree,
-  MemoryTreeRevisionList,
+  MemoryTreeVersionList,
   ObservationList,
   CatalogOverview,
   GetCatalogOverviewQuery
@@ -18,10 +18,10 @@ interface MemoryResources extends RefreshState {
   automation: Resource<MemoryTreeAutomation>
   tree: Resource<MemoryTree>
   /** The graph window, centered on a navigation target or starting at latest. */
-  graphRevisions: Resource<MemoryTreeRevisionList>
-  /** One page of revision history for the list view. */
-  revisionPages: PagedResource<null, number, MemoryTreeRevisionList>
-  /** One page of observations, optionally filtered to one consuming revision. */
+  graphVersions: Resource<MemoryTreeVersionList>
+  /** One page of version history for the list view. */
+  versionPages: PagedResource<null, number, MemoryTreeVersionList>
+  /** One page of observations, optionally filtered to one consuming version. */
   observationPages: PagedResource<number | undefined, string, ObservationList>
   graphTarget: number | undefined
   showGraph: (target?: number) => Promise<void>
@@ -44,38 +44,38 @@ export function useMemoryResources(): MemoryResources {
   )
   const graphTargetRef = React.useRef<number | undefined>(undefined)
   const [graphTarget, setGraphTarget] = React.useState<number>()
-  const graphRevisions = useResource(async (signal) => {
+  const graphVersions = useResource(async (signal) => {
     const target = graphTargetRef.current
     if (target === undefined)
-      return api<MemoryTreeRevisionList>(
-        `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}`,
+      return api<MemoryTreeVersionList>(
+        `/memory/versions?limit=${GRAPH_VERSION_WINDOW}`,
         { signal }
       )
-    const latest = await api<MemoryTreeRevisionList>(
-      '/memory/revisions?limit=1',
+    const latest = await api<MemoryTreeVersionList>(
+      '/memory/versions?limit=1',
       { signal }
     )
-    const newest = latest.revisions[0]?.revision ?? 0
-    // Catalog assigns contiguous revisions with max(revision) + 1 and retains history.
+    const newest = latest.versions[0]?.version ?? 0
+    // Catalog assigns contiguous versions with max(version) + 1 and retains history.
     // Prefer 25 newer and 24 older neighbors; transfer unused space at either end.
-    const upper = Math.min(newest, Math.max(GRAPH_REVISION_WINDOW, target + 25))
-    return api<MemoryTreeRevisionList>(
-      `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}&before_revision=${upper + 1}`,
+    const upper = Math.min(newest, Math.max(GRAPH_VERSION_WINDOW, target + 25))
+    return api<MemoryTreeVersionList>(
+      `/memory/versions?limit=${GRAPH_VERSION_WINDOW}&before_version=${upper + 1}`,
       { signal }
     )
   })
   const showGraph = async (target?: number): Promise<void> => {
     graphTargetRef.current = target
     setGraphTarget(target)
-    await graphRevisions.reload()
+    await graphVersions.reload()
   }
-  const revisionPages = usePagedResource<null, number, MemoryTreeRevisionList>(
+  const versionPages = usePagedResource<null, number, MemoryTreeVersionList>(
     { filter: null, limit: DEFAULT_PAGE_SIZE },
     ({ limit, trail }, signal) => {
       const query = new URLSearchParams({ limit: String(limit) })
       const before = trail.at(-1)
-      if (before !== undefined) query.set('before_revision', String(before))
-      return api<MemoryTreeRevisionList>(`/memory/revisions?${query}`, {
+      if (before !== undefined) query.set('before_version', String(before))
+      return api<MemoryTreeVersionList>(`/memory/versions?${query}`, {
         signal
       })
     }
@@ -88,7 +88,7 @@ export function useMemoryResources(): MemoryResources {
     { filter: undefined, limit: DEFAULT_PAGE_SIZE },
     ({ filter, limit, trail }, signal) => {
       const query = new URLSearchParams({ limit: String(limit) })
-      if (filter !== undefined) query.set('consumed_revision', String(filter))
+      if (filter !== undefined) query.set('consumed_version', String(filter))
       const cursor = trail.at(-1)
       if (cursor !== undefined) query.set('cursor', cursor)
       return api<ObservationList>(`/memory/observations?${query}`, { signal })
@@ -103,17 +103,17 @@ export function useMemoryResources(): MemoryResources {
     await Promise.all([
       automation.reload(),
       tree.reload(),
-      graphRevisions.reload(),
-      revisionPages.resource.reload(),
+      graphVersions.reload(),
+      versionPages.resource.reload(),
       observationPages.resource.reload(),
       overview.reload()
     ])
   }, [
     automation.reload,
-    graphRevisions.reload,
+    graphVersions.reload,
     observationPages.resource.reload,
     overview.reload,
-    revisionPages.resource.reload,
+    versionPages.resource.reload,
     tree.reload
   ])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
@@ -127,10 +127,10 @@ export function useMemoryResources(): MemoryResources {
   return {
     automation,
     tree,
-    graphRevisions,
+    graphVersions,
     graphTarget,
     showGraph,
-    revisionPages,
+    versionPages,
     observationPages,
     overview,
     overviewRange,
@@ -143,5 +143,5 @@ export function useMemoryResources(): MemoryResources {
 
 /** Matches the default the Runs list uses for its cursor pager. */
 export const DEFAULT_PAGE_SIZE = 20
-/** Maximum number of revisions drawn in a graph window. */
-export const GRAPH_REVISION_WINDOW = 50
+/** Maximum number of versions drawn in a graph window. */
+export const GRAPH_VERSION_WINDOW = 50

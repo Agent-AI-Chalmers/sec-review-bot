@@ -4,8 +4,8 @@ from typing import Any, Literal
 
 from temporalio import activity, workflow
 
-from sec_review_agents.memory.revision_commit_input import (
-    MemoryTreeRevisionCommitInput,
+from sec_review_agents.memory.version_commit_input import (
+    MemoryTreeVersionCommitInput,
 )
 from sec_review_agents.temporal.support import activity_retry_policy
 
@@ -36,7 +36,7 @@ class MemoryMaintenanceRequest:
 @dataclass(frozen=True)
 class MemoryMaintenancePreparationResult:
     kind: Literal["complete", "prepared"]
-    commit_input: MemoryTreeRevisionCommitInput | None = None
+    commit_input: MemoryTreeVersionCommitInput | None = None
     reason: str | None = None
     summary: str | None = None
 
@@ -60,12 +60,12 @@ class MemoryMaintenancePreparationResult:
             return
         if self.kind == "prepared":
             if (
-                not isinstance(self.commit_input, MemoryTreeRevisionCommitInput)
+                not isinstance(self.commit_input, MemoryTreeVersionCommitInput)
                 or self.reason is not None
                 or self.summary is not None
             ):
                 raise ValueError(
-                    "Prepared maintenance requires only a revision commit input."
+                    "Prepared maintenance requires only a version commit input."
                 )
             return
         raise ValueError(f"Unsupported maintenance preparation kind: {self.kind!r}")
@@ -97,7 +97,7 @@ async def prepare_memory_maintenance_activity(
         raise ValueError("AGENT_MEMORY_CATALOG_URL is required for memory maintenance.")
     operation_id = f"memory-tree-{activity.info().workflow_run_id}"
     if catalog_client.get_memory_tree_automation().get("state") == "paused":
-        catalog_client.abandon_revision_publications(operation_id, kind=request.mode)
+        catalog_client.abandon_version_publications(operation_id, kind=request.mode)
         return MemoryMaintenancePreparationResult(
             kind="complete",
             reason="automation_paused",
@@ -140,8 +140,8 @@ async def prepare_memory_maintenance_activity(
 
 
 @activity.defn
-def commit_memory_tree_revision_activity(
-    commit_input: MemoryTreeRevisionCommitInput,
+def commit_memory_tree_version_activity(
+    commit_input: MemoryTreeVersionCommitInput,
 ) -> dict[str, Any]:
     from temporalio.exceptions import ApplicationError
 
@@ -155,21 +155,21 @@ def commit_memory_tree_revision_activity(
     catalog_client = configured_memory_catalog_client()
     if catalog_client is None:
         raise RuntimeError(
-            "Memory catalog is required to commit a coordinated revision."
+            "Memory catalog is required to commit a coordinated version."
         )
     try:
         if commit_input.source_kind == "reorganization":
-            committed = catalog_client.create_reorganization_revision(
+            committed = catalog_client.create_reorganization_version(
                 operation_id=commit_input.operation_id,
-                expected_active_revision=commit_input.expected_active_revision,
+                expected_active_version=commit_input.expected_active_version,
                 memory_tree_reference=commit_input.memory_tree_reference,
                 trajectory_reference=commit_input.trajectory_reference,
                 maintenance_report=commit_input.maintenance_report,
             )
         else:
-            committed = catalog_client.create_learning_revision(
+            committed = catalog_client.create_learning_version(
                 operation_id=commit_input.operation_id,
-                expected_active_revision=commit_input.expected_active_revision,
+                expected_active_version=commit_input.expected_active_version,
                 observation_ids=list(commit_input.observation_ids),
                 memory_tree_reference=commit_input.memory_tree_reference,
                 trajectory_reference=commit_input.trajectory_reference,
@@ -192,7 +192,7 @@ def commit_memory_tree_revision_activity(
     except MemoryCatalogConflictError as error:
         raise ApplicationError(
             str(error),
-            type="MEMORY_CATALOG_REVISION_CONFLICT",
+            type="MEMORY_CATALOG_VERSION_CONFLICT",
             non_retryable=True,
         ) from error
     source = committed.get("source")
@@ -201,7 +201,7 @@ def commit_memory_tree_revision_activity(
         or source.get("kind") != commit_input.source_kind
         or source.get("operation_id") != commit_input.operation_id
     ):
-        raise RuntimeError("Catalog returned a different revision operation identity.")
+        raise RuntimeError("Catalog returned a different version operation identity.")
     processed_count = (
         len(commit_input.observation_ids)
         if commit_input.source_kind == "learning"
@@ -315,7 +315,7 @@ class MemoryMaintenanceWorkflow:
         elif prepared.kind == "prepared":
             assert prepared.commit_input is not None
             result = await workflow.execute_activity(
-                commit_memory_tree_revision_activity,
+                commit_memory_tree_version_activity,
                 prepared.commit_input,
                 schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
                 retry_policy=activity_retry_policy(),
@@ -343,7 +343,7 @@ __all__ = [
     "MemoryMaintenancePreparationResult",
     "MemoryMaintenanceRequest",
     "MemoryMaintenanceWorkflow",
-    "commit_memory_tree_revision_activity",
+    "commit_memory_tree_version_activity",
     "count_pending_memory_observations_activity",
     "prepare_memory_maintenance_activity",
 ]

@@ -14,8 +14,8 @@ function memoryCatalogPath(bffUrl: string): string | null {
     return `/v1/memory-tree/automation${url.search}`
   if (path === '/api/memory/tree') return `/v1/memory-tree${url.search}`
   if (
-    path === '/api/memory/revisions' ||
-    /^\/api\/memory\/revisions\/[1-9][0-9]*$/.test(path)
+    path === '/api/memory/versions' ||
+    /^\/api\/memory\/versions\/[1-9][0-9]*$/.test(path)
   )
     return `/v1/memory-tree${path.slice('/api/memory'.length)}${url.search}`
   const allowed =

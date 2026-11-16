@@ -1,7 +1,7 @@
 {
   "automation": {
     "state": "enabled",
-    "generation": 0,
+    "version": 0,
     "changed_by": {
       "kind": "user",
       "id": "sample"

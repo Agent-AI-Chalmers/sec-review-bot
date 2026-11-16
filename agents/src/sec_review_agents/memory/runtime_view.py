@@ -15,7 +15,7 @@ from sec_review_agents.filesystem.path_views import PathView, memory_view
 def materialized_memory_view() -> Generator[PathView | None]:
     """Yield the active memory tree for one invocation, then remove it.
 
-    Unlike bundled skills, memory is revision-selected external input. The caller
+    Unlike bundled skills, memory is version-selected external input. The caller
     therefore owns its invocation-scoped lifetime and passes the resulting view
     into backend construction.
     """

@@ -41,8 +41,8 @@ Open the URL printed by Vite, normally `http://localhost:5173`. This mode suppli
 
 The fixture server also exposes stable full-page error states for visual inspection:
 
-- `/memory/revisions/404/tree` shows a memory-tree preview failure while preserving the artifact download.
-- `/memory/revisions/404/trajectory` shows a trajectory load failure.
+- `/memory/versions/404/tree` shows a memory-tree preview failure while preserving the artifact download.
+- `/memory/versions/404/trajectory` shows a trajectory load failure.
 - `/runs/fixture-artifact-load-error/files` shows a run-files load failure.
 
 <!-- doc-default: control-plane-ui.viewer-input; source=apps/control-plane-ui/shared/trajectory-events.ts -->
@@ -161,7 +161,7 @@ The BFF also proxies execution archive downloads from private RustFS storage. It
 
 The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
 
-Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic memory updates, edit the active memory tree, and restore an existing revision.
+Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic memory updates, edit the active memory tree, and restore an existing version.
 
 The BFF accesses Catalog and object storage and verifies artifact size and SHA-256 digest before returning artifacts. The browser receives no storage URIs or credentials.
 
@@ -169,4 +169,4 @@ After an edit fails, keeping the editor open with unchanged content allows retri
 
 <!-- doc-default: control-plane-ui.memory-recovery; source=apps/control-plane-ui/browser/features/memory/Memory.tsx -->
 
-Memory edit and restore failures appear inside their operation dialogs. Editing preserves the draft for retries. File creation rejects existing paths, and renaming a file to its current path leaves it unchanged. On narrow screens, revision and observation lists keep identity and actions together, and selecting a graph node brings its details into view. Failed artifact previews can be retried without leaving the page.
+Memory edit and restore failures appear inside their operation dialogs. Editing preserves the draft for retries. File creation rejects existing paths, and renaming a file to its current path leaves it unchanged. On narrow screens, version and observation lists keep identity and actions together, and selecting a graph node brings its details into view. Failed artifact previews can be retried without leaving the page.

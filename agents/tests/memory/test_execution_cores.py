@@ -337,18 +337,18 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("expected_active_revision", "active_reference"),
+    ("expected_active_version", "active_reference"),
     [(0, None), (1, _s3_reference("memory-tree").as_dict())],
 )
-async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
+async def test_coordinated_maintenance_accepts_catalog_version_reference_pairs(
     tmp_path: Path,
-    expected_active_revision: int,
+    expected_active_version: int,
     active_reference: dict[str, object] | None,
 ) -> None:
     client = Mock()
-    client.list_revision_publications.return_value = []
+    client.list_version_publications.return_value = []
     client.get_learning_input.return_value = {
-        "expected_active_revision": expected_active_revision,
+        "expected_active_version": expected_active_version,
         "active_memory_tree_reference": active_reference,
         "observations": [
             {"observation_id": "extraction-1", "body_markdown": "Remember this."}
@@ -409,10 +409,10 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         )
 
     assert prepared is not None
-    assert prepared.expected_active_revision == expected_active_revision
+    assert prepared.expected_active_version == expected_active_version
     assert prepared.observation_ids == ("extraction-1",)
     assert prepared.maintenance_report == report
-    intent = client.reserve_revision_publication.call_args.args[0]
+    intent = client.reserve_version_publication.call_args.args[0]
     assert intent["source"]["maintenance_report"] == report.model_dump(mode="json")
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["base_memory_tree"] == (
@@ -431,10 +431,10 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     topic_path: str,
 ) -> None:
     client = Mock()
-    client.list_revision_publications.return_value = []
+    client.list_version_publications.return_value = []
     active_reference = _s3_reference("active-memory-tree")
     client.get_memory_tree.return_value = {
-        "revision": 2,
+        "version": 2,
         "memory_tree_reference": active_reference.as_dict(),
     }
     active_tree = tmp_path / "active"
@@ -495,14 +495,14 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     assert reorganized.commit_input is not None
     assert reorganized.commit_input.source_kind == "reorganization"
     assert reorganized.commit_input.observation_ids == ()
-    assert reorganized.commit_input.expected_active_revision == 2
+    assert reorganized.commit_input.expected_active_version == 2
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["observations"] == []
     assert maintain.await_args.kwargs["reorganization"] is True
-    client.list_revision_publications.assert_called_once_with(
+    client.list_version_publications.assert_called_once_with(
         "maintenance-1", kind="reorganization"
     )
-    intent = client.reserve_revision_publication.call_args.args[0]
+    intent = client.reserve_version_publication.call_args.args[0]
     assert intent["source"]["kind"] == "reorganization"
     assert "observation_ids" not in intent["source"]
     assert intent["source"]["maintenance_report"] == {
@@ -516,10 +516,10 @@ async def test_coordinated_reorganization_skips_unchanged_tree(
     tmp_path: Path,
 ) -> None:
     client = Mock()
-    client.list_revision_publications.return_value = []
+    client.list_version_publications.return_value = []
     active_reference = _s3_reference("active-memory-tree")
     client.get_memory_tree.return_value = {
-        "revision": 2,
+        "version": 2,
         "memory_tree_reference": active_reference.as_dict(),
     }
     active_tree = tmp_path / "active"
@@ -555,15 +555,15 @@ async def test_coordinated_reorganization_skips_unchanged_tree(
 
     assert reorganized.commit_input is None
     assert reorganized.summary == "Reorganization produced no memory changes."
-    client.reserve_revision_publication.assert_not_called()
+    client.reserve_version_publication.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
     client = Mock()
-    client.list_revision_publications.return_value = []
+    client.list_version_publications.return_value = []
     client.get_memory_tree.return_value = {
-        "revision": 0,
+        "version": 0,
         "memory_tree_reference": None,
     }
 
@@ -582,7 +582,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
     [
         (
             {
-                "expected_active_revision": "0",
+                "expected_active_version": "0",
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
@@ -591,11 +591,11 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                     }
                 ],
             },
-            "expected active revision",
+            "expected active version",
         ),
         (
             {
-                "expected_active_revision": 0,
+                "expected_active_version": 0,
                 "active_memory_tree_reference": [],
                 "observations": [
                     {
@@ -608,7 +608,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
         ),
         (
             {
-                "expected_active_revision": 0,
+                "expected_active_version": 0,
                 "active_memory_tree_reference": _s3_reference(
                     "unexpected-memory-tree"
                 ).as_dict(),
@@ -619,11 +619,11 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                     }
                 ],
             },
-            "null exactly at revision 0",
+            "null exactly at version 0",
         ),
         (
             {
-                "expected_active_revision": 1,
+                "expected_active_version": 1,
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
@@ -632,11 +632,11 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                     }
                 ],
             },
-            "null exactly at revision 0",
+            "null exactly at version 0",
         ),
         (
             {
-                "expected_active_revision": 0,
+                "expected_active_version": 0,
                 "active_memory_tree_reference": None,
                 "observations": [
                     {"observation_id": 1, "body_markdown": "Remember this."}
@@ -646,7 +646,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
         ),
         (
             {
-                "expected_active_revision": 0,
+                "expected_active_version": 0,
                 "active_memory_tree_reference": None,
                 "observations": [
                     {"observation_id": "extraction-1", "body_markdown": 1}
@@ -661,7 +661,7 @@ async def test_coordinated_maintenance_rejects_invalid_catalog_payloads(
     message: str,
 ) -> None:
     client = Mock()
-    client.list_revision_publications.return_value = []
+    client.list_version_publications.return_value = []
     client.get_learning_input.return_value = learning_input
 
     with pytest.raises(ValueError, match=message):

@@ -16,7 +16,7 @@
 
 `cloudflared` 作为单独管理的宿主机服务运行，不由 Docker Compose 管理。
 
-Cloudflare Tunnel 将 GitHub 流量转发到 GitHub Integration。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、trajectory、memory revision 和 artifact。
+Cloudflare Tunnel 将 GitHub 流量转发到 GitHub Integration。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、trajectory、memory version 和 artifact。
 
 图中的 Langfuse 独立部署，位于 Docker Compose 和宿主机 Worker 边界之外。Worker 可以向其导出模型调用记录，Review Runs 再读取这些记录，生成模型用量快照；这两条链路都不会阻塞审查执行或结果发布。
 
@@ -173,23 +173,23 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 核心字段：
 
-| Field                                                                      | 如何配置                                                                                                                                          |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TEMPORAL_ADDRESS`                                                         | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。                                                              |
-| `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE`                      | 必须与根目录 `.env` 中的同名值一致。                                                                                                              |
-| `AGENT_DOCKER_IMAGE`                                                       | Docker sandbox 使用的镜像；默认使用通用镜像。                                                                                                     |
-| `AGENT_SKILLS_ENABLED`                                                     | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。                                                                                 |
-| `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED`                          | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。                                                                                 |
-| `AGENT_MCP_ENABLED`                                                        | 启用已配置的 MCP 集成；默认是 `false`。                                                                                                           |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED`                                         | 允许 review agent 读取整理后的 memory；默认是 `true`。                                                                                            |
-| `AGENT_MEMORY_PROCESSING_ENABLED`                                          | 允许 trajectory extraction 和 memory maintenance；默认是 `true`。                                                                                 |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`                                          | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。           |
-| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE`                                  | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。    |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入执行归档，并读取 active memory revision。                                                            |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取执行归档，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
-| `AGENT_MEMORY_CATALOG_URL`                                                 | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。                                                                             |
-| `AGENT_MEMORY_CATALOG_TOKEN`                                               | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。                                                                    |
-| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN`                                      | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。                                                                                 |
+| Field                                                                      | 如何配置                                                                                                                                         |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TEMPORAL_ADDRESS`                                                         | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。                                                             |
+| `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE`                      | 必须与根目录 `.env` 中的同名值一致。                                                                                                             |
+| `AGENT_DOCKER_IMAGE`                                                       | Docker sandbox 使用的镜像；默认使用通用镜像。                                                                                                    |
+| `AGENT_SKILLS_ENABLED`                                                     | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。                                                                                |
+| `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED`                          | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。                                                                                |
+| `AGENT_MCP_ENABLED`                                                        | 启用已配置的 MCP 集成；默认是 `false`。                                                                                                          |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED`                                         | 允许 review agent 读取整理后的 memory；默认是 `true`。                                                                                           |
+| `AGENT_MEMORY_PROCESSING_ENABLED`                                          | 允许 trajectory extraction 和 memory maintenance；默认是 `true`。                                                                                |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`                                          | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。          |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE`                                  | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。   |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入执行归档，并读取 active memory version。                                                            |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取执行归档，并读写 memory version 和压缩后的 memory-agent trajectory。 |
+| `AGENT_MEMORY_CATALOG_URL`                                                 | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。                                                                            |
+| `AGENT_MEMORY_CATALOG_TOKEN`                                               | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。                                                                   |
+| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN`                                      | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。                                                                                |
 
 #### 产物与存储凭据
 
@@ -202,9 +202,9 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。
 
 - **数据库隔离。** Compose 运行一个 PostgreSQL 实例，其中有独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database 与 login role。每个服务只接收自己的 database URL。
-- **保存的状态。** Memory Catalog 保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 还记录 source 和全局唯一的 operation ID；learning 和 reorganization 修订包含 maintainer trajectory reference。
+- **保存的状态。** Memory Catalog 保存 extraction records 及其可选 observations、memory-tree version history 和 active version pointer。每个 version 还记录 source 和全局唯一的 operation ID；learning 和 reorganization 版本包含 maintainer trajectory reference。
 - **执行与提交。** Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 保存 catalog 状态，并在提交时检查 compare-and-swap 条件。宿主 Worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用 Memory Catalog。
-- **对象存储。** memory-tree revisions 和 memory-agent trajectories 作为不可变对象保存在 RustFS 中。Worker 将对象物化到每次调用的临时 worktree，Agent sandbox 只看到最终的文件系统挂载。
+- **对象存储。** memory-tree versions 和 memory-agent trajectories 作为不可变对象保存在 RustFS 中。Worker 将对象物化到每次调用的临时 worktree，Agent sandbox 只看到最终的文件系统挂载。
 
 #### Control Plane UI 的记忆管理
 
@@ -212,7 +212,7 @@ Compose 向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPE
 
 - 经过认证的 browser session 通过 BFF 查看和管理 memory，不会获得 Catalog 或对象存储凭据。
 - UI storage identity 可以读取 run 产物、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。
-- 编辑或恢复不会改变记忆树自动更新状态。operator 可以独立暂停自动修订提交；暂停期间仍可人工编辑或恢复版本。
+- 编辑或恢复不会改变记忆树自动更新状态。operator 可以独立暂停自动版本提交；暂停期间仍可人工编辑或恢复版本。
 - 系统不自动清理未引用的 memory object。
 
 #### PostgreSQL 初始化与重新安装
@@ -291,13 +291,13 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 使用 sample 配置时，集成部署默认把运行数据写入以下仓库级路径：
 
-| Path                    | Owner         | Purpose                                                                                                |
-| ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
-| `.agent-rustfs-state`   | RustFS        | run inputs、执行归档、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
-| `.agent-run-inputs`     | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的执行归档                                                     |
-| `.agent-artifacts`      | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出                                                                  |
-| `.agent-postgres-state` | PostgreSQL    | Review Runs run 状态与 Memory Catalog 协调状态                                                         |
-| `.agent-temporal-state` | Temporal      | workflow history 和待处理 task state                                                                   |
+| Path                    | Owner         | Purpose                                                                                               |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| `.agent-rustfs-state`   | RustFS        | run inputs、执行归档、memory-tree versions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
+| `.agent-run-inputs`     | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的执行归档                                                    |
+| `.agent-artifacts`      | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出                                                                 |
+| `.agent-postgres-state` | PostgreSQL    | Review Runs run 状态与 Memory Catalog 协调状态                                                        |
+| `.agent-temporal-state` | Temporal      | workflow history 和待处理 task state                                                                  |
 
 ## 运行部署
 

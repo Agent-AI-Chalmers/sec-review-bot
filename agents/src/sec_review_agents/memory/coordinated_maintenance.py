@@ -26,43 +26,43 @@ from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     memory_tree_artifact_s3_key,
 )
-from sec_review_agents.memory.revision_commit_input import (
-    MemoryTreeRevisionCommitInput,
-)
 from sec_review_agents.memory.trajectory_artifact import (
     build_memory_agent_trajectory,
     memory_agent_trajectory_s3_key,
 )
+from sec_review_agents.memory.version_commit_input import (
+    MemoryTreeVersionCommitInput,
+)
 from sec_review_agents.runtime.trajectories import trajectory_path
 
-MemoryRevisionSourceKind = Literal["learning", "reorganization"]
+MemoryVersionSourceKind = Literal["learning", "reorganization"]
 
 
 @dataclass(frozen=True)
 class CoordinatedReorganizationResult:
-    """Prepared reorganization revision or the reason reorganization stopped."""
+    """Prepared reorganization version or the reason reorganization stopped."""
 
-    commit_input: MemoryTreeRevisionCommitInput | None
+    commit_input: MemoryTreeVersionCommitInput | None
     summary: str
 
 
 def _commit_input_from_intent(
     *, operation_id: str, intent: dict[str, Any]
-) -> MemoryTreeRevisionCommitInput:
+) -> MemoryTreeVersionCommitInput:
     source = intent.get("source")
     if not isinstance(source, dict):
-        raise RuntimeError("Memory revision publication intent has no source.")
+        raise RuntimeError("Memory version publication intent has no source.")
     kind = source.get("kind")
     if kind not in {"learning", "reorganization"}:
         raise RuntimeError(
-            "Memory revision publication intent is not a maintainer source."
+            "Memory version publication intent is not a maintainer source."
         )
     observation_ids = source.get("observation_ids", ())
     if not isinstance(observation_ids, (list, tuple)):
-        raise RuntimeError("Memory revision publication observation_ids is invalid.")
-    return MemoryTreeRevisionCommitInput(
+        raise RuntimeError("Memory version publication observation_ids is invalid.")
+    return MemoryTreeVersionCommitInput(
         operation_id=operation_id,
-        expected_active_revision=intent["expected_active_revision"],
+        expected_active_version=intent["expected_active_version"],
         observation_ids=tuple(observation_ids),
         memory_tree_reference=ArtifactReference.from_mapping(
             intent["memory_tree_reference"]
@@ -81,14 +81,14 @@ def _recover_publication(
     *,
     catalog_client: MemoryCatalogClient,
     operation_id: str,
-    source_kind: MemoryRevisionSourceKind,
-) -> MemoryTreeRevisionCommitInput | None:
-    for publication in catalog_client.list_revision_publications(
+    source_kind: MemoryVersionSourceKind,
+) -> MemoryTreeVersionCommitInput | None:
+    for publication in catalog_client.list_version_publications(
         operation_id, kind=source_kind
     ):
         if publication["status"] == "abandoned":
             raise MemoryPublicationAbandonedError(
-                "Revision publication has been abandoned."
+                "Version publication has been abandoned."
             )
         intent = publication["intent"]
         if all(
@@ -98,18 +98,18 @@ def _recover_publication(
                 intent["source"]["trajectory_reference"],
             )
         ):
-            catalog_client.confirm_revision_publication(intent)
+            catalog_client.confirm_version_publication(intent)
             commit_input = _commit_input_from_intent(
                 operation_id=operation_id, intent=intent
             )
             if commit_input.source_kind != source_kind:
                 raise RuntimeError(
-                    "Memory revision publication source kind does not match this run."
+                    "Memory version publication source kind does not match this run."
                 )
             return commit_input
         if publication["status"] == "selected":
             raise RuntimeError(
-                "Selected memory revision publication artifact is missing."
+                "Selected memory version publication artifact is missing."
             )
     return None
 
@@ -118,14 +118,14 @@ def _publish_candidate(
     *,
     catalog_client: MemoryCatalogClient,
     operation_id: str,
-    expected_active_revision: int,
-    source_kind: MemoryRevisionSourceKind,
+    expected_active_version: int,
+    source_kind: MemoryVersionSourceKind,
     observation_ids: tuple[str, ...],
     memory_tree_path: Path,
     maintainer_trajectory_path: Path,
     maintenance_report: MemoryMaintenanceOutput,
     temp_root: Path,
-) -> MemoryTreeRevisionCommitInput:
+) -> MemoryTreeVersionCommitInput:
     trajectory = build_memory_agent_trajectory(
         trajectory_path=maintainer_trajectory_path,
         output_dir=temp_root / "published-trajectories",
@@ -149,19 +149,19 @@ def _publish_candidate(
     if source_kind == "learning":
         source["observation_ids"] = list(observation_ids)
     intent = {
-        "expected_active_revision": expected_active_revision,
+        "expected_active_version": expected_active_version,
         "memory_tree_reference": memory_tree_reference.as_dict(),
         "source": source,
     }
-    catalog_client.reserve_revision_publication(intent)
+    catalog_client.reserve_version_publication(intent)
     publish_immutable_s3_artifact(
         trajectory, key=trajectory_key, description="maintainer trajectory"
     )
     publish_immutable_s3_artifact(tree, key=tree_key, description="memory tree")
-    catalog_client.confirm_revision_publication(intent)
-    return MemoryTreeRevisionCommitInput(
+    catalog_client.confirm_version_publication(intent)
+    return MemoryTreeVersionCommitInput(
         operation_id=operation_id,
-        expected_active_revision=expected_active_revision,
+        expected_active_version=expected_active_version,
         observation_ids=observation_ids,
         memory_tree_reference=memory_tree_reference,
         trajectory_reference=trajectory_reference,
@@ -176,7 +176,7 @@ async def prepare_coordinated_memory_learning(
     operation_id: str,
     batch_size: int,
     deployment: str | None = None,
-) -> MemoryTreeRevisionCommitInput | None:
+) -> MemoryTreeVersionCommitInput | None:
     """Run learning and publish immutable inputs for a later commit."""
     recovered = _recover_publication(
         catalog_client=catalog_client,
@@ -190,14 +190,14 @@ async def prepare_coordinated_memory_learning(
     if learning_input is None:
         return None
 
-    expected_active_revision = learning_input.get("expected_active_revision")
+    expected_active_version = learning_input.get("expected_active_version")
     if (
-        not isinstance(expected_active_revision, int)
-        or isinstance(expected_active_revision, bool)
-        or expected_active_revision < 0
+        not isinstance(expected_active_version, int)
+        or isinstance(expected_active_version, bool)
+        or expected_active_version < 0
     ):
         raise ValueError(
-            "Catalog expected active revision must be a non-negative integer."
+            "Catalog expected active version must be a non-negative integer."
         )
     if "active_memory_tree_reference" not in learning_input:
         raise ValueError("Catalog learning input is missing active memory.")
@@ -206,9 +206,9 @@ async def prepare_coordinated_memory_learning(
         active_memory_tree_reference, dict
     ):
         raise ValueError("Catalog active memory reference must be an object or null.")
-    if (expected_active_revision == 0) != (active_memory_tree_reference is None):
+    if (expected_active_version == 0) != (active_memory_tree_reference is None):
         raise ValueError(
-            "Catalog active memory reference must be null exactly at revision 0."
+            "Catalog active memory reference must be null exactly at version 0."
         )
 
     observations = learning_input.get("observations")
@@ -271,7 +271,7 @@ async def prepare_coordinated_memory_learning(
         return _publish_candidate(
             catalog_client=catalog_client,
             operation_id=operation_id,
-            expected_active_revision=expected_active_revision,
+            expected_active_version=expected_active_version,
             source_kind="learning",
             observation_ids=tuple(observation_ids),
             memory_tree_path=result.memory_tree_path,
@@ -296,15 +296,15 @@ async def prepare_coordinated_memory_reorganization(
     if recovered is not None:
         return CoordinatedReorganizationResult(
             commit_input=recovered,
-            summary="Recovered prepared reorganization revision.",
+            summary="Recovered prepared reorganization version.",
         )
 
     active_memory = catalog_client.get_memory_tree()
-    expected_active_revision = active_memory.get("revision")
+    expected_active_version = active_memory.get("version")
     if (
-        not isinstance(expected_active_revision, int)
-        or isinstance(expected_active_revision, bool)
-        or expected_active_revision < 1
+        not isinstance(expected_active_version, int)
+        or isinstance(expected_active_version, bool)
+        or expected_active_version < 1
     ):
         return CoordinatedReorganizationResult(
             commit_input=None,
@@ -358,7 +358,7 @@ async def prepare_coordinated_memory_reorganization(
         commit_input = _publish_candidate(
             catalog_client=catalog_client,
             operation_id=operation_id,
-            expected_active_revision=expected_active_revision,
+            expected_active_version=expected_active_version,
             source_kind="reorganization",
             observation_ids=(),
             memory_tree_path=result.memory_tree_path,
@@ -368,7 +368,7 @@ async def prepare_coordinated_memory_reorganization(
         )
         return CoordinatedReorganizationResult(
             commit_input=commit_input,
-            summary="Prepared reorganization revision.",
+            summary="Prepared reorganization version.",
         )
 
 

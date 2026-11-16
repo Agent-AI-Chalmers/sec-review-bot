@@ -15,8 +15,8 @@ vi.mock('../../browser/shared/api-client.js', async (importOriginal) => ({
 vi.mock('../../browser/features/memory/MemoryOverview.js', () => ({
   MemoryOverview: (): null => null
 }))
-vi.mock('../../browser/features/memory/MemoryRevisionHistory.js', () => ({
-  MemoryRevisionHistory: (): null => null
+vi.mock('../../browser/features/memory/MemoryVersionHistory.js', () => ({
+  MemoryVersionHistory: (): null => null
 }))
 vi.mock('../../browser/features/memory/MemoryObservationList.js', () => ({
   MemoryObservationList: (): null => null
@@ -45,27 +45,27 @@ test.each([
   [2, false],
   [2, true]
 ] as const)(
-  'editing revision %i retains its base across refresh and retries (delayed load: %s)',
-  async (baseRevision, delayedLoad) => {
-    // Refreshing the catalog must not authorize old editor files against a newer revision.
-    let currentRevision: number = baseRevision
+  'editing version %i retains its base across refresh and retries (delayed load: %s)',
+  async (baseVersion, delayedLoad) => {
+    // Refreshing the catalog must not authorize old editor files against a newer version.
+    let currentVersion: number = baseVersion
     let treeReads = 0
     let releaseContent: (() => void) | undefined
     vi.mocked(api).mockImplementation(async (path) => {
       if (path === '/memory/tree') {
         treeReads++
-        return { revision: currentRevision }
+        return { version: currentVersion }
       }
       if (path === '/memory/tree/automation')
-        return { state: 'paused', generation: 1 }
+        return { state: 'paused', version: 1 }
       if (path.endsWith('/content')) {
-        const revision = currentRevision
-        if (delayedLoad && revision === baseRevision) {
+        const version = currentVersion
+        if (delayedLoad && version === baseVersion) {
           await new Promise<void>((resolve) => {
             releaseContent = resolve
           })
         }
-        return { files: { 'MEMORY.md': `Revision ${revision}` } }
+        return { files: { 'MEMORY.md': `Version ${version}` } }
       }
       return {}
     })
@@ -78,7 +78,7 @@ test.each([
     fireEvent.click(edit)
     if (delayedLoad) {
       await waitFor(() => expect(releaseContent).toBeDefined())
-      currentRevision = 3
+      currentVersion = 3
       const readsBefore = treeReads
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'))
@@ -92,20 +92,20 @@ test.each([
       name: 'Memory content'
     })
     fireEvent.change(content, { target: { value: 'First edit' } })
-    currentRevision = 3
+    currentVersion = 3
     const readsBefore = treeReads
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
     await waitFor(() => expect(treeReads).toBeGreaterThan(readsBefore))
-    const commit = screen.getByRole('button', { name: 'Commit revision' })
+    const commit = screen.getByRole('button', { name: 'Commit version' })
     fireEvent.click(commit)
     await within(
       screen.getByRole('dialog', { name: 'Edit memory files' })
     ).findByText('The edit could not be committed.')
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String),
-      expected_active_revision: baseRevision,
+      expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'First edit' }
     })
     const first = vi.mocked(apiPost).mock.calls[0]![1]
@@ -118,7 +118,7 @@ test.each([
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(3))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String),
-      expected_active_revision: baseRevision,
+      expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'Changed edit' }
     })
     expect(vi.mocked(apiPost).mock.calls[2]![1]).not.toEqual(
@@ -143,13 +143,13 @@ test.each([
     const reopened = await screen.findByRole('textbox', {
       name: 'Memory content'
     })
-    expect(reopened).toHaveValue('Revision 3')
+    expect(reopened).toHaveValue('Version 3')
     fireEvent.change(reopened, { target: { value: 'First edit' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Commit revision' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Commit version' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(4))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String),
-      expected_active_revision: 3,
+      expected_active_version: 3,
       files: { 'MEMORY.md': 'First edit' }
     })
     expect(vi.mocked(apiPost).mock.calls[3]![1]).not.toEqual(

@@ -108,7 +108,7 @@ export type ExtractionPublicationList = {
   publications: ExtractionPublication[]
 }
 
-export type AutomaticRevisionPublicationOwner = {
+export type AutomaticVersionPublicationOwner = {
   kind: 'learning' | 'reorganization'
   /**
    * @minLength 1
@@ -143,7 +143,7 @@ export type ObservationDecision = {
 }
 
 /**
- * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
+ * @description Maintainer account of an automatic version. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
  * @type object
  */
 export type MaintenanceReport = {
@@ -156,7 +156,7 @@ export type MaintenanceReport = {
   observation_decisions: ObservationDecision[]
 }
 
-export type LearningRevisionSource = {
+export type LearningVersionSource = {
   kind: 'learning'
   /**
    * @minLength 1
@@ -167,7 +167,7 @@ export type LearningRevisionSource = {
   observation_ids: ExtractionId[]
   trajectory_reference: ArtifactReference
   /**
-   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
+   * @description Maintainer account of an automatic version. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
    * @type object
    */
   maintenance_report: MaintenanceReport
@@ -177,7 +177,7 @@ export type LearningRevisionSource = {
  * @description A maintainer-only curation of existing memory that consumes no observations.
  * @type object
  */
-export type ReorganizationRevisionSource = {
+export type ReorganizationVersionSource = {
   kind: 'reorganization'
   /**
    * @minLength 1
@@ -187,13 +187,13 @@ export type ReorganizationRevisionSource = {
   operation_id: OperationId
   trajectory_reference: ArtifactReference
   /**
-   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
+   * @description Maintainer account of an automatic version. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
    * @type object
    */
   maintenance_report: MaintenanceReport
 }
 
-export type ManualRevisionCreationSource = {
+export type ManualVersionCreationSource = {
   kind: 'manual'
   /**
    * @minLength 1
@@ -203,27 +203,27 @@ export type ManualRevisionCreationSource = {
   operation_id: OperationId
 }
 
-export type MemoryTreeRevisionCreation = {
+export type MemoryTreeVersionCreation = {
   /**
-   * @description Active revision that must still be current for this compare-and-swap commit.
+   * @description Active version that must still be current for this compare-and-swap commit.
    * @minimum 0
    * @type integer
    */
-  expected_active_revision: number
+  expected_active_version: number
   memory_tree_reference: ArtifactReference
   source:
-    | LearningRevisionSource
-    | ReorganizationRevisionSource
-    | ManualRevisionCreationSource
+    | LearningVersionSource
+    | ReorganizationVersionSource
+    | ManualVersionCreationSource
 }
 
-export type RevisionPublication = {
-  intent: MemoryTreeRevisionCreation
+export type VersionPublication = {
+  intent: MemoryTreeVersionCreation
   status: 'reserved' | 'present' | 'selected' | 'abandoned'
 }
 
-export type RevisionPublicationList = {
-  publications: RevisionPublication[]
+export type VersionPublicationList = {
+  publications: VersionPublication[]
 }
 
 export type ExtractionRegistrationResult = {
@@ -304,7 +304,7 @@ export type ObservationRecord = {
    * @minimum 1
    * @type integer
    */
-  consumed_revision: number | null
+  consumed_version: number | null
   /**
    * @description
    * Format: `date-time`
@@ -436,11 +436,11 @@ export type LearningObservation = {
 
 export type LearningInput = {
   /**
-   * @description Active revision that must still be current when this learning input is committed.
+   * @description Active version that must still be current when this learning input is committed.
    * @minimum 0
    * @type integer
    */
-  expected_active_revision: number
+  expected_active_version: number
   active_memory_tree_reference: ArtifactReference | null
   observations: LearningObservation[]
 }
@@ -449,7 +449,7 @@ export type LearningInputResult = {
   input: LearningInput | null
 }
 
-export type ManualRevisionSource = {
+export type ManualVersionSource = {
   kind: 'manual'
   /**
    * @minLength 1
@@ -460,16 +460,16 @@ export type ManualRevisionSource = {
   actor: Actor
 }
 
-export type MemoryTreeRevisionSource =
-  LearningRevisionSource | ReorganizationRevisionSource | ManualRevisionSource
+export type MemoryTreeVersionSource =
+  LearningVersionSource | ReorganizationVersionSource | ManualVersionSource
 
-export type MemoryTreeRevisionCreationResult = {
+export type MemoryTreeVersionCreationResult = {
   created: boolean
   /**
    * @minimum 1
    * @type integer
    */
-  revision: number
+  version: number
   source:
     | {
         kind: 'learning'
@@ -505,24 +505,24 @@ export type MemoryTree = {
    * @minimum 0
    * @type integer
    */
-  revision: number
+  version: number
   memory_tree_reference: ArtifactReference | null
 }
 
-export type MemoryTreeRevision = {
+export type MemoryTreeVersion = {
   /**
    * @minimum 1
    * @type integer
    */
-  revision: number
+  version: number
   /**
-   * @description Revision that was active when this revision was created; null for the first revision.
+   * @description Version that was active when this version was created; null for the first version.
    * @minimum 1
    * @type integer
    */
-  predecessor_revision: number | null
+  predecessor_version: number | null
   memory_tree_reference: ArtifactReference
-  source: MemoryTreeRevisionSource
+  source: MemoryTreeVersionSource
   /**
    * @description
    * Format: `date-time`
@@ -542,12 +542,12 @@ export type MemoryTreeRestoreOperation = {
    * @minimum 1
    * @type integer
    */
-  expected_active_revision: number
+  expected_active_version: number
   /**
    * @minimum 1
    * @type integer
    */
-  restored_revision: number
+  restored_version: number
 }
 
 export type MemoryTreeRestoreOperationResult = {
@@ -556,7 +556,7 @@ export type MemoryTreeRestoreOperationResult = {
    * @minimum 1
    * @type integer
    */
-  active_revision: number
+  active_version: number
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -565,22 +565,22 @@ export type MemoryTreeRestoreOperationResult = {
   operation_id: OperationId
 }
 
-export type MemoryTreeRevisionList = {
-  revisions: MemoryTreeRevision[]
+export type MemoryTreeVersionList = {
+  versions: MemoryTreeVersion[]
   /**
    * @minimum 1
    * @type integer
    */
-  next_before_revision: number | null
+  next_before_version: number | null
 }
 
 /**
- * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+ * @description Admission state for new learning and reorganization version commits. Pausing does not cancel running work or block manual versions, restores, extraction registration, artifact publication, or successful-operation replays.
  * @type object
  */
 export type MemoryTreeAutomation = {
   /**
-   * @description Whether new learning and reorganization revisions may commit; this is not a worker execution status.
+   * @description Whether new learning and reorganization versions may commit; this is not a worker execution status.
    * @type string
    */
   state: 'enabled' | 'paused'
@@ -588,7 +588,7 @@ export type MemoryTreeAutomation = {
    * @minimum 0
    * @type integer
    */
-  generation: number
+  version: number
   changed_by: Actor
   /**
    * @description
@@ -609,13 +609,13 @@ export type MemoryTreeAutomationOperation = {
    * @minimum 0
    * @type integer
    */
-  expected_generation: number
+  expected_version: number
 }
 
 export type MemoryTreeAutomationOperationResult = {
   created: boolean
   /**
-   * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+   * @description Admission state for new learning and reorganization version commits. Pausing does not cancel running work or block manual versions, restores, extraction registration, artifact publication, or successful-operation replays.
    * @type object
    */
   automation: MemoryTreeAutomation
@@ -776,7 +776,7 @@ export type ListObservationsQuery = {
    * @pattern ^[1-9][0-9]*$
    * @type string | undefined
    */
-  consumed_revision?: string
+  consumed_version?: string
 }
 
 export type ListObservationsOptions = {
@@ -848,18 +848,18 @@ export type GetLearningInputResponseBodyByStatus = {
 export type GetLearningInputResponseBody =
   GetLearningInputResponseBodyByStatus['200']
 
-export type CreateMemoryTreeRevisionBody = MemoryTreeRevisionCreation
+export type CreateMemoryTreeVersionBody = MemoryTreeVersionCreation
 
-export type CreateMemoryTreeRevisionOptions = {
-  body: CreateMemoryTreeRevisionBody
+export type CreateMemoryTreeVersionOptions = {
+  body: CreateMemoryTreeVersionBody
   path?: never
   query?: never
   headers?: never
 }
 
-export type CreateMemoryTreeRevisionResponseBodyByStatus = {
-  '200': MemoryTreeRevisionCreationResult
-  '201': MemoryTreeRevisionCreationResult
+export type CreateMemoryTreeVersionResponseBodyByStatus = {
+  '200': MemoryTreeVersionCreationResult
+  '201': MemoryTreeVersionCreationResult
   '400': ErrorResponse
   '401': ErrorResponse
   '409': ErrorResponse
@@ -868,15 +868,15 @@ export type CreateMemoryTreeRevisionResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CreateMemoryTreeRevisionResponseBody =
-  CreateMemoryTreeRevisionResponseBodyByStatus['200' | '201']
+export type CreateMemoryTreeVersionResponseBody =
+  CreateMemoryTreeVersionResponseBodyByStatus['200' | '201']
 
-export type ListMemoryTreeRevisionsQuery = {
+export type ListMemoryTreeVersionsQuery = {
   /**
    * @pattern ^[1-9][0-9]*$
    * @type string | undefined
    */
-  before_revision?: string
+  before_version?: string
   /**
    * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string | undefined
@@ -884,23 +884,23 @@ export type ListMemoryTreeRevisionsQuery = {
   limit?: string
 }
 
-export type ListMemoryTreeRevisionsOptions = {
+export type ListMemoryTreeVersionsOptions = {
   body?: never
   path?: never
-  query?: ListMemoryTreeRevisionsQuery
+  query?: ListMemoryTreeVersionsQuery
   headers?: never
 }
 
-export type ListMemoryTreeRevisionsResponseBodyByStatus = {
-  '200': MemoryTreeRevisionList
+export type ListMemoryTreeVersionsResponseBodyByStatus = {
+  '200': MemoryTreeVersionList
   '400': ErrorResponse
   '401': ErrorResponse
   '500': ErrorResponse
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListMemoryTreeRevisionsResponseBody =
-  ListMemoryTreeRevisionsResponseBodyByStatus['200']
+export type ListMemoryTreeVersionsResponseBody =
+  ListMemoryTreeVersionsResponseBodyByStatus['200']
 
 export type GetMemoryTreeOptions = {
   body?: never
@@ -950,7 +950,7 @@ export type GetMemoryTreeAutomationOptions = {
 
 export type GetMemoryTreeAutomationResponseBodyByStatus = {
   /**
-   * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+   * @description Admission state for new learning and reorganization version commits. Pausing does not cancel running work or block manual versions, restores, extraction registration, artifact publication, or successful-operation replays.
    * @type object
    */
   '200': MemoryTreeAutomation
@@ -1008,23 +1008,23 @@ export type ResumeMemoryTreeAutomationResponseBodyByStatus = {
 export type ResumeMemoryTreeAutomationResponseBody =
   ResumeMemoryTreeAutomationResponseBodyByStatus['200' | '201']
 
-export type GetMemoryTreeRevisionPath = {
+export type GetMemoryTreeVersionPath = {
   /**
    * @pattern ^[1-9][0-9]*$
    * @type string
    */
-  revision: string
+  version: string
 }
 
-export type GetMemoryTreeRevisionOptions = {
+export type GetMemoryTreeVersionOptions = {
   body?: never
-  path: GetMemoryTreeRevisionPath
+  path: GetMemoryTreeVersionPath
   query?: never
   headers?: never
 }
 
-export type GetMemoryTreeRevisionResponseBodyByStatus = {
-  '200': MemoryTreeRevision
+export type GetMemoryTreeVersionResponseBodyByStatus = {
+  '200': MemoryTreeVersion
   '400': ErrorResponse
   '401': ErrorResponse
   '404': ErrorResponse
@@ -1032,8 +1032,8 @@ export type GetMemoryTreeRevisionResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetMemoryTreeRevisionResponseBody =
-  GetMemoryTreeRevisionResponseBodyByStatus['200']
+export type GetMemoryTreeVersionResponseBody =
+  GetMemoryTreeVersionResponseBodyByStatus['200']
 
 export type ReserveExtractionPublicationBody = ExtractionPublicationIntent
 
@@ -1106,17 +1106,17 @@ export type ListExtractionPublicationsResponseBodyByStatus = {
 export type ListExtractionPublicationsResponseBody =
   ListExtractionPublicationsResponseBodyByStatus['200']
 
-export type AbandonRevisionPublicationsBody = AutomaticRevisionPublicationOwner
+export type AbandonVersionPublicationsBody = AutomaticVersionPublicationOwner
 
-export type AbandonRevisionPublicationsOptions = {
-  body: AbandonRevisionPublicationsBody
+export type AbandonVersionPublicationsOptions = {
+  body: AbandonVersionPublicationsBody
   path?: never
   query?: never
   headers?: never
 }
 
-export type AbandonRevisionPublicationsResponseBodyByStatus = {
-  '200': RevisionPublicationList
+export type AbandonVersionPublicationsResponseBodyByStatus = {
+  '200': VersionPublicationList
   '400': ErrorResponse
   '401': ErrorResponse
   '413': ErrorResponse
@@ -1124,42 +1124,20 @@ export type AbandonRevisionPublicationsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type AbandonRevisionPublicationsResponseBody =
-  AbandonRevisionPublicationsResponseBodyByStatus['200']
+export type AbandonVersionPublicationsResponseBody =
+  AbandonVersionPublicationsResponseBodyByStatus['200']
 
-export type ReserveRevisionPublicationBody = MemoryTreeRevisionCreation
+export type ReserveVersionPublicationBody = MemoryTreeVersionCreation
 
-export type ReserveRevisionPublicationOptions = {
-  body: ReserveRevisionPublicationBody
+export type ReserveVersionPublicationOptions = {
+  body: ReserveVersionPublicationBody
   path?: never
   query?: never
   headers?: never
 }
 
-export type ReserveRevisionPublicationResponseBodyByStatus = {
-  '200': RevisionPublication
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '409': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
-}
-
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ReserveRevisionPublicationResponseBody =
-  ReserveRevisionPublicationResponseBodyByStatus['200']
-
-export type ConfirmRevisionPublicationBody = MemoryTreeRevisionCreation
-
-export type ConfirmRevisionPublicationOptions = {
-  body: ConfirmRevisionPublicationBody
-  path?: never
-  query?: never
-  headers?: never
-}
-
-export type ConfirmRevisionPublicationResponseBodyByStatus = {
-  '200': RevisionPublication
+export type ReserveVersionPublicationResponseBodyByStatus = {
+  '200': VersionPublication
   '400': ErrorResponse
   '401': ErrorResponse
   '409': ErrorResponse
@@ -1168,10 +1146,32 @@ export type ConfirmRevisionPublicationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ConfirmRevisionPublicationResponseBody =
-  ConfirmRevisionPublicationResponseBodyByStatus['200']
+export type ReserveVersionPublicationResponseBody =
+  ReserveVersionPublicationResponseBodyByStatus['200']
 
-export type ListRevisionPublicationsPath = {
+export type ConfirmVersionPublicationBody = MemoryTreeVersionCreation
+
+export type ConfirmVersionPublicationOptions = {
+  body: ConfirmVersionPublicationBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ConfirmVersionPublicationResponseBodyByStatus = {
+  '200': VersionPublication
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
+}
+
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ConfirmVersionPublicationResponseBody =
+  ConfirmVersionPublicationResponseBodyByStatus['200']
+
+export type ListVersionPublicationsPath = {
   kind: 'learning' | 'reorganization' | 'manual'
   /**
    * @minLength 1
@@ -1181,23 +1181,23 @@ export type ListRevisionPublicationsPath = {
   owner_id: string
 }
 
-export type ListRevisionPublicationsOptions = {
+export type ListVersionPublicationsOptions = {
   body?: never
-  path: ListRevisionPublicationsPath
+  path: ListVersionPublicationsPath
   query?: never
   headers?: never
 }
 
-export type ListRevisionPublicationsResponseBodyByStatus = {
-  '200': RevisionPublicationList
+export type ListVersionPublicationsResponseBodyByStatus = {
+  '200': VersionPublicationList
   '400': ErrorResponse
   '401': ErrorResponse
   '500': ErrorResponse
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListRevisionPublicationsResponseBody =
-  ListRevisionPublicationsResponseBodyByStatus['200']
+export type ListVersionPublicationsResponseBody =
+  ListVersionPublicationsResponseBodyByStatus['200']
 
 export interface OperationOptionsById {
   health: HealthOptions
@@ -1208,19 +1208,19 @@ export interface OperationOptionsById {
   listObservations: ListObservationsOptions
   getCatalogOverview: GetCatalogOverviewOptions
   getLearningInput: GetLearningInputOptions
-  createMemoryTreeRevision: CreateMemoryTreeRevisionOptions
-  listMemoryTreeRevisions: ListMemoryTreeRevisionsOptions
+  createMemoryTreeVersion: CreateMemoryTreeVersionOptions
+  listMemoryTreeVersions: ListMemoryTreeVersionsOptions
   getMemoryTree: GetMemoryTreeOptions
   restoreMemoryTree: RestoreMemoryTreeOptions
   getMemoryTreeAutomation: GetMemoryTreeAutomationOptions
   pauseMemoryTreeAutomation: PauseMemoryTreeAutomationOptions
   resumeMemoryTreeAutomation: ResumeMemoryTreeAutomationOptions
-  getMemoryTreeRevision: GetMemoryTreeRevisionOptions
+  getMemoryTreeVersion: GetMemoryTreeVersionOptions
   reserveExtractionPublication: ReserveExtractionPublicationOptions
   confirmExtractionPublication: ConfirmExtractionPublicationOptions
   listExtractionPublications: ListExtractionPublicationsOptions
-  abandonRevisionPublications: AbandonRevisionPublicationsOptions
-  reserveRevisionPublication: ReserveRevisionPublicationOptions
-  confirmRevisionPublication: ConfirmRevisionPublicationOptions
-  listRevisionPublications: ListRevisionPublicationsOptions
+  abandonVersionPublications: AbandonVersionPublicationsOptions
+  reserveVersionPublication: ReserveVersionPublicationOptions
+  confirmVersionPublication: ConfirmVersionPublicationOptions
+  listVersionPublications: ListVersionPublicationsOptions
 }

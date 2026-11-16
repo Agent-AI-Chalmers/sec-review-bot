@@ -21,8 +21,8 @@ type MemoryArtifactRequest = {
   identity: string
   view: 'download' | 'content'
 } & (
-  | { kind: 'tree'; collection: 'revisions' }
-  | { kind: 'trajectory'; collection: 'revisions' | 'extractions' }
+  | { kind: 'tree'; collection: 'versions' }
+  | { kind: 'trajectory'; collection: 'versions' | 'extractions' }
 )
 
 /** Resolve the HTTP representation into a valid artifact source and view. */
@@ -31,14 +31,14 @@ function parseMemoryArtifactRequest(
   identity: string,
   representation: string
 ): MemoryArtifactRequest | null {
-  if (collection !== 'revisions' && collection !== 'extractions') return null
-  if (collection === 'revisions' && !/^[1-9][0-9]*$/.test(identity)) return null
+  if (collection !== 'versions' && collection !== 'extractions') return null
+  if (collection === 'versions' && !/^[1-9][0-9]*$/.test(identity)) return null
   if (collection === 'extractions' && !/^[A-Za-z0-9._:-]+$/.test(identity))
     return null
   switch (representation) {
     case 'artifact':
     case 'content':
-      if (collection !== 'revisions') return null
+      if (collection !== 'versions') return null
       return {
         collection,
         identity,
@@ -116,7 +116,7 @@ export function createMemoryArtifactRoutes({
   ): Promise<boolean> => {
     if (request.method !== 'GET') return false
     const match =
-      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|trajectory|content|trajectory\/content)$/.exec(
+      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/(artifact|trajectory|content|trajectory\/content)$/.exec(
         request.url ?? ''
       )
     if (match === null) return false

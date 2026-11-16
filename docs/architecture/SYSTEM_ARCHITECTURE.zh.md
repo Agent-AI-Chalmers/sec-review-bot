@@ -23,7 +23,7 @@ Temporal Server 属于基础设施，但它会直接向 Worker 进程分发工�
 
 Memory Catalog 在 PostgreSQL 中保存协调状态，对象存储保存不可变的记忆文件树和执行轨迹，Temporal 调度工作流。启用记忆读取且已有生效版本时，审查调用会将记忆文件树还原到临时目录，供 Agent 读取，并在调用结束后清理。
 
-Control Plane UI 通过同源服务端（BFF）访问 Memory Catalog，浏览器不会获得 Catalog 令牌、对象存储凭据或 `s3://` 引用。BFF 下载产物后先核对引用信息、大小和摘要，再返回内容。经过认证的运维人员可以暂停或恢复记忆树自动修订提交、提交人工编辑版本，以及恢复已有版本。新修订以创建时的生效版本为前驱，修订编号仍全局递增。BFF 可以创建不可变的记忆文件树对象，但对审查产物和记忆执行轨迹仅有读取权限。
+Control Plane UI 通过同源服务端（BFF）访问 Memory Catalog，浏览器不会获得 Catalog 令牌、对象存储凭据或 `s3://` 引用。BFF 下载产物后先核对引用信息、大小和摘要，再返回内容。经过认证的运维人员可以暂停或恢复记忆树自动版本提交、提交人工编辑版本，以及恢复已有版本。新版本以创建时的生效版本为前驱，版本编号仍全局递增。BFF 可以创建不可变的记忆文件树对象，但对审查产物和记忆执行轨迹仅有读取权限。
 
 ## 运行角色职责地图
 
@@ -35,8 +35,8 @@ Control Plane UI 通过同源服务端（BFF）访问 Memory Catalog，浏览器
 | Execution Gateway         | `services/execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换             | [README](../../services/execution-gateway/README.zh.md) |
 | Execution Worker          | `agents/`                     | 执行审查工作流、activity 和 Agent，保存阶段产物并发布执行归档 | [README](../../agents/README.zh.md)                     |
 | Memory Extraction Worker  | `agents/`                     | 读取执行归档、提取经验、发布轨迹并登记 extraction             | [README](../../agents/README.zh.md)                     |
-| Memory Maintenance Worker | `agents/`                     | 分批整理待处理经验、发布记忆文件树并提交修订                  | [README](../../agents/README.zh.md)                     |
-| Memory Catalog Server     | `services/memory-catalog/`    | 保存 extraction、不可变修订历史和当前生效版本                 | [README](../../services/memory-catalog/README.zh.md)    |
+| Memory Maintenance Worker | `agents/`                     | 分批整理待处理经验、发布记忆文件树并提交版本                  | [README](../../agents/README.zh.md)                     |
+| Memory Catalog Server     | `services/memory-catalog/`    | 保存 extraction、不可变版本历史和当前生效版本                 | [README](../../services/memory-catalog/README.zh.md)    |
 
 这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。`services/` 归集内部 HTTP 服务包；各包保留独立的配置、构建和部署。源码包的位置不决定运行进程的组织方式：`agents/` 实现彼此独立部署的 Temporal Worker。`apps/` 下的应用也分别独立部署。
 
@@ -96,7 +96,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: 分发 maintenance 工作
     Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
     MaintenanceWorker->>Catalog: 选择一批待处理 observations
-    Catalog-->>MaintenanceWorker: 返回 observations、observation IDs、expected active revision 和当前 memory tree reference
+    Catalog-->>MaintenanceWorker: 返回 observations、observation IDs、expected active version 和当前 memory tree reference
     opt 存在当前 memory tree
       MaintenanceWorker->>Storage: 下载当前 memory tree artifact
       Storage-->>MaintenanceWorker: memory tree artifact
@@ -105,11 +105,11 @@ sequenceDiagram
     Note over MaintenanceWorker: 运行 maintainer
     MaintenanceWorker->>Storage: 保存 maintainer trajectory
     MaintenanceWorker->>Storage: 保存新的 memory tree artifact
-    MaintenanceWorker-->>Temporal: 返回 artifact references、observation IDs 和 expected active revision
+    MaintenanceWorker-->>Temporal: 返回 artifact references、observation IDs 和 expected active version
     Note over Temporal: 后续 commit 重试复用该 activity 结果
-    Temporal->>MaintenanceWorker: 调度 revision commit
-    MaintenanceWorker->>Catalog: 使用 maintenance ID 和 expected active revision CAS 创建 memory tree revision
-    Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 revision，或 revision conflict
+    Temporal->>MaintenanceWorker: 调度 version commit
+    MaintenanceWorker->>Catalog: 使用 maintenance ID 和 expected active version CAS 创建 memory tree version
+    Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 version，或 version conflict
   end
 ```
 

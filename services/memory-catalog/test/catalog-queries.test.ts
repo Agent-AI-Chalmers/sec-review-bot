@@ -16,7 +16,7 @@ const artifact = {
   size_bytes: 42,
 }
 
-const revisionTrajectory = {
+const versionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
   media_type: 'application/zstd',
@@ -30,7 +30,7 @@ const extractionTrajectory = {
   size_bytes: 18,
 }
 
-await test('memory tree revision history pagination returns an exclusive descending cursor', async () => {
+await test('memory tree version history pagination returns an exclusive descending cursor', async () => {
   const queried: unknown[][] = []
   const pool = {
     query: (_sql: string, parameters: unknown[]) => {
@@ -38,37 +38,37 @@ await test('memory tree revision history pagination returns an exclusive descend
       return Promise.resolve({
         rows: [
           {
-            revision: '4',
+            version: '4',
             source_kind: 'learning',
             operation_id: 'maintenance-4',
-            predecessor_revision: '3',
+            predecessor_version: '3',
             observation_ids: ['extraction-4'],
             memory_tree_reference: artifact,
-            trajectory_reference: revisionTrajectory,
+            trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-4']),
             actor: null,
             created_at: new Date('2026-10-23T04:00:00Z'),
           },
           {
-            revision: '3',
+            version: '3',
             source_kind: 'learning',
             operation_id: 'maintenance-3',
-            predecessor_revision: '2',
+            predecessor_version: '2',
             observation_ids: ['extraction-3'],
             memory_tree_reference: artifact,
-            trajectory_reference: revisionTrajectory,
+            trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-3']),
             actor: null,
             created_at: new Date('2026-10-23T03:00:00Z'),
           },
           {
-            revision: '2',
+            version: '2',
             source_kind: 'learning',
             operation_id: 'maintenance-2',
-            predecessor_revision: '1',
+            predecessor_version: '1',
             observation_ids: ['extraction-2'],
             memory_tree_reference: artifact,
-            trajectory_reference: revisionTrajectory,
+            trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-2']),
             actor: null,
             created_at: new Date('2026-10-23T02:00:00Z'),
@@ -81,14 +81,14 @@ await test('memory tree revision history pagination returns an exclusive descend
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
-  const page = await queries.listMemoryTreeRevisions(5, 2)
+  const page = await queries.listMemoryTreeVersions(5, 2)
 
   assert.deepEqual(queried, [[5, 3]])
   assert.deepEqual(
-    page.revisions.map((entry) => entry.revision),
+    page.versions.map((entry) => entry.version),
     [4, 3],
   )
-  assert.equal(page.next_before_revision, 3)
+  assert.equal(page.next_before_version, 3)
 })
 
 await test('extraction pagination uses a stable opaque exclusive cursor', async () => {
@@ -169,7 +169,7 @@ await test('observation records include their authoritative extraction source', 
             source_run_id: 'run-1',
             source_unit_id: 'review',
             body_markdown: 'Remember this.',
-            consumed_revision: null,
+            consumed_version: null,
             created_at: new Date('2026-10-23T00:00:00Z'),
           },
         ],
@@ -188,7 +188,7 @@ await test('observation records include their authoritative extraction source', 
       source_run_id: 'run-1',
       source_unit_id: 'review',
       body_markdown: 'Remember this.',
-      consumed_revision: null,
+      consumed_version: null,
       created_at: '2026-10-23T00:00:00.000Z',
     },
   ])
@@ -335,7 +335,7 @@ await test('memory-tree automation reads the durable singleton state', async () 
         rows: [
           {
             state: 'enabled',
-            generation: '0',
+            version: '0',
             changed_by: { kind: 'service', id: 'memory-catalog' },
             changed_at: new Date('2026-10-23T00:00:00Z'),
           },
@@ -348,24 +348,24 @@ await test('memory-tree automation reads the durable singleton state', async () 
 
   assert.deepEqual(await queries.getMemoryTreeAutomation(), {
     state: 'enabled',
-    generation: 0,
+    version: 0,
     changed_by: { kind: 'service', id: 'memory-catalog' },
     changed_at: '2026-10-23T00:00:00.000Z',
   })
 })
 
-await test('reorganization revisions retain their source and trajectory in detail and history', async () => {
+await test('reorganization versions retain their source and trajectory in detail and history', async () => {
   const pool = {
     query: () =>
       Promise.resolve({
         rows: [
           {
-            revision: '2',
-            predecessor_revision: '1',
+            version: '2',
+            predecessor_version: '1',
             source_kind: 'reorganization',
             operation_id: 'reorganization-2',
             observation_ids: [],
-            trajectory_reference: revisionTrajectory,
+            trajectory_reference: versionTrajectory,
             maintenance_report: reorganizationReport,
             actor: null,
             memory_tree_reference: artifact,
@@ -376,20 +376,20 @@ await test('reorganization revisions retain their source and trajectory in detai
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
   const expected = {
-    revision: 2,
-    predecessor_revision: 1,
+    version: 2,
+    predecessor_version: 1,
     source: {
       kind: 'reorganization',
       operation_id: 'reorganization-2',
-      trajectory_reference: revisionTrajectory,
+      trajectory_reference: versionTrajectory,
       maintenance_report: reorganizationReport,
     },
     memory_tree_reference: artifact,
     created_at: '2026-10-23T04:00:00.000Z',
   }
-  assert.deepEqual(await queries.getMemoryTreeRevision(2), expected)
-  assert.deepEqual(await queries.listMemoryTreeRevisions(undefined, 10), {
-    revisions: [expected],
-    next_before_revision: null,
+  assert.deepEqual(await queries.getMemoryTreeVersion(2), expected)
+  assert.deepEqual(await queries.listMemoryTreeVersions(undefined, 10), {
+    versions: [expected],
+    next_before_version: null,
   })
 })

@@ -2,8 +2,8 @@ import React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
-import { MemoryRevisionHistory } from '../../browser/features/memory/MemoryRevisionHistory.js'
-import type { MemoryTreeRevision } from '../../browser/features/memory/api-types.generated.js'
+import { MemoryVersionHistory } from '../../browser/features/memory/MemoryVersionHistory.js'
+import type { MemoryTreeVersion } from '../../browser/features/memory/api-types.generated.js'
 import { renderComponent } from './render.js'
 
 const trajectoryReference = {
@@ -13,9 +13,9 @@ const trajectoryReference = {
   size_bytes: 21
 }
 
-const revision: MemoryTreeRevision = {
-  revision: 2,
-  predecessor_revision: 1,
+const version: MemoryTreeVersion = {
+  version: 2,
+  predecessor_version: 1,
   created_at: '2026-11-09T00:00:00Z',
   memory_tree_reference: {
     uri: 's3://test/tree',
@@ -34,10 +34,10 @@ const revision: MemoryTreeRevision = {
   }
 }
 
-const learningRevision: MemoryTreeRevision = {
-  ...revision,
-  revision: 3,
-  predecessor_revision: 2,
+const learningVersion: MemoryTreeVersion = {
+  ...version,
+  version: 3,
+  predecessor_version: 2,
   source: {
     kind: 'learning',
     operation_id: 'learning-3',
@@ -64,22 +64,22 @@ const learningRevision: MemoryTreeRevision = {
 }
 
 function historyProps(
-  revisions: MemoryTreeRevision[]
+  versions: MemoryTreeVersion[]
 ): Pick<
-  React.ComponentProps<typeof MemoryRevisionHistory>,
-  | 'graphRevisions'
+  React.ComponentProps<typeof MemoryVersionHistory>,
+  | 'graphVersions'
   | 'graphLoading'
   | 'graphError'
-  | 'listRevisions'
+  | 'listVersions'
   | 'listLoading'
   | 'listError'
   | 'pagination'
 > {
   return {
-    graphRevisions: revisions,
+    graphVersions: versions,
     graphLoading: false,
     graphError: '',
-    listRevisions: revisions,
+    listVersions: versions,
     listLoading: false,
     listError: '',
     pagination: {
@@ -98,11 +98,11 @@ test.each(['list', 'graph'])(
   (view) => {
     const onViewTrajectory = vi.fn()
     renderComponent(
-      <MemoryRevisionHistory
-        {...historyProps([revision])}
-        activeRevision={2}
+      <MemoryVersionHistory
+        {...historyProps([version])}
+        activeVersion={2}
         view={view}
-        highlightedRevision={undefined}
+        highlightedVersion={undefined}
         onViewChange={vi.fn()}
         onViewFiles={vi.fn()}
         onViewTrajectory={onViewTrajectory}
@@ -120,16 +120,16 @@ test.each(['list', 'graph'])(
 )
 
 function renderHistory(
-  revisions: MemoryTreeRevision[],
+  versions: MemoryTreeVersion[],
   view: string = 'list',
   onRevealObservation = vi.fn()
 ): void {
   renderComponent(
-    <MemoryRevisionHistory
-      {...historyProps(revisions)}
-      activeRevision={revisions[0]?.revision}
+    <MemoryVersionHistory
+      {...historyProps(versions)}
+      activeVersion={versions[0]?.version}
       view={view}
-      highlightedRevision={undefined}
+      highlightedVersion={undefined}
       onViewChange={vi.fn()}
       onViewFiles={vi.fn()}
       onViewTrajectory={vi.fn()}
@@ -144,7 +144,7 @@ function renderHistory(
 test.each(['list', 'graph'])(
   'the maintenance report shows the summary and each observation decision in %s view',
   async (view) => {
-    renderHistory([learningRevision], view)
+    renderHistory([learningVersion], view)
     fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
     expect(
       await screen.findByText('Added one lesson and skipped a duplicate.')
@@ -160,7 +160,7 @@ test.each(['list', 'graph'])(
 )
 
 test('a reorganization report states that no observations were consumed', async () => {
-  renderHistory([revision])
+  renderHistory([version])
   fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
   expect(
     await screen.findByText('Merged duplicate path topics.')
@@ -169,10 +169,10 @@ test('a reorganization report states that no observations were consumed', async 
 })
 
 test.each(['list', 'graph'])(
-  'a report decision reveals its observation with the revision in %s view',
+  'a report decision reveals its observation with the version in %s view',
   async (view) => {
     const onRevealObservation = vi.fn()
-    renderHistory([learningRevision], view, onRevealObservation)
+    renderHistory([learningVersion], view, onRevealObservation)
     fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
     const links = await screen.findAllByRole('button', {
       name: 'View observation'
@@ -184,11 +184,11 @@ test.each(['list', 'graph'])(
 
 test('the graph toolbar exposes its range and keeps latest navigation in place', () => {
   renderComponent(
-    <MemoryRevisionHistory
-      {...historyProps([revision])}
-      activeRevision={2}
+    <MemoryVersionHistory
+      {...historyProps([version])}
+      activeVersion={2}
       view="graph"
-      highlightedRevision={undefined}
+      highlightedVersion={undefined}
       onViewChange={vi.fn()}
       onViewFiles={vi.fn()}
       onViewTrajectory={vi.fn()}
@@ -198,6 +198,6 @@ test('the graph toolbar exposes its range and keeps latest navigation in place',
       onHighlightEnd={vi.fn()}
     />
   )
-  expect(screen.getByText('Revisions 2–2')).toBeInTheDocument()
+  expect(screen.getByText('Versions 2–2')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Back to latest' })).toBeDisabled()
 })

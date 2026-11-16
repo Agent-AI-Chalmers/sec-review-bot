@@ -10,15 +10,15 @@ import { useMessages, type Message } from '../../shared/i18n.js'
 import type {
   MemoryTreeAutomationOperation,
   MemoryTreeRestoreOperation,
-  MemoryTreeRevision
+  MemoryTreeVersion
 } from './api-types.generated.js'
 import { MemoryEditorDialog, MemoryRestoreDialog } from './MemoryDialogs.js'
 import { MemoryFilesViewer } from './MemoryFilesViewer.js'
 import { MemoryHeader } from './MemoryHeader.js'
 import { MemoryObservationList } from './MemoryObservationList.js'
 import { MemoryOverview } from './MemoryOverview.js'
-import { MemoryRevisionDiffViewer } from './MemoryRevisionDiff.js'
-import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
+import { MemoryVersionDiffViewer } from './MemoryVersionDiff.js'
+import { MemoryVersionHistory } from './MemoryVersionHistory.js'
 import { useMemoryEditor } from './useMemoryEditor.js'
 import { DEFAULT_PAGE_SIZE, useMemoryResources } from './useMemoryResources.js'
 import type { PagedResource } from './usePagedResource.js'
@@ -29,7 +29,7 @@ import {
   type TrajectoryTarget
 } from '../trajectory/TrajectoryViewer.js'
 
-type Revision = MemoryTreeRevision
+type Version = MemoryTreeVersion
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
 
 function operationId(): string {
@@ -41,10 +41,10 @@ export function Memory(): React.JSX.Element {
   const {
     automation,
     tree,
-    graphRevisions,
+    graphVersions,
     graphTarget,
     showGraph,
-    revisionPages,
+    versionPages,
     observationPages,
     overview,
     overviewRange,
@@ -53,16 +53,16 @@ export function Memory(): React.JSX.Element {
     refreshing,
     lastChecked
   } = useMemoryResources()
-  const activeRevision = tree.data?.revision
+  const activeVersion = tree.data?.version
   const editor = useMemoryEditor()
-  const [restoreRevision, setRestoreRevision] = React.useState<number>()
-  const [viewRevision, setViewRevision] = React.useState<number>()
-  const [diffRevision, setDiffRevision] = React.useState<Revision>()
+  const [restoreVersion, setRestoreVersion] = React.useState<number>()
+  const [viewVersion, setViewVersion] = React.useState<number>()
+  const [diffVersion, setDiffVersion] = React.useState<Version>()
   const [trajectoryTarget, setTrajectoryTarget] =
     React.useState<TrajectoryTarget>()
   const [activeTab, setActiveTab] = React.useState<string | null>('overview')
-  const [revisionView, setRevisionView] = React.useState('graph')
-  const [highlightedRevision, setHighlightedRevision] = React.useState<number>()
+  const [versionView, setVersionView] = React.useState('graph')
+  const [highlightedVersion, setHighlightedVersion] = React.useState<number>()
   const [highlightedObservation, setHighlightedObservation] =
     React.useState<string>()
   const [error, setError] = React.useState('')
@@ -71,31 +71,31 @@ export function Memory(): React.JSX.Element {
   const [queryFailure, setQueryFailure] = React.useState<unknown>()
   const [busy, setBusy] = React.useState(false)
 
-  const revealRevision = (revision: number): void => {
-    setActiveTab('revisions')
-    setRevisionView('graph')
-    // Clearing first lets repeated visits to the same revision replay the cue.
-    setHighlightedRevision(undefined)
-    requestAnimationFrame(() => setHighlightedRevision(revision))
-    void showGraph(revision)
+  const revealVersion = (version: number): void => {
+    setActiveTab('versions')
+    setVersionView('graph')
+    // Clearing first lets repeated visits to the same version replay the cue.
+    setHighlightedVersion(undefined)
+    requestAnimationFrame(() => setHighlightedVersion(version))
+    void showGraph(version)
   }
 
-  // A revision consumes one learning batch, which the catalog caps at 100, the same
+  // A version consumes one learning batch, which the catalog caps at 100, the same
   // as its largest list page; the filtered first page at that size holds the target.
-  const revealObservation = (revision: number, observationId: string): void => {
+  const revealObservation = (version: number, observationId: string): void => {
     setActiveTab('observations')
     setHighlightedObservation(undefined)
     void observationPages
-      .openFirst({ filter: revision, limit: MAX_PAGE_SIZE })
+      .openFirst({ filter: version, limit: MAX_PAGE_SIZE })
       .then(() => setHighlightedObservation(observationId))
   }
 
-  const viewMemoryMaintainerTrajectory = (revision: number): void => {
+  const viewMemoryMaintainerTrajectory = (version: number): void => {
     setTrajectoryTarget({
       title: t('memoryMaintainerTrajectory'),
-      contentHref: `/memory/revisions/${revision}/trajectory/content`,
-      downloadHref: `/api/memory/revisions/${revision}/trajectory`,
-      pageHref: `/memory/revisions/${revision}/trajectory`
+      contentHref: `/memory/versions/${version}/trajectory/content`,
+      downloadHref: `/api/memory/versions/${version}/trajectory`,
+      pageHref: `/memory/versions/${version}/trajectory`
     })
   }
 
@@ -108,7 +108,7 @@ export function Memory(): React.JSX.Element {
     try {
       const request = {
         operation_id: operationId(),
-        expected_generation: automation.data.generation
+        expected_version: automation.data.version
       } satisfies MemoryTreeAutomationOperation
       await apiPost(`/memory/tree/automation/${action}`, request)
       await refresh()
@@ -124,10 +124,10 @@ export function Memory(): React.JSX.Element {
     }
   }
   const beginEdit = async (): Promise<void> => {
-    if (activeRevision === undefined) return
+    if (activeVersion === undefined) return
     setEditError('')
     try {
-      await editor.begin(activeRevision)
+      await editor.begin(activeVersion)
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       else setError(t('memoryLoadFailed'))
@@ -144,7 +144,7 @@ export function Memory(): React.JSX.Element {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       setEditError(
         failure instanceof ApiError && failure.status === 409
-          ? t('memoryRevisionConflict')
+          ? t('memoryVersionConflict')
           : t('memoryEditFailed')
       )
     } finally {
@@ -152,17 +152,17 @@ export function Memory(): React.JSX.Element {
     }
   }
   const restore = async (): Promise<void> => {
-    if (restoreRevision === undefined || activeRevision === undefined) return
+    if (restoreVersion === undefined || activeVersion === undefined) return
     setBusy(true)
     setRestoreError('')
     try {
       const request = {
         operation_id: operationId(),
-        expected_active_revision: activeRevision,
-        restored_revision: restoreRevision
+        expected_active_version: activeVersion,
+        restored_version: restoreVersion
       } satisfies RestoreRequest
       await apiPost('/memory/restore', request)
-      setRestoreRevision(undefined)
+      setRestoreVersion(undefined)
       await refresh()
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
@@ -183,8 +183,8 @@ export function Memory(): React.JSX.Element {
     [
       automation.error,
       tree.error,
-      graphRevisions.error,
-      revisionPages.resource.error,
+      graphVersions.error,
+      versionPages.resource.error,
       observationPages.resource.error,
       overview.error
     ].find(isUnauthorizedApiError)
@@ -198,13 +198,13 @@ export function Memory(): React.JSX.Element {
     'memoryAutomationLoadFailed'
   )
   const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
-  const graphRevisionsError = failureText(
-    graphRevisions.error,
-    'memoryRevisionsLoadFailed'
+  const graphVersionsError = failureText(
+    graphVersions.error,
+    'memoryVersionsLoadFailed'
   )
-  const revisionPageError = failureText(
-    revisionPages.resource.error,
-    'memoryRevisionsLoadFailed'
+  const versionPageError = failureText(
+    versionPages.resource.error,
+    'memoryVersionsLoadFailed'
   )
   const observationsError = failureText(
     observationPages.resource.error,
@@ -224,7 +224,7 @@ export function Memory(): React.JSX.Element {
       )}
       <MemoryHeader
         automation={automation.data}
-        activeRevision={activeRevision}
+        activeVersion={activeVersion}
         busy={busy}
         automationLoading={automation.loading}
         treeLoading={tree.loading}
@@ -244,7 +244,7 @@ export function Memory(): React.JSX.Element {
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Tab value="overview">{t('memoryOverview')}</Tabs.Tab>
-          <Tabs.Tab value="revisions">{t('memoryRevisions')}</Tabs.Tab>
+          <Tabs.Tab value="versions">{t('memoryVersions')}</Tabs.Tab>
           <Tabs.Tab value="observations">{t('memoryObservations')}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="overview" pt="md">
@@ -264,36 +264,36 @@ export function Memory(): React.JSX.Element {
             />
           )}
         </Tabs.Panel>
-        <Tabs.Panel value="revisions" pt="md">
-          <MemoryRevisionHistory
-            graphRevisions={graphRevisions.data?.revisions ?? []}
+        <Tabs.Panel value="versions" pt="md">
+          <MemoryVersionHistory
+            graphVersions={graphVersions.data?.versions ?? []}
             graphTarget={graphTarget}
             onShowLatest={() => {
-              setHighlightedRevision(undefined)
+              setHighlightedVersion(undefined)
               void showGraph()
             }}
-            graphLoading={graphRevisions.loading}
-            graphError={graphRevisionsError}
-            listRevisions={revisionPages.resource.data?.page.revisions ?? []}
-            listLoading={revisionPages.resource.loading}
-            listError={revisionPageError}
+            graphLoading={graphVersions.loading}
+            graphError={graphVersionsError}
+            listVersions={versionPages.resource.data?.page.versions ?? []}
+            listLoading={versionPages.resource.loading}
+            listError={versionPageError}
             pagination={pagination(
-              revisionPages,
-              revisionPages.resource.data?.page.next_before_revision
+              versionPages,
+              versionPages.resource.data?.page.next_before_version
             )}
-            activeRevision={activeRevision}
-            view={revisionView}
-            highlightedRevision={highlightedRevision}
-            onViewChange={setRevisionView}
-            onViewFiles={setViewRevision}
+            activeVersion={activeVersion}
+            view={versionView}
+            highlightedVersion={highlightedVersion}
+            onViewChange={setVersionView}
+            onViewFiles={setViewVersion}
             onViewTrajectory={viewMemoryMaintainerTrajectory}
             onRevealObservation={revealObservation}
-            onCompare={setDiffRevision}
-            onSetCurrent={(revision) => {
+            onCompare={setDiffVersion}
+            onSetCurrent={(version) => {
               setRestoreError('')
-              setRestoreRevision(revision)
+              setRestoreVersion(version)
             }}
-            onHighlightEnd={() => setHighlightedRevision(undefined)}
+            onHighlightEnd={() => setHighlightedVersion(undefined)}
           />
         </Tabs.Panel>
         <Tabs.Panel value="observations" pt="md">
@@ -307,8 +307,8 @@ export function Memory(): React.JSX.Element {
               observationPages,
               observationPages.resource.data?.page.next_cursor
             )}
-            revisionFilter={observationPages.query.filter}
-            onClearRevisionFilter={() => {
+            versionFilter={observationPages.query.filter}
+            onClearVersionFilter={() => {
               setHighlightedObservation(undefined)
               void observationPages.openFirst({
                 filter: undefined,
@@ -317,7 +317,7 @@ export function Memory(): React.JSX.Element {
             }}
             highlightedObservation={highlightedObservation}
             onHighlightEnd={() => setHighlightedObservation(undefined)}
-            onRevealRevision={revealRevision}
+            onRevealVersion={revealVersion}
             onViewTrajectory={(item) =>
               setTrajectoryTarget({
                 title: t('memoryExtractorTrajectory'),
@@ -330,12 +330,12 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
       </Tabs>
       <MemoryFilesViewer
-        revision={viewRevision}
-        onClose={() => setViewRevision(undefined)}
+        version={viewVersion}
+        onClose={() => setViewVersion(undefined)}
       />
-      <MemoryRevisionDiffViewer
-        target={diffRevision}
-        onClose={() => setDiffRevision(undefined)}
+      <MemoryVersionDiffViewer
+        target={diffVersion}
+        onClose={() => setDiffVersion(undefined)}
       />
       <TrajectoryViewer
         target={trajectoryTarget}
@@ -343,9 +343,9 @@ export function Memory(): React.JSX.Element {
       />
       <MemoryRestoreDialog
         error={restoreError}
-        revision={restoreRevision}
+        version={restoreVersion}
         busy={busy}
-        onClose={() => setRestoreRevision(undefined)}
+        onClose={() => setRestoreVersion(undefined)}
         onConfirm={() => void restore()}
       />
       {editor.session !== undefined && (

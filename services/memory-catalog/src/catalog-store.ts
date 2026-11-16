@@ -1,10 +1,10 @@
 import { Pool, type PoolClient } from 'pg'
 
 import type {
-  AutomaticRevisionPublicationOwner,
+  AutomaticVersionPublicationOwner,
   ExtractionPublication,
   ExtractionPublicationIntent,
-  RevisionPublication,
+  VersionPublication,
   Actor,
   ArtifactReference,
   ExtractionRegistration,
@@ -13,9 +13,9 @@ import type {
   LearningInput,
   MemoryTreeRestoreOperation,
   MemoryTreeRestoreOperationResult,
-  MemoryTreeRevisionCreation,
-  MemoryTreeRevisionCreationResult,
-  ManualRevisionSource,
+  MemoryTreeVersionCreation,
+  MemoryTreeVersionCreationResult,
+  ManualVersionSource,
 } from './contract-types-generated.js'
 import {
   PostgresMemoryCatalogQueries,
@@ -27,14 +27,14 @@ export type AuthenticatedMemoryTreeAutomationOperation =
   MemoryTreeAutomationOperation & { actor: Actor }
 export type AuthenticatedMemoryTreeRestoreOperation =
   MemoryTreeRestoreOperation & { actor: Actor }
-export type AuthenticatedMemoryTreeRevisionCreation = Omit<
-  MemoryTreeRevisionCreation,
+export type AuthenticatedMemoryTreeVersionCreation = Omit<
+  MemoryTreeVersionCreation,
   'source'
 > & {
   source:
-    | Extract<MemoryTreeRevisionCreation['source'], { kind: 'learning' }>
-    | Extract<MemoryTreeRevisionCreation['source'], { kind: 'reorganization' }>
-    | ManualRevisionSource
+    | Extract<MemoryTreeVersionCreation['source'], { kind: 'learning' }>
+    | Extract<MemoryTreeVersionCreation['source'], { kind: 'reorganization' }>
+    | ManualVersionSource
 }
 
 async function inTransaction<T>(
@@ -68,28 +68,28 @@ export interface MemoryCatalogStore {
   listExtractionPublications(
     extractionId: string,
   ): Promise<ExtractionPublication[]>
-  reserveRevisionPublication(
-    intent: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<RevisionPublication>
-  confirmRevisionPublication(
-    intent: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<RevisionPublication>
-  listRevisionPublications(
+  reserveVersionPublication(
+    intent: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<VersionPublication>
+  confirmVersionPublication(
+    intent: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<VersionPublication>
+  listVersionPublications(
     kind: 'learning' | 'reorganization' | 'manual',
     ownerId: string,
-  ): Promise<RevisionPublication[]>
-  abandonRevisionPublications(
-    input: AutomaticRevisionPublicationOwner,
-  ): Promise<RevisionPublication[]>
+  ): Promise<VersionPublication[]>
+  abandonVersionPublications(
+    input: AutomaticVersionPublicationOwner,
+  ): Promise<VersionPublication[]>
   registerExtraction(input: ExtractionRegistration): Promise<boolean>
   changeMemoryTreeAutomation(
     targetState: 'enabled' | 'paused',
     input: AuthenticatedMemoryTreeAutomationOperation,
   ): Promise<MemoryTreeAutomationOperationResult>
   getLearningInput(limit: number): Promise<LearningInput | null>
-  createMemoryTreeRevision(
-    input: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<MemoryTreeRevisionCreationResult>
+  createMemoryTreeVersion(
+    input: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<MemoryTreeVersionCreationResult>
   restoreMemoryTree(
     input: AuthenticatedMemoryTreeRestoreOperation,
   ): Promise<MemoryTreeRestoreOperationResult>
@@ -97,13 +97,13 @@ export interface MemoryCatalogStore {
 
 export class ExtractionConflictError extends Error {}
 
-export class MemoryTreeRevisionConflictError extends Error {}
+export class MemoryTreeVersionConflictError extends Error {}
 
 export class MemoryTreeAutomationConflictError extends Error {}
 
 export class AutomationPausedError extends Error {}
 
-export class PublicationAbandonedError extends MemoryTreeRevisionConflictError {}
+export class PublicationAbandonedError extends MemoryTreeVersionConflictError {}
 
 /** Owns the pool lifecycle, publication ledgers, and atomic catalog transitions.
  * Read-only views live in queries; learning input retains its transaction here. */
@@ -183,80 +183,80 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     return result.rows
   }
 
-  async reserveRevisionPublication(
-    intent: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<RevisionPublication> {
+  async reserveVersionPublication(
+    intent: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<VersionPublication> {
     return await inTransaction(this.#pool, async (client) => {
-      const identity = revisionPublicationIdentity(intent)
+      const identity = versionPublicationIdentity(intent)
       await client.query(
-        `insert into memory_revision_publications
+        `insert into memory_version_publications
         (source_kind, operation_id, tree_digest, trajectory_digest, intent)
         values ($1,$2,$3,$4,$5) on conflict do nothing`,
         [...identity, intent],
       )
       const result = await client.query<{
-        intent: AuthenticatedMemoryTreeRevisionCreation
-        status: RevisionPublication['status']
+        intent: AuthenticatedMemoryTreeVersionCreation
+        status: VersionPublication['status']
         identical: boolean
       }>(
-        `select intent, status, intent=$5::jsonb as identical from memory_revision_publications
+        `select intent, status, intent=$5::jsonb as identical from memory_version_publications
          where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 for update`,
         [...identity, intent],
       )
       const row = result.rows[0]!
       if (!row.identical)
-        throw new MemoryTreeRevisionConflictError(
-          'Revision publication intent changed.',
+        throw new MemoryTreeVersionConflictError(
+          'Version publication intent changed.',
         )
-      return projectRevisionPublication(row)
+      return projectVersionPublication(row)
     })
   }
 
-  async confirmRevisionPublication(
-    intent: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<RevisionPublication> {
-    const result = await this.#pool.query<RevisionPublicationRow>(
-      `update memory_revision_publications
+  async confirmVersionPublication(
+    intent: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<VersionPublication> {
+    const result = await this.#pool.query<VersionPublicationRow>(
+      `update memory_version_publications
        -- Both CASEs read the row before this UPDATE, so only a reserved -> present move counts.
        set status_changed_at=case when status='reserved' then clock_timestamp() else status_changed_at end,
            status=case when status in ('selected','abandoned') then status else 'present' end
        where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
        returning intent,status`,
-      [...revisionPublicationIdentity(intent), intent],
+      [...versionPublicationIdentity(intent), intent],
     )
     if (!result.rows[0])
-      throw new MemoryTreeRevisionConflictError(
-        'Matching revision publication reservation is required.',
+      throw new MemoryTreeVersionConflictError(
+        'Matching version publication reservation is required.',
       )
-    return projectRevisionPublication(result.rows[0])
+    return projectVersionPublication(result.rows[0])
   }
 
-  async listRevisionPublications(
+  async listVersionPublications(
     kind: 'learning' | 'reorganization' | 'manual',
     ownerId: string,
-  ): Promise<RevisionPublication[]> {
-    const result = await this.#pool.query<RevisionPublicationRow>(
-      `select intent,status from memory_revision_publications where source_kind=$1 and operation_id=$2
+  ): Promise<VersionPublication[]> {
+    const result = await this.#pool.query<VersionPublicationRow>(
+      `select intent,status from memory_version_publications where source_kind=$1 and operation_id=$2
        order by (status='selected') desc, created_at, tree_digest, trajectory_digest`,
       [kind, ownerId],
     )
-    return result.rows.map(projectRevisionPublication)
+    return result.rows.map(projectVersionPublication)
   }
 
-  async abandonRevisionPublications(
-    input: AutomaticRevisionPublicationOwner,
-  ): Promise<RevisionPublication[]> {
+  async abandonVersionPublications(
+    input: AutomaticVersionPublicationOwner,
+  ): Promise<VersionPublication[]> {
     return await inTransaction(this.#pool, async (client) => {
       await client.query(
         'select pg_advisory_xact_lock(hashtextextended($1, 0))',
-        [`revision:${input.operation_id}`],
+        [`version:${input.operation_id}`],
       )
-      const abandoned = await abandonUnselectedRevisionPublications(
+      const abandoned = await abandonUnselectedVersionPublications(
         client,
-        revisionOwner(input),
+        versionOwner(input),
         'worker_cleanup',
       )
-      return abandoned.map(projectRevisionPublication)
+      return abandoned.map(projectVersionPublication)
     })
   }
 
@@ -361,31 +361,31 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   ): Promise<MemoryTreeAutomationOperationResult> {
     return await inTransaction(this.#pool, async (client) => {
       // Lock before looking for a replay. A retry that overlaps the first attempt would otherwise
-      // miss the replay row, wait here, and then report a generation conflict for an operation
+      // miss the replay row, wait here, and then report a version conflict for an operation
       // that succeeded.
       const current = await client.query<{
         state: 'enabled' | 'paused'
-        generation: string
+        version: string
       }>(
-        `select state, generation from memory_tree_automation
+        `select state, version from memory_tree_automation
          where singleton=true for update`,
       )
       const replay = await client.query<{
         identical: boolean
         resulting_state: 'enabled' | 'paused'
-        resulting_generation: string
+        resulting_version: string
         actor: Actor
         changed_at: Date
       }>(
-        `select target_state=$2 and expected_generation=$3 and
+        `select target_state=$2 and expected_version=$3 and
                 actor=$4::jsonb as identical,
-                target_state as resulting_state, expected_generation + 1 as resulting_generation,
+                target_state as resulting_state, expected_version + 1 as resulting_version,
                 actor, changed_at
          from memory_tree_automation_operations where operation_id=$1`,
         [
           input.operation_id,
           targetState,
-          input.expected_generation,
+          input.expected_version,
           JSON.stringify(input.actor),
         ],
       )
@@ -399,7 +399,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           created: false,
           automation: {
             state: existing.resulting_state,
-            generation: Number(existing.resulting_generation),
+            version: Number(existing.resulting_version),
             changed_by: existing.actor,
             changed_at: existing.changed_at.toISOString(),
           },
@@ -409,9 +409,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const row = current.rows[0]
       if (row === undefined)
         throw new Error('Memory-tree automation row is missing.')
-      if (Number(row.generation) !== input.expected_generation)
+      if (Number(row.version) !== input.expected_version)
         throw new MemoryTreeAutomationConflictError(
-          `Memory-tree automation generation no longer matches ${input.expected_generation}.`,
+          `Memory-tree automation version no longer matches ${input.expected_version}.`,
         )
       const expectedState = targetState === 'paused' ? 'enabled' : 'paused'
       if (row.state !== expectedState)
@@ -420,15 +420,15 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         )
       const changed = await client.query<{
         state: 'enabled' | 'paused'
-        generation: string
+        version: string
         changed_by: Actor
         changed_at: Date
       }>(
         `update memory_tree_automation
-         set state=$1, generation=generation+1, changed_by=$2,
+         set state=$1, version=version+1, changed_by=$2,
              changed_at=clock_timestamp()
          where singleton=true
-         returning state, generation, changed_by, changed_at`,
+         returning state, version, changed_by, changed_at`,
         [targetState, input.actor],
       )
       const control = changed.rows[0]
@@ -436,12 +436,12 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         throw new Error('Memory-tree automation update returned no row.')
       await client.query(
         `insert into memory_tree_automation_operations (
-           operation_id, target_state, expected_generation, actor, changed_at
+           operation_id, target_state, expected_version, actor, changed_at
          ) values ($1,$2,$3,$4,$5)`,
         [
           input.operation_id,
           targetState,
-          input.expected_generation,
+          input.expected_version,
           input.actor,
           control.changed_at,
         ],
@@ -450,7 +450,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         created: true,
         automation: {
           state: control.state,
-          generation: Number(control.generation),
+          version: Number(control.version),
           changed_by: control.changed_by,
           changed_at: control.changed_at.toISOString(),
         },
@@ -466,91 +466,91 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }>(
         `select observation_id, body_markdown
          from observations
-         where consumed_revision is null
+         where consumed_version is null
          order by created_at, observation_id limit $1`,
         [limit],
       )
       if (observations.rowCount === 0) return null
       const active = await client.query<{
-        revision: string
+        version: string
         memory_tree_reference: ArtifactReference | null
-      }>(`select state.active_revision as revision, revision.memory_tree_reference
+      }>(`select state.active_version as version, version.memory_tree_reference
           from memory_tree_state state
-          left join memory_tree_revisions revision
-            on revision.revision=state.active_revision
+          left join memory_tree_versions version
+            on version.version=state.active_version
           where state.singleton=true`)
       const row = active.rows[0]
       if (row === undefined)
         throw new Error('Memory tree state row is missing.')
       return {
-        expected_active_revision: Number(row.revision),
+        expected_active_version: Number(row.version),
         active_memory_tree_reference: row.memory_tree_reference,
         observations: observations.rows,
       }
     })
   }
 
-  async createMemoryTreeRevision(
-    input: AuthenticatedMemoryTreeRevisionCreation,
-  ): Promise<MemoryTreeRevisionCreationResult> {
+  async createMemoryTreeVersion(
+    input: AuthenticatedMemoryTreeVersionCreation,
+  ): Promise<MemoryTreeVersionCreationResult> {
     const result = await inTransaction(this.#pool, async (client) => {
       const source = input.source
       // Competing candidates must observe the winner before trying to select themselves.
       await client.query(
         `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
-        [`revision:${source.operation_id}`],
+        [`version:${source.operation_id}`],
       )
       const selected = await client.query(
-        `select 1 from memory_revision_publications
+        `select 1 from memory_version_publications
         where operation_id=$1 and status='selected' and intent<>$2::jsonb`,
         [source.operation_id, input],
       )
       if (selected.rows[0])
-        throw new MemoryTreeRevisionConflictError(
-          'A different revision publication is already selected.',
+        throw new MemoryTreeVersionConflictError(
+          'A different version publication is already selected.',
         )
       const candidate = await client.query<{
-        status: RevisionPublication['status']
+        status: VersionPublication['status']
       }>(
-        'select status from memory_revision_publications where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb',
-        [...revisionPublicationIdentity(input), input],
+        'select status from memory_version_publications where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb',
+        [...versionPublicationIdentity(input), input],
       )
       if (candidate.rows[0]?.status === 'abandoned')
         throw new PublicationAbandonedError(
-          'Revision publication has been abandoned.',
+          'Version publication has been abandoned.',
         )
       const publication = await client.query(
-        `select 1 from memory_revision_publications where source_kind=$1 and operation_id=$2
+        `select 1 from memory_version_publications where source_kind=$1 and operation_id=$2
          and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
          and status in ('present','selected') for update`,
-        [...revisionPublicationIdentity(input), input],
+        [...versionPublicationIdentity(input), input],
       )
       if (!publication.rows[0])
-        throw new MemoryTreeRevisionConflictError(
-          'A confirmed revision publication is required.',
+        throw new MemoryTreeVersionConflictError(
+          'A confirmed version publication is required.',
         )
-      let existing: { revision: string; identical: boolean } | undefined
+      let existing: { version: string; identical: boolean } | undefined
       if (source.kind === 'learning') {
         const replay = await client.query<{
-          revision: string
+          version: string
           identical: boolean
         }>(
-          `select revision.revision,
-                  revision.predecessor_revision is not distinct from nullif($2, 0) and
-                  revision.memory_tree_reference=$3::jsonb and
-                  revision.trajectory_reference=$4::jsonb and
-                  revision.maintenance_report=$6::jsonb and
+          `select version.version,
+                  version.predecessor_version is not distinct from nullif($2, 0) and
+                  version.memory_tree_reference=$3::jsonb and
+                  version.trajectory_reference=$4::jsonb and
+                  version.maintenance_report=$6::jsonb and
                   coalesce(array_agg(observation.observation_id order by observation.observation_id)
                     filter (where observation.observation_id is not null), '{}')=$5::text[]
                     as identical
-           from memory_tree_revisions revision
+           from memory_tree_versions version
            left join observations observation
-             on observation.consumed_revision=revision.revision
-           where revision.source_kind='learning' and revision.operation_id=$1
-           group by revision.revision`,
+             on observation.consumed_version=version.version
+           where version.source_kind='learning' and version.operation_id=$1
+           group by version.version`,
           [
             source.operation_id,
-            input.expected_active_revision,
+            input.expected_active_version,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
             source.observation_ids.toSorted(),
@@ -560,20 +560,20 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         existing = replay.rows[0]
       } else if (source.kind === 'reorganization') {
         const replay = await client.query<{
-          revision: string
+          version: string
           identical: boolean
         }>(
-          `select revision.revision,
-                  revision.predecessor_revision is not distinct from nullif($2, 0) and
-                  revision.memory_tree_reference=$3::jsonb and
-                  revision.trajectory_reference=$4::jsonb and
-                  revision.maintenance_report=$5::jsonb
+          `select version.version,
+                  version.predecessor_version is not distinct from nullif($2, 0) and
+                  version.memory_tree_reference=$3::jsonb and
+                  version.trajectory_reference=$4::jsonb and
+                  version.maintenance_report=$5::jsonb
                     as identical
-           from memory_tree_revisions revision
-           where revision.source_kind='reorganization' and revision.operation_id=$1`,
+           from memory_tree_versions version
+           where version.source_kind='reorganization' and version.operation_id=$1`,
           [
             source.operation_id,
-            input.expected_active_revision,
+            input.expected_active_version,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
             JSON.stringify(source.maintenance_report),
@@ -582,18 +582,18 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         existing = replay.rows[0]
       } else {
         const replay = await client.query<{
-          revision: string
+          version: string
           identical: boolean
         }>(
-          `select revision.revision,
-                  revision.predecessor_revision is not distinct from nullif($2, 0) and
-                  revision.memory_tree_reference=$3::jsonb and
-                  revision.actor=$4::jsonb as identical
-           from memory_tree_revisions revision
-           where revision.source_kind='manual' and revision.operation_id=$1`,
+          `select version.version,
+                  version.predecessor_version is not distinct from nullif($2, 0) and
+                  version.memory_tree_reference=$3::jsonb and
+                  version.actor=$4::jsonb as identical
+           from memory_tree_versions version
+           where version.source_kind='manual' and version.operation_id=$1`,
           [
             source.operation_id,
-            input.expected_active_revision,
+            input.expected_active_version,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.actor),
           ],
@@ -602,14 +602,14 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
       if (existing !== undefined) {
         if (!existing.identical) {
-          throw new MemoryTreeRevisionConflictError(
-            'Revision operation id already exists with different content.',
+          throw new MemoryTreeVersionConflictError(
+            'Version operation id already exists with different content.',
           )
         }
         return {
           created: false,
-          revision: Number(existing.revision),
-          source: revisionOwner(source),
+          version: Number(existing.version),
+          source: versionOwner(source),
         }
       }
 
@@ -619,9 +619,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
            where singleton=true for update`,
         )
         if (control.rows[0]?.state !== 'enabled') {
-          await abandonUnselectedRevisionPublications(
+          await abandonUnselectedVersionPublications(
             client,
-            revisionOwner(source),
+            versionOwner(source),
             'automation_paused',
           )
           return null
@@ -629,23 +629,23 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
 
       await client.query(
-        `update memory_revision_publications set status='selected', status_changed_at=clock_timestamp()
+        `update memory_version_publications set status='selected', status_changed_at=clock_timestamp()
         where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4`,
-        revisionPublicationIdentity(input),
+        versionPublicationIdentity(input),
       )
-      const active = await client.query<{ revision: string }>(
-        `select active_revision as revision from memory_tree_state
+      const active = await client.query<{ version: string }>(
+        `select active_version as version from memory_tree_state
          where singleton=true for update`,
       )
-      if (Number(active.rows[0]?.revision) !== input.expected_active_revision) {
-        throw new MemoryTreeRevisionConflictError(
-          `Active revision no longer matches expected active revision ${input.expected_active_revision}.`,
+      if (Number(active.rows[0]?.version) !== input.expected_active_version) {
+        throw new MemoryTreeVersionConflictError(
+          `Active version no longer matches expected active version ${input.expected_active_version}.`,
         )
       }
       if (source.kind === 'learning') {
         const selected = await client.query<{ observation_id: string }>(
           `select observation_id from observations
-           where observation_id=any($1) and consumed_revision is null for update`,
+           where observation_id=any($1) and consumed_version is null for update`,
           [source.observation_ids],
         )
         if (
@@ -654,24 +654,24 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             selected.rows.some((row) => row.observation_id === id),
           )
         ) {
-          throw new MemoryTreeRevisionConflictError(
+          throw new MemoryTreeVersionConflictError(
             'One or more source observations are no longer pending.',
           )
         }
       }
-      const next = await client.query<{ revision: string }>(
-        `select coalesce(max(revision), 0) + 1 as revision
-         from memory_tree_revisions`,
+      const next = await client.query<{ version: string }>(
+        `select coalesce(max(version), 0) + 1 as version
+         from memory_tree_versions`,
       )
-      const nextRevision = Number(next.rows[0]?.revision)
+      const nextVersion = Number(next.rows[0]?.version)
       await client.query(
-        `insert into memory_tree_revisions (
-           revision, predecessor_revision, memory_tree_reference, source_kind,
+        `insert into memory_tree_versions (
+           version, predecessor_version, memory_tree_reference, source_kind,
            operation_id, trajectory_reference, maintenance_report, actor
          ) values ($1,nullif($2, 0),$3,$4,$5,$6,$7,$8)`,
         [
-          nextRevision,
-          input.expected_active_revision,
+          nextVersion,
+          input.expected_active_version,
           input.memory_tree_reference,
           source.kind,
           source.operation_id,
@@ -682,26 +682,26 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       )
       if (source.kind === 'learning')
         await client.query(
-          `update observations set consumed_revision=$1
-           where observation_id=any($2) and consumed_revision is null`,
-          [nextRevision, source.observation_ids],
+          `update observations set consumed_version=$1
+           where observation_id=any($2) and consumed_version is null`,
+          [nextVersion, source.observation_ids],
         )
       await client.query(
         `update memory_tree_state
-         set active_revision=$1
+         set active_version=$1
          where singleton=true`,
-        [nextRevision],
+        [nextVersion],
       )
       return {
         created: true,
-        revision: nextRevision,
-        source: revisionOwner(source),
+        version: nextVersion,
+        source: versionOwner(source),
       }
     })
     // Raise after committing abandonment so a lost response cannot revive this candidate.
     if (result === null)
       throw new AutomationPausedError(
-        'Automatic memory-tree revision commits are paused.',
+        'Automatic memory-tree version commits are paused.',
       )
     return result
   }
@@ -711,110 +711,110 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   ): Promise<MemoryTreeRestoreOperationResult> {
     return await inTransaction(this.#pool, async (client) => {
       // Lock before looking for a replay, for the same reason as automation changes: an overlapping
-      // retry must find the first attempt's ledger row rather than an advanced active revision.
-      const active = await client.query<{ revision: string }>(
-        `select active_revision as revision from memory_tree_state
+      // retry must find the first attempt's ledger row rather than an advanced active version.
+      const active = await client.query<{ version: string }>(
+        `select active_version as version from memory_tree_state
          where singleton=true for update`,
       )
       const replay = await client.query<{
         identical: boolean
-        restored_revision: string
+        restored_version: string
       }>(
-        `select expected_active_revision=$2 and restored_revision=$3 and
+        `select expected_active_version=$2 and restored_version=$3 and
                 actor=$4::jsonb as identical,
-                restored_revision
+                restored_version
          from memory_tree_restore_operations where operation_id=$1`,
         [
           input.operation_id,
-          input.expected_active_revision,
-          input.restored_revision,
+          input.expected_active_version,
+          input.restored_version,
           JSON.stringify(input.actor),
         ],
       )
       const existing = replay.rows[0]
       if (existing !== undefined) {
         if (!existing.identical)
-          throw new MemoryTreeRevisionConflictError(
+          throw new MemoryTreeVersionConflictError(
             'Restore operation id already exists with different content.',
           )
         return {
           created: false,
-          active_revision: Number(existing.restored_revision),
+          active_version: Number(existing.restored_version),
           operation_id: input.operation_id,
         }
       }
 
-      if (Number(active.rows[0]?.revision) !== input.expected_active_revision)
-        throw new MemoryTreeRevisionConflictError(
-          `Active revision no longer matches expected active revision ${input.expected_active_revision}.`,
+      if (Number(active.rows[0]?.version) !== input.expected_active_version)
+        throw new MemoryTreeVersionConflictError(
+          `Active version no longer matches expected active version ${input.expected_active_version}.`,
         )
 
       const target = await client.query(
-        `select 1 from memory_tree_revisions where revision=$1`,
-        [input.restored_revision],
+        `select 1 from memory_tree_versions where version=$1`,
+        [input.restored_version],
       )
       if (target.rowCount === 0)
-        throw new MemoryTreeRevisionConflictError(
-          `Restored revision does not exist: ${input.restored_revision}.`,
+        throw new MemoryTreeVersionConflictError(
+          `Restored version does not exist: ${input.restored_version}.`,
         )
 
       await client.query(
         `insert into memory_tree_restore_operations (
-           operation_id, expected_active_revision, restored_revision, actor
+           operation_id, expected_active_version, restored_version, actor
          ) values ($1,$2,$3,$4)`,
         [
           input.operation_id,
-          input.expected_active_revision,
-          input.restored_revision,
+          input.expected_active_version,
+          input.restored_version,
           input.actor,
         ],
       )
       await client.query(
         `update memory_tree_state
-         set active_revision=$1
+         set active_version=$1
          where singleton=true`,
-        [input.restored_revision],
+        [input.restored_version],
       )
       return {
         created: true,
-        active_revision: input.restored_revision,
+        active_version: input.restored_version,
         operation_id: input.operation_id,
       }
     })
   }
 }
 
-/** A `memory_revision_publications` row as the store reads it back. */
-type RevisionPublicationRow = {
-  intent: AuthenticatedMemoryTreeRevisionCreation
-  status: RevisionPublication['status']
+/** A `memory_version_publications` row as the store reads it back. */
+type VersionPublicationRow = {
+  intent: AuthenticatedMemoryTreeVersionCreation
+  status: VersionPublication['status']
 }
 
-type RevisionOwner<Kind extends string = string> = {
+type VersionOwner<Kind extends string = string> = {
   kind: Kind
   operation_id: string
 }
 
-/** The `(kind, operation_id)` pair that owns a revision publication, without the source's other
+/** The `(kind, operation_id)` pair that owns a version publication, without the source's other
  * fields: a learning or reorganization source also carries its trajectory, which must not leak
  * into an owner-scoped write or a manual projection. */
-function revisionOwner<Kind extends string>(
-  source: RevisionOwner<Kind>,
-): RevisionOwner<Kind> {
+function versionOwner<Kind extends string>(
+  source: VersionOwner<Kind>,
+): VersionOwner<Kind> {
   return { kind: source.kind, operation_id: source.operation_id }
 }
 
-/** Abandon an automatic operation's unselected revision candidates. The caller holds the
+/** Abandon an automatic operation's unselected version candidates. The caller holds the
  * operation's advisory lock, so a commit and an abandonment cannot both claim the same candidate.
  * Only `reserved` and `present` can be abandoned: a selected candidate is already committed, and an
  * abandoned one stays abandoned. */
-async function abandonUnselectedRevisionPublications(
+async function abandonUnselectedVersionPublications(
   client: PoolClient,
-  owner: RevisionOwner,
+  owner: VersionOwner,
   reason: 'worker_cleanup' | 'automation_paused',
-): Promise<RevisionPublicationRow[]> {
-  const result = await client.query<RevisionPublicationRow>(
-    `update memory_revision_publications
+): Promise<VersionPublicationRow[]> {
+  const result = await client.query<VersionPublicationRow>(
+    `update memory_version_publications
      set status='abandoned', abandon_reason=$3, status_changed_at=clock_timestamp()
      where source_kind=$1 and operation_id=$2 and status in ('reserved','present')
      returning intent, status`,
@@ -823,8 +823,8 @@ async function abandonUnselectedRevisionPublications(
   return result.rows
 }
 
-function revisionPublicationIdentity(
-  input: AuthenticatedMemoryTreeRevisionCreation,
+function versionPublicationIdentity(
+  input: AuthenticatedMemoryTreeVersionCreation,
 ): string[] {
   return [
     input.source.kind,
@@ -836,15 +836,15 @@ function revisionPublicationIdentity(
   ]
 }
 
-function projectRevisionPublication(
-  row: RevisionPublicationRow,
-): RevisionPublication {
+function projectVersionPublication(
+  row: VersionPublicationRow,
+): VersionPublication {
   const { source, ...rest } = row.intent
   return {
     status: row.status,
     intent: {
       ...rest,
-      source: source.kind === 'manual' ? revisionOwner(source) : source,
+      source: source.kind === 'manual' ? versionOwner(source) : source,
     },
   }
 }

@@ -43,8 +43,8 @@ pnpm run dev:fixtures
 
 测试数据服务端还提供稳定的全页错误状态，便于进行视觉检查：
 
-- `/memory/revisions/404/tree` 显示记忆文件树预览失败，同时保留产物下载入口。
-- `/memory/revisions/404/trajectory` 显示执行轨迹加载失败。
+- `/memory/versions/404/tree` 显示记忆文件树预览失败，同时保留产物下载入口。
+- `/memory/versions/404/trajectory` 显示执行轨迹加载失败。
 - `/runs/fixture-artifact-load-error/files` 显示 run 文件加载失败。
 
 <!-- doc-default: control-plane-ui.viewer-input; source=apps/control-plane-ui/shared/trajectory-events.ts -->
@@ -163,7 +163,7 @@ BFF 还负责代理下载私有 RustFS 中的执行归档。它使用单独的 `
 
 服务端记忆文件树读取和构建代码实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入浏览器 bundle；BFF 负责校验、摘要计算和规范对象键。
 
-设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后，即可在控制台管理记忆：暂停或恢复记忆自动更新、编辑当前生效的记忆文件树，以及恢复已有修订。
+设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后，即可在控制台管理记忆：暂停或恢复记忆自动更新、编辑当前生效的记忆文件树，以及恢复已有版本。
 
 BFF 负责访问 Catalog 和对象存储，并在返回产物前校验大小和 SHA-256 摘要。浏览器不会获得存储 URI 或凭据。
 
@@ -171,4 +171,4 @@ BFF 负责访问 Catalog 和对象存储，并在返回产物前校验大小和 
 
 <!-- doc-default: control-plane-ui.memory-recovery; source=apps/control-plane-ui/browser/features/memory/Memory.tsx -->
 
-记忆编辑和恢复失败时，错误显示在对应操作弹窗内；编辑草稿会保留以便重试。新建文件会拒绝已有路径，重命名为原路径时不改变文件。在窄屏上，修订和观察列表将记录身份与操作放在一起，选择图节点后会将详情带入视野。产物预览失败后可在当前页面重试。
+记忆编辑和恢复失败时，错误显示在对应操作弹窗内；编辑草稿会保留以便重试。新建文件会拒绝已有路径，重命名为原路径时不改变文件。在窄屏上，版本和观察列表将记录身份与操作放在一起，选择图节点后会将详情带入视野。产物预览失败后可在当前页面重试。

@@ -33,7 +33,7 @@ await test('applies the complete catalog schema as version 1', async () => {
 
   assert.ok(
     statements.some(({ sql }) =>
-      sql.includes('create table memory_tree_revisions'),
+      sql.includes('create table memory_tree_versions'),
     ),
   )
   assert.ok(

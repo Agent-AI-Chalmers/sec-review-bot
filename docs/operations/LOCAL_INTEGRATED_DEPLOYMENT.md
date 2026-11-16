@@ -14,7 +14,7 @@ For a standalone Memory development environment, see [Local Memory Development](
 
 `cloudflared` runs as a separately managed host service, outside Docker Compose.
 
-Cloudflare Tunnel sends GitHub traffic to the integration service. Review Runs coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, trajectories, memory revisions, and artifacts.
+Cloudflare Tunnel sends GitHub traffic to the integration service. Review Runs coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, trajectories, memory versions, and artifacts.
 
 Langfuse is independently deployed outside both Docker Compose and the host Worker boundary. Workers can export model-call records to it, and Review Runs reads those records to build model-usage snapshots; neither path blocks review execution or result publication.
 
@@ -113,8 +113,8 @@ The initialization command fills the service tokens and PostgreSQL/RustFS creden
 RustFS credentials are assigned by storage responsibility:
 
 - GitHub Integration writes input objects.
-- Execution Worker reads inputs, writes execution archives, and reads the active memory revision.
-- Memory Extraction Worker and Memory Maintenance Worker share one storage credential to read execution archives and read/write memory revisions and compressed memory-agent trajectories.
+- Execution Worker reads inputs, writes execution archives, and reads the active memory version.
+- Memory Extraction Worker and Memory Maintenance Worker share one storage credential to read execution archives and read/write memory versions and compressed memory-agent trajectories.
 - The UI BFF reads stored execution archives for authenticated downloads.
 
 ### 2. GitHub Integration `.env`
@@ -183,8 +183,8 @@ Core fields:
 | `AGENT_MEMORY_PROCESSING_ENABLED`                                          | Allow trajectory extraction and memory maintenance; defaults to `true`.                                                                                                          |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`                                          | Optional custom S3-compatible endpoint. The local RustFS deployment uses `http://127.0.0.1:9100`; omit it to use the AWS endpoint selected from `AWS_REGION`.                    |
 | `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE`                                  | S3 request addressing: `auto`, `path`, or `virtual`. The local RustFS deployment uses `path`; external storage can use `auto` or `virtual` without changing artifact references. |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write execution archives, and read active memory revisions.                                                                 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Shared storage credential for both memory workers; it can read execution archives and read/write memory revisions and compressed memory-agent trajectories.                      |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write execution archives, and read active memory versions.                                                                  |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Shared storage credential for both memory workers; it can read execution archives and read/write memory versions and compressed memory-agent trajectories.                       |
 | `AGENT_MEMORY_CATALOG_URL`                                                 | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`.                                                                                                 |
 | `AGENT_MEMORY_CATALOG_TOKEN`                                               | Worker credential for extraction and automatic maintenance; it grants no direct PostgreSQL access.                                                                               |
 | `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN`                                      | Operator credential used by Control Plane UI for memory reads and manual control operations.                                                                                     |
@@ -200,9 +200,9 @@ Core fields:
 Memory Catalog Server is a separate TypeScript service, not part of Review Runs.
 
 - **Database isolation.** Compose runs one PostgreSQL instance with separate `sec_review_review_runs` and `sec_review_memory_catalog` databases and login roles. Each service receives only its own database URL.
-- **Stored state.** Memory Catalog stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision also records its source and globally unique operation ID; learning and reorganization revisions include a maintainer trajectory reference.
+- **Stored state.** Memory Catalog stores extraction records and their optional observations, memory-tree version history, and the active version pointer. Each version also records its source and globally unique operation ID; learning and reorganization versions include a maintainer trajectory reference.
 - **Execution and commits.** Temporal runs extraction and the singleton maintenance workflow; PostgreSQL stores catalog state and checks compare-and-swap conditions at commit. Host Workers call Memory Catalog with `AGENT_MEMORY_CATALOG_TOKEN`.
-- **Object storage.** Memory-tree revisions and memory-agent trajectories remain immutable objects in RustFS. Workers materialize them into invocation-scoped temporary worktrees; agent sandboxes see only the resulting filesystem mounts.
+- **Object storage.** Memory-tree versions and memory-agent trajectories remain immutable objects in RustFS. Workers materialize them into invocation-scoped temporary worktrees; agent sandboxes see only the resulting filesystem mounts.
 
 #### Control Plane UI Memory Management
 
@@ -210,7 +210,7 @@ Compose gives Control Plane UI `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR
 
 - Authenticated browser sessions inspect and manage memory through the BFF without receiving Catalog or object-storage credentials.
 - The UI storage identity can read run artifacts, memory trees, and memory trajectories, but creates immutable objects only under `memory/trees/*`.
-- Editing or restoring does not change memory-tree automation state. Operators can pause automatic revision commits independently; manual edits and restores remain available while paused.
+- Editing or restoring does not change memory-tree automation state. Operators can pause automatic version commits independently; manual edits and restores remain available while paused.
 - Unreferenced memory objects are not cleaned up automatically.
 
 #### PostgreSQL Initialization And Reinstallation
@@ -289,13 +289,13 @@ CodeGraph runs inside the sandbox, so it needs a backend that can execute comman
 
 With the sample configuration, the integrated deployment stores runtime data in these repository-level paths:
 
-| Path                    | Owner       | Purpose                                                                                                                             |
-| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `.agent-rustfs-state`   | RustFS      | Persistent object storage for run inputs, execution archives, memory-tree revisions, memory-agent trajectories, and other artifacts |
-| `.agent-run-inputs`     | Host worker | Materialized input for active runs; never included in published execution archives                                                  |
-| `.agent-artifacts`      | Host worker | Agent artifacts and workflow output for each task                                                                                   |
-| `.agent-postgres-state` | PostgreSQL  | Review Runs run state and Memory Catalog coordination state                                                                         |
-| `.agent-temporal-state` | Temporal    | Workflow history and pending task state                                                                                             |
+| Path                    | Owner       | Purpose                                                                                                                            |
+| ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `.agent-rustfs-state`   | RustFS      | Persistent object storage for run inputs, execution archives, memory-tree versions, memory-agent trajectories, and other artifacts |
+| `.agent-run-inputs`     | Host worker | Materialized input for active runs; never included in published execution archives                                                 |
+| `.agent-artifacts`      | Host worker | Agent artifacts and workflow output for each task                                                                                  |
+| `.agent-postgres-state` | PostgreSQL  | Review Runs run state and Memory Catalog coordination state                                                                        |
+| `.agent-temporal-state` | Temporal    | Workflow history and pending task state                                                                                            |
 
 ## Run The Deployment
 

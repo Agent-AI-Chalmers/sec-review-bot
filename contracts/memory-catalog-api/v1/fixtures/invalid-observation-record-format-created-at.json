@@ -4,6 +4,6 @@
   "source_run_id": "sample",
   "source_unit_id": "sample",
   "body_markdown": "sample",
-  "consumed_revision": 1,
+  "consumed_version": 1,
   "created_at": "invalid"
 }

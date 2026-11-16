@@ -12,11 +12,11 @@ components:
     catalogToken:
       type: http
       scheme: bearer
-      description: Worker or operator credential for shared catalog reads and role-checked revision creation.
+      description: Worker or operator credential for shared catalog reads and role-checked version creation.
     workerToken:
       type: http
       scheme: bearer
-      description: Worker credential for extraction and learning or reorganization revisions.
+      description: Worker credential for extraction and learning or reorganization versions.
     operatorToken:
       type: http
       scheme: bearer
@@ -118,22 +118,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExtractionPublication"
-    AutomaticRevisionPublicationOwner:
+    AutomaticVersionPublicationOwner:
       type: object
       additionalProperties: false
       required: [kind, operation_id]
       properties:
         kind: { type: string, enum: [learning, reorganization] }
         operation_id: { type: string, minLength: 1, pattern: "^[A-Za-z0-9._:-]+$" }
-    RevisionPublication:
+    VersionPublication:
       type: object
       additionalProperties: false
       required: [intent, status]
       properties:
         intent:
-          $ref: "#/components/schemas/MemoryTreeRevisionCreation"
+          $ref: "#/components/schemas/MemoryTreeVersionCreation"
         status: { type: string, enum: [reserved, present, selected, abandoned] }
-    RevisionPublicationList:
+    VersionPublicationList:
       type: object
       additionalProperties: false
       required: [publications]
@@ -141,7 +141,7 @@ components:
         publications:
           type: array
           items:
-            $ref: "#/components/schemas/RevisionPublication"
+            $ref: "#/components/schemas/VersionPublication"
     ExtractionRegistrationResult:
       type: object
       additionalProperties: false
@@ -199,7 +199,7 @@ components:
         - source_run_id
         - source_unit_id
         - body_markdown
-        - consumed_revision
+        - consumed_version
         - created_at
       properties:
         observation_id:
@@ -210,7 +210,7 @@ components:
         source_run_id: { type: string, minLength: 1 }
         source_unit_id: { type: string, minLength: 1 }
         body_markdown: { type: string, minLength: 1 }
-        consumed_revision:
+        consumed_version:
           type: [integer, "null"]
           minimum: 1
         created_at:
@@ -316,12 +316,12 @@ components:
       type: object
       additionalProperties: false
       required:
-        [expected_active_revision, active_memory_tree_reference, observations]
+        [expected_active_version, active_memory_tree_reference, observations]
       properties:
-        expected_active_revision:
+        expected_active_version:
           type: integer
           minimum: 0
-          description: Active revision that must still be current when this learning input is committed.
+          description: Active version that must still be current when this learning input is committed.
         active_memory_tree_reference:
           oneOf:
             - $ref: "#/components/schemas/ArtifactReference"
@@ -361,7 +361,7 @@ components:
     MaintenanceReport:
       type: object
       additionalProperties: false
-      description: Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
+      description: Maintainer account of an automatic version. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
       required: [summary, observation_decisions]
       properties:
         summary: { type: string, minLength: 1, maxLength: 4000 }
@@ -370,7 +370,7 @@ components:
           maxItems: 1000
           items:
             $ref: "#/components/schemas/ObservationDecision"
-    LearningRevisionSource:
+    LearningVersionSource:
       type: object
       additionalProperties: false
       required:
@@ -393,7 +393,7 @@ components:
           $ref: "#/components/schemas/ArtifactReference"
         maintenance_report:
           $ref: "#/components/schemas/MaintenanceReport"
-    ReorganizationRevisionSource:
+    ReorganizationVersionSource:
       type: object
       additionalProperties: false
       description: A maintainer-only curation of existing memory that consumes no observations.
@@ -410,7 +410,7 @@ components:
           $ref: "#/components/schemas/ArtifactReference"
         maintenance_report:
           $ref: "#/components/schemas/MaintenanceReport"
-    ManualRevisionSource:
+    ManualVersionSource:
       type: object
       additionalProperties: false
       required: [kind, operation_id, actor]
@@ -420,7 +420,7 @@ components:
           $ref: "#/components/schemas/OperationId"
         actor:
           $ref: "#/components/schemas/Actor"
-    ManualRevisionCreationSource:
+    ManualVersionCreationSource:
       type: object
       additionalProperties: false
       required: [kind, operation_id]
@@ -428,34 +428,34 @@ components:
         kind: { type: string, const: manual }
         operation_id:
           $ref: "#/components/schemas/OperationId"
-    MemoryTreeRevisionSource:
+    MemoryTreeVersionSource:
       oneOf:
-        - $ref: "#/components/schemas/LearningRevisionSource"
-        - $ref: "#/components/schemas/ReorganizationRevisionSource"
-        - $ref: "#/components/schemas/ManualRevisionSource"
-    MemoryTreeRevisionCreation:
+        - $ref: "#/components/schemas/LearningVersionSource"
+        - $ref: "#/components/schemas/ReorganizationVersionSource"
+        - $ref: "#/components/schemas/ManualVersionSource"
+    MemoryTreeVersionCreation:
       type: object
       additionalProperties: false
-      required: [expected_active_revision, memory_tree_reference, source]
+      required: [expected_active_version, memory_tree_reference, source]
       properties:
-        expected_active_revision:
+        expected_active_version:
           type: integer
           minimum: 0
-          description: Active revision that must still be current for this compare-and-swap commit.
+          description: Active version that must still be current for this compare-and-swap commit.
         memory_tree_reference:
           $ref: "#/components/schemas/ArtifactReference"
         source:
           oneOf:
-            - $ref: "#/components/schemas/LearningRevisionSource"
-            - $ref: "#/components/schemas/ReorganizationRevisionSource"
-            - $ref: "#/components/schemas/ManualRevisionCreationSource"
-    MemoryTreeRevisionCreationResult:
+            - $ref: "#/components/schemas/LearningVersionSource"
+            - $ref: "#/components/schemas/ReorganizationVersionSource"
+            - $ref: "#/components/schemas/ManualVersionCreationSource"
+    MemoryTreeVersionCreationResult:
       type: object
       additionalProperties: false
-      required: [created, revision, source]
+      required: [created, version, source]
       properties:
         created: { type: boolean }
-        revision: { type: integer, minimum: 1 }
+        version: { type: integer, minimum: 1 }
         source:
           oneOf:
             - type: object
@@ -482,32 +482,32 @@ components:
     MemoryTree:
       type: object
       additionalProperties: false
-      required: [revision, memory_tree_reference]
+      required: [version, memory_tree_reference]
       properties:
-        revision: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 0 }
         memory_tree_reference:
           oneOf:
             - $ref: "#/components/schemas/ArtifactReference"
             - type: "null"
-    MemoryTreeRevision:
+    MemoryTreeVersion:
       type: object
       additionalProperties: false
       required:
-        - revision
-        - predecessor_revision
+        - version
+        - predecessor_version
         - memory_tree_reference
         - source
         - created_at
       properties:
-        revision: { type: integer, minimum: 1 }
-        predecessor_revision:
+        version: { type: integer, minimum: 1 }
+        predecessor_version:
           type: [integer, "null"]
           minimum: 1
-          description: Revision that was active when this revision was created; null for the first revision.
+          description: Version that was active when this version was created; null for the first version.
         memory_tree_reference:
           $ref: "#/components/schemas/ArtifactReference"
         source:
-          $ref: "#/components/schemas/MemoryTreeRevisionSource"
+          $ref: "#/components/schemas/MemoryTreeVersionSource"
         created_at:
           type: string
           format: date-time
@@ -516,49 +516,49 @@ components:
       additionalProperties: false
       required:
         - operation_id
-        - expected_active_revision
-        - restored_revision
+        - expected_active_version
+        - restored_version
       properties:
         operation_id:
           $ref: "#/components/schemas/OperationId"
-        expected_active_revision:
+        expected_active_version:
           type: integer
           minimum: 1
-        restored_revision:
+        restored_version:
           type: integer
           minimum: 1
     MemoryTreeRestoreOperationResult:
       type: object
       additionalProperties: false
-      required: [created, active_revision, operation_id]
+      required: [created, active_version, operation_id]
       properties:
         created: { type: boolean }
-        active_revision: { type: integer, minimum: 1 }
+        active_version: { type: integer, minimum: 1 }
         operation_id:
           $ref: "#/components/schemas/OperationId"
-    MemoryTreeRevisionList:
+    MemoryTreeVersionList:
       type: object
       additionalProperties: false
-      required: [revisions, next_before_revision]
+      required: [versions, next_before_version]
       properties:
-        revisions:
+        versions:
           type: array
           items:
-            $ref: "#/components/schemas/MemoryTreeRevision"
-        next_before_revision:
+            $ref: "#/components/schemas/MemoryTreeVersion"
+        next_before_version:
           type: [integer, "null"]
           minimum: 1
     MemoryTreeAutomation:
-      description: Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+      description: Admission state for new learning and reorganization version commits. Pausing does not cancel running work or block manual versions, restores, extraction registration, artifact publication, or successful-operation replays.
       type: object
       additionalProperties: false
-      required: [state, generation, changed_by, changed_at]
+      required: [state, version, changed_by, changed_at]
       properties:
         state:
-          description: Whether new learning and reorganization revisions may commit; this is not a worker execution status.
+          description: Whether new learning and reorganization versions may commit; this is not a worker execution status.
           type: string
           enum: [enabled, paused]
-        generation:
+        version:
           type: integer
           minimum: 0
         changed_by:
@@ -569,11 +569,11 @@ components:
     MemoryTreeAutomationOperation:
       type: object
       additionalProperties: false
-      required: [operation_id, expected_generation]
+      required: [operation_id, expected_version]
       properties:
         operation_id:
           $ref: "#/components/schemas/OperationId"
-        expected_generation:
+        expected_version:
           type: integer
           minimum: 0
     MemoryTreeAutomationOperationResult:
@@ -612,7 +612,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     Conflict:
-      description: An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a learning or reorganization revision was attempted while memory-tree automation is paused.
+      description: An immutable identity differs from existing content, a version compare-and-swap precondition failed, or a learning or reorganization version was attempted while memory-tree automation is paused.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -722,7 +722,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/observation-backlog:
     get:
-      description: Summarize observations that have not yet been consumed by a memory revision.
+      description: Summarize observations that have not yet been consumed by a memory version.
       operationId: getObservationBacklog
       security: [{ catalogToken: [] }]
       responses:
@@ -752,7 +752,7 @@ paths:
           required: false
           schema: { type: string, enum: [pending, consumed] }
         - in: query
-          name: consumed_revision
+          name: consumed_version
           required: false
           schema: { type: string, pattern: "^[1-9][0-9]*$" }
       responses:
@@ -804,19 +804,19 @@ paths:
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions:
+  /v1/memory-tree/versions:
     post:
-      description: Select a matching confirmed publication intent, create its immutable revision with compare-and-swap, and consume any source observations.
-      operationId: createMemoryTreeRevision
+      description: Select a matching confirmed publication intent, create its immutable version with compare-and-swap, and consume any source observations.
+      operationId: createMemoryTreeVersion
       security: [{ catalogToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MemoryTreeRevisionCreation" }
+            schema: { $ref: "#/components/schemas/MemoryTreeVersionCreation" }
       responses:
         "201":
-          description: The revision was created.
+          description: The version was created.
           headers:
             Location:
               schema: { type: string }
@@ -824,15 +824,15 @@ paths:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MemoryTreeRevisionCreationResult",
+                  $ref: "#/components/schemas/MemoryTreeVersionCreationResult",
                 }
         "200":
-          description: An identical revision submission had already created this revision.
+          description: An identical version submission had already created this version.
           content:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MemoryTreeRevisionCreationResult",
+                  $ref: "#/components/schemas/MemoryTreeVersionCreationResult",
                 }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -840,12 +840,12 @@ paths:
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
     get:
-      description: List immutable memory tree revisions in descending revision order.
-      operationId: listMemoryTreeRevisions
+      description: List immutable memory tree versions in descending version order.
+      operationId: listMemoryTreeVersions
       security: [{ catalogToken: [] }]
       parameters:
         - in: query
-          name: before_revision
+          name: before_version
           required: false
           schema: { type: string, pattern: "^[1-9][0-9]*$" }
         - in: query
@@ -854,21 +854,21 @@ paths:
           schema: { type: string, pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
       responses:
         "200":
-          description: One page of immutable memory tree revision history.
+          description: One page of immutable memory tree version history.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MemoryTreeRevisionList" }
+              schema: { $ref: "#/components/schemas/MemoryTreeVersionList" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree:
     get:
-      description: Return the current memory tree revision and its artifact reference, if one exists.
+      description: Return the current memory tree version and its artifact reference, if one exists.
       operationId: getMemoryTree
       security: [{ catalogToken: [] }]
       responses:
         "200":
-          description: Current memory tree revision and artifact reference.
+          description: Current memory tree version and artifact reference.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MemoryTree" }
@@ -876,7 +876,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/restore:
     post:
-      description: Move the active memory pointer to an existing revision without creating a revision.
+      description: Move the active memory pointer to an existing version without creating a version.
       operationId: restoreMemoryTree
       security: [{ operatorToken: [] }]
       requestBody:
@@ -908,7 +908,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/automation:
     get:
-      description: Return whether new learning and reorganization memory-tree revisions may commit.
+      description: Return whether new learning and reorganization memory-tree versions may commit.
       operationId: getMemoryTreeAutomation
       security: [{ catalogToken: [] }]
       responses:
@@ -983,22 +983,22 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions/{revision}:
+  /v1/memory-tree/versions/{version}:
     get:
-      description: Return one immutable memory tree revision and its maintainer trajectory.
-      operationId: getMemoryTreeRevision
+      description: Return one immutable memory tree version and its maintainer trajectory.
+      operationId: getMemoryTreeVersion
       security: [{ catalogToken: [] }]
       parameters:
         - in: path
-          name: revision
+          name: version
           required: true
           schema: { type: string, pattern: "^[1-9][0-9]*$" }
       responses:
         "200":
-          description: The requested immutable memory tree revision.
+          description: The requested immutable memory tree version.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MemoryTreeRevision" }
+              schema: { $ref: "#/components/schemas/MemoryTreeVersion" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1064,72 +1064,72 @@ paths:
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions/publications/abandon:
+  /v1/memory-tree/versions/publications/abandon:
     post:
-      description: Abandon existing unselected publications for an automatic revision. Selected publications and artifact objects are preserved.
-      operationId: abandonRevisionPublications
+      description: Abandon existing unselected publications for an automatic version. Selected publications and artifact objects are preserved.
+      operationId: abandonVersionPublications
       security: [{ workerToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AutomaticRevisionPublicationOwner" }
+            schema: { $ref: "#/components/schemas/AutomaticVersionPublicationOwner" }
       responses:
         "200":
           description: Publications changed to abandoned; empty on a retry or when none exist.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RevisionPublicationList" }
+              schema: { $ref: "#/components/schemas/VersionPublicationList" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions/publications/reserve:
+  /v1/memory-tree/versions/publications/reserve:
     post:
       description: Reserve the complete intent before uploading its immutable artifacts.
-      operationId: reserveRevisionPublication
+      operationId: reserveVersionPublication
       security: [{ catalogToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MemoryTreeRevisionCreation" }
+            schema: { $ref: "#/components/schemas/MemoryTreeVersionCreation" }
       responses:
         "200":
           description: The durable publication state.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RevisionPublication" }
+              schema: { $ref: "#/components/schemas/VersionPublication" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions/publications/confirm:
+  /v1/memory-tree/versions/publications/confirm:
     post:
       description: Confirm that every artifact in the reserved intent is present.
-      operationId: confirmRevisionPublication
+      operationId: confirmVersionPublication
       security: [{ catalogToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MemoryTreeRevisionCreation" }
+            schema: { $ref: "#/components/schemas/MemoryTreeVersionCreation" }
       responses:
         "200":
           description: The durable publication state.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RevisionPublication" }
+              schema: { $ref: "#/components/schemas/VersionPublication" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/memory-tree/revisions/publications/{kind}/{owner_id}:
+  /v1/memory-tree/versions/publications/{kind}/{owner_id}:
     get:
       description: Recover complete publication intents before regenerating artifacts.
-      operationId: listRevisionPublications
+      operationId: listVersionPublications
       security: [{ catalogToken: [] }]
       parameters:
         - in: path
@@ -1145,7 +1145,7 @@ paths:
           description: Recorded intents, with the selected intent first.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RevisionPublicationList" }
+              schema: { $ref: "#/components/schemas/VersionPublicationList" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }

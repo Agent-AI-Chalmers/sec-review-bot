@@ -262,7 +262,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
         dashed=True,
     )
 
-    # Catalog coordinates revisions; workers transfer artifact bytes directly.
+    # Catalog coordinates versions; workers transfer artifact bytes directly.
     add_path(
         root,
         [(1450, 265), (1420, 265), (1420, 230), (800, 230), (800, 315)],
@@ -355,7 +355,7 @@ render(
     "local-integrated-deployment.svg",
     {
         "title": "Local integrated deployment shape",
-        "description": "GitHub, an operator browser, and independently deployed Langfuse connect to Docker Compose services and host workers. Catalog coordinates memory revisions; workers transfer artifacts directly to object storage.",
+        "description": "GitHub, an operator browser, and independently deployed Langfuse connect to Docker Compose services and host workers. Catalog coordinates memory versions; workers transfer artifacts directly to object storage.",
         "external": "External",
         "host": "Host",
         "browser": "Operator\nbrowser",
@@ -368,7 +368,7 @@ render(
     "local-integrated-deployment.zh.svg",
     {
         "title": "本地集成部署结构",
-        "description": "GitHub、运维人员浏览器和独立部署的 Langfuse 连接 Compose 服务及宿主机 workers。Catalog 协调 Memory revision，workers 直接向对象存储传输 artifacts。",
+        "description": "GitHub、运维人员浏览器和独立部署的 Langfuse 连接 Compose 服务及宿主机 workers。Catalog 协调 Memory version，workers 直接向对象存储传输 artifacts。",
         "external": "外部",
         "host": "宿主机",
         "browser": "运维人员\n浏览器",

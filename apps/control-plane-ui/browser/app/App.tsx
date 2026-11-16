@@ -45,13 +45,13 @@ const MemoryFilesPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
     .MemoryFilesPage
 }))
-const MemoryRevisionDiffPage = React.lazy(async () => ({
+const MemoryVersionDiffPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
-    .MemoryRevisionDiffPage
+    .MemoryVersionDiffPage
 }))
-const RevisionTrajectoryPage = React.lazy(async () => ({
+const VersionTrajectoryPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
-    .RevisionTrajectoryPage
+    .VersionTrajectoryPage
 }))
 const ExtractionTrajectoryPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
@@ -248,16 +248,16 @@ export function App(): React.JSX.Element {
                 <Route path="/runs/:runId/files" element={<RunFilesPage />} />
                 <Route path="/memory" element={<Memory />} />
                 <Route
-                  path="/memory/revisions/:revision/tree"
+                  path="/memory/versions/:version/tree"
                   element={<MemoryFilesPage />}
                 />
                 <Route
-                  path="/memory/revisions/:revision/diff"
-                  element={<MemoryRevisionDiffPage />}
+                  path="/memory/versions/:version/diff"
+                  element={<MemoryVersionDiffPage />}
                 />
                 <Route
-                  path="/memory/revisions/:revision/trajectory"
-                  element={<RevisionTrajectoryPage />}
+                  path="/memory/versions/:version/trajectory"
+                  element={<VersionTrajectoryPage />}
                 />
                 <Route
                   path="/memory/extractions/:extractionId/trajectory"

@@ -1,4 +1,4 @@
-"""Strict HTTP client for coordinated memory state and revision commits."""
+"""Strict HTTP client for coordinated memory state and version commits."""
 
 import json
 from dataclasses import dataclass
@@ -41,15 +41,15 @@ def _open_catalog_request(request: Request, *, timeout: int) -> Any:
 
 
 class MemoryCatalogConflictError(RuntimeError):
-    """A catalog identity or revision precondition conflicts with stored state."""
+    """A catalog identity or version precondition conflicts with stored state."""
 
 
 class MemoryPublicationAbandonedError(MemoryCatalogConflictError):
-    """The revision candidate was abandoned and cannot be committed."""
+    """The version candidate was abandoned and cannot be committed."""
 
 
 class MemoryAutomationPausedError(MemoryCatalogConflictError):
-    """The catalog refused a new automatic memory-tree revision while automation is paused."""
+    """The catalog refused a new automatic memory-tree version while automation is paused."""
 
 
 def _error_code(detail: str) -> str | None:
@@ -132,7 +132,7 @@ class MemoryCatalogClient:
     def confirm_extraction_publication(self, intent: dict[str, Any]) -> None:
         self._request("POST", f"{_API_ROOT}/extractions/publications/confirm", intent)
 
-    def list_revision_publications(
+    def list_version_publications(
         self,
         operation_id: str,
         *,
@@ -140,35 +140,35 @@ class MemoryCatalogClient:
     ) -> list[dict[str, Any]]:
         value = self._request(
             "GET",
-            f"{_API_ROOT}/memory-tree/revisions/publications/{kind}/{quote(operation_id, safe='')}",
+            f"{_API_ROOT}/memory-tree/versions/publications/{kind}/{quote(operation_id, safe='')}",
         )
         return value["publications"]
 
-    def abandon_revision_publications(
+    def abandon_version_publications(
         self, operation_id: str, *, kind: Literal["learning", "reorganization"]
     ) -> None:
         self._request(
             "POST",
-            f"{_API_ROOT}/memory-tree/revisions/publications/abandon",
+            f"{_API_ROOT}/memory-tree/versions/publications/abandon",
             {"kind": kind, "operation_id": operation_id},
         )
 
-    def reserve_revision_publication(self, intent: dict[str, Any]) -> None:
+    def reserve_version_publication(self, intent: dict[str, Any]) -> None:
         result = self._request(
-            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/reserve", intent
+            "POST", f"{_API_ROOT}/memory-tree/versions/publications/reserve", intent
         )
         if result["status"] == "abandoned":
             raise MemoryPublicationAbandonedError(
-                "Revision publication has been abandoned."
+                "Version publication has been abandoned."
             )
 
-    def confirm_revision_publication(self, intent: dict[str, Any]) -> None:
+    def confirm_version_publication(self, intent: dict[str, Any]) -> None:
         result = self._request(
-            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/confirm", intent
+            "POST", f"{_API_ROOT}/memory-tree/versions/publications/confirm", intent
         )
         if result["status"] == "abandoned":
             raise MemoryPublicationAbandonedError(
-                "Revision publication has been abandoned."
+                "Version publication has been abandoned."
             )
 
     def register_extraction(
@@ -228,15 +228,15 @@ class MemoryCatalogClient:
         cursor: str | None = None,
         limit: int = 50,
         status: str | None = None,
-        consumed_revision: int | None = None,
+        consumed_version: int | None = None,
     ) -> dict[str, Any]:
         parameters: dict[str, str | int] = {"limit": limit}
         if cursor is not None:
             parameters["cursor"] = cursor
         if status is not None:
             parameters["status"] = status
-        if consumed_revision is not None:
-            parameters["consumed_revision"] = consumed_revision
+        if consumed_version is not None:
+            parameters["consumed_version"] = consumed_version
         return self._request("GET", f"{_API_ROOT}/observations?{urlencode(parameters)}")
 
     def get_observation_backlog(self) -> dict[str, Any]:
@@ -250,7 +250,7 @@ class MemoryCatalogClient:
         *,
         target_state: str,
         operation_id: str,
-        expected_generation: int,
+        expected_version: int,
     ) -> dict[str, Any]:
         if target_state not in {"enabled", "paused"}:
             raise ValueError("Memory-tree automation target state is invalid.")
@@ -260,7 +260,7 @@ class MemoryCatalogClient:
             f"{_API_ROOT}/memory-tree/automation/{action}",
             {
                 "operation_id": operation_id,
-                "expected_generation": expected_generation,
+                "expected_version": expected_version,
             },
         )
 
@@ -271,11 +271,11 @@ class MemoryCatalogClient:
         )
         return value["input"]
 
-    def create_learning_revision(
+    def create_learning_version(
         self,
         *,
         operation_id: str,
-        expected_active_revision: int,
+        expected_active_version: int,
         observation_ids: list[str],
         memory_tree_reference: ArtifactReference,
         trajectory_reference: ArtifactReference,
@@ -283,9 +283,9 @@ class MemoryCatalogClient:
     ) -> dict[str, Any]:
         return self._request(
             "POST",
-            f"{_API_ROOT}/memory-tree/revisions",
+            f"{_API_ROOT}/memory-tree/versions",
             {
-                "expected_active_revision": expected_active_revision,
+                "expected_active_version": expected_active_version,
                 "memory_tree_reference": memory_tree_reference.as_dict(),
                 "source": {
                     "kind": "learning",
@@ -297,20 +297,20 @@ class MemoryCatalogClient:
             },
         )
 
-    def create_reorganization_revision(
+    def create_reorganization_version(
         self,
         *,
         operation_id: str,
-        expected_active_revision: int,
+        expected_active_version: int,
         memory_tree_reference: ArtifactReference,
         trajectory_reference: ArtifactReference,
         maintenance_report: MemoryMaintenanceOutput,
     ) -> dict[str, Any]:
         return self._request(
             "POST",
-            f"{_API_ROOT}/memory-tree/revisions",
+            f"{_API_ROOT}/memory-tree/versions",
             {
-                "expected_active_revision": expected_active_revision,
+                "expected_active_version": expected_active_version,
                 "memory_tree_reference": memory_tree_reference.as_dict(),
                 "source": {
                     "kind": "reorganization",
@@ -324,20 +324,20 @@ class MemoryCatalogClient:
     def get_memory_tree(self) -> dict[str, Any]:
         return self._request("GET", f"{_API_ROOT}/memory-tree")
 
-    def get_memory_tree_revision(self, revision: int) -> dict[str, Any]:
-        return self._request("GET", f"{_API_ROOT}/memory-tree/revisions/{revision}")
+    def get_memory_tree_version(self, version: int) -> dict[str, Any]:
+        return self._request("GET", f"{_API_ROOT}/memory-tree/versions/{version}")
 
-    def list_memory_tree_revisions(
+    def list_memory_tree_versions(
         self,
         *,
-        before_revision: int | None = None,
+        before_version: int | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
         parameters = [f"limit={limit}"]
-        if before_revision is not None:
-            parameters.append(f"before_revision={before_revision}")
+        if before_version is not None:
+            parameters.append(f"before_version={before_version}")
         return self._request(
-            "GET", f"{_API_ROOT}/memory-tree/revisions?{'&'.join(parameters)}"
+            "GET", f"{_API_ROOT}/memory-tree/versions?{'&'.join(parameters)}"
         )
 
 

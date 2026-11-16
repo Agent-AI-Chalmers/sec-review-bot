@@ -8,7 +8,7 @@ from sec_review_agents.entrypoints.memory_maintenance_worker import (
 )
 from sec_review_agents.workflows.memory.maintenance import (
     MemoryMaintenanceWorkflow,
-    commit_memory_tree_revision_activity,
+    commit_memory_tree_version_activity,
     count_pending_memory_observations_activity,
     prepare_memory_maintenance_activity,
 )
@@ -54,7 +54,7 @@ async def test_maintenance_worker_owns_maintenance_registration_and_schedule(
     assert captured["workflows"] == [MemoryMaintenanceWorkflow]
     assert captured["activities"] == [
         count_pending_memory_observations_activity,
-        commit_memory_tree_revision_activity,
+        commit_memory_tree_version_activity,
         prepare_memory_maintenance_activity,
     ]
     assert captured["max_concurrent_activities"] == 1

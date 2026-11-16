@@ -15,7 +15,7 @@ from sec_review_agents.memory.catalog_client import MemoryCatalogClient
 def test_memory_edit_replay_and_restore(
     catalog, object_store, node_service, monkeypatch, tmp_path
 ):
-    """A lost edit response must not create a second revision or lose its bytes."""
+    """A lost edit response must not create a second version or lose its bytes."""
     for key, value in object_store.items():
         monkeypatch.setenv(key, value)
     bff = node_service(
@@ -48,20 +48,20 @@ def test_memory_edit_replay_and_restore(
     assert unauthorized.value.code == 401
     post("/api/session", {"token": "seam-ui"})
     client = MemoryCatalogClient(catalog["url"], "seam-worker")
-    before = client.get_memory_tree()["revision"]
+    before = client.get_memory_tree()["version"]
     first = {
         "operation_id": uuid.uuid4().hex,
-        "expected_active_revision": before,
+        "expected_active_version": before,
         "files": {"MEMORY.md": "First memory\n"},
     }
     created = post("/api/memory/edit", first)
     assert created["created"] is True
     # Replay the original operation and precondition as after a lost response.
     assert post("/api/memory/edit", first) == {**created, "created": False}
-    revision = client.get_memory_tree()
-    assert revision["revision"] == before + 1
+    version = client.get_memory_tree()
+    assert version["version"] == before + 1
     materialized = materialize_verified_artifact_file(
-        ArtifactReference.from_mapping(revision["memory_tree_reference"]),
+        ArtifactReference.from_mapping(version["memory_tree_reference"]),
         local_destination=tmp_path / "tree.tar.zst",
         maximum_bytes=1024 * 1024,
     )
@@ -78,7 +78,7 @@ def test_memory_edit_replay_and_restore(
     second = {
         **first,
         "operation_id": uuid.uuid4().hex,
-        "expected_active_revision": before + 1,
+        "expected_active_version": before + 1,
         "files": {"MEMORY.md": "Second memory\n"},
     }
     post("/api/memory/edit", second)
@@ -86,8 +86,8 @@ def test_memory_edit_replay_and_restore(
         "/api/memory/restore",
         {
             "operation_id": uuid.uuid4().hex,
-            "expected_active_revision": before + 2,
-            "restored_revision": before + 1,
+            "expected_active_version": before + 2,
+            "restored_version": before + 1,
         },
     )
-    assert client.get_memory_tree() == revision
+    assert client.get_memory_tree() == version

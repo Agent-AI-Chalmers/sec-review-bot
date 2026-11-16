@@ -10,8 +10,8 @@ import type {
   ExtractionRecord,
   MemoryTreeAutomation,
   MemoryTree,
-  MemoryTreeRevision,
-  MemoryTreeRevisionList,
+  MemoryTreeVersion,
+  MemoryTreeVersionList,
   ObservationBacklog,
   ObservationList,
 } from './contract-types-generated.js'
@@ -26,7 +26,7 @@ export interface ExtractionListFilters {
 
 export interface ObservationListFilters {
   status?: 'pending' | 'consumed'
-  consumedRevision?: number
+  consumedVersion?: number
 }
 
 export interface MemoryCatalogQueries {
@@ -45,13 +45,11 @@ export interface MemoryCatalogQueries {
   getCatalogOverview(range: CatalogOverviewRange): Promise<CatalogOverview>
   getMemoryTreeAutomation(): Promise<MemoryTreeAutomation>
   getMemoryTree(): Promise<MemoryTree>
-  getMemoryTreeRevision(
-    revision: number,
-  ): Promise<MemoryTreeRevision | undefined>
-  listMemoryTreeRevisions(
-    beforeRevision: number | undefined,
+  getMemoryTreeVersion(version: number): Promise<MemoryTreeVersion | undefined>
+  listMemoryTreeVersions(
+    beforeVersion: number | undefined,
     limit: number,
-  ): Promise<MemoryTreeRevisionList>
+  ): Promise<MemoryTreeVersionList>
 }
 
 export class InvalidCatalogCursorError extends Error {
@@ -63,9 +61,9 @@ interface CatalogCursor {
   rowId: string
 }
 
-interface RevisionRow {
-  revision: string
-  predecessor_revision: string | null
+interface VersionRow {
+  version: string
+  predecessor_version: string | null
   source_kind: 'learning' | 'reorganization' | 'manual'
   operation_id: string
   observation_ids: string[]
@@ -216,28 +214,28 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       source_run_id: string
       source_unit_id: string
       body_markdown: string
-      consumed_revision: string | null
+      consumed_version: string | null
       created_at: Date
     }>(
       `select observation.observation_id, observation.extraction_id, extraction.source_run_id,
               extraction.source_unit_id,
               observation.body_markdown,
-              observation.consumed_revision, observation.created_at
+              observation.consumed_version, observation.created_at
        from observations observation
        join extractions extraction using (extraction_id)
        where ($1::timestamptz is null or
                 (observation.created_at, observation.observation_id) < ($1, $2))
          and ($3::text is null or
-              ($3='pending' and observation.consumed_revision is null) or
-              ($3='consumed' and observation.consumed_revision is not null))
-         and ($4::bigint is null or observation.consumed_revision=$4)
+              ($3='pending' and observation.consumed_version is null) or
+              ($3='consumed' and observation.consumed_version is not null))
+         and ($4::bigint is null or observation.consumed_version=$4)
        order by observation.created_at desc, observation.observation_id desc
        limit $5`,
       [
         cursor?.createdAt ?? null,
         cursor?.rowId ?? null,
         filters.status ?? null,
-        filters.consumedRevision ?? null,
+        filters.consumedVersion ?? null,
         limit + 1,
       ],
     )
@@ -249,8 +247,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         source_run_id: row.source_run_id,
         source_unit_id: row.source_unit_id,
         body_markdown: row.body_markdown,
-        consumed_revision:
-          row.consumed_revision === null ? null : Number(row.consumed_revision),
+        consumed_version:
+          row.consumed_version === null ? null : Number(row.consumed_version),
         created_at: row.created_at.toISOString(),
       })),
       next_cursor:
@@ -269,7 +267,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       oldest_pending_created_at: Date | null
     }>(`select count(*) as pending_count,
                min(created_at) as oldest_pending_created_at
-        from observations where consumed_revision is null`)
+        from observations where consumed_version is null`)
     const row = result.rows[0]
     if (row === undefined)
       throw new Error('Observation backlog query returned no row.')
@@ -368,9 +366,9 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
                   count(*) filter (where has_observation) as units_with_observation_count,
                   count(*) filter (where not has_observation) as units_without_observation_count,
                   (select count(*) from observations) as observation_count,
-                  (select count(*) from observations where consumed_revision is null)
+                  (select count(*) from observations where consumed_version is null)
                     as pending_observation_count,
-                  (select count(*) from observations where consumed_revision is not null)
+                  (select count(*) from observations where consumed_version is not null)
                     as consumed_observation_count
            from unit_outcomes`),
       this.pool.query<{
@@ -441,17 +439,17 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   async getMemoryTreeAutomation(): Promise<MemoryTreeAutomation> {
     const result = await this.pool.query<{
       state: 'enabled' | 'paused'
-      generation: string
+      version: string
       changed_by: Actor
       changed_at: Date
-    }>(`select state, generation, changed_by, changed_at
+    }>(`select state, version, changed_by, changed_at
         from memory_tree_automation where singleton=true`)
     const row = result.rows[0]
     if (row === undefined)
       throw new Error('Memory-tree automation row is missing.')
     return {
       state: row.state,
-      generation: Number(row.generation),
+      version: Number(row.version),
       changed_by: row.changed_by,
       changed_at: row.changed_at.toISOString(),
     }
@@ -459,67 +457,67 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
 
   async getMemoryTree(): Promise<MemoryTree> {
     const result = await this.pool.query<{
-      revision: string
+      version: string
       memory_tree_reference: ArtifactReference | null
-    }>(`select state.active_revision as revision, revision.memory_tree_reference
+    }>(`select state.active_version as version, version.memory_tree_reference
         from memory_tree_state state
-        left join memory_tree_revisions revision
-          on revision.revision=state.active_revision
+        left join memory_tree_versions version
+          on version.version=state.active_version
         where state.singleton=true`)
     const row = result.rows[0]
     if (row === undefined) throw new Error('Memory tree state row is missing.')
     return {
-      revision: Number(row.revision),
+      version: Number(row.version),
       memory_tree_reference: row.memory_tree_reference,
     }
   }
 
-  async getMemoryTreeRevision(
-    revision: number,
-  ): Promise<MemoryTreeRevision | undefined> {
-    const result = await this.pool.query<RevisionRow>(
-      `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.operation_id, revision.trajectory_reference,
-              revision.maintenance_report, revision.actor,
+  async getMemoryTreeVersion(
+    version: number,
+  ): Promise<MemoryTreeVersion | undefined> {
+    const result = await this.pool.query<VersionRow>(
+      `select version.version, version.predecessor_version, version.source_kind,
+              version.operation_id, version.trajectory_reference,
+              version.maintenance_report, version.actor,
               coalesce(array_agg(observation.observation_id order by observation.observation_id)
                 filter (where observation.observation_id is not null), '{}') as observation_ids,
-              revision.memory_tree_reference, revision.created_at
-       from memory_tree_revisions revision
+              version.memory_tree_reference, version.created_at
+       from memory_tree_versions version
        left join observations observation
-         on observation.consumed_revision=revision.revision
-       where revision.revision=$1
-       group by revision.revision`,
-      [revision],
+         on observation.consumed_version=version.version
+       where version.version=$1
+       group by version.version`,
+      [version],
     )
     const row = result.rows[0]
-    return row ? projectRevision(row) : undefined
+    return row ? projectVersion(row) : undefined
   }
 
-  async listMemoryTreeRevisions(
-    beforeRevision: number | undefined,
+  async listMemoryTreeVersions(
+    beforeVersion: number | undefined,
     limit: number,
-  ): Promise<MemoryTreeRevisionList> {
-    const result = await this.pool.query<RevisionRow>(
-      `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.operation_id, revision.trajectory_reference,
-              revision.maintenance_report, revision.actor,
+  ): Promise<MemoryTreeVersionList> {
+    const result = await this.pool.query<VersionRow>(
+      `select version.version, version.predecessor_version, version.source_kind,
+              version.operation_id, version.trajectory_reference,
+              version.maintenance_report, version.actor,
               coalesce(array_agg(observation.observation_id order by observation.observation_id)
                 filter (where observation.observation_id is not null), '{}') as observation_ids,
-              revision.memory_tree_reference, revision.created_at
-       from memory_tree_revisions revision
+              version.memory_tree_reference, version.created_at
+       from memory_tree_versions version
        left join observations observation
-         on observation.consumed_revision=revision.revision
-       where ($1::bigint is null or revision.revision < $1)
-       group by revision.revision
-       order by revision.revision desc limit $2`,
-      [beforeRevision ?? null, limit + 1],
+         on observation.consumed_version=version.version
+       where ($1::bigint is null or version.version < $1)
+       group by version.version
+       order by version.version desc limit $2`,
+      [beforeVersion ?? null, limit + 1],
     )
     const rows = result.rows.slice(0, limit)
     return {
-      revisions: rows.map(projectRevision),
-      next_before_revision:
+      versions: rows.map(projectVersion),
+      next_before_version:
         result.rows.length > limit && rows.length > 0
-          ? Number(rows[rows.length - 1]?.revision)
+          ? Number(rows[rows.length - 1]?.version)
           : null,
     }
   }
@@ -547,7 +545,7 @@ function projectExtraction(row: {
   }
 }
 
-function projectRevision(row: RevisionRow): MemoryTreeRevision {
+function projectVersion(row: VersionRow): MemoryTreeVersion {
   const source =
     row.source_kind === 'learning'
       ? {
@@ -582,11 +580,9 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
             actor: requireValue(row.actor, 'actor'),
           }
   return {
-    revision: Number(row.revision),
-    predecessor_revision:
-      row.predecessor_revision === null
-        ? null
-        : Number(row.predecessor_revision),
+    version: Number(row.version),
+    predecessor_version:
+      row.predecessor_version === null ? null : Number(row.predecessor_version),
     memory_tree_reference: row.memory_tree_reference,
     source,
     created_at: row.created_at.toISOString(),
@@ -595,6 +591,6 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
 
 function requireValue<T>(value: T | null, field: string): T {
   if (value === null)
-    throw new Error(`Memory revision is missing source field: ${field}.`)
+    throw new Error(`Memory version is missing source field: ${field}.`)
   return value
 }

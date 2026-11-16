@@ -24,7 +24,7 @@ function fixturePort(): number {
 }
 
 export const test = base.extend<TestFixtures>({
-  // Mutating browser flows must not leak revisions or session state into later tests.
+  // Mutating browser flows must not leak versions or session state into later tests.
   fixtureRuntime: [
     async ({ browserName }, use): Promise<void> => {
       if (browserName !== 'chromium') {
