@@ -22,11 +22,15 @@ These guarantees hold only when the check and the write are atomic: they run in 
 
 ## Terms Used Here
 
-- A claim is a time-limited right to work on a record. The claimant receives a claim token and renews the claim's lease while it works. When the lease expires, another process may claim the work.
+- A claim authorizes its holder to work on a record using a claim token. The holder renews the claim's lease while it works. When the lease expires, another process may claim the work.
 - An axis is one lifecycle of a Review Runs run. Each run has three: preparation, execution, and publication. They have separate states.
 - A publication step is one external side effect within a publication, for example one draft pull request for one repository delivery. Each step has its own state and attempt budget.
 - `uncertain` and `disconnected` describe different recovery conditions on each axis; use the axis as well as the status when interpreting a run.
 - Memory Catalog uses `automation.version` to identify the automation switch state and `active_version` to identify the memory tree currently in use. Writes carry `expected_version` or `expected_active_version` so the server can reject operations based on stale state.
+
+<!-- doc-default: publication.claim-ownership; source=services/review-runs/src/persistence/publication-store.ts -->
+
+For publication, lease expiry allows takeover; it does not by itself invalidate the current token. The current owner can still renew or write until takeover replaces the token or a release clears it. The `uncertain` and `disconnected` states retain the owner so it can perform permitted step reconciliation. A disconnected publication cannot be automatically claimed or concluded by its owner; an operator can resume it or give up. Both decisions clear the token and lease timestamp.
 
 ## Recovery Meaning By Axis
 

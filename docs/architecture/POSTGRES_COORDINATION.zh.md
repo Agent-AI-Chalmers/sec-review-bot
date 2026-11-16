@@ -24,11 +24,15 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 
 ## 本文用到的术语
 
-- claim 是在一段时间内处理某条记录的权利。领取者拿到一个 claim token，并在工作期间为它的租约续期。租约过期后，其他进程可以领取这份工作。
+- claim 授权领取者使用 claim token 处理某条记录，并在工作期间为租约续期。租约过期后，其他进程可以领取这份工作。
 - 轴（axis）是 Review Runs 中一个 run 的一条生命周期。每个 run 有三条：preparation、execution 和 publication，各自有独立的状态。
 - publication step 是一次 publication 中的一个外部副作用，例如为某个仓库交付打开的一个 draft pull request。每个 step 有自己的状态和尝试预算。
 - `uncertain` 和 `disconnected` 在不同轴上对应不同的恢复条件；解释运行状态时，必须同时看所属轴和状态值。
 - Memory Catalog 用 `automation.version` 标识自动化开关状态的版本，用 `active_version` 标识当前生效的记忆树版本。写入时带上 `expected_version` 或 `expected_active_version`，服务端据此拒绝基于过时状态的操作。
+
+<!-- doc-default: publication.claim-ownership; source=services/review-runs/src/persistence/publication-store.ts -->
+
+对于 publication，租约到期允许其他进程接管，但不会单独使当前 token 失效。在接管替换 token 或释放操作清空 token 之前，当前 owner 仍可续租或写入。`uncertain` 和 `disconnected` 保留 owner，让它执行允许的 step 核对。处于 disconnected 的 publication 不能被自动认领，也不能由 owner 整体收尾；运维人员可以恢复或放弃，两种决定都会清空 token 和租约时间戳。
 
 ## 各轴的恢复含义
 
