@@ -66,13 +66,13 @@ The stage performs targeted fact checks and standardized scoring within the curr
 
 `verifier` independently reviews analyzer and mitigator output. It checks whether analyzer overstated the claim, whether the patch fixes the target, and whether the patch introduces obvious side effects or bypasses.
 
-In repository review, `verifier` checks both the report and the patch and provides the final quality gate for keep/blocked decisions.
+In repository review, `verifier` checks both the report and the patch and provides the final quality gate for delivery eligibility decisions.
 
 Verifier restores an independent workspace from the input snapshot and applies the mitigation patch before starting its investigation. The workspace contains the patched code and is writable for verification commands and tests. If the patch cannot be applied, verification fails rather than judging patch coverage from unpatched baseline code.
 
 ### `delivery-planning`
 
-Only case results with `disposition="keep"` enter delivery planning and execution.
+Only case results with `deliverable=true` enter delivery planning and execution.
 
 `delivery-planning` groups verified cases into delivery units. Its main facts come from prepared per-case outputs, not the final shared workspace state. It prefers case item payload, mitigation overview, changed files, and workbench state; it reads per-case patches only when those inputs cannot explain a delivery coupling question.
 

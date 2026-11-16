@@ -49,6 +49,6 @@ async def test_incomplete_delivery_fails_without_synthesis(
     assert outcome.file_changes == []
     synthesize.assert_not_awaited()
     result = build_delivery_result_from_outcomes(
-        deliveries=[entry], keep_case_ids=case_ids, patch_outcomes=[outcome]
+        deliveries=[entry], delivery_case_ids=case_ids, patch_outcomes=[outcome]
     )
     assert result.deliveries == []

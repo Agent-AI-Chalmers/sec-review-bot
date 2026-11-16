@@ -152,11 +152,12 @@ Workflow: `repository-review`
 
 Repository review is composed of `scan -> case review -> delivery`:
 
-- `scan_summary` is the public scan-stage summary; full discovery / triage outputs are kept in artifacts.
+- `scan_summary` is the public scan-stage summary; `triaged_case_count` counts cases produced by triage, excluding deletion cases. Full discovery / triage outputs are kept in artifacts.
+- `case_count` counts all actual review units in `case_results`, from triage and deleted files, including failed reviews. Deleted files may be grouped into one case; deletions skipped before case creation do not add to this count.
 - `case_results[].review_record` is the case-level review output.
 - `deliveries[]` contains repository delivery results and publishable artifacts produced by delivery execution.
 
-The result shape is defined by [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json). `case_results[]` expresses case-level public results through `case_id`, `disposition`, `reason`, and `review_record`.
+The result shape is defined by [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json). `case_results[]` expresses case-level public results through `case_id`, `deliverable`, `reason`, and `review_record`. `deliverable` is `true` when the repair may enter delivery and `false` otherwise; `reason` explains that decision. Both remain in the report. This is eligibility, not the outcome of publishing a delivery.
 
 ### Repository Deliveries
 

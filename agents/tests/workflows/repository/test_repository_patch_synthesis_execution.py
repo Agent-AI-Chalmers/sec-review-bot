@@ -94,7 +94,7 @@ def _build_file_changes_from_workspace_patch(
 async def _execute_delivery_direct_for_test(
     *,
     input_data: PreparedRepositoryInput,
-    keep_case_results: list[dict],
+    delivery_case_results: list[dict],
     delivery_plan: DeliveryPlan,
 ) -> dict[str, Any]:
     workspace_path = Path(input_data.input_bundle_root_path) / "workspace"
@@ -117,7 +117,10 @@ async def _execute_delivery_direct_for_test(
     ):
         result = await repository_direct.run_repository_delivery_direct(
             request,
-            [RepositoryCaseResult.model_validate(item) for item in keep_case_results],
+            [
+                RepositoryCaseResult.model_validate(item)
+                for item in delivery_case_results
+            ],
         )
         return result.model_dump(mode="json")
 
@@ -340,7 +343,7 @@ class TestRepositoryDeliveryExecution:
                 "verification": verification,
                 "cvss": None,
             },
-            "disposition": "keep",
+            "deliverable": True,
             "reason": "Ready for delivery execution.",
         }
 
@@ -491,7 +494,7 @@ class TestRepositoryDeliveryExecution:
             ),
         )
 
-        assert delivery_execution_input.keep_case_ids == ["case-1", "case-2"]
+        assert delivery_execution_input.delivery_case_ids == ["case-1", "case-2"]
         assert "cases_artifacts_root_path" not in delivery_execution_input.model_dump()
         single_case = delivery_execution_input.single_delivery_execution_items[
             0
@@ -535,7 +538,7 @@ class TestRepositoryDeliveryExecution:
 
         result = await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -593,7 +596,7 @@ class TestRepositoryDeliveryExecution:
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -623,7 +626,7 @@ class TestRepositoryDeliveryExecution:
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -655,7 +658,7 @@ class TestRepositoryDeliveryExecution:
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -674,7 +677,7 @@ class TestRepositoryDeliveryExecution:
 
         result = await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[
+            delivery_case_results=[
                 self._case_result("case-1"),
             ],
             delivery_plan=self._delivery_plan(
@@ -744,7 +747,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -823,7 +826,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -887,7 +890,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -941,7 +944,7 @@ class TestRepositoryDeliveryExecution:
         ):
             result = await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1009,7 +1012,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1078,7 +1081,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1164,7 +1167,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1203,7 +1206,7 @@ class TestRepositoryDeliveryExecution:
 
         result = await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -1234,7 +1237,7 @@ class TestRepositoryDeliveryExecution:
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(
                 [
                     {
@@ -1270,7 +1273,7 @@ class TestRepositoryDeliveryExecution:
         ) as create_graph:
             result = await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=[case_result],
+                delivery_case_results=[case_result],
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1292,7 +1295,7 @@ class TestRepositoryDeliveryExecution:
         with pytest.raises(ValueError, match="strategy"):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=[case_result],
+                delivery_case_results=[case_result],
                 delivery_plan=DeliveryPlan(
                     status="completed",
                     metadata=DeliveryPlanningMetadata(
@@ -1313,7 +1316,7 @@ class TestRepositoryDeliveryExecution:
     @pytest.mark.asyncio
     async def test_delivery_stage_skips_planning_when_no_cases_are_kept(self) -> None:
         blocked_case = self._case_result("case-1")
-        blocked_case["disposition"] = "blocked"
+        blocked_case["deliverable"] = False
         blocked_case["reason"] = "Case is not ready for delivery."
         with (
             patch(
@@ -1384,7 +1387,7 @@ class TestRepositoryDeliveryExecution:
         with self._use_deterministic_combined_patch_outcomes():
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1463,7 +1466,7 @@ class TestRepositoryDeliveryExecution:
         ):
             result = await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1534,7 +1537,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=case_results,
+                delivery_case_results=case_results,
                 delivery_plan=self._delivery_plan(
                     [
                         {
@@ -1576,7 +1579,7 @@ class TestRepositoryDeliveryExecution:
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
-            keep_case_results=[case_result],
+            delivery_case_results=[case_result],
             delivery_plan=self._delivery_plan(),
         )
 
@@ -1640,7 +1643,7 @@ class TestRepositoryDeliveryExecution:
         ):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
-                keep_case_results=[case_a, case_b],
+                delivery_case_results=[case_a, case_b],
                 delivery_plan=self._delivery_plan(
                     [
                         {

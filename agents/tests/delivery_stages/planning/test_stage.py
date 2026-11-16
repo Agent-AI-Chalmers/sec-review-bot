@@ -55,7 +55,7 @@ async def test_delivery_planning_always_refines_once(
                             case_id="a",
                             mitigation_overview="A",
                             mitigator_file_changes=[],
-                            disposition="keep",
+                            deliverable=True,
                             reason=None,
                             mitigator_patch_diff=None,
                         )
@@ -70,7 +70,7 @@ async def test_delivery_planning_always_refines_once(
                         case_id="a",
                         mitigation_overview="A",
                         mitigator_file_changes=[],
-                        disposition="keep",
+                        deliverable=True,
                         reason=None,
                         mitigator_patch_diff=None,
                     )
@@ -119,7 +119,7 @@ async def test_delivery_batch_inputs_preserve_order_and_duplicate_payloads(
             case_id=case_id,
             mitigation_overview=overview,
             mitigator_file_changes=[],
-            disposition="keep",
+            deliverable=True,
             reason=None,
             mitigator_patch_diff=None,
         )

@@ -295,7 +295,7 @@ def _reference_patch_block(patch_diff: Any) -> list[str]:
 
 
 def _is_blocked_confirmed_case(case_result: dict[str, Any]) -> bool:
-    if compact_plain_text(case_result.get("disposition")) == "keep":
+    if case_result.get("deliverable") is True:
         return False
     review_record = as_dict(case_result.get("review_record"))
     analysis = as_dict(review_record.get("analysis"))

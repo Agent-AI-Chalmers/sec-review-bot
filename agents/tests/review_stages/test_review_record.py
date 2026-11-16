@@ -90,7 +90,7 @@ def test_issue_review_record_projects_staged_result_with_patch(tmp_path) -> None
     assert record["verification"]["regression"] == "not-run"
     assert record["verification"]["findings"] == []
     assert record["verification"]["evidence"] == ["Checked normalized path handling."]
-    assert "disposition" not in record
+    assert "deliverable" not in record
     assert "raw" not in record
 
 
@@ -252,7 +252,7 @@ def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
     assert record["verification"]["target_claim"] == (
         "SQL injection in src/a.py was fixed."
     )
-    assert "disposition" not in record
+    assert "deliverable" not in record
     assert record["mitigation"]["file_changes"] == [
         {"path": "src/a.py", "status": "deleted"}
     ]

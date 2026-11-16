@@ -83,13 +83,13 @@ class DeliveryCaseInput(BaseModel):
     """Review projection shared by delivery planning and execution preparation.
 
     Planning reads the mitigation summary and changed paths; execution reads the
-    patch contents. Disposition and reason are retained for the input artifact.
+    patch contents. Delivery status and reason are retained for the input artifact.
     Review narratives and verification details stay with the review record:
     delivery consumes cases already selected by repository orchestration.
     """
 
     case_id: str
-    disposition: str
+    deliverable: bool = Field(strict=True)
     reason: str | None
     mitigation_overview: str
     mitigator_file_changes: list[FileChange]

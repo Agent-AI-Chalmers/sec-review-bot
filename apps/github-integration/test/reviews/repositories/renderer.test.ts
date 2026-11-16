@@ -73,7 +73,7 @@ function scanSummary(
     scanned_file_count: 0,
     skipped_file_count: 0,
     candidate_count: 0,
-    case_count: 0,
+    triaged_case_count: 0,
     suppressed_candidate_count: 0,
     deleted_file_count: 0,
     ...overrides
@@ -91,6 +91,7 @@ function repositoryResult(
     api_version: 'v1',
     scan_summary: scanSummary(options.scan_summary),
     case_results,
+    case_count: case_results.length,
     deliveries: [],
     deletion_review_skipped: options.deletion_review_skipped ?? false
   }
@@ -140,7 +141,7 @@ test('repository renderer derives blocked confirmed case cards from case results
       [
         {
           case_id: 'case-1',
-          disposition: 'blocked',
+          deliverable: false,
           reason: 'The verifier did not fully approve the patch.',
           review_record
         }
@@ -149,7 +150,7 @@ test('repository renderer derives blocked confirmed case cards from case results
         scan_summary: {
           scannable_file_count: 1,
           scanned_file_count: 1,
-          case_count: 1,
+          triaged_case_count: 1,
           suppressed_candidate_count: 0
         }
       }
@@ -201,12 +202,12 @@ test('repository renderer derives blocked confirmed case cards from case results
   )
 })
 
-test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
+test('repository blocked confirmed case uses deliverable reason as mitigation and verification fallback', () => {
   const body = renderRepositorySecuritySummaryComment({
     workflow_result: summaryView([
       {
         case_id: 'case-1',
-        disposition: 'blocked',
+        deliverable: false,
         reason: 'Verifier rejected the incomplete patch.',
         review_record: reviewRecord({
           analysis: {
@@ -243,7 +244,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
     workflow_result: summaryView([
       {
         case_id: 'case-1',
-        disposition: 'keep',
+        deliverable: true,
         reason: null,
         review_record: reviewRecord({
           cvss: {
@@ -255,7 +256,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
       },
       {
         case_id: 'case-2',
-        disposition: 'keep',
+        deliverable: true,
         reason: null,
         review_record: reviewRecord({
           cvss: {
@@ -302,7 +303,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
     case_results: [
       {
         case_id: 'case-1',
-        disposition: 'keep',
+        deliverable: true,
         reason: null,
         review_record: reviewRecord({
           cvss: {
@@ -321,7 +322,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.doesNotMatch(body, /##### Evidence anchors/)
   assert.doesNotMatch(body, /Coverage: `full`/)
   assert.doesNotMatch(body, /Next step: `none`/)
-  assert.doesNotMatch(body, /Case disposition: `keep`/)
+  assert.doesNotMatch(body, /Case deliverable:/)
   assert.doesNotMatch(body, /- Analysis: `confirmed security defect`/)
   assert.doesNotMatch(body, /## Delivery CVSS/)
   assert.match(body, /<summary>CVSS<\/summary>/)
@@ -345,24 +346,25 @@ test('repository renderer preserves CVSS not-scored state', () => {
 test('repository summary workflow view projects a validated repository result without reparsing', () => {
   const caseResult: RepositoryCaseResult = {
     case_id: 'case-1',
-    disposition: 'keep',
+    deliverable: true,
     reason: null,
     review_record: reviewRecord()
   }
   const view = buildRepositorySummaryWorkflowView(
-    repositoryResult([caseResult], { scan_summary: { case_count: 1 } }),
+    repositoryResult([caseResult], { scan_summary: { triaged_case_count: 1 } }),
     { run_id: 'run-1' }
   )
 
   assert.deepStrictEqual(view, {
     run_id: 'run-1',
+    case_count: 1,
     deletion_review_skipped: false,
     scan_summary: {
       scannable_file_count: 0,
       scanned_file_count: 0,
       skipped_file_count: 0,
       candidate_count: 0,
-      case_count: 1,
+      triaged_case_count: 1,
       suppressed_candidate_count: 0,
       deleted_file_count: 0
     },
@@ -411,7 +413,7 @@ test('repository draft PR body renders case details from case results', () => {
     case_results: [
       {
         case_id: 'case-1',
-        disposition: 'keep',
+        deliverable: true,
         reason: null,
         review_record: reviewRecord({
           analysis: {
@@ -465,7 +467,7 @@ test('repository draft PR case details use delivery fallback text', () => {
     case_results: [
       {
         case_id: 'case-1',
-        disposition: 'keep',
+        deliverable: true,
         reason: null,
         review_record: reviewRecord({
           analysis: {
@@ -553,7 +555,7 @@ test('repository renderer warns when deletion review was skipped', () => {
       scan_summary: {
         scannable_file_count: 3,
         scanned_file_count: 3,
-        case_count: 0,
+        triaged_case_count: 0,
         suppressed_candidate_count: 0,
         deleted_file_count: 250
       }
@@ -568,7 +570,7 @@ test('repository renderer warns when deletion review was skipped', () => {
   // The warning sits above the summary details, so skimming the top of the comment shows it.
   assert.ok(
     body.indexOf('Deletion review skipped') <
-      body.indexOf('Scan summary details')
+      body.indexOf('Review summary details')
   )
   assert.match(body, /Deleted files in window: `250`/)
 })
@@ -580,7 +582,7 @@ test('repository renderer stays quiet when deletion review ran', () => {
       scan_summary: {
         scannable_file_count: 3,
         scanned_file_count: 3,
-        case_count: 0,
+        triaged_case_count: 0,
         suppressed_candidate_count: 0,
         deleted_file_count: 4
       }
@@ -592,4 +594,37 @@ test('repository renderer stays quiet when deletion review ran', () => {
 
   assert.doesNotMatch(body, /Deletion review skipped/)
   assert.match(body, /Deleted files in window: `4`/)
+})
+
+test('repository summary distinguishes triage, reviewed and delivery-ready case counts', () => {
+  const cases: RepositoryCaseResult[] = [
+    {
+      case_id: 'triage-case',
+      deliverable: true,
+      reason: null,
+      review_record: reviewRecord()
+    },
+    {
+      case_id: 'deletion-case',
+      deliverable: false,
+      reason: 'Analyzer failed.',
+      review_record: reviewRecord()
+    }
+  ]
+  const result = repositoryResult(cases, {
+    scan_summary: { triaged_case_count: 1, deleted_file_count: 3 }
+  })
+  const view = buildRepositorySummaryWorkflowView(result, { run_id: 'counts' })
+  assert.equal(view.case_count, 2)
+  assert.equal(view.scan_summary.triaged_case_count, 1)
+  const body = renderRepositorySecuritySummaryComment({
+    workflow_result: view,
+    published_delivery_entries: [],
+    event_type: 'manual',
+    target_branch: 'main'
+  })
+  assert.match(body, /Reviewed cases: .2./)
+  assert.match(body, /Cases after triage: .1./)
+  assert.match(body, /Deleted files in window: .3./)
+  assert.match(body, /Ready for delivery: .1./)
 })

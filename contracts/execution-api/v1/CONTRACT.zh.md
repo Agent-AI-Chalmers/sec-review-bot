@@ -154,11 +154,12 @@ Execution Worker 根据内部阶段输出构造对外结果。构造 `ReviewReco
 
 Repository review 由 `scan -> case review -> delivery` 组成：
 
-- `scan_summary` 是扫描阶段公开摘要；完整 Discovery / Triage 输出保存在执行归档中。
+- `scan_summary` 是扫描阶段公开摘要；`triaged_case_count` 只统计 triage 产生的 cases，不含删除 cases。完整 Discovery / Triage 输出保存在执行归档中。
+- `case_count` 统计 `case_results` 中实际进入审查的全部单元，包括 triage cases、删除 cases 和审查失败的 cases。多个删除文件可能汇成一个 case；因限制而未生成的删除 cases 不计入总数。
 - `case_results[].review_record` 是每个 case 的审查结果。
 - `deliveries[]` 是 delivery execution 产出的 repository delivery result 和可发布产物。
 
-结果结构由 [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json) 定义。`case_results[]` 通过 `case_id`、`disposition`、`reason` 和 `review_record` 表达 case-level 公开结果。
+结果结构由 [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json) 定义。`case_results[]` 通过 `case_id`、`deliverable`、`reason` 和 `review_record` 表达 case-level 公开结果。`deliverable` 为 `true` 时允许修复进入交付，为 `false` 时阻止交付；`reason` 解释判断原因。两种结果都保留在报告中。该字段表示交付资格，不表示实际发布是否成功。
 
 ### Repository 交付单元
 

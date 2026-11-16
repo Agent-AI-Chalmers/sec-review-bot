@@ -35,6 +35,8 @@ def test_a_skipped_deletion_review_says_so_in_the_result() -> None:
 
     assert result["scan_summary"]["deleted_file_count"] == 250
     assert result["deletion_review_skipped"] is True
+    assert result["case_count"] == 0
+    assert result["scan_summary"]["triaged_case_count"] == 0
 
 
 def test_the_scan_counts_only_deletions_review_covers() -> None:

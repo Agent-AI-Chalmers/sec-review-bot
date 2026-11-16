@@ -55,7 +55,7 @@ class DeliveryExecutionInput(BaseModel):
     workspace_snapshot_tar_path: str
     max_concurrency: int
     deliveries: list[DeliveryEntry]
-    keep_case_ids: list[str]
+    delivery_case_ids: list[str]
     single_delivery_execution_items: list[DeliveryExecutionItem]
     combined_delivery_execution_items: list[DeliveryExecutionItem]
 
@@ -65,17 +65,19 @@ def build_delivery_execution_input(
     run_artifacts_root: Path,
     workspace_snapshot_tar_path: Path,
     deliveries: Sequence[DeliveryEntry],
-    keep_case_results: Sequence[DeliveryCaseInput],
+    delivery_case_results: Sequence[DeliveryCaseInput],
 ) -> DeliveryExecutionInput:
-    keep_case_results_by_case_id = {item.case_id: item for item in keep_case_results}
+    delivery_case_results_by_case_id = {
+        item.case_id: item for item in delivery_case_results
+    }
     delivery_items = list(deliveries)
     single_delivery_execution_items: list[DeliveryExecutionItem] = []
     combined_delivery_execution_items: list[DeliveryExecutionItem] = []
     for index, delivery_entry in enumerate(delivery_items):
-        delivery_case_results = [
-            keep_case_results_by_case_id[case_id]
+        entry_case_results = [
+            delivery_case_results_by_case_id[case_id]
             for case_id in delivery_entry.case_ids
-            if case_id in keep_case_results_by_case_id
+            if case_id in delivery_case_results_by_case_id
         ]
         delivery_request = DeliveryExecutionItem(
             index=index,
@@ -86,7 +88,7 @@ def build_delivery_execution_input(
                     mitigator_file_changes=item.mitigator_file_changes,
                     mitigator_patch_diff=item.mitigator_patch_diff,
                 )
-                for item in delivery_case_results
+                for item in entry_case_results
             ],
         )
         if delivery_entry.strategy == "combined":
@@ -102,7 +104,7 @@ def build_delivery_execution_input(
             DELIVERY_PATCH_MAX_CONCURRENCY,
         ),
         deliveries=delivery_items,
-        keep_case_ids=[item.case_id for item in keep_case_results],
+        delivery_case_ids=[item.case_id for item in delivery_case_results],
         single_delivery_execution_items=single_delivery_execution_items,
         combined_delivery_execution_items=combined_delivery_execution_items,
     )
@@ -112,7 +114,7 @@ def persist_delivery_execution_input(
     *,
     run_artifacts_root: Path,
     deliveries: Sequence[DeliveryEntry],
-    keep_case_results: Sequence[DeliveryCaseInput],
+    delivery_case_results: Sequence[DeliveryCaseInput],
 ) -> None:
     combined_delivery_count = sum(
         1 for item in deliveries if item.strategy == "combined"
@@ -120,18 +122,18 @@ def persist_delivery_execution_input(
     execution_payload = {
         "summary": {
             "delivery_count": len(deliveries),
-            "case_result_count": len(keep_case_results),
-            "keep_case_count": len(keep_case_results),
+            "case_result_count": len(delivery_case_results),
+            "ready_case_count": len(delivery_case_results),
             "combined_delivery_count": combined_delivery_count,
         },
         "deliveries": [item.model_dump(mode="json") for item in deliveries],
         "cases": [
             {
                 "case_id": item.case_id,
-                "disposition": item.disposition,
+                "deliverable": item.deliverable,
                 "reason": item.reason,
             }
-            for item in keep_case_results
+            for item in delivery_case_results
         ],
     }
     persist_json_artifact(

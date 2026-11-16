@@ -16,13 +16,13 @@ async def test_delivery_replay_validates_cases_before_shared_selection(
 ) -> None:
     """Replay validates every stored case before applying the normal delivery rule."""
     cases = [
-        {"case_id": "blocked", "disposition": "blocked", "review_record": {}},
+        {"case_id": "blocked", "deliverable": False, "review_record": {}},
     ]
     if scenario != "blocked":
         cases.append(
             {
                 "case_id": "approved",
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "mitigation": {
                         "overview": "Approved repair",
@@ -79,7 +79,7 @@ async def test_delivery_replay_validates_cases_before_shared_selection(
         raise stopped
 
     def persist(**kwargs):
-        observed.extend(kwargs["keep_case_results"])
+        observed.extend(kwargs["delivery_case_results"])
         raise stopped
 
     if replay is delivery_planning:

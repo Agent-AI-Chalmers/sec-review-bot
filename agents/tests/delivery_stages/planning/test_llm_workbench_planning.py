@@ -31,7 +31,7 @@ async def test_llm_can_drive_delivery_planning_workbench_state_to_valid_export(
     planning_cases = [
         DeliveryCaseInput.model_validate(
             {
-                "disposition": "keep",
+                "deliverable": True,
                 "reason": None,
                 "mitigation_overview": "",
                 "mitigator_patch_diff": None,

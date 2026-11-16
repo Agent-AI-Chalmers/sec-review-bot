@@ -17,7 +17,7 @@ export interface RepositoryDelivery {
 export interface RepositoryCaseResult {
   case_id: string
   review_record: ReviewRecord
-  disposition: string
+  deliverable: boolean
   reason: string | null
 }
 
@@ -26,7 +26,7 @@ export interface RepositoryScanSummary {
   scanned_file_count: number
   skipped_file_count: number
   candidate_count: number
-  case_count: number
+  triaged_case_count: number
   suppressed_candidate_count: number
   deleted_file_count: number
 }
@@ -34,6 +34,7 @@ export interface RepositoryScanSummary {
 export interface RepositoryWorkflowResult {
   api_version: ExecutionApiVersion
   scan_summary: RepositoryScanSummary
+  case_count: number
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
   // True when the window removed more files than deletion review covers. The schema makes it

@@ -53,7 +53,7 @@ test('repository result parser accepts the shared v1 blocked result fixture', ()
   )
 
   assert.strictEqual(result.api_version, 'v1')
-  assert.strictEqual(result.case_results.at(0)?.disposition, 'blocked')
+  assert.strictEqual(result.case_results.at(0)?.deliverable, false)
   assert.deepStrictEqual(result.deliveries, [])
 })
 

@@ -98,8 +98,8 @@ async def run_repository_case_reviews_direct(
     request: ReviewWorkflowRequest,
     scan_result: RepositoryScanResult,
 ) -> list[RepositoryCaseResult]:
-    cases = scan_result.triage_result.cases
-    case_batch = prepare_repository_case_review_inputs_activity(request, cases)
+    triage_cases = scan_result.triage_result.cases
+    case_batch = prepare_repository_case_review_inputs_activity(request, triage_cases)
     case_requests = case_batch.case_requests
     max_concurrency = max(1, case_batch.max_concurrency)
 
@@ -139,11 +139,11 @@ async def run_repository_delivery_direct(
         persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)
         return result
 
-    keep_case_results = select_delivery_cases(case_results)
+    delivery_case_results = select_delivery_cases(case_results)
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         deliveries=deliveries,
-        keep_case_results=keep_case_results,
+        delivery_case_results=delivery_case_results,
     )
     workspace_snapshot_tar_path = required_path(
         request.prepared_input.workspace_snapshot_tar_path,
@@ -153,7 +153,7 @@ async def run_repository_delivery_direct(
         run_artifacts_root=run_artifacts_root,
         workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         deliveries=deliveries,
-        keep_case_results=keep_case_results,
+        delivery_case_results=delivery_case_results,
     )
     patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
     for delivery_request in delivery_execution.single_delivery_execution_items:
@@ -190,7 +190,7 @@ async def run_repository_delivery_direct(
 
     result = build_delivery_result_from_outcomes(
         deliveries=deliveries,
-        keep_case_ids=delivery_execution.keep_case_ids,
+        delivery_case_ids=delivery_execution.delivery_case_ids,
         patch_outcomes=[outcome for outcome in patch_outcomes if outcome is not None],
     )
     persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)

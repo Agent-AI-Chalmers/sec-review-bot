@@ -5,14 +5,13 @@
     "scanned_file_count": 12,
     "skipped_file_count": 0,
     "candidate_count": 2,
-    "case_count": 1,
     "suppressed_candidate_count": 1,
-    "deleted_file_count": 0
+    "deleted_file_count": 0,
+    "triaged_case_count": 1
   },
   "case_results": [
     {
       "case_id": "case-1",
-      "disposition": "keep",
       "reason": null,
       "review_record": {
         "analysis": {
@@ -51,7 +50,8 @@
           "overview": "Authenticated users can replay stale webhook retry payloads.",
           "not_scored_reason": null
         }
-      }
+      },
+      "deliverable": true
     }
   ],
   "deliveries": [
@@ -71,5 +71,6 @@
       ]
     }
   ],
-  "deletion_review_skipped": false
+  "deletion_review_skipped": false,
+  "case_count": 1
 }

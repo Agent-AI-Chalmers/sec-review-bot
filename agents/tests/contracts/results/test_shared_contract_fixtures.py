@@ -41,6 +41,6 @@ def test_shared_repository_blocked_result_fixture_is_public_shape() -> None:
     result = contract_fixture("repository-review-result-blocked.json")
 
     assert_public_workflow_result(result)
-    assert result["case_results"][0]["disposition"] == "blocked"
+    assert result["case_results"][0]["deliverable"] is False
     assert result["deliveries"] == []
     assert_review_record_shape(result["case_results"][0]["review_record"])

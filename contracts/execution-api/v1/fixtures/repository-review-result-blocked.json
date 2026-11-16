@@ -5,14 +5,13 @@
     "scanned_file_count": 8,
     "skipped_file_count": 0,
     "candidate_count": 1,
-    "case_count": 1,
     "suppressed_candidate_count": 0,
-    "deleted_file_count": 0
+    "deleted_file_count": 0,
+    "triaged_case_count": 1
   },
   "case_results": [
     {
       "case_id": "case-blocked-1",
-      "disposition": "blocked",
       "reason": "The fix requires credential rotation outside the repository workspace.",
       "review_record": {
         "analysis": {
@@ -48,9 +47,11 @@
           "overview": "Authenticated repository readers can recover a production token.",
           "not_scored_reason": null
         }
-      }
+      },
+      "deliverable": false
     }
   ],
   "deliveries": [],
-  "deletion_review_skipped": false
+  "deletion_review_skipped": false,
+  "case_count": 1
 }

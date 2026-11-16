@@ -460,7 +460,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
         return RepositoryCaseResult.model_validate(
             {
                 "case_id": case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "reason": "unit-test",
                 "review_record": {
                     "cvss": (
@@ -530,11 +530,11 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     results = await run_workflow()
 
     assert [item.case_id for item in results] == ["case-1", "case-2", "case-3"]
-    assert results[0].disposition == "keep"
-    assert results[1].disposition == "blocked"
+    assert results[0].deliverable
+    assert results[1].deliverable is False
     assert "Case processing failed after retries" in (results[1].reason or "")
     assert_not_run_review_record(results[1].review_record.model_dump(mode="json"))
-    assert results[2].disposition == "keep"
+    assert results[2].deliverable
 
 
 @pytest.mark.asyncio
@@ -550,7 +550,7 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
         if case_id == "case-2":
             raise RuntimeError("case-2 failed")
         return RepositoryCaseResult.model_validate(
-            {"review_record": {}, "case_id": case_id, "disposition": "keep"}
+            {"review_record": {}, "case_id": case_id, "deliverable": True}
         )
 
     with (
@@ -579,7 +579,7 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
         )
 
     assert [item.case_id for item in results] == ["case-1", "case-2", "case-3"]
-    assert results[1].disposition == "blocked"
+    assert results[1].deliverable is False
     assert "Case processing failed" in (results[1].reason or "")
     assert_not_run_review_record(results[1].review_record.model_dump(mode="json"))
 
@@ -604,7 +604,7 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
         await asyncio.sleep(0)
         active_count -= 1
         return RepositoryCaseResult.model_validate(
-            {"review_record": {}, "case_id": case_id, "disposition": "keep"}
+            {"review_record": {}, "case_id": case_id, "deliverable": True}
         )
 
     with (
@@ -864,7 +864,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
         return RepositoryCaseResult.model_validate(
             {
                 "case_id": prepared_case.case_execution_input.case_id,
-                "disposition": "blocked",
+                "deliverable": False,
                 "review_record": {
                     "cvss": (
                         cvss_result.model_dump(mode="json")
@@ -999,7 +999,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
         return RepositoryCaseResult.model_validate(
             {
                 "case_id": prepared_case.case_execution_input.case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "cvss": (
                         cvss_result.model_dump(mode="json")
@@ -1044,7 +1044,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     result = await run_workflow()
 
-    assert result.disposition == "keep"
+    assert result.deliverable
     assert result.review_record.cvss is None
     assert result.review_record.verification.coverage == "full"
 
@@ -1135,7 +1135,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         return RepositoryCaseResult.model_validate(
             {
                 "case_id": prepared_case.case_execution_input.case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "cvss": (
                         cvss_result.model_dump(mode="json")
@@ -1269,7 +1269,7 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         return RepositoryCaseResult.model_validate(
             {
                 "case_id": prepared_case.case_execution_input.case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "cvss": (
                         cvss_result.model_dump(mode="json")
@@ -1410,7 +1410,7 @@ async def test_direct_window_bounds_pending_work_and_cleans_up(
             case_id = case_request.case_execution_input.case_id
             await execute(int(case_id.split("-")[1]))
             return RepositoryCaseResult.model_validate(
-                {"case_id": case_id, "disposition": "keep", "review_record": {}}
+                {"case_id": case_id, "deliverable": True, "review_record": {}}
             )
 
         monkeypatch.setattr(
@@ -1450,7 +1450,7 @@ async def test_direct_window_bounds_pending_work_and_cleans_up(
                     f"case-{i}" for i in range(5)
                 ]
                 if outcome == "failure":
-                    assert result[1].disposition == "blocked"
+                    assert result[1].deliverable is False
         expected = (
             [0, 1]
             if outcome == "cancel" or (outcome == "failure" and stage == "discovery")

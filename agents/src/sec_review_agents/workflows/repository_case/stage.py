@@ -32,24 +32,24 @@ from sec_review_agents.workflows.repository_case.verification import (
 from sec_review_agents.workspace.file_changes import file_change_paths
 
 
-def _blocked_case_disposition(reason: str) -> dict[str, Any]:
+def _blocked_deliverability(reason: str) -> dict[str, Any]:
     return {
-        "disposition": "blocked",
+        "deliverable": False,
         "reason": reason,
     }
 
 
-def derive_case_disposition(
+def derive_case_deliverability(
     mitigator_result: MitigationStageResult | None,
     verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
     if not file_change_paths(
         mitigator_result.file_changes if mitigator_result is not None else None
     ):
-        return _blocked_case_disposition("The case did not produce an applied patch.")
+        return _blocked_deliverability("The case did not produce an applied patch.")
 
     if verifier_result is None or verifier_result.coverage != "full":
-        return _blocked_case_disposition(
+        return _blocked_deliverability(
             "The verifier did not fully approve the patch for delivery execution."
         )
 
@@ -60,17 +60,17 @@ def derive_case_disposition(
         "not-run",
         "not-applicable",
     }:
-        return _blocked_case_disposition(
+        return _blocked_deliverability(
             "The verifier did not clear regression risk for delivery execution."
         )
 
     if verifier_result.next_step != "none":
-        return _blocked_case_disposition(
+        return _blocked_deliverability(
             "The verifier requires follow-up before delivery execution."
         )
 
     return {
-        "disposition": "keep",
+        "deliverable": True,
         "reason": "Case produced a patch approved by verifier for delivery execution.",
     }
 

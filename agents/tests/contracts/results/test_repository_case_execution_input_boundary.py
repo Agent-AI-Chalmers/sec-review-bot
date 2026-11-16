@@ -505,7 +505,12 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
                             "path": "src/guard.py",
                             "status": "deleted",
                             "previous_path": None,
-                        }
+                        },
+                        {
+                            "path": "src/guard_helper.py",
+                            "status": "deleted",
+                            "previous_path": None,
+                        },
                     ],
                 }
             ),
@@ -519,7 +524,7 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
     )
     restored_request, restored_cases = await pydantic_data_converter.decode(
         await pydantic_data_converter.encode([request, [case]]),
-        [argument_types["request"], argument_types["cases"]],
+        [argument_types["request"], argument_types["triage_cases"]],
     )
     assert isinstance(restored_cases[0], TriageCase)
     assert isinstance(restored_cases[0].anchor_locations[0], DiscoveryLocation)
@@ -534,7 +539,47 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
     assert "candidate-private" not in first.review_input
     assert "src/routes.py:7" in first.review_input
     assert "src/guard.py" in deleted.review_input
+    assert "src/guard_helper.py" in deleted.review_input
     assert "Candidate Anchors" not in deleted.review_input
+
+    from sec_review_agents.review_stages.record import build_review_record
+    from sec_review_agents.workflows.repository.result import (
+        build_repository_workflow_result,
+    )
+    from sec_review_agents.workflows.repository.workflow import (
+        build_blocked_repository_case_result,
+    )
+    from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
+    from tests.repository_scan_fixtures import scan_result_fixture
+
+    reviewed = [
+        RepositoryCaseResult(
+            case_id=first.case_id,
+            deliverable=True,
+            review_record=build_review_record(
+                analysis_result=None,
+                mitigation_result=None,
+                verifier_result=None,
+                cvss_result=None,
+            ),
+        ),
+        build_blocked_repository_case_result(
+            restored.case_requests[1], "Analyzer failed."
+        ),
+    ]
+    report = build_repository_workflow_result(
+        scan_result=scan_result_fixture(case_count=1, deleted_file_count=2),
+        delivery_result=None,
+        case_results=reviewed,
+    )
+    assert report["case_count"] == 2
+    assert report["scan_summary"]["triaged_case_count"] == 1
+    assert [item["case_id"] for item in report["case_results"]] == [
+        first.case_id,
+        deleted.case_id,
+    ]
+    assert report["case_results"][1]["deliverable"] is False
+    assert report["case_results"][1]["reason"] == "Analyzer failed."
     assert isinstance(request.prepared_input, PreparedRepositoryInput)
     assert (
         deleted.case_id
@@ -550,7 +595,7 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
         with pytest.raises(ValueError, match=missing):
             await pydantic_data_converter.decode(
                 await pydantic_data_converter.encode([[malformed]]),
-                [argument_types["cases"]],
+                [argument_types["triage_cases"]],
             )
     for colliding_id in ("case-1", " case-1 ", deleted.case_id):
         with pytest.raises(ValueError, match="must be unique"):

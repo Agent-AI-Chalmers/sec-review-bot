@@ -36,7 +36,7 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
     }
     case_result = {
         "case_id": "case-1",
-        "disposition": "keep",
+        "deliverable": True,
         "review_record": {
             "analysis": {
                 "verdict": "confirmed-vulnerability",
@@ -132,7 +132,7 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
     assert "##### Evidence anchors" not in content
     assert "- Coverage: `full`" in content
     assert "- Next step: `none`" in content
-    assert "- Case disposition: `keep`" not in content
+    assert "- Case deliverable:" not in content
     assert "- Analysis: `confirmed security vulnerability`" in content
     assert "<summary>CVSS</summary>" in content
     assert "<summary>Mitigation</summary>" in content
@@ -282,7 +282,7 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
         case_results=[
             {
                 "case_id": "case-1",
-                "disposition": "blocked",
+                "deliverable": False,
                 "reason": "The verifier did not fully approve the patch.",
                 "review_record": review_record,
             }

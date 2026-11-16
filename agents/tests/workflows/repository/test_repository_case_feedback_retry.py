@@ -199,15 +199,15 @@ async def test_repository_case_without_patch_does_not_retry_verification() -> No
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("next_step", "regression", "disposition"),
+    ("next_step", "regression", "deliverable"),
     [
-        ("none", "passed", "keep"),
-        ("retry-ai", "passed", "blocked"),
-        ("none", None, "blocked"),
+        ("none", "passed", True),
+        ("retry-ai", "passed", False),
+        ("none", None, False),
     ],
 )
 async def test_repository_case_workflow_retries_and_passes_verifier_history(
-    next_step: NextStep, regression: RegressionStatus | None, disposition: str
+    next_step: NextStep, regression: RegressionStatus | None, deliverable: bool
 ) -> None:
     """Retry exhaustion must preserve the real builder's delivery restrictions."""
     state = _CaseWorkflowState(
@@ -261,7 +261,7 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history(
     assert state.verification_retry_contexts[1].retry_index == 1
     assert len(state.archive_retry_contexts) == 1
     assert result.review_record.verification.coverage == "full"
-    assert result.disposition == disposition
+    assert result.deliverable == deliverable
     assert result.review_record.verification.next_step == next_step
     assert result.review_record.verification.regression == regression
     assert "diagnostics" not in result.model_dump()
