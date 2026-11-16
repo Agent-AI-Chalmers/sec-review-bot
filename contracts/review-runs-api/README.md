@@ -15,7 +15,7 @@ Input publication operations reserve a complete immutable publication intent und
 
 ## Boundary
 
-Review Runs produces each observed run from `observeRun()` and each record from `rowToRecord()`. The record carries `failure_message`, which the redacted read shape deliberately drops, so it only ever crosses the service-token boundary.
+Review Runs exposes redacted observed runs to read-token callers and full coordination records to service-token callers. Only the full record includes `failure_message`.
 
 ## Public Boundary
 
@@ -32,9 +32,9 @@ Consumers can rely on:
 
 ## Enforcement
 
-The console imports its `Run` and `ArtifactStorage` types from the contract-generated module. The contract tools check that committed projections match a fresh render. UI type tests independently verify assignment behavior: an available archive requires its reference, including its URI and digest, while an unavailable archive needs no reference. These tests use the public UI types without importing contract fixtures or comparing a sample's exact field set.
+Consumers use the contract-generated types, and the contract tools check that committed projections match a fresh render. Consumer type tests verify that an available archive requires its reference, including URI and digest, while an unavailable archive needs no reference.
 
-Review Runs owns the value-level half in `services/review-runs/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite.
+Review Runs validates the shared fixtures against their manifest and checks actual read responses against the response schemas. Types and schemas derive from the same `ObservedRun` definition in `openapi.yaml`. Values outside the status enums, patterns, or timestamp formats are rejected by those checks.
 
 ## Tooling
 
@@ -53,6 +53,6 @@ pnpm test
 ## Error codes
 
 - **Validation codes** (`INVALID_QUERY`, `INVALID_BODY`, and `INVALID_PATH_PARAMETER`) name which part of a request failed the contract's own schema, so a caller classifying by `code` can tell a bad run-list filter from a bad body from a bad path parameter. A run-list request also validates strictly against the declared query parameters: an undeclared query parameter is rejected as `INVALID_QUERY`, not ignored, because `listRuns` models its filters as one `additionalProperties: false` object rather than a bare parameter list. They surface as an HTTP 400 with a string `code`. The server projects the whole enum into `ERROR_RESPONSE_CODES_FROM_CONTRACT` and refuses to emit a code the contract omits, so the envelope cannot advertise a value outside [openapi.yaml](v1/openapi.yaml)'s `ErrorResponse.code` enum.
-- **Control-flow codes** (the four `PUBLICATION_STEP_*` codes Review Runs emits as terminal publication failures) are single-sourced in [openapi.yaml](v1/openapi.yaml)'s `ErrorResponse.code` enum and surface on the write surface as an HTTP 409 with a string `code`. The server's `PUBLICATION_STEP_ERROR_CODES` (review-runs) is a projection of that enum, and GitHub Integration consumes the generated `REVIEW_RUNS_PUBLICATION_ERROR_CODES` map instead of restating the strings. It classifies confirmed refusals as `retry: false`; `publication-error-code-alignment.test.ts` checks the policy against the source contract. An exhaustion code on a transport failure remains retryable because it does not establish a service refusal.
+- **Control-flow codes** (the four `PUBLICATION_STEP_*` codes Review Runs emits as terminal publication failures) are single-sourced in [openapi.yaml](v1/openapi.yaml)'s `ErrorResponse.code` enum and surface on the write surface as an HTTP 409 with a string `code`. The server's `PUBLICATION_STEP_ERROR_CODES` (review-runs) is a projection of that enum, and GitHub Integration consumes the generated `REVIEW_RUNS_PUBLICATION_ERROR_CODES` map instead of restating the strings. Confirmed refusals stop retries; consumer tests check the classification against the source contract. An exhaustion code on a transport failure remains retryable because it does not establish a service refusal.
 - **Responses with no `code`**: every operation declares an HTTP 500 (`InternalError`) for an internal fault, and every operation that reads a request body an HTTP 413 (`PayloadTooLarge`) for a body over the 1 MiB limit. Neither carries a `code`: the fault is deliberately opaque, and an oversized body is rejected before the contract's own schema sees it. A Spectral rule (`operation-declares-server-errors`) fails a new operation that omits them.
 - **Diagnostic codes** (`failure_code`, the execution error `code`) are open sets and remain un-enumerated until their vocabulary stabilizes.

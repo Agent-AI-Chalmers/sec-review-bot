@@ -20,12 +20,7 @@ This contract covers only the format. It does not decide whether to trust where 
 
 ## Enforcement
 
-There is no JSON Schema for this contract. The rules that matter are decision logic (a `working-directory` that cannot escape the repository root, an `env` name that cannot smuggle shell syntax, a positive-integer timeout), and do not fit a structural shape. They live in the Execution Worker and GitHub Integration parsers, so no separate schema can disagree with them:
-
-- Python (Execution Worker): `agents/src/sec_review_agents/entrypoints/setup_declaration.py`
-- TypeScript (GitHub Integration): `apps/github-integration/src/github/setup-declaration.ts`
-
-The Execution Worker and GitHub Integration execute the shared corpus in tests. Adding a rule means adding a case to [v1/corpus](v1/corpus) and making each enforcer pass it, so their implementations cannot silently drift apart.
+GitHub Integration and the Execution Worker apply the same format rules at the submission and execution boundaries. Their tests use the shared [v1/corpus](v1/corpus) to check acceptance and rejection, including path containment and YAML scalar handling. Adding a rule requires a corpus case that both sides pass; this contract does not maintain a separate JSON Schema.
 
 Blank content is part of the boundary: an empty or whitespace-only declaration is valid and means "no declaration" in each implementation.
 

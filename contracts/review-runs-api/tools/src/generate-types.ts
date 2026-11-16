@@ -156,22 +156,16 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
 }
 
-// The server's own projection of the contract's error-code vocabulary. The hand-written
-// openapi.yaml owns the strings; this file exposes them as a closed union plus an ordered
-// array so `errors.ts` can keep its semantic keys while its string values are pinned to the
-// contract (and vice-versa) by a compile-time check.
+// Generate the server's closed error-code vocabulary from the contract enum.
 export const ERROR_CODES_PATH = path.resolve(
   REVIEW_RUNS_ROOT,
   'src',
   'error-codes-generated.ts'
 )
 
-/** Every member of the contract's ErrorResponse.code enum.
- *
- * A non-string member is an error rather than something to filter out: the generated file
- * advertises itself as "Every code the contract's ErrorResponse.code enum allows", and that
- * array is a security control — `server.ts` refuses to emit any code outside it, so a member
- * silently dropped here would be stripped from a response as if it were an internal code. */
+/** Preserve every error-code enum member; reject non-string values rather than silently
+ * generating an incomplete vocabulary for response validation.
+ */
 export function errorResponseCodes(spec: OpenApiDocument): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
     { properties?: { code?: { enum?: (string | number)[] } } } | undefined
@@ -192,7 +186,7 @@ export function publicationStepCodes(spec: OpenApiDocument): string[] {
   )
 }
 
-/** The committed content of `services/review-runs/src/error-codes-generated.ts`. */
+/** Render server and connector error-code projections. */
 export async function renderErrorCodeTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const codes = publicationStepCodes(spec)
@@ -227,7 +221,7 @@ export const CONTRACT_TYPES_PATH = path.resolve(
   'contract-types-generated.ts'
 )
 
-/** The committed content of `services/review-runs/src/contract-types-generated.ts`. */
+/** Render the service contract types. */
 export async function renderContractTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const body =
@@ -318,7 +312,7 @@ export function listRunQueryParameters(spec: OpenApiDocument): string[] {
   )
 }
 
-/** The committed content of `apps/control-plane-ui/shared/list-run-query-params.ts`. */
+/** Render the console query-parameter allowlist. */
 export async function renderListRunQueryParams(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const names = listRunQueryParameters(spec)
@@ -357,7 +351,7 @@ export const UI_TYPES_PATH = path.resolve(
   'api-types.generated.ts'
 )
 
-/** The committed content of `apps/control-plane-ui/browser/features/runs/api-types.generated.ts`. */
+/** Render the console contract types. */
 export async function renderUiContractTypes(): Promise<string> {
   const body =
     headerComment() +

@@ -49,21 +49,13 @@ Parsing is strict. Anything outside the format above is rejected, never silently
 
 **The declaration text is capped at 64 KiB (UTF-8).** The validated text travels inline in the workflow input. GitHub Integration rejects an oversized file before submission; the Execution Worker and the input schema carry the same limit.
 
-## Two Enforcers
+## Validation Before Submission And Execution
 
-The format is enforced by two independent implementations that must agree:
+GitHub Integration validates the declaration before submitting a run. It reads the file from the base repository's default branch and reports the repository, ref, and path when the declaration is invalid. Invalid content is a preparation error; it must not be silently treated as a missing declaration.
 
-- the **Execution Worker** parser, in Python (`agents/src/sec_review_agents/entrypoints/setup_declaration.py`);
-- the **GitHub Integration** validator, in TypeScript (`apps/github-integration/src/github/setup-declaration.ts`).
+The Execution Worker validates the declaration before executing setup, including declarations supplied by callers other than GitHub Integration. An invalid declaration fails the run. A valid declaration whose setup step fails has a different outcome: remaining setup steps stop, the environment is marked `incomplete`, and the review continues.
 
-They have different jobs on the same rules:
-
-- **GitHub Integration owns the content rules at the producer boundary**: it reads the file from the base repository's default branch, validates it, and rejects an invalid declaration **before** submitting the run, reporting the repository, ref, and path. A broken `.sec-review/setup.yml` on the default branch is a maintainer error, so it fails loudly instead of silently degrading to an unbootstrapped environment.
-- Execution Worker validates the declaration again before execution. An invalid declaration fails the run. If the declaration is valid but a setup step fails, the remaining setup steps stop, the environment is marked `incomplete`, and the review continues.
-
-GitHub Integration normally rejects invalid declarations before submitting a run. Worker validation also checks declarations supplied by other callers and can reveal disagreements between the two validators.
-
-There is no JSON Schema for this contract. The important rules (a `working-directory` that cannot escape the root, an `env` name that cannot smuggle shell syntax, a timeout that is a positive integer) are decision logic rather than structural shape. Expressing them as JSON Schema would create a second definition ("schema says valid, parser says no") that the repository's contract rules explicitly avoid: schemas own structural shape, cross-field and policy rules stay with the code that enforces them.
+Both sides must apply the same validity rules. The shared corpus below checks that they accept and reject the same inputs. This contract uses that corpus to verify its format and policy rules, including path containment and scalar handling, rather than maintaining a separate JSON Schema.
 
 ## Corpus
 

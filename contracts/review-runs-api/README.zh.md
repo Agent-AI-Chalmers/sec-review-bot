@@ -17,7 +17,7 @@
 
 ## 两种运行记录
 
-Review Runs 通过 `observeRun()` 生成供读取接口使用的脱敏记录，通过 `rowToRecord()` 生成协调记录。后者包含 `failure_message`；脱敏记录会移除该字段，因此只有使用 service token 的接口才返回它。
+Review Runs 向 read token 调用方提供脱敏运行记录，向 service token 调用方提供完整协调记录。只有完整记录包含 `failure_message`。
 
 ## 调用方可以依赖什么
 
@@ -34,9 +34,9 @@ Review Runs 通过 `observeRun()` 生成供读取接口使用的脱敏记录，�
 
 ## 如何校验
 
-控制台从契约生成的模块导入 `Run` 和 `ArtifactStorage` 类型。契约工具检查已提交的投影是否与重新生成的结果一致。UI 类型测试独立验证赋值行为：可用归档必须包含引用及其 URI 和 digest，不可用归档不需要引用。这些测试使用 UI 公开的类型，不导入契约 fixtures，也不比较某份样例的完整字段集合。
+调用方使用契约生成的类型，契约工具检查已提交的投影是否与重新生成的结果一致。调用方的类型测试验证：可用归档必须包含引用及其 URI 和 digest，不可用归档不需要引用。
 
-字段值由 Review Runs 的 `services/review-runs/test/observed-run-contract.test.ts` 验证：测试按清单校验每份输入，也校验 `observeRun()` 的实际输出。类型和 schema 都来自 `openapi.yaml` 的 `ObservedRun`，无需另外维护一份字段对照。超出枚举的状态、不符合 schema 中 pattern 约束的值或格式错误的时间戳都会让测试失败。
+Review Runs 按清单校验共享 fixtures，并检查实际读取响应是否符合响应 schema。类型和 schema 都来自 `openapi.yaml` 的同一份 `ObservedRun` 定义。超出状态枚举、不符合 pattern 或时间戳格式的值会被这些检查拒绝。
 
 ## 工具
 
@@ -55,6 +55,6 @@ pnpm test
 ## 错误码
 
 - **请求校验错误**：`INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` 分别表示查询参数、请求体和路径参数未通过 schema 校验，返回 HTTP 400 和字符串 `code`。运行列表不接受未声明的查询参数：`listRuns` 将过滤条件定义为 `additionalProperties: false` 的对象，因此未知参数返回 `INVALID_QUERY`。服务端从契约枚举生成 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，不会返回枚举之外的 `ErrorResponse.code`。
-- **发布流程错误**：`PUBLICATION_STEP_*` 错误码表示确定的、应停止自动重试的发布失败，定义在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` 中，写入接口以 HTTP 409 和字符串 `code` 返回。Review Runs 从该枚举生成 `PUBLICATION_STEP_ERROR_CODES`；GitHub Integration 使用生成的 `REVIEW_RUNS_PUBLICATION_ERROR_CODES` 映射，不再重复定义字符串。收到确定拒绝时按 `retry: false` 处理，`publication-error-code-alignment.test.ts` 对照源契约检查该策略。传输失败携带的次数耗尽错误码仍允许重试，因为它不能证明服务已拒绝请求。
+- **发布流程错误**：`PUBLICATION_STEP_*` 错误码表示确定的、应停止自动重试的发布失败，定义在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` 中，写入接口以 HTTP 409 和字符串 `code` 返回。Review Runs 从该枚举生成 `PUBLICATION_STEP_ERROR_CODES`；GitHub Integration 使用生成的 `REVIEW_RUNS_PUBLICATION_ERROR_CODES` 映射，不再重复定义字符串。收到确定拒绝时停止重试，调用方测试对照源契约检查该分类。传输失败携带的次数耗尽错误码仍允许重试，因为它不能证明服务已拒绝请求。
 - **不带 `code` 的错误**：每个操作都声明 HTTP 500（`InternalError`）；读取请求体的操作还声明超过 1 MiB 上限时的 HTTP 413（`PayloadTooLarge`）。两者不返回 `code`：内部错误不暴露细节，过大的请求体则在 schema 校验前被拒绝。Spectral 规则 `operation-declares-server-errors` 会检查新增操作是否遗漏这些响应。
 - **诊断错误码**：`failure_code` 和执行错误的 `code` 暂不限定为枚举，可以增加新值。
