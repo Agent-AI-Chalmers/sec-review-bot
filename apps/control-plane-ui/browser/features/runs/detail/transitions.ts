@@ -5,6 +5,7 @@ import {
   type MachineBody,
   type StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
+import { isStateLabelKey } from '../state-labels.js'
 import type { Message, Translator } from '../../../shared/i18n.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12
@@ -36,11 +37,9 @@ export function stateLabel(
   state: string,
   t: Translator
 ): string {
-  const key = `state_${machine.key}_${state}_label` as Message
-  const translated = t(key)
-  return translated && translated !== key
-    ? translated
-    : (machine.body.details[state]?.label ?? state)
+  const key = `state_${machine.key}_${state}_label`
+  if (isStateLabelKey(key)) return t(key)
+  return machine.body.details[state]?.label ?? state
 }
 
 export function stateDescription(

@@ -189,7 +189,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
           'Execution never ran because preparation failed. This is not an execution failure; the reason is on the preparation axis.'
       },
       uncertain: {
-        label: 'Unconfirmed',
+        label: 'Uncertain',
         description:
           'The task was submitted, but no response arrived, so it is unknown whether the Execution API provider accepted it. This is not a failure: the submission is replayed under the same run_id.'
       },
@@ -435,9 +435,9 @@ export const STATE_MACHINES: readonly StateMachine[] = [
             'An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened.'
         },
         failed: {
-          label: 'Failed',
+          label: 'Attempt failed',
           description:
-            'The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.'
+            'The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding.'
         },
         uncertain: {
           label: 'Uncertain',
