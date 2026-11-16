@@ -9,11 +9,12 @@ from sec_review_agents.agents.triage.agent import (
     run_repository_triage_agent as run_triage_agent,
 )
 from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
-from sec_review_agents.scan_stages.triage.agent_passes import (
+from sec_review_agents.scan_stages.triage.stage import (
+    REPOSITORY_TRIAGER_AGENT_NAME,
     TriageMode,
-    run_repository_triage_agent,
+    run_repository_triage_stage,
 )
-from sec_review_agents.scan_stages.triage.stage import REPOSITORY_TRIAGER_AGENT_NAME
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 @pytest.mark.asyncio
@@ -141,10 +142,12 @@ async def test_repository_triage_single_mode_passes_explicit_runtime_inputs(
     tmp_path: Path,
 ) -> None:
     triage_root = tmp_path / "triage"
-    pass_metas: list[dict | None] = []
+    phases: list[str] = []
 
-    async def fake_agent_pass(*, pass_meta: dict | None = None, **_kwargs):
-        pass_metas.append(pass_meta)
+    async def fake_agent_pass(*, phase: str, **_kwargs):
+        phases.append(phase)
+        if len(phases) > 1:
+            return
         _kwargs["workbench_state"].create_group(
             kind="keep",
             item_ids=["candidate-a"],
@@ -152,32 +155,33 @@ async def test_repository_triage_single_mode_passes_explicit_runtime_inputs(
             category="test",
             evidence=["A"],
         )
-        return {"passIndex": len(pass_metas) - 1}
+        return
 
     with patch(
-        "sec_review_agents.scan_stages.triage.agent_passes._run_repository_triage_agent_pass",
+        "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent",
         side_effect=fake_agent_pass,
     ) as pass_mock:
-        result = await run_repository_triage_agent(
+        result = await run_repository_triage_stage(
             triage_root=triage_root,
-            triage_candidates=[
-                DiscoveryCandidateResult(
-                    candidate_id="candidate-a",
-                    candidate=DiscoveryCandidate(
-                        category="xss", description="A", locations=[], evidence=[]
-                    ),
-                    grounding_status="grounded",
-                )
-            ],
-            max_passes=2,
+            discovery_result=scan_result_fixture(
+                candidates=[
+                    DiscoveryCandidateResult(
+                        candidate_id="candidate-a",
+                        candidate=DiscoveryCandidate(
+                            category="xss", description="A", locations=[], evidence=[]
+                        ),
+                        grounding_status="grounded",
+                    )
+                ]
+            ).discovery_result,
             triage_mode="single",
         )
 
-    assert result.metadata.triage_pass_count == 1
+    assert result.metadata.agent_run_count == 2
     assert "agent_result" not in result.model_dump()
     assert "agent_results" not in result.model_dump()
     assert pass_mock.call_args.kwargs["triage_root"] == triage_root
-    assert pass_metas == [None]
+    assert phases == ["draft", "refinement"]
     assert json.loads((triage_root / "triage-input.json").read_text()) == {
         "summary": {"candidate_count": 1},
         "candidates": [
@@ -197,41 +201,42 @@ async def test_repository_triage_single_mode_passes_explicit_runtime_inputs(
 async def test_repository_triage_batched_mode_uses_explicit_runtime_inputs(
     tmp_path: Path,
 ) -> None:
-    result = await run_repository_triage_agent(
-        triage_root=tmp_path / "triage",
-        triage_candidates=[],
-        max_passes=1,
-        triage_mode="batched",
-        max_batch_size=2,
-    )
+    with patch(
+        "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent"
+    ) as refine:
+        result = await run_repository_triage_stage(
+            triage_root=tmp_path / "triage",
+            discovery_result=scan_result_fixture(candidates=[]).discovery_result,
+            triage_mode="batched",
+            max_batch_size=2,
+        )
+    refine.assert_not_awaited()
+    assert result.metadata.agent_run_count == 0
 
-    assert result.metadata.triage_pass_count == 0
     assert "agent_result" not in result.model_dump()
     assert "agent_results" not in result.model_dump()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("triage_mode", ["single", "batched"])
-@pytest.mark.parametrize("max_passes", [0, 1, 2, 10])
-async def test_triage_allows_at_most_one_refinement(
-    tmp_path: Path, triage_mode: TriageMode, max_passes: int
+@pytest.mark.parametrize("draft", ["valid", "repaired", "incomplete"])
+async def test_triage_always_refines_once(
+    tmp_path: Path, triage_mode: TriageMode, draft: str
 ) -> None:
-    """The pass budget controls refinement, not an arbitrary retry loop."""
-    pass_indices: list[int] = []
+    """Refine even edited drafts; reject incomplete state after that one chance to repair."""
+    phases: list[str] = []
 
-    async def fake_agent_pass(*, workbench_state, pass_index, **_kwargs):
-        pass_indices.append(pass_index)
-        if pass_index == 0:
-            workbench_state.create_groups(
-                groups=[
-                    {
-                        "kind": "keep",
-                        "item_ids": ["a"],
-                        "summary": "A",
-                        "category": "test",
-                        "evidence": ["A"],
-                    }
-                ]
+    async def fake_agent_pass(*, workbench_state, phase, **_kwargs):
+        phases.append(phase)
+        if (phase == "draft" and draft == "valid") or (
+            phase == "refinement" and draft == "repaired"
+        ):
+            workbench_state.create_group(
+                kind="keep",
+                item_ids=["a"],
+                summary="A",
+                category="test",
+                evidence=["A"],
             )
 
     candidate = DiscoveryCandidateResult(
@@ -242,17 +247,33 @@ async def test_triage_allows_at_most_one_refinement(
         grounding_status="grounded",
     )
     with patch(
-        "sec_review_agents.scan_stages.triage.agent_passes._run_repository_triage_agent_pass",
+        "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent",
         side_effect=fake_agent_pass,
     ):
-        result = await run_repository_triage_agent(
-            triage_root=tmp_path,
-            triage_candidates=[candidate],
-            max_passes=max_passes,
-            triage_mode=triage_mode,
-        )
-    assert pass_indices == ([0, 1] if max_passes > 1 else [0])
-    assert result.metadata.triage_pass_count == len(pass_indices)
+        if draft == "incomplete":
+            with pytest.raises(RuntimeError, match="incomplete"):
+                result = await run_repository_triage_stage(
+                    triage_root=tmp_path,
+                    discovery_result=scan_result_fixture(
+                        candidates=[candidate]
+                    ).discovery_result,
+                    triage_mode=triage_mode,
+                )
+        else:
+            result = await run_repository_triage_stage(
+                triage_root=tmp_path,
+                discovery_result=scan_result_fixture(
+                    candidates=[candidate]
+                ).discovery_result,
+                triage_mode=triage_mode,
+            )
+            assert result.metadata.agent_run_count == len(phases)
+            artifact = json.loads((tmp_path / "triage-result.json").read_text())
+            assert type(result).model_validate(artifact) == result
+
+    assert phases == ["draft", "refinement"]
+    if draft == "incomplete":
+        assert not (tmp_path / "triage-result.json").exists()
 
 
 @pytest.mark.asyncio
@@ -262,8 +283,11 @@ async def test_batch_drafts_preserve_input_order_and_first_duplicate(
     """ID sorting for batching must not reorder or replace model-visible candidates."""
     observed: dict[int, list[tuple[str, str]]] = {}
 
-    async def fake_agent_pass(*, workbench_state, pass_meta, **_kwargs):
-        observed[pass_meta["index"]] = [
+    async def fake_agent_pass(*, workbench_state, phase, batch_index=None, **_kwargs):
+        if phase == "refinement":
+            return
+        assert batch_index is not None
+        observed[batch_index] = [
             (
                 item_id,
                 workbench_state.items_by_id[item_id].candidate.candidate.description,
@@ -298,14 +322,15 @@ async def test_batch_drafts_preserve_input_order_and_first_duplicate(
         ]
     ]
     with patch(
-        "sec_review_agents.scan_stages.triage.agent_passes._run_repository_triage_agent_pass",
+        "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent",
         side_effect=fake_agent_pass,
     ):
-        await run_repository_triage_agent(
+        await run_repository_triage_stage(
             triage_root=tmp_path,
-            triage_candidates=candidates,
+            discovery_result=scan_result_fixture(
+                candidates=candidates
+            ).discovery_result,
             triage_mode="batched",
             max_batch_size=3,
-            max_passes=1,
         )
     assert observed == {1: [("b", "first B"), ("a", "A")], 2: [("c", "C")]}

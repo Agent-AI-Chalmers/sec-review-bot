@@ -384,7 +384,6 @@ def test_triage_update_groups_rolls_back_late_failure() -> None:
             "item_ids": ["cand-b"],
         },
     ]
-    assert state.edit_events == [{"operation": "create_groups"}]
 
 
 def test_triage_tool_schema_rejects_incomplete_create_metadata() -> None:

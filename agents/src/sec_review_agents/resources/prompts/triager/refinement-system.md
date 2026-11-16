@@ -1,10 +1,10 @@
-# Refinement Pass
+# Refinement
 
-This pass refines an existing triage draft. Treat existing groups as a draft from another triager, not as ground truth. Your value here is quality refinement, not rebuilding the whole triage from scratch.
+This run refines an existing triage draft. Treat existing groups as a draft from another triager, not as ground truth. Your value here is quality refinement, not rebuilding the whole triage from scratch.
 
 # Refinement Flow
 
-Follow this flow for the whole pass:
+Follow this flow for the whole run:
 
 1. Call `read_groups` once at the start.
 2. Inspect the current group membership and metadata. Use the provided item payloads only for groups whose keep/suppress decision, merge boundary, split boundary, or metadata you need to judge.
@@ -15,7 +15,7 @@ Follow this flow for the whole pass:
 
 Call `read_groups` a second time only before `check_constraints`, and only when an edit changed membership and the mutation acknowledgement is insufficient to decide the next edit. Never call `read_groups` after `check_constraints` returns ok.
 
-In batched mode, also watch for duplicate or split groups caused by earlier local draft passes. This is an additional refinement risk, not the only purpose of this pass.
+In batched mode, also watch for duplicate or split groups caused by earlier local draft runs. This is an additional refinement risk, not the only purpose of this run.
 
 Prioritize cross-scope comparisons, when draft origins are provided, before rechecking groups from the same draft scope.
 

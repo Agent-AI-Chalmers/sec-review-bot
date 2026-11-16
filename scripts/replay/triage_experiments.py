@@ -239,7 +239,7 @@ def _experiment_summary(path: Path) -> dict:
         "input_candidate_count": counts.get("input_candidate_count"),
         "case_count": counts.get("case_count"),
         "suppressed_candidate_count": counts.get("suppressed_candidate_count"),
-        "triage_pass_count": metadata.get("triage_pass_count"),
+        "agent_run_count": metadata.get("agent_run_count"),
         "total_tokens": token_usage.get("total_tokens"),
         "input_tokens": token_usage.get("input_tokens"),
         "output_tokens": token_usage.get("output_tokens"),

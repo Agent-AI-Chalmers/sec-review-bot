@@ -1,10 +1,10 @@
-# Refinement Pass
+# Refinement
 
-This pass refines an existing delivery-plan draft. Treat existing groups as a draft from another planner, not as ground truth. Exact coverage is enforced by the system, so your value here is plan quality refinement.
+This run refines an existing delivery-plan draft. Treat existing groups as a draft from another planner, not as ground truth. Exact coverage is enforced by the system, so your value here is plan quality refinement.
 
 # Refinement Flow
 
-Follow this flow for the whole pass:
+Follow this flow for the whole run:
 
 1. Call `read_groups` once at the start.
 2. Inspect the current group membership and reasons. Use the provided item payloads only for groups whose delivery boundary, membership, or reason you need to judge.

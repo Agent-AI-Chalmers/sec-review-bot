@@ -52,7 +52,7 @@ class DeliveryPlanningCase(BaseModel):
 
 class DeliveryPlanningMetadata(BaseModel):
     planning_mode: Literal["single", "batched", "skipped"]
-    planning_pass_count: int = Field(strict=True, ge=0)
+    agent_run_count: int = Field(strict=True, ge=0)
     batch_size: int | None = Field(strict=True, gt=0)
 
 

@@ -70,6 +70,7 @@ def _build_metadata(agent_name: str) -> dict[str, str]:
             # Delivery item being planned or synthesized.
             "sec_review_delivery_id": trace_context.get("delivery_id"),
             # Initial or feedback pass; explains repeated agent invocations.
+            "sec_review_agent_phase": trace_context.get("agent_phase"),
             "sec_review_pass_kind": trace_context.get("pass_kind"),
             # Zero-based pass number within the same stage.
             "sec_review_pass_index": trace_context.get("pass_index"),

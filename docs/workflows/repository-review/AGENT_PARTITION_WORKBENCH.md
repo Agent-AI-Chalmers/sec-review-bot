@@ -167,7 +167,7 @@ This working style should be reentrant: the agent may face an empty workbench or
 
 ### Refinement
 
-Reentrancy makes a second refinement round natural: the first agent run can create a full draft from an empty workbench; the second agent run can inherit the same workbench and treat existing groups as a draft for quality correction.
+Triage and delivery planning create a draft, then run one refinement on the complete workbench. Single mode refines its draft directly; batch mode merges all batch drafts before refinement. The system checks final constraints after refinement and fails the stage if they remain unsatisfied. Stages with no eligible input are skipped before invoking the agent.
 
 Coverage is the system constraints checker's job, so refinement targets something else. In the first pass, the agent often reads the full input and then confidently creates a draft with `create_groups` in one call. That draft usually satisfies constraints, but may still contain over-merge, missed merge, weak reason, or keep/suppress boundary errors.
 
@@ -187,7 +187,7 @@ Do not encourage the agent to manually count item_ids, list every group, or rest
 
 Common execution modes on this workbench model:
 
-- `single + optional refinement`: one agent pass processes the full item inventory; if quality correction is needed, run refinement on the same workbench.
+- `single + refinement`: one agent pass drafts the full item inventory, followed by one refinement on the same workbench.
 - `batch + refinement`: multiple batch drafts process item subsets in parallel, then merge drafts into one global workbench for refinement.
 
 Batch is a wall-time tradeoff and not a smarter default planning mode.
@@ -212,7 +212,7 @@ When a stage uses batch draft followed by global refinement, the system can prov
 Recommended shape lists group ids by origin scope:
 
 ```markdown
-Use this section only to prioritize refinement attention. Groups from different draft scopes may not have been compared in the same pass.
+Use this section only to prioritize refinement attention. Groups from different draft scopes may not have been compared in the same run.
 
 - `draft batch 0001`: `group-1`, `group-2`, `group-3`
 - `draft batch 0002`: `group-4`, `group-5`

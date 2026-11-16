@@ -9,7 +9,7 @@ from sec_review_agents.utils.markdown import (
     scalar_section,
 )
 
-TriagePassKind = Literal["draft", "refinement"]
+TriagePhase = Literal["draft", "refinement"]
 
 REPOSITORY_TRIAGE_INTRO = "\n".join(
     [
@@ -20,27 +20,25 @@ REPOSITORY_TRIAGE_INTRO = "\n".join(
 )
 
 
-def build_repository_triage_system_prompt(
-    *, pass_kind: TriagePassKind = "draft"
-) -> str:
+def build_repository_triage_system_prompt(*, phase: TriagePhase = "draft") -> str:
     return join_prompt_sections(
         [
             "triager/workbench-system.md",
-            _triage_pass_prompt(pass_kind),
+            _triage_phase_prompt(phase),
         ]
     )
 
 
-def _triage_pass_prompt(pass_kind: TriagePassKind) -> str:
-    if pass_kind == "draft":
-        return "triager/draft-pass-system.md"
-    return "triager/refinement-pass-system.md"
+def _triage_phase_prompt(phase: TriagePhase) -> str:
+    if phase == "draft":
+        return "triager/draft-system.md"
+    return "triager/refinement-system.md"
 
 
 def build_repository_triage_user_prompt(
     *,
     items: Sequence[Mapping[str, Any]],
-    pass_kind: str,
+    phase: TriagePhase,
     draft_origins: Sequence[Mapping[str, Any]] | None = None,
 ) -> str:
     sections = [REPOSITORY_TRIAGE_INTRO]
@@ -51,18 +49,18 @@ def build_repository_triage_user_prompt(
                 "Triage Context",
                 {
                     "item_count": len(items),
-                    "pass_kind": pass_kind,
+                    "phase": phase,
                 },
             ),
             "",
             "## Items",
             "",
-            "Use these item payloads as the complete evidence inventory for this pass.",
+            "Use these item payloads as the complete evidence inventory for this run.",
             "",
             json_section("Triage Items", {"items": items}),
         ]
     )
-    if pass_kind == "refinement" and draft_origins:
+    if phase == "refinement" and draft_origins:
         sections.extend(
             [
                 "",
@@ -71,7 +69,7 @@ def build_repository_triage_user_prompt(
                 (
                     "Use this section only to prioritize refinement attention. "
                     "Groups from different draft scopes may not have been compared "
-                    "in the same pass."
+                    "in the same run."
                 ),
                 "",
                 *_render_draft_origins(draft_origins),

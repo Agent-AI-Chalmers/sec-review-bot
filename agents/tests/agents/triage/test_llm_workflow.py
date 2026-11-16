@@ -20,10 +20,11 @@ from sec_review_agents.agents.discovery.model import (
     DiscoveryLocation,
 )
 from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
-from sec_review_agents.scan_stages.triage.agent_passes import (
-    run_repository_triage_agent,
+from sec_review_agents.scan_stages.triage.stage import (
+    run_repository_triage_stage,
 )
 from tests.llm_probe import llm_probe
+from tests.repository_scan_fixtures import scan_result_fixture
 from tests.runtime.trajectory_artifact_helpers import (
     read_file_paths_from_trajectory,
 )
@@ -46,10 +47,11 @@ async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        result = await run_repository_triage_agent(
+        result = await run_repository_triage_stage(
             triage_root=triage_root,
-            triage_candidates=_scanner_style_candidates(),
-            max_passes=1,
+            discovery_result=scan_result_fixture(
+                candidates=_scanner_style_candidates()
+            ).discovery_result,
             triage_mode="single",
         )
 
@@ -323,10 +325,11 @@ async def test_triage_keeps_attacker_driven_availability_leads_only() -> None:
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        result = await run_repository_triage_agent(
+        result = await run_repository_triage_stage(
             triage_root=_artifact_root(),
-            triage_candidates=_availability_candidates(),
-            max_passes=1,
+            discovery_result=scan_result_fixture(
+                candidates=_availability_candidates()
+            ).discovery_result,
             triage_mode="single",
         )
 

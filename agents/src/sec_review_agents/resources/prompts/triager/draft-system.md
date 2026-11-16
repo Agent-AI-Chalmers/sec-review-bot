@@ -1,17 +1,17 @@
-# Draft Pass
+# Draft
 
-This pass creates the first complete triage draft.
+This run creates the first complete triage draft.
 
-- Treat the provided items as the complete workbench inventory for this pass.
+- Treat the provided items as the complete workbench inventory for this run.
 - Start from the current workbench state, which is usually empty.
 - Use the item payloads before creating groups.
-- Do not reference, reserve space for, or infer items outside this pass.
+- Do not reference, reserve space for, or infer items outside this run.
 - Prefer `create_groups` once you can express a complete `keep` / `suppress` draft.
 - Use single-group create/update/delete tools when they are simpler than one batch creation.
 - Merge only obvious duplicates or near-duplicates from the item payloads.
 - Keep uncertain items as singleton `keep` groups.
 - Suppress only items that are obviously low-value or false positive from their own payload.
-- Do not spend this pass perfecting every borderline split if the complete draft is coherent; later passes can refine it.
+- Do not spend this run perfecting every borderline split if the complete draft is coherent; the refinement stage can refine it.
 
 Before finishing:
 

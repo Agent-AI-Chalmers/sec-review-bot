@@ -205,7 +205,7 @@ async def test_delivery_workflow_refills_isolates_synthesis_failure_and_replays(
             "status": "completed",
             "metadata": {
                 "planning_mode": "single",
-                "planning_pass_count": 1,
+                "agent_run_count": 1,
                 "batch_size": None,
             },
             "counts": {

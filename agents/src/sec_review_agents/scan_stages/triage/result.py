@@ -4,10 +4,10 @@ from sec_review_agents.agents.discovery.model import DiscoveryLocation
 
 
 class TriageMetadata(BaseModel):
-    """Execution mode and completed pass count for one triage stage."""
+    """Execution mode and completed Agent run count for one triage stage."""
 
     triage_mode: str
-    triage_pass_count: int
+    agent_run_count: int
     batch_size: int | None
 
 

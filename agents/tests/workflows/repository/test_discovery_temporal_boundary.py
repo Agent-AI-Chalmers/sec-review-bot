@@ -31,7 +31,6 @@ from sec_review_agents.workflows.review_intent import ReviewIntent
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.prepared_input_fixtures import prepared_repository_input
-from tests.repository_scan_fixtures import scan_result_fixture
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -138,11 +137,21 @@ async def test_discovery_production_activities_cross_temporal_boundary(
         timeout_seconds=30,
         runtime_context={},
     )
-    triage_output = scan_result_fixture(candidate_count=1, case_count=1).triage_result
-    triage_agent = AsyncMock(return_value=triage_output)
+
+    async def complete_triage(*, workbench_state, phase, **kwargs):
+        if phase == "draft":
+            workbench_state.create_group(
+                kind="keep",
+                item_ids=workbench_state.ordered_item_ids,
+                summary="Anchored candidate",
+                category="example",
+                evidence=["print('ok')"],
+            )
+
+    triage_agent = AsyncMock(side_effect=complete_triage)
     with (
         patch(
-            "sec_review_agents.scan_stages.triage.agent_passes.run_repository_triage_agent",
+            "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent",
             triage_agent,
         ),
         patch(
@@ -196,7 +205,8 @@ async def test_discovery_production_activities_cross_temporal_boundary(
                         timeout=45,
                     )
     assert isinstance(scan_result, RepositoryScanResult)
-    assert scan_result.triage_result == triage_output
+    assert scan_result.triage_result.counts.case_count == 1
+    assert scan_result.triage_result.metadata.agent_run_count == 2
     assert scan_result.deleted_file_count == 0
     assert scan_result.deletion_review_skipped is False
     result = scan_result.discovery_result
@@ -225,10 +235,14 @@ async def test_discovery_production_activities_cross_temporal_boundary(
         location.model_dump(exclude_none=True)
         for location in candidate.candidate.locations
     ] == [{"file": "app.py", "label": "call"}]
-    assert triage_agent.call_args.kwargs["triage_candidates"] == result.candidates
-    assert isinstance(
-        triage_agent.call_args.kwargs["triage_candidates"][0], DiscoveryCandidateResult
-    )
+    workbench = triage_agent.call_args.kwargs["workbench_state"]
+    assert [
+        workbench.items_by_id[item_id].candidate
+        for item_id in workbench.ordered_item_ids
+    ] == result.candidates
+    assert scan_result.triage_result.cases[0].member_candidate_ids == [
+        candidate.candidate_id
+    ]
     assert result.files[0].path == "app.py"
     assert result.skipped_files[0].path == "README.md"
 

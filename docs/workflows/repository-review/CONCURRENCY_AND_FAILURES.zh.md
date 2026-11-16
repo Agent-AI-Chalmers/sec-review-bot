@@ -62,7 +62,7 @@ Discovery 将一个或多个完整文件组织成一个 chunk，作为一次扫�
 
 Triage 在一个 activity 内部运行。batched triage 会按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
-<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
+<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/stage.py -->
 
 当前 batch draft 并发上限是代码常量 `TRIAGE_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Triage 的输出是全局 case set；某个 batch 失败时，整个 Triage 失败。
 
@@ -84,7 +84,7 @@ Triage 后的每个 case 是独立审查单元。Repository review 会按滑动�
 
 Delivery planning 可以按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
-<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
+<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/stage.py -->
 
 当前 batch draft 并发上限是代码常量 `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Delivery planning 产出的是全局 delivery plan；某个 batch 失败时，整个 delivery planning 失败。
 

@@ -43,6 +43,7 @@ def test_tracing_metadata_uses_bound_trace_context(monkeypatch) -> None:
     bind_trace_context(
         workflow="repository-review",
         run_id="run-1",
+        agent_phase="refinement",
     )
 
     config = build_tracing_config(
@@ -52,6 +53,7 @@ def test_tracing_metadata_uses_bound_trace_context(monkeypatch) -> None:
     assert config.metadata == {
         "sec_review_agent": "repository-analyzer",
         "sec_review_workflow": "repository-review",
+        "sec_review_agent_phase": "refinement",
         "langfuse_session_id": "run-1",
     }
 

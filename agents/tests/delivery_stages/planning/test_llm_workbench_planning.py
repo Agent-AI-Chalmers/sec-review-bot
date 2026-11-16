@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
-from sec_review_agents.delivery_stages.planning.agent_passes import (
-    run_delivery_planning,
+from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.delivery_stages.planning.stage import (
+    generate_delivery_plan,
 )
 from tests.llm_probe import llm_probe
 
@@ -29,28 +29,55 @@ async def test_llm_can_drive_delivery_planning_workbench_state_to_valid_export(
     run_artifacts.mkdir(parents=True, exist_ok=True)
 
     planning_cases = [
-        DeliveryPlanningCase.model_validate(
-            {"overview": "", "changed_files": [], **item}
+        DeliveryCaseInput.model_validate(
+            {
+                "disposition": "keep",
+                "reason": None,
+                "mitigation_overview": "",
+                "mitigator_patch_diff": None,
+                **item,
+            }
         )
         for item in [
             {
                 "case_id": "case-auth-header",
-                "changed_files": ["src/auth.ts"],
+                "mitigator_file_changes": [
+                    {
+                        "path": "src/auth.ts",
+                        "status": "upsert",
+                        "content": "",
+                        "content_encoding": "utf-8",
+                    }
+                ],
             },
             {
                 "case_id": "case-auth-token",
-                "changed_files": ["src/auth.ts"],
+                "mitigator_file_changes": [
+                    {
+                        "path": "src/auth.ts",
+                        "status": "upsert",
+                        "content": "",
+                        "content_encoding": "utf-8",
+                    }
+                ],
             },
             {
                 "case_id": "case-logging",
-                "changed_files": ["src/logging.ts"],
+                "mitigator_file_changes": [
+                    {
+                        "path": "src/logging.ts",
+                        "status": "upsert",
+                        "content": "",
+                        "content_encoding": "utf-8",
+                    }
+                ],
             },
         ]
     ]
 
-    result = await run_delivery_planning(
-        delivery_planning_root=run_artifacts / "delivery-planning",
-        planning_cases=planning_cases,
+    result = await generate_delivery_plan(
+        run_artifacts_root=run_artifacts,
+        case_results=planning_cases,
     )
 
     assert result.status == "completed"

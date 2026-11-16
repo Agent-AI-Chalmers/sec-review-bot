@@ -117,9 +117,6 @@ class TriageWorkbenchState:
     ordered_item_ids: list[str]
     items_by_id: dict[str, _TriageItem] = field(default_factory=dict)
     groups: dict[str, _TriageGroup] = field(default_factory=dict)
-    # Successful edit operation names, in call order, for the refinement heuristic.
-    # No before/after values are stored; this is not a replayable change log.
-    edit_events: list[dict[str, Any]] = field(default_factory=list)
     _next_group_number: int = 1
 
     @classmethod
@@ -164,7 +161,6 @@ class TriageWorkbenchState:
             item_ids=item_ids,
         )
         created_group_id = self._create_group(payload)
-        self._record_edit("create_group")
         return self._mutation_result(
             operation="create_group",
             created_group_ids=[created_group_id],
@@ -196,7 +192,6 @@ class TriageWorkbenchState:
             )
         self.groups = staged.groups
         self._next_group_number = staged._next_group_number
-        self._record_edit("create_groups")
         return self._mutation_result(
             operation="create_groups",
             created_group_ids=created_group_ids,
@@ -224,7 +219,6 @@ class TriageWorkbenchState:
             item_ids=item_ids,
         )
         changed_group_id = self._update_group(payload)
-        self._record_edit("update_group")
         return self._mutation_result(
             operation="update_group",
             changed_group_ids=[changed_group_id],
@@ -240,7 +234,6 @@ class TriageWorkbenchState:
             changed_group_ids.append(staged._update_group(group))
         self.groups = staged.groups
         self._next_group_number = staged._next_group_number
-        self._record_edit("update_groups")
         return self._mutation_result(
             operation="update_groups",
             changed_group_ids=changed_group_ids,
@@ -249,7 +242,6 @@ class TriageWorkbenchState:
     def delete_group(self, *, group_id: str) -> dict[str, Any]:
         payload = _DeleteGroupInput(group_id=group_id)
         deleted_group_id, unprocessed_item_ids = self._delete_group(payload)
-        self._record_edit("delete_group")
         return self._mutation_result(
             operation="delete_group",
             deleted_group_ids=[deleted_group_id] if deleted_group_id else [],
@@ -271,7 +263,6 @@ class TriageWorkbenchState:
             unprocessed_item_ids.extend(released_item_ids)
         self.groups = staged.groups
         self._next_group_number = staged._next_group_number
-        self._record_edit("delete_groups")
         return self._mutation_result(
             operation="delete_groups",
             deleted_group_ids=deleted_group_ids,
@@ -578,9 +569,6 @@ class TriageWorkbenchState:
             self._next_group_number += 1
             if group_id not in self.groups:
                 return group_id
-
-    def _record_edit(self, operation: str) -> None:
-        self.edit_events.append({"operation": operation})
 
 
 def _candidate_payload(candidate: DiscoveryCandidateResult) -> dict[str, Any]:

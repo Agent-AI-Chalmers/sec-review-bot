@@ -426,7 +426,6 @@ def test_delivery_planning_create_groups_rolls_back_late_failure(
             "item_ids": ["case-a", "case-b"],
         }
     ]
-    assert workbench_state.edit_events == [{"operation": "create_group"}]
 
     monkeypatch.setattr(
         DeliveryWorkbenchState,
@@ -474,7 +473,6 @@ def test_delivery_planning_update_groups_rolls_back_late_failure() -> None:
             "item_ids": ["case-b"],
         },
     ]
-    assert workbench_state.edit_events == [{"operation": "create_groups"}]
 
 
 def test_delivery_planning_group_drafts_snapshot_can_seed_global_state() -> None:
