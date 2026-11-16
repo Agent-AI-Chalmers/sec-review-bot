@@ -672,33 +672,38 @@ export class PublicationStore {
     return await transaction(this.pool, async (client) => {
       if (!(await this.lockPublicationOwnership(client, runId, token)))
         return false
+      // Both answers share one guard and one parameter prefix: $1-$3 name the step and $4 is the
+      // attempt ceiling, so the two statements cannot drift apart on what "still exhausted" means.
+      const exhaustedStep = `WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
+              AND status='uncertain' AND attempt_count>=$4`
+      const stepParams = [
+        runId,
+        this.connectorId,
+        stepKey,
+        MAX_PUBLICATION_STEP_ATTEMPTS
+      ]
       const result = outcome.found
         ? await client.query(
             `
             UPDATE publication_steps
-            SET status='succeeded', claimed_by=NULL, remote_object_id=$4,
-                remote_object_url=$5, failure_code=NULL, failure_message=NULL,
+            SET status='succeeded', claimed_by=NULL, remote_object_id=$5,
+                remote_object_url=$6, failure_code=NULL, failure_message=NULL,
                 updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
-              AND status='uncertain' AND attempt_count>=$6
+            ${exhaustedStep}
           `,
             [
-              runId,
-              this.connectorId,
-              stepKey,
+              ...stepParams,
               outcome.remote.id ?? null,
-              outcome.remote.url ?? null,
-              MAX_PUBLICATION_STEP_ATTEMPTS
+              outcome.remote.url ?? null
             ]
           )
         : await client.query(
             `
             UPDATE publication_steps
             SET status='terminal_failed', claimed_by=NULL, updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
-              AND status='uncertain' AND attempt_count>=$4
+            ${exhaustedStep}
           `,
-            [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
+            stepParams
           )
       if (result.rowCount !== 1) return false
       await this.appendStepEvent(client, runId, stepKey, {
