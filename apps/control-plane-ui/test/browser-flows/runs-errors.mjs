@@ -53,21 +53,26 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   )
   await page.unroute('**/api/admin/runs/*/resume')
 
+  // Synthetic transitions keep both page shapes independent of how many real
+  // transitions a fixture run happens to have: exactly one full page, then one
+  // row more. Appending to real transitions can produce 24+ rows, making page
+  // two legitimately full and indistinguishable from a page-change race.
+  let syntheticTransitionCount = 12
   await page.route('**/api/runs/*/events', async (route) => {
     const response = await route.fetch()
     const body = await response.json()
     const sample = body.events.find((event) => event.from_status !== null)
     assert.ok(sample, `${name} fixtures need a transition to synthesize`)
-    // Keep the paginated shape independent of whichever fixture run is first.
-    // Appending to its real transitions can produce 24+ rows, making page two
-    // legitimately full and indistinguishable from a page-change race.
-    const transitions = Array.from({ length: 13 }, (_, index) => ({
-      ...sample,
-      event_id: `synthetic-transition-${index}`,
-      occurred_at: new Date(
-        Date.parse(sample.occurred_at) + (index + 1) * 1000
-      ).toISOString()
-    }))
+    const transitions = Array.from(
+      { length: syntheticTransitionCount },
+      (_, index) => ({
+        ...sample,
+        event_id: `synthetic-transition-${index}`,
+        occurred_at: new Date(
+          Date.parse(sample.occurred_at) + (index + 1) * 1000
+        ).toISOString()
+      })
+    )
     await route.fulfill({
       response,
       json: {
@@ -82,6 +87,22 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   await page.locator('tbody tr td a').first().click()
   await page.waitForSelector('.run-progress-timeline')
   const transitions = page.locator('.run-transitions')
+  await transitions.locator('.transitions-entry').click()
+  await transitions.locator('.transitions-body').waitFor()
+  assert.strictEqual(
+    await transitions.locator('.run-transition').count(),
+    12,
+    `${name} a full single page must list every transition`
+  )
+  assert.strictEqual(
+    await transitions.locator('.mantine-Pagination-root').count(),
+    0,
+    `${name} a single page of transitions must not render pagination`
+  )
+
+  syntheticTransitionCount = 13
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForSelector('.run-progress-timeline')
   await transitions.locator('.transitions-entry').click()
   await transitions.locator('.transitions-body').waitFor()
   assert.strictEqual(
