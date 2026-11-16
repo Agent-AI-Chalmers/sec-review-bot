@@ -8,10 +8,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter
 from sec_review_agents.delivery_stages.planning import generate_delivery_plan
 from sec_review_agents.utils.env import bootstrap_agents_env, env_value
 from sec_review_agents.workflows.repository.workflow import (
-    project_repository_case_result_for_delivery,
+    select_delivery_cases,
 )
 from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
@@ -88,25 +89,18 @@ async def main() -> None:
         "cases": str(run_artifacts / "cases"),
     }
 
-    case_results = previous_result.get("case_results") or []
-    keep_case_results = [
-        item
-        for item in case_results
-        if isinstance(item, dict) and item.get("disposition") == "keep"
-    ]
-    if not keep_case_results:
+    case_results = previous_result.get("case_results", [])
+    delivery_case_inputs = select_delivery_cases(
+        TypeAdapter(list[RepositoryCaseResult]).validate_python(case_results)
+    )
+    if not delivery_case_inputs:
         raise RuntimeError(
             "Repository result does not contain keep case_results for delivery planning."
         )
 
     delivery_plan = await generate_delivery_plan(
         run_artifacts_root=run_artifacts,
-        case_results=[
-            project_repository_case_result_for_delivery(
-                RepositoryCaseResult.model_validate(item)
-            )
-            for item in keep_case_results
-        ],
+        case_results=delivery_case_inputs,
     )
     result_path = run_artifacts / "delivery-planning" / "delivery-plan.json"
 
@@ -115,7 +109,7 @@ async def main() -> None:
             {
                 "ok": True,
                 "run_id": run_artifacts.name,
-                "keep_case_count": len(keep_case_results),
+                "keep_case_count": len(delivery_case_inputs),
                 "delivery_plan_status": delivery_plan.status,
                 "delivery_plan_delivery_count": len(delivery_plan.deliveries),
                 "result_path": str(result_path),

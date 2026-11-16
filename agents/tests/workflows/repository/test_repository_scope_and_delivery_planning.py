@@ -42,7 +42,7 @@ from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from sec_review_agents.workflows.repository.workflow import (
-    project_repository_case_result_for_delivery,
+    select_delivery_cases,
 )
 from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.stage import (
@@ -680,12 +680,12 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 await generate_delivery_plan(
                     run_artifacts_root=Path(input_data["input_bundle_root_path"])
                     / "artifacts",
-                    case_results=[
-                        project_repository_case_result_for_delivery(
+                    case_results=select_delivery_cases(
+                        [
                             RepositoryCaseResult.model_validate(item)
-                        )
-                        for item in case_results
-                    ],
+                            for item in case_results
+                        ]
+                    ),
                 )
 
             assert not (
@@ -869,21 +869,25 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
 def test_delivery_projection_requires_only_selected_case_and_mitigation() -> None:
     """Delivery must not reach into analysis or verification after case selection."""
-    projected = project_repository_case_result_for_delivery(
-        RepositoryCaseResult.model_validate(
-            {
-                "case_id": "case-1",
-                "disposition": "keep",
-                "reason": "ready",
-                "review_record": {
-                    "mitigation": {
-                        "overview": "Remove unsafe entrypoint",
-                        "file_changes": [{"path": "unsafe.py", "status": "deleted"}],
-                        "patch_diff": "reference patch",
-                    }
-                },
-            }
-        )
+    [projected] = select_delivery_cases(
+        [
+            RepositoryCaseResult.model_validate(
+                {
+                    "case_id": "case-1",
+                    "disposition": "keep",
+                    "reason": "ready",
+                    "review_record": {
+                        "mitigation": {
+                            "overview": "Remove unsafe entrypoint",
+                            "file_changes": [
+                                {"path": "unsafe.py", "status": "deleted"}
+                            ],
+                            "patch_diff": "reference patch",
+                        }
+                    },
+                }
+            )
+        ]
     )
     assert projected == DeliveryCaseInput(
         case_id="case-1",
@@ -893,3 +897,42 @@ def test_delivery_projection_requires_only_selected_case_and_mitigation() -> Non
         mitigator_file_changes=[{"path": "unsafe.py", "status": "deleted"}],
         mitigator_patch_diff="reference patch",
     )
+
+
+@pytest.mark.parametrize(
+    ("dispositions", "expected_ids"),
+    [
+        ([], []),
+        (["blocked", "blocked"], []),
+        (["keep", "blocked", "keep"], ["case-0", "case-2"]),
+    ],
+)
+def test_delivery_selection_preserves_order_without_removing_reported_cases(
+    dispositions: list[str], expected_ids: list[str]
+) -> None:
+    """Approval gates delivery, not whether a reviewed case remains visible in the report."""
+    cases = [
+        RepositoryCaseResult.model_validate(
+            {
+                "case_id": f"case-{index}",
+                "disposition": disposition,
+                "review_record": {
+                    "mitigation": {
+                        "overview": f"repair-{index}",
+                        "file_changes": [
+                            {"path": f"case-{index}.py", "status": "deleted"}
+                        ],
+                    }
+                },
+            }
+        )
+        for index, disposition in enumerate(dispositions)
+    ]
+    before = [case.model_dump() for case in cases]
+    selected = select_delivery_cases(cases)
+    assert [case.case_id for case in selected] == expected_ids
+    assert [case.model_dump() for case in cases] == before
+    for case in selected:
+        assert case.mitigator_file_changes == [
+            {"path": f"{case.case_id}.py", "status": "deleted"}
+        ]

@@ -31,6 +31,7 @@ from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
     prepare_repository_case_review_inputs_activity,
     scan_repository_discovery_chunk_activity,
+    select_delivery_cases,
     triage_repository_activity,
     window_deletion_summary_activity,
 )
@@ -138,15 +139,7 @@ async def run_repository_delivery_direct(
         persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)
         return result
 
-    from sec_review_agents.workflows.repository.workflow import (
-        project_repository_case_result_for_delivery,
-    )
-
-    keep_case_results = [
-        project_repository_case_result_for_delivery(item)
-        for item in case_results
-        if item.disposition == "keep"
-    ]
+    keep_case_results = select_delivery_cases(case_results)
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         deliveries=deliveries,
