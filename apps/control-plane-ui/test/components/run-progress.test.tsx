@@ -8,7 +8,6 @@ import { runs } from '../../scripts/dev-fixtures/runs/generate.js'
 import { renderComponent } from './render.js'
 
 test('publication attempts render from the read response even without failure details', () => {
-  // The old hand-written response type read failure_count, silently hiding this counter.
   const run = runs.find((value) => value.publication.status === 'uncertain')!
   const response: ListRunPublicationStepsResponseBody = {
     run_id: run.run_id,

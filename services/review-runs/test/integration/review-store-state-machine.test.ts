@@ -6,8 +6,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 
 import {
-  concludeExhaustedSubmissionRecovery,
-  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
+  MAX_UNRESOLVED_SUBMISSION_RECOVERIES,
   recoverReviewRunSubmission
 } from '../../src/runtime/submission-recovery.js'
 import { coordinateReviewRunsOnce } from '../../src/runtime/coordinator.js'
@@ -407,7 +406,10 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
       ),
       ExecutionSubmissionUncertainError
     )
-    const first = await store.executions.claimSubmissionRecovery(runId)
+    const first = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(first)
 
     // Heartbeat repeatedly past the 300ms lease. If the lease were observed_at-based, these
@@ -418,7 +420,10 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
 
-    const second = await store.executions.claimSubmissionRecovery(runId)
+    const second = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(
       second,
       'the expired recovery claim is reclaimable despite heartbeats'
@@ -475,12 +480,18 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       'uncertain'
     )
 
-    const first = await store.executions.claimSubmissionRecovery(runId)
+    const first = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(first)
     // Heartbeats would, under a shared updated_at lease, refresh the recovery lease. With
     // observed_at separate they must not; a zero timeout lets us observe that directly.
     await store.executions.touchObservation(runId)
-    const second = await store.executions.claimSubmissionRecovery(runId)
+    const second = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(second, 'the expired recovery claim is reclaimable')
     assert.notStrictEqual(
       second,
@@ -1128,8 +1139,14 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       code: 'SUBMISSION_STATE_UNCERTAIN',
       message: 'response lost'
     })
-    const staleToken = await store.executions.claimSubmissionRecovery(runId)
-    const currentToken = await store.executions.claimSubmissionRecovery(runId)
+    const staleToken = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
+    const currentToken = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(staleToken)
     assert.ok(currentToken)
     assert.notStrictEqual(staleToken, currentToken)
@@ -2474,8 +2491,10 @@ test('every publication transition writes exactly one audit event', async () => 
       'pending',
       'an uncertain submission must not skip publication'
     )
-    const recoveryToken =
-      await store.executions.claimSubmissionRecovery(recoveredRun)
+    const recoveryToken = await store.executions.claimSubmissionRecovery(
+      recoveredRun,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(recoveryToken)
     assert.strictEqual(
       await store.submissionTransitions.completeSubmissionRecovery(
@@ -2502,8 +2521,10 @@ test('every publication transition writes exactly one audit event', async () => 
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    const rejectedToken =
-      await store.executions.claimSubmissionRecovery(rejectedRun)
+    const rejectedToken = await store.executions.claimSubmissionRecovery(
+      rejectedRun,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(rejectedToken)
     assert.strictEqual(
       await store.submissionTransitions.failSubmissionRecovery(
@@ -2896,7 +2917,10 @@ test('a rejected submission replay converges an in-flight publication', async ()
     } finally {
       await pool.end()
     }
-    const claimToken = await store.executions.claimSubmissionRecovery(runId)
+    const claimToken = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.notStrictEqual(claimToken, null)
     assert.strictEqual(
       await store.submissionTransitions.failSubmissionRecovery(
@@ -2992,7 +3016,10 @@ test('an accepted replay refuses to queue an execution whose publication already
       [runId]
     )
 
-    const token = await store.executions.claimSubmissionRecovery(runId)
+    const token = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(token)
     assert.strictEqual(
       await store.submissionTransitions.completeSubmissionRecovery(
@@ -3782,7 +3809,10 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       'disconnected'
     )
     assert.strictEqual(
-      await store.executions.claimSubmissionRecovery(runId),
+      await store.executions.claimSubmissionRecovery(
+        runId,
+        MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+      ),
       null,
       'a disconnected execution is not claimable by automatic recovery'
     )
@@ -3811,12 +3841,20 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       false
     )
     assert.strictEqual(
-      await store.executions.submissionRecoveryAttemptCount(runId),
+      (
+        await pool.query<{ unresolved_recovery_count: number }>(
+          'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
+          [runId]
+        )
+      ).rows[0]?.unresolved_recovery_count,
       0,
       'resuming grants a replay budget the run can act on'
     )
     assert.notStrictEqual(
-      await store.executions.claimSubmissionRecovery(runId),
+      await store.executions.claimSubmissionRecovery(
+        runId,
+        MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+      ),
       null,
       'the resumed run is claimable again'
     )
@@ -4005,7 +4043,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
     // The publisher exhausted its attempts and the reconciliation budget, so the step parked.
     await pool.query(
       `UPDATE publication_steps SET status='disconnected', attempt_count=3,
-         recovery_attempt_count=3, claimed_by=NULL WHERE run_id=$1`,
+         unresolved_recovery_count=3, claimed_by=NULL WHERE run_id=$1`,
       [runId]
     )
     await pool.query(
@@ -4651,27 +4689,27 @@ test('a disconnected publication is parked until an operator resumes it', async 
     // contract promises ("published again"): the parked step becomes attemptable again and both
     // budgets are refreshed. It is the operator's decision that unparks a side effect whose
     // outcome nobody established - automation never does this on its own - and it is recorded as
-    // its own event. `recovery_attempt_count` is internal (the summary deliberately does not
+    // its own event. `unresolved_recovery_count` is internal (the summary deliberately does not
     // publish it), so the budgets are read from the row that actually holds them.
     const readStep = async (): Promise<{
       status: string
       attempt_count: number
-      recovery_attempt_count: number
+      unresolved_recovery_count: number
     }> =>
       (
         await pool.query<{
           status: string
           attempt_count: number
-          recovery_attempt_count: number
+          unresolved_recovery_count: number
         }>(
-          `SELECT status,attempt_count,recovery_attempt_count FROM publication_steps
+          `SELECT status,attempt_count,unresolved_recovery_count FROM publication_steps
            WHERE run_id=$1`,
           [runId]
         )
       ).rows[0] as {
         status: string
         attempt_count: number
-        recovery_attempt_count: number
+        unresolved_recovery_count: number
       }
     const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
     assert.strictEqual(
@@ -4707,7 +4745,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
       'the parked step is attemptable again, not merely reconcilable'
     )
     assert.strictEqual(
-      revived.recovery_attempt_count,
+      revived.unresolved_recovery_count,
       0,
       'the operator decision refreshes the reconciliation budget'
     )
@@ -5131,7 +5169,10 @@ test('an uncertain submission queues no notice until the run is conclusively fai
     )
 
     // The replay is accepted: the run proceeds normally and was never announced as failed.
-    const recoveryToken = await store.executions.claimSubmissionRecovery(runId)
+    const recoveryToken = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(recoveryToken)
     assert.strictEqual(
       await store.submissionTransitions.completeSubmissionRecovery(
@@ -5181,7 +5222,10 @@ test('a rejected replay announces the failure that actually happened', async () 
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' },
       { retry: false }
     )
-    const recoveryToken = await store.executions.claimSubmissionRecovery(runId)
+    const recoveryToken = await store.executions.claimSubmissionRecovery(
+      runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
     assert.ok(recoveryToken)
     assert.strictEqual(
       await store.submissionTransitions.failSubmissionRecovery(
@@ -5214,10 +5258,9 @@ test('a rejected replay announces the failure that actually happened', async () 
 })
 
 test('an uncertain submission that never resolves is concluded once its budget is spent', async () => {
-  // Without a budget this run would stay `uncertain` forever, and (now that entering that state
-  // queues no notice) would never be reported at all. Spending the budget concludes it as a real
-  // failure, which is what makes the notice truthful.
+  // Exhaustion stops replay and requests attention without asserting remote failure.
   const store = await createStore({ claimTimeoutMs: 0 })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   const runId = `run-recovery-exhausted-${randomUUID()}`
   try {
     const admission = await store.admissions.create({
@@ -5245,28 +5288,58 @@ test('an uncertain submission that never resolves is concluded once its budget i
 
     const recovering = await store.queries.getRun(runId)
     assert.ok(recovering)
-    assert.strictEqual(
-      await concludeExhaustedSubmissionRecovery(store, recovering),
-      null,
-      'an unspent budget must leave the run to the normal replay path'
-    )
-
-    // Every replay keeps ending with an unknown outcome.
-    for (
-      let attempt = 0;
-      attempt < MAX_SUBMISSION_RECOVERY_ATTEMPTS;
-      attempt += 1
-    ) {
-      const claimed = await store.executions.claimSubmissionRecovery(runId)
-      assert.ok(claimed, `replay ${attempt + 1} should be claimable`)
-      assert.strictEqual(
-        await store.executions.recordUnknownRecoveryOutcome(runId, claimed),
-        true
+    // Taking and replacing claims alone do not spend the unresolved-result budget.
+    for (let claim = 0; claim < 2; claim += 1) {
+      assert.ok(
+        await store.executions.claimSubmissionRecovery(
+          runId,
+          MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+        )
       )
     }
-    assert.strictEqual(
-      await store.executions.submissionRecoveryAttemptCount(runId),
-      MAX_SUBMISSION_RECOVERY_ATTEMPTS
+    assert.equal(
+      (
+        await pool.query<{ unresolved_recovery_count: number }>(
+          'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
+          [runId]
+        )
+      ).rows[0]?.unresolved_recovery_count,
+      0
+    )
+    const lostResponse = new Error('response lost')
+    let submissions = 0
+    const dependencies = {
+      async submit() {
+        submissions += 1
+        throw lostResponse
+      },
+      classifyError: () => ({ uncertain: true, message: 'response lost' })
+    }
+    for (
+      let replay = 0;
+      replay < MAX_UNRESOLVED_SUBMISSION_RECOVERIES;
+      replay += 1
+    ) {
+      assert.deepEqual(
+        await recoverReviewRunSubmission(store, recovering, dependencies),
+        { outcome: 'deferred', error: lostResponse }
+      )
+    }
+    assert.equal(
+      (
+        await pool.query<{ unresolved_recovery_count: number }>(
+          'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
+          [runId]
+        )
+      ).rows[0]?.unresolved_recovery_count,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+    )
+    assert.equal(
+      await store.executions.claimSubmissionRecovery(
+        runId,
+        MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+      ),
+      null
     )
     assert.deepStrictEqual(
       (await store.queries.getRun(runId))?.notices,
@@ -5277,9 +5350,10 @@ test('an uncertain submission that never resolves is concluded once its budget i
     const exhaustedRun = await store.queries.getRun(runId)
     assert.ok(exhaustedRun)
     assert.deepStrictEqual(
-      await concludeExhaustedSubmissionRecovery(store, exhaustedRun),
-      { status: 'disconnected' }
+      await recoverReviewRunSubmission(store, exhaustedRun, dependencies),
+      { outcome: 'disconnected' }
     )
+    assert.equal(submissions, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
     const run = await store.queries.getRun(runId)
     assert.strictEqual(run?.execution.status, 'disconnected')
     assert.strictEqual(run?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
@@ -5296,10 +5370,14 @@ test('an uncertain submission that never resolves is concluded once its budget i
     ])
     // The budget is spent, so a later pass does not replay this run again.
     assert.strictEqual(
-      await store.executions.claimSubmissionRecovery(runId),
+      await store.executions.claimSubmissionRecovery(
+        runId,
+        MAX_UNRESOLVED_SUBMISSION_RECOVERIES
+      ),
       null
     )
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -5412,14 +5490,14 @@ test('a reconciliation failure reported twice against one count spends the budge
     )
     const recoveryCount = async () =>
       (await store.publications.listPublicationSteps(runId))[0]
-        ?.recovery_attempt_count
+        ?.unresolved_recovery_count
     const report = async (expected: number) =>
       await store.publications.failPublicationStep(
         runId,
         token,
         step,
         { message: 'GitHub answered 502' },
-        { retry: true, expectedRecoveryAttemptCount: expected }
+        { retry: true, expectedUnresolvedRecoveryCount: expected }
       )
 
     assert.strictEqual(await report(0), true)

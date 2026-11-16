@@ -37,7 +37,7 @@ function step(
     status: 'pending',
     attempt_count: 1,
     last_attempt_at: '2026-01-01T00:00:00.000Z',
-    recovery_attempt_count: 0,
+    unresolved_recovery_count: 0,
     remote_object_id: null,
     remote_object_url: null,
     failure_code: null,

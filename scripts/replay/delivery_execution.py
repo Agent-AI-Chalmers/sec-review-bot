@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.delivery_stages.execution.input import (
     build_delivery_execution_input,
@@ -26,7 +27,7 @@ from sec_review_agents.workflows.repository.result import (
     build_scan_summary,
 )
 from sec_review_agents.workflows.repository.workflow import (
-    project_repository_case_result_for_delivery,
+    select_delivery_cases,
 )
 from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
@@ -159,24 +160,15 @@ async def main() -> None:
     if not delivery_plan.deliveries:
         raise RuntimeError("Delivery plan does not contain deliveries.")
 
-    case_results = previous_result.get("case_results") or []
-    if not isinstance(case_results, list) or not case_results:
-        raise RuntimeError("Repository result does not contain case_results.")
-
-    keep_case_results = [
-        item for item in case_results if item.get("disposition") == "keep"
-    ]
-    if not keep_case_results:
+    case_results = previous_result.get("case_results", [])
+    delivery_case_inputs = select_delivery_cases(
+        TypeAdapter(list[RepositoryCaseResult]).validate_python(case_results)
+    )
+    if not delivery_case_inputs:
         raise RuntimeError(
             "Repository result does not contain keep case_results for delivery execution."
         )
 
-    delivery_case_inputs = [
-        project_repository_case_result_for_delivery(
-            RepositoryCaseResult.model_validate(item)
-        )
-        for item in keep_case_results
-    ]
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts,
         deliveries=delivery_plan.deliveries,

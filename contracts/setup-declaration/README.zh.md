@@ -22,12 +22,7 @@
 
 ## 如何校验
 
-本契约没有 JSON Schema。`working-directory` 不得越出仓库根目录、`env` 名不得夹带 shell 语法、超时必须为正整数等规则，由两端解析器直接校验，避免与另一份 schema 定义发生分歧：
-
-- Python（Execution Worker）：`agents/src/sec_review_agents/entrypoints/setup_declaration.py`
-- TypeScript（GitHub Integration）：`apps/github-integration/src/github/setup-declaration.ts`
-
-两端测试使用同一套输入。新增规则时，必须在 [v1/corpus](v1/corpus) 添加用例，并确认两端得到相同结果。
+GitHub Integration 和 Execution Worker 分别在提交前与执行前应用相同的格式规则。两端测试使用共享的 [v1/corpus](v1/corpus) 检查接受与拒绝行为，包括路径范围和 YAML 标量处理。新增规则时，必须添加两端都通过的语料用例；本契约不另外维护 JSON Schema。
 
 空文件或只含空白的内容是有效输入，两端都将其视为“没有声明”。
 

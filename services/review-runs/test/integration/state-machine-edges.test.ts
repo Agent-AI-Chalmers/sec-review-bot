@@ -1,3 +1,4 @@
+import { MAX_UNRESOLVED_SUBMISSION_RECOVERIES } from '../../src/runtime/submission-recovery.js'
 // The contract's `x-state-machines` block claims to describe the transitions the write paths
 // perform. These tests compare that claim with the transitions the stores actually *record*
 // into the audit log, in both directions:
@@ -293,7 +294,8 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     const recovery = await store.executions.claimSubmissionRecovery(
-      uncertain.runId
+      uncertain.runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
     assert.notStrictEqual(recovery, null)
     // Resolving the replay moves the run back to `queued`. The unresolved branch stays
@@ -358,7 +360,8 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     const failingRecovery = await store.executions.claimSubmissionRecovery(
-      uncertainFails.runId
+      uncertainFails.runId,
+      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
     assert.notStrictEqual(failingRecovery, null)
     assert.strictEqual(

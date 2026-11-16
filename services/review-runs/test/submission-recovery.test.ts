@@ -2,8 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  concludeExhaustedSubmissionRecovery,
-  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
+  MAX_UNRESOLVED_SUBMISSION_RECOVERIES,
   recoverReviewRunSubmission
 } from '../src/runtime/submission-recovery.js'
 import type { ReviewRunRecord } from '../src/shapes.js'
@@ -50,7 +49,6 @@ function run(
 type RecoveryStore = Parameters<typeof recoverReviewRunSubmission>[0]
 type FlatRecoveryStore = {
   claimSubmissionRecovery: RecoveryStore['executions']['claimSubmissionRecovery']
-  submissionRecoveryAttemptCount: RecoveryStore['executions']['submissionRecoveryAttemptCount']
   completeSubmissionRecovery: RecoveryStore['submissionTransitions']['completeSubmissionRecovery']
   failSubmissionRecovery: RecoveryStore['submissionTransitions']['failSubmissionRecovery']
   disconnectExhaustedSubmissionRecovery: RecoveryStore['executions']['disconnectExhaustedSubmissionRecovery']
@@ -69,9 +67,6 @@ function store(overrides: Partial<FlatRecoveryStore> = {}): RecoveryStore {
     async failSubmissionRecovery() {
       return true
     },
-    async submissionRecoveryAttemptCount() {
-      return 0
-    },
     async disconnectExhaustedSubmissionRecovery() {
       return false
     },
@@ -82,11 +77,13 @@ function store(overrides: Partial<FlatRecoveryStore> = {}): RecoveryStore {
   }
   return {
     executions: {
-      claimSubmissionRecovery: (runId) => flat.claimSubmissionRecovery(runId),
-      submissionRecoveryAttemptCount: (runId) =>
-        flat.submissionRecoveryAttemptCount(runId),
-      disconnectExhaustedSubmissionRecovery: (runId, maxAttempts) =>
-        flat.disconnectExhaustedSubmissionRecovery(runId, maxAttempts),
+      claimSubmissionRecovery: (runId, limit) =>
+        flat.claimSubmissionRecovery(runId, limit),
+      disconnectExhaustedSubmissionRecovery: (runId, maxUnresolvedRecoveries) =>
+        flat.disconnectExhaustedSubmissionRecovery(
+          runId,
+          maxUnresolvedRecoveries
+        ),
       recordUnknownRecoveryOutcome: (runId, token) =>
         flat.recordUnknownRecoveryOutcome(runId, token)
     },
@@ -119,7 +116,7 @@ test('submission recovery replays the persisted input and commits its claim', as
     }
   )
 
-  assert.strictEqual(result.status, 'recovered')
+  assert.strictEqual(result.outcome, 'recovered')
   assert.deepStrictEqual(events, [
     [
       'submit',
@@ -198,7 +195,7 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
     }
   )
 
-  assert.deepStrictEqual(result, { status: 'deferred', error: transportError })
+  assert.deepStrictEqual(result, { outcome: 'deferred', error: transportError })
   // The attempt is counted even though nothing is concluded: the budget is what eventually lets
   // an otherwise endless uncertainty end, so it has to advance on every unknown outcome.
   assert.deepStrictEqual(counted, ['claim-1'])
@@ -230,68 +227,129 @@ test('submission recovery records missing persisted input without calling Execut
     }
   )
 
-  assert.strictEqual(result.status, 'input_missing')
+  assert.strictEqual(result.outcome, 'input_missing')
   assert.strictEqual(submitted, false)
   assert.strictEqual(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
 })
 
-test('an uncertain submission disconnects once its replay budget is spent', async () => {
-  // A submission whose replays never resolve would otherwise stay `uncertain` forever: no axis
-  // must stop automation, but it is not evidence that the Execution rejected the submission.
-  const result = await concludeExhaustedSubmissionRecovery(
+const acceptedSubmission = {
+  async submit() {},
+  classifyError(error: unknown): never {
+    throw error
+  }
+}
+
+test('recovery disconnects an exhausted run before claiming or submitting', async () => {
+  const result = await recoverReviewRunSubmission(
     store({
-      async submissionRecoveryAttemptCount() {
-        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
-      },
-      async disconnectExhaustedSubmissionRecovery(_runId, maxAttempts) {
-        assert.strictEqual(maxAttempts, MAX_SUBMISSION_RECOVERY_ATTEMPTS)
+      async disconnectExhaustedSubmissionRecovery(_runId, limit) {
+        assert.equal(limit, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
         return true
+      },
+      async claimSubmissionRecovery() {
+        throw new Error('must not claim')
       }
     }),
-    run()
+    run(),
+    {
+      ...acceptedSubmission,
+      async submit() {
+        throw new Error('must not submit')
+      }
+    }
   )
-
-  assert.deepStrictEqual(result, { status: 'disconnected' })
+  assert.deepEqual(result, { outcome: 'disconnected' })
 })
 
-test('a replay budget that is not spent yet leaves the run to the normal replay path', async () => {
-  let taken = false
-  const result = await concludeExhaustedSubmissionRecovery(
+test('recovery checks the budget before claiming and replaying', async () => {
+  const events: string[] = []
+  const result = await recoverReviewRunSubmission(
     store({
-      async submissionRecoveryAttemptCount() {
-        return MAX_SUBMISSION_RECOVERY_ATTEMPTS - 1
-      },
       async disconnectExhaustedSubmissionRecovery() {
-        taken = true
-        return true
+        events.push('check')
+        return false
+      },
+      async claimSubmissionRecovery(_runId, limit) {
+        assert.equal(limit, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
+        events.push('claim')
+        return 'claim'
       }
     }),
-    run()
+    run(),
+    {
+      ...acceptedSubmission,
+      async submit() {
+        events.push('submit')
+      }
+    }
   )
-
-  assert.strictEqual(result, null)
-  assert.strictEqual(
-    taken,
-    false,
-    'an unfinished budget must not conclude the run'
-  )
+  assert.equal(result.outcome, 'recovered')
+  assert.deepEqual(events, ['check', 'claim', 'submit'])
 })
 
-test('losing the race to another owner reports nothing', async () => {
-  // Two processes can both see a spent budget. `disconnectExhaustedSubmissionRecovery` is gated on the
-  // claim, so only one wins; the loser must stay silent rather than report a conclusion it did
-  // not make.
-  const result = await concludeExhaustedSubmissionRecovery(
+test('recovery does not replay when neither disconnection nor claim is available', async () => {
+  const result = await recoverReviewRunSubmission(
     store({
-      async submissionRecoveryAttemptCount() {
-        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
-      },
       async disconnectExhaustedSubmissionRecovery() {
         return false
+      },
+      async claimSubmissionRecovery() {
+        return null
       }
     }),
-    run()
+    run(),
+    {
+      ...acceptedSubmission,
+      async submit() {
+        throw new Error('must not submit')
+      }
+    }
   )
+  assert.deepEqual(result, { outcome: 'claim_unavailable' })
+})
 
-  assert.strictEqual(result, null)
+for (const outcome of [
+  'accepted',
+  'unknown',
+  'rejected',
+  'input_missing'
+] as const) {
+  test(`recovery reports claim loss when recording ${outcome} is refused`, async () => {
+    const result = await recoverReviewRunSubmission(
+      store({
+        async completeSubmissionRecovery() {
+          return false
+        },
+        async failSubmissionRecovery() {
+          return false
+        },
+        async recordUnknownRecoveryOutcome() {
+          return false
+        }
+      }),
+      run(outcome === 'input_missing' ? null : { api_version: 'v1' }),
+      {
+        async submit() {
+          if (outcome === 'unknown' || outcome === 'rejected')
+            throw new Error('remote outcome')
+        },
+        classifyError: (error) => ({
+          uncertain: outcome === 'unknown',
+          message: String(error)
+        })
+      }
+    )
+    assert.deepEqual(result, { outcome: 'claim_lost' })
+  })
+}
+
+test('a confirmed rejection reports failure only after recording it', async () => {
+  const error = new Error('rejected')
+  const result = await recoverReviewRunSubmission(store(), run(), {
+    async submit() {
+      throw error
+    },
+    classifyError: (error) => ({ uncertain: false, message: String(error) })
+  })
+  assert.deepEqual(result, { outcome: 'failed', error })
 })

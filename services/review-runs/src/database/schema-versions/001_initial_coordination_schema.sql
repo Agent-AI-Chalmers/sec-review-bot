@@ -180,14 +180,9 @@ CREATE TABLE executions (
   workflow_result jsonb,
   claim_token uuid,
   claimed_at timestamptz,
-  -- How many recovery replays of an uncertain submission produced another unknown outcome. The
-  -- axis stays `uncertain` on each such replay, so without a budget an Execution provider that keeps timing
-  -- out would be replayed forever and the run would never reach a state anyone is told about.
-  -- Named `attempt_count` like the other two axes: the name says what is counted (attempts), and
-  -- each table has exactly one such counter, so the axis is the qualifier. Counted here rather
-  -- than in memory because the lease lets a different process take over.
-  attempt_count integer NOT NULL DEFAULT 0
-    CHECK (attempt_count >= 0),
+  -- Recovery replays whose acceptance remains unknown; claims alone do not spend this budget.
+  unresolved_recovery_count integer NOT NULL DEFAULT 0
+    CHECK (unresolved_recovery_count >= 0),
   observed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -253,7 +248,7 @@ COMMENT ON COLUMN executions.claim_token IS
   'Fencing token held while reconciling an Execution submission whose acceptance was uncertain. Not a long-running lease: the replay is short and the Execution provider owns request idempotency.';
 COMMENT ON COLUMN executions.claimed_at IS
   'When the current recovery claim was taken; a stale claim is reclaimed after the claim timeout.';
-COMMENT ON COLUMN executions.attempt_count IS
+COMMENT ON COLUMN executions.unresolved_recovery_count IS
   'Number of recovery replays that ended with the outcome still unknown. The row stays uncertain on each one; when this reaches the recovery budget it becomes disconnected, stopping automation without asserting that the Execution did not accept the run. Automatic work never clears it - that is what bounds a run''s automatic recovery rather than one owner''s tenure - and only an operator resume resets it, which grants a fresh budget by design.';
 COMMENT ON COLUMN executions.observed_at IS
   'Last time polling successfully confirmed the run state. Informational: it never drives claim expiry.';
@@ -359,7 +354,7 @@ CREATE TABLE publication_steps (
   -- is no separate failure counter, because a failure total is derivable from the `failed`
   -- transitions recorded on this row, and a second maintained counter could drift from them.
   attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-  recovery_attempt_count integer NOT NULL DEFAULT 0 CHECK (recovery_attempt_count >= 0),
+  unresolved_recovery_count integer NOT NULL DEFAULT 0 CHECK (unresolved_recovery_count >= 0),
   last_attempt_at timestamptz,
   -- The publication token that took the current attempt, so a reclaim can tell "a different
   -- owner is taking over a step the previous owner left running" from "this owner is claiming the
@@ -396,7 +391,7 @@ COMMENT ON COLUMN publication_steps.claimed_by IS
   'Publication token that owns the current running attempt. A step may be reclaimed only when this differs from the caller''s token, so an owner cannot start a second attempt on a step it already holds.';
 COMMENT ON COLUMN publication_steps.attempt_count IS
   'How many times this step has been claimed and started, and the step''s retry budget: a failed step is claimable again only while this is below MAX_PUBLICATION_STEP_ATTEMPTS. More than one means an earlier owner began the side effect, so a new owner must reconcile against the remote object instead of assuming nothing happened. An attempt counts once it begins, so an owner that died before recording anything still spent one.';
-COMMENT ON COLUMN publication_steps.recovery_attempt_count IS
+COMMENT ON COLUMN publication_steps.unresolved_recovery_count IS
   'How many automatic remote reconciliations of an uncertain step did not yield a conclusive answer. It is separate from attempt_count because reads do not spend permission to repeat the external write. Reaching the recovery budget moves the step to disconnected.';
 COMMENT ON COLUMN publication_steps.last_attempt_at IS
   'When the latest claim of this step started; NULL until it is claimed once. Together with attempt_count it distinguishes a never-started step from one whose owner died mid-effect.';
@@ -527,7 +522,7 @@ CREATE TABLE execution_statistics (
   cache_read_input_tokens bigint CHECK (cache_read_input_tokens >= 0),
   cache_creation_input_tokens bigint CHECK (cache_creation_input_tokens >= 0),
   reasoning_tokens bigint CHECK (reasoning_tokens >= 0),
-  failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
+  consecutive_failure_count integer NOT NULL DEFAULT 0 CHECK (consecutive_failure_count >= 0),
   next_attempt_at timestamptz NOT NULL,
   reconciliation_deadline_at timestamptz,
   claim_token uuid,
@@ -564,7 +559,7 @@ COMMENT ON COLUMN execution_statistics.input_tokens IS
   'Inclusive OpenTelemetry GenAI input total. Cache-read and cache-creation columns are subsets.';
 COMMENT ON COLUMN execution_statistics.output_tokens IS
   'Inclusive OpenTelemetry GenAI output total. Reasoning tokens are a subset.';
-COMMENT ON COLUMN execution_statistics.failure_count IS
+COMMENT ON COLUMN execution_statistics.consecutive_failure_count IS
   'Consecutive failed Langfuse reads. A successful snapshot resets it, so earlier successful reconciliation polls do not consume the transport-failure budget.';
 COMMENT ON COLUMN execution_statistics.reconciliation_deadline_at IS
   'End of the observation-settling window, established when this run is first claimed. Backlog time before the first Langfuse read does not consume the window.';

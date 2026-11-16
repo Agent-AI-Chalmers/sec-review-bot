@@ -51,21 +51,13 @@ setup:
 
 **声明文本有大小上限。** 校验后的文本会内联进工作流 input，因此上限为 64 KiB（UTF-8）。GitHub Integration 在提交前拒绝超限文件；Execution Worker 与 input schema 携带同一上限。
 
-## 两端如何校验
+## 提交前与执行前的校验
 
-该格式由两个独立实现分别校验，结果必须一致：
+GitHub Integration 在提交任务前校验声明。它从目标仓库的默认分支读取文件，声明无效时，在错误中报告仓库、ref 和路径。无效内容属于准备失败，不能悄悄按“没有声明”处理。
 
-- **Execution Worker** 解析器，Python（`agents/src/sec_review_agents/entrypoints/setup_declaration.py`）；
-- **GitHub Integration** 校验器，TypeScript（`apps/github-integration/src/github/setup-declaration.ts`）。
+Execution Worker 在执行环境准备前校验声明，也校验其他调用方提供的声明。声明无效时，任务失败。声明有效但某个准备步骤执行失败时，处理方式不同：停止后续准备步骤，将环境标记为 `incomplete`，然后继续审查。
 
-它们在相同的规则上承担不同的职责：
-
-- **GitHub Integration 在提交前检查声明内容**：它从目标仓库的默认分支读取文件、校验它，并在提交运行**之前**拒绝非法声明，报错中附带仓库、ref 和路径。默认分支上的 `.sec-review/setup.yml` 写坏了，是维护者错误，应明确报错，不能悄悄改为不执行环境准备。
-- Execution Worker 会在执行前再次校验声明。声明无效时，任务失败；声明有效但某个准备步骤执行失败时，停止后续准备步骤，将环境标记为 `incomplete`，然后继续审查。
-
-GitHub Integration 通常会在提交任务前拒绝无效声明。Worker 再次校验，是为了防止其他调用方绕过检查，也能发现两端校验结果不一致的情况。
-
-该契约没有 JSON Schema。重要的规则（`working-directory` 不能逃出根、`env` 名不能夹带 shell 语法、timeout 必须是正整数）属于决策逻辑，不属于数据结构。把它们表达为 JSON Schema 会产生第二份定义（"schema 说合法、解析器说不行"），而这正是本仓库契约规则明确要避免的：schema 只管数据结构，跨字段与策略规则留在执行这些检查的代码里。
+两端必须遵循相同的有效性规则，下节的共享语料用于检查它们是否接受和拒绝相同输入。本契约通过语料验证格式与策略规则，包括路径范围和标量处理，不另外维护 JSON Schema。
 
 ## 语料
 

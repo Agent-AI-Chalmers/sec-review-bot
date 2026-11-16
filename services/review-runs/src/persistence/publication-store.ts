@@ -1,15 +1,5 @@
-// Owns the single-axis publication writes: lease renewal, completion, failure, and per-step
-// progress. Callers use this axis directly because these operations touch only
-// `publications` / `publication_steps`.
-//
-// Selecting publishable work is deliberately NOT here. It requires the execution axis
-// (`executions.status='succeeded'` and a non-null workflow_result) and returns a full
-// cross-axis record, so it lives in the sibling `PublicationClaimStore`.
-// Do not reintroduce a publication-only selection here: a version that duplicated the SQL
-// without a caller is what this comment replaces.
-//
-// Resuming a disconnected publication is still a single-axis write: it returns the row to
-// `pending`, where the normal cross-axis selector can claim it after checking execution.
+// Owns publication lease renewal, completion, failure, and step progress.
+// PublicationClaimStore selects work across execution and publication axes.
 import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
 
@@ -22,114 +12,55 @@ import type { PublicationStatus, PublicationStepRecord } from '../shapes.js'
 import { appendEvent, type AppendEventFields } from './review-run-events.js'
 import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 
-/**
- * Why every `publication_steps` write takes the publication row lock FIRST.
+/** Step writes lock the publication row before reading or changing steps.
  *
- * PostgreSQL keeps the legacy "one statement validates its own precondition" habit dangerous
- * here. A statement like
+ * withOwnedPublication checks the token under SELECT ... FOR UPDATE. This serializes step writes
+ * with takeover and publication conclusion; UPDATE ... FROM alone would only read an ownership
+ * snapshot and could allow a step write after another transaction released the publication.
+ * Under the publication lock, step reads need no additional row locks.
  *
- *     UPDATE publication_steps s SET ... FROM publications p
- *     WHERE p.run_id = s.run_id AND p.status = 'publishing' AND p.claim_token = $token
- *
- * looks like it checks the publication before writing the step, but `publications` is only a
- * snapshot read: no row lock is taken on it (an `EXPLAIN`/`pg_locks` inspection shows just an
- * ACCESS SHARE relation lock and no tuple lock on `publications`). So a concurrent transaction
- * that converges the publication to `skipped` — an execution failure, a rejected submission
- * replay, or an operator abandon — can commit between this statement's snapshot and its write,
- * and the step is still recorded on a publication that no longer publishes anything.
- *
- * The result of that race is a permanent orphan: `publications.status='skipped'` next to a
- * `publication_steps` row that is `running` (or `succeeded`) with a claim token whose owner is
- * gone. Nothing sweeps such rows, because every repair path starts from a publication that is
- * still `publishing`, so the contradiction stays visible to operators and misleads them into
- * looking for a publisher that does not exist. It also invalidates the reasoning the claim path
- * depends on (`attempt_count > 1` means "a previous owner may have already run this side
- * effect"), because the step is neither really running nor definitely abandoned.
- *
- * The fix is to lock the publication row and re-read it inside the same transaction
- * (`SELECT ... FOR UPDATE`) before touching the step. That serialises the two writers: either
- * the step write commits first, or it observes the conclusion and refuses. The shared
- * `withOwnedPublication` helper is the only way a step write gets a transaction, so no write path
- * can skip the lock: one that did would look correct on its own while disagreeing with the others.
- *
- * The same lock is why step reads need no `FOR UPDATE` of their own. Once it is held no other
- * transaction can write this run's steps, so a step status read earlier in the transaction (a
- * `FROM (SELECT status ...) previous` subquery, or a list read before the UPDATE) is exactly the
- * status the UPDATE replaces, and its event may name it.
- *
- * Note on discovery: this is not reproducible by adding concurrency pressure. Interleavings are
- * only observable when one writer's UPDATE is deliberately left uncommitted while the other
- * proceeds, so a stress test tends to report "no deadlock, no errors" and prove nothing. The
- * failure is a lost update, not a lock wait: the two writers never block each other today, they
- * merely disagree. Verify a change here by forcing the interleaving (hold the publication
- * UPDATE open in a second session and assert the step write waits), not by raising the load.
+ * Step changes, derived axis changes, and their events commit in the same transaction. Events
+ * use the stored previous status, including when a write accepts several source states.
+ * To verify serialization, hold a publication update open on a second connection and assert
+ * that a step write waits, then rejects a token released by that transaction.
  */
 
-/** The publication states a claim token can own, passed as a `text[]` parameter. Ownership is
- * the token: `uncertain` and `disconnected` describe what a step is doing, not who may act, so
- * token-fenced writes use this set to keep acting on the step that put the axis there.
- * Concluding the axis itself uses the narrower CONCLUDABLE_PUBLICATION_STATUSES.
- *
- * A publication write that admits several statuses must not name a literal `fromStatus` in its
- * event: it reads the prior status back with `WITH previous AS (SELECT ... FROM publications ...
- * FOR UPDATE) ... RETURNING previous.status`. The `FOR UPDATE` there locks the publication row
- * itself; step writes rely on that lock instead (see the module note). */
+/** States whose current token may authorize step writes and lease renewal.
+ * Uncertain and disconnected steps preserve the owner. Only disconnected blocks overall conclusion.
+ */
 const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
   'publishing',
   'uncertain',
   'disconnected'
 ]
 
-/** The states in which an owner may conclude the publication itself. A `disconnected` axis is
- * excluded: automation handed it to an operator, and concluding it would leave a disconnected
- * step that refuses every claim on a run that has left the parked queue. */
+/** A disconnected publication requires an operator decision before overall conclusion. */
 const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
   'publishing',
   'uncertain'
 ]
 
-/** How many times one side effect may be attempted before the step is given up on.
- *
- * The budget is spent by attempts, not by recorded failures, so a publisher that dies mid-effect
- * consumes one too. That is deliberate: an attempt whose outcome is unknown is not free, and a
- * crash loop has to end the same way a failure loop does. It also keeps the ceiling equal to the
- * only number the system can observe without trusting a counter to agree with the rows it
- * summarises. The other axes bound work the same way and for the same reason, each with its own
- * number (`MAX_PREPARATION_ATTEMPTS` here, `MAX_SUBMISSION_RECOVERY_ATTEMPTS` for replays), so
- * changing one is a local decision about that axis' external traffic rather than a shared policy. */
+/** Claims spend the write budget, including attempts whose owner dies before reporting.
+ * Exhaustion requires remote reconciliation before the step can be concluded.
+ */
 const MAX_PUBLICATION_STEP_ATTEMPTS = 3
-const MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS = 3
+/** Failed remote lookups that leave a step unresolved; operator resume resets this budget. */
+const MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES = 3
 
-/** Whether this step has used up its attempts and is waiting on a reconciliation decision.
- *
- * `failed` and `running` are the two states an exhausted step can be in: `failed` means the last
- * attempt reported a failure (which may still have taken effect remotely), and `running` means an
- * owner started one and never reported at all. `pending` cannot be exhausted because it has not
- * spent an attempt. */
+/** Whether the step has spent its write-attempt budget. */
 function isStepExhausted(step: PublicationStepRecord): boolean {
   return step.attempt_count >= MAX_PUBLICATION_STEP_ATTEMPTS
 }
 
-/** Re-derive the publication axis from the state of its steps.
- *
- * The axis carries no independent opinion about uncertainty: a step is what interacts with the
- * remote system, so only a step can be uncertain or disconnected. The axis reflects the strongest
- * such state so an operator queue can find the run without walking every step, and it never
- * overrides a step: `uncertain` and `disconnected` describe where reconciliation got stuck, and
- * `published`/`failed` remain the axis' own conclusion.
- *
- * Re-deriving the axis preserves its claim token, so the same publisher can
- * continue other steps while an unresolved step keeps the axis uncertain.
+/** Project the strongest step state onto an owned publication: disconnected, uncertain,
+ * otherwise publishing. Preserve the token so its owner can continue permitted step work.
+ * Overall completion and failure are separate owner decisions.
  */
 async function derivePublicationStatus(
   client: PoolClient,
   connectorId: string,
   runId: string
 ): Promise<void> {
-  // The target status is computed once, in the `derived` CTE, rather than in both SET and WHERE.
-  // The two used to spell out the same CASE twice; a later edit to one copy would then produce a
-  // write whose guard disagreed with its assignment - a silent no-op in one direction, or an
-  // event logged for a state the row never held in the other.
   const result = await client.query<{
     from_status: string
     to_status: string
@@ -259,17 +190,11 @@ export class PublicationStore {
     )
     const row = result.rows[0]
     if (row === undefined) return false
-    // The resume returns the attempt budget, which is what makes it "published again" rather
-    // than "keep publishing": a spent budget refuses the write, so without this the connector
-    // could only ever reconcile, and would conclude a step it found absent as failed.
-    //
-    // Resumes are deliberately uncapped: the operator decides, and each resume appends an event.
-    // Parked steps become attemptable and reconcilable again: the status returns to `pending`
-    // so a claim can start the side effect, and both budgets are refreshed. Steps that already
-    // succeeded are untouched - the run continues from where it stopped, it does not start over.
+    // Refresh both budgets for disconnected steps; leave successful steps untouched.
+    // Each operator resume is audited and grants another recovery cycle without a lifetime cap.
     const resumedSteps = await client.query<{ step_key: string }>(
       `UPDATE publication_steps
-       SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
+       SET status='pending', claimed_by=NULL, attempt_count=0, unresolved_recovery_count=0,
            updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
        RETURNING step_key`,
@@ -473,7 +398,7 @@ export class PublicationStore {
       }
     >(
       `
-      SELECT step_key,status,attempt_count,last_attempt_at,recovery_attempt_count,
+      SELECT step_key,status,attempt_count,last_attempt_at,unresolved_recovery_count,
              remote_object_id,remote_object_url,failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
@@ -775,10 +700,10 @@ export class PublicationStore {
     token: string,
     stepKey: string,
     error: { code?: string | null; message: string },
-    options: { retry?: boolean; expectedRecoveryAttemptCount?: number } = {}
+    options: { retry?: boolean; expectedUnresolvedRecoveryCount?: number } = {}
   ): Promise<boolean> {
     const terminal = options.retry === false
-    const expected = options.expectedRecoveryAttemptCount ?? null
+    const expected = options.expectedUnresolvedRecoveryCount ?? null
     return await this.withOwnedPublication(
       runId,
       token,
@@ -791,13 +716,13 @@ export class PublicationStore {
         // decided before the status guard below, which would refuse a `disconnected` step.
         if (expected !== null) {
           const current = await client.query<{
-            recovery_attempt_count: number
+            unresolved_recovery_count: number
           }>(
-            `SELECT recovery_attempt_count FROM publication_steps
+            `SELECT unresolved_recovery_count FROM publication_steps
            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
             [runId, this.connectorId, stepKey]
           )
-          const stored = current.rows[0]?.recovery_attempt_count
+          const stored = current.rows[0]?.unresolved_recovery_count
           if (stored !== undefined && stored > expected) return true
         }
         // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
@@ -813,15 +738,15 @@ export class PublicationStore {
         UPDATE publication_steps s
         SET status=CASE
               WHEN s.status='uncertain' AND $7::boolean
-                AND s.recovery_attempt_count+1 >= $8 THEN 'disconnected'
+                AND s.unresolved_recovery_count+1 >= $8 THEN 'disconnected'
               WHEN s.status='uncertain' AND $7::boolean THEN 'uncertain'
               ELSE $5
             END,
             claimed_by=NULL,
-            recovery_attempt_count=CASE
+            unresolved_recovery_count=CASE
               WHEN s.status='uncertain' AND $7::boolean
-                THEN s.recovery_attempt_count+1
-              ELSE s.recovery_attempt_count
+                THEN s.unresolved_recovery_count+1
+              ELSE s.unresolved_recovery_count
             END,
             failure_code=$3, failure_message=$4, updated_at=clock_timestamp()
         -- Step reads need no FOR UPDATE under the publication lock; see the module note.
@@ -829,7 +754,7 @@ export class PublicationStore {
               WHERE run_id=$1 AND connector_id=$2 AND step_key=$6) previous
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$6
           AND s.status IN ('running','uncertain')
-          AND ($9::integer IS NULL OR s.recovery_attempt_count = $9)
+          AND ($9::integer IS NULL OR s.unresolved_recovery_count = $9)
         RETURNING previous.status AS from_status, s.status AS to_status
       `,
           [
@@ -840,7 +765,7 @@ export class PublicationStore {
             terminal ? 'terminal_failed' : 'failed',
             stepKey,
             options.retry === true,
-            MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS,
+            MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES,
             expected
           ]
         )

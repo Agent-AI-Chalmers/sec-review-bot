@@ -139,7 +139,10 @@ export class ExecutionStore {
    * run becomes claimable again only when this lease expires rather than on the next coordination
    * tick. Clearing the claim on a failed replay would replay the same submission every tick.
    */
-  async claimSubmissionRecovery(runId: string): Promise<string | null> {
+  async claimSubmissionRecovery(
+    runId: string,
+    maxUnresolvedRecoveries: number
+  ): Promise<string | null> {
     const token = crypto.randomUUID()
     return await transaction(this.pool, async (client) => {
       const result = await client.query<{ claim_token: string }>(
@@ -147,12 +150,18 @@ export class ExecutionStore {
         UPDATE executions
         SET claim_token=$2, claimed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$3
-          AND status='uncertain'
+          AND status='uncertain' AND unresolved_recovery_count < $5
           AND (claim_token IS NULL
             OR claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
         RETURNING claim_token
       `,
-        [runId, token, this.connectorId, this.claimTimeoutMs]
+        [
+          runId,
+          token,
+          this.connectorId,
+          this.claimTimeoutMs,
+          maxUnresolvedRecoveries
+        ]
       )
       if (result.rows[0] === undefined) return null
       // The state stays `uncertain`; taking the claim is not a transition, so record it as a
@@ -169,29 +178,9 @@ export class ExecutionStore {
     })
   }
 
-  /** How many replays of an uncertain submission ended with the outcome still unknown. */
-  async submissionRecoveryAttemptCount(runId: string): Promise<number | null> {
-    const result = await this.pool.query<{ attempt_count: number }>(
-      `SELECT attempt_count FROM executions
-       WHERE run_id=$1 AND connector_id=$2`,
-      [runId, this.connectorId]
-    )
-    return result.rows[0]?.attempt_count ?? null
-  }
-
-  /** Hand a disconnected execution back to automatic replay, on an operator's decision.
-   *
-   * Disconnection is reached when the replay budget is spent, and nothing else can move the row:
-   * `claimSubmissionRecovery` only takes `uncertain`, and no automatic path selects a
-   * `disconnected` execution. Without this the run would be permanently stuck with no owner and
-   * no writer, which is why the only other outcome is abandoning it.
-   *
-   * `attempt_count` is reset because it is the budget the disconnect consumed: a row resumed with
-   * the count intact would be disconnected again by the next coordination pass, and the
-   * operator's decision would never get a replay to act on. The reset grants attempts, not facts
-   * — the run still does not know whether the Execution accepted anything.
-   *
-   * Returns false when the row is not (or no longer) disconnected. */
+  /** Resume automatic recovery with a fresh unresolved-result budget.
+   * The submission remains uncertain; only its automatic recovery allowance is reset.
+   */
   async resumeDisconnectedSubmissionRecovery(runId: string): Promise<boolean> {
     return await transaction(
       this.pool,
@@ -200,11 +189,7 @@ export class ExecutionStore {
     )
   }
 
-  /** The same decision, on a transaction the caller already opened.
-   *
-   * An operator resume re-claims the execution and reads the record it returns in one
-   * transaction. Opening a second transaction for the claim deadlocks when the caller holds the
-   * pool's only connection, so the decision takes the caller's transaction instead. */
+  /** Apply resume in the operator decision's transaction. */
   async resumeDisconnectedSubmissionRecoveryOn(
     client: PoolClient,
     runId: string
@@ -213,7 +198,7 @@ export class ExecutionStore {
       const result = await client.query<{ run_id: string }>(
         `UPDATE executions
          SET status='uncertain', claim_token=NULL, claimed_at=NULL,
-             attempt_count=0, updated_at=clock_timestamp()
+             unresolved_recovery_count=0, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
          RETURNING run_id`,
         [runId, this.connectorId]
@@ -236,21 +221,12 @@ export class ExecutionStore {
     }
   }
 
-  /** Stop automatic recovery for an uncertain submission whose replay budget is exhausted.
-   *
-   * `recordUnknownRecoveryOutcome` keeps handing the row back to another owner, so an Execution provider that
-   * answers every replay with another timeout would leave the run `uncertain` forever. That is
-   * not evidence that the Execution rejected it, though, so the only automatic conclusion is
-   * `disconnected`: stop issuing replays and make the uncertainty visible to an operator.
-   *
-   * The take is an UPDATE gated on the budget *and* the claim, so a caller that read an outdated
-   * count cannot conclude a run that a concurrent owner has just taken, and two owners cannot
-   * both conclude the same row. Returns whether this caller is the one that disconnected it, or
-   * false when the row is not (or no longer) over budget. It deliberately returns no claim token:
-   * `disconnected` holds no claim, so a token here would name an owner that never existed. */
+  /** Stop over-budget recovery only when no live recovery lease prevents the decision.
+   * Atomically check count, state, and lease; enqueue attention with the transition.
+   */
   async disconnectExhaustedSubmissionRecovery(
     runId: string,
-    maxAttempts: number
+    maxUnresolvedRecoveries: number
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query<{ run_id: string }>(
@@ -260,12 +236,12 @@ export class ExecutionStore {
             updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
           AND status='uncertain'
-          AND attempt_count >= $3
+          AND unresolved_recovery_count >= $3
           AND (claim_token IS NULL
             OR claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
         RETURNING run_id
       `,
-        [runId, this.connectorId, maxAttempts, this.claimTimeoutMs]
+        [runId, this.connectorId, maxUnresolvedRecoveries, this.claimTimeoutMs]
       )
       if (result.rows[0] === undefined) return false
       const eventId = await appendEvent(client, {
@@ -288,13 +264,7 @@ export class ExecutionStore {
     })
   }
 
-  /** Record that a replay was handed to the Execution and its outcome is still unknown.
-   *
-   * The axis stays `uncertain` — that is what the state means, and concluding anything from an
-   * unknown answer is exactly the mistake the state exists to prevent. What this adds is the
-   * budget: the count is what eventually disconnects a run whose replays never resolve. The
-   * claim token is kept (not cleared) so the next replay waits for this owner's lease to
-   * expire instead of retrying on the very next tick. */
+  /** Count one replay whose acceptance remains unknown, retaining the lease to pace retries. */
   async recordUnknownRecoveryOutcome(
     runId: string,
     token: string
@@ -303,7 +273,7 @@ export class ExecutionStore {
       const result = await client.query(
         `
         UPDATE executions
-        SET attempt_count=attempt_count+1,
+        SET unresolved_recovery_count=unresolved_recovery_count+1,
             updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
           AND status='uncertain' AND claim_token=$3

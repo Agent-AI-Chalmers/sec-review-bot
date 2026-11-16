@@ -54,13 +54,17 @@ Review Runs 轮询 `queued` 和 `running` run。Execution API 服务成功后，
 
 重放结果按以下方式处理：
 
-<!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
+<!-- doc-default: MAX_UNRESOLVED_SUBMISSION_RECOVERIES; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
 - **被接受：** run 恢复正常推进。
 - **被 Execution API 服务明确拒绝：** run 失败，publication 标为 `skipped`，并创建 failure notice。
-- **重放预算耗尽时结果仍未知**（`executions.attempt_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
+- **重放预算耗尽时结果仍未知**（`executions.unresolved_recovery_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
 
 若没有这个预算，未解决的提交可能无限地产生自动重放。
+
+<!-- doc-default: submission-recovery.outcome; source=services/review-runs/src/runtime/server-runtime.ts -->
+
+恢复日志通过 `execution_submission_recovery_finished` 及其 `outcome` 记录本次恢复调用的结果，而不是执行状态。未认领或已失去所有权的恢复不会报告成功；恢复结果仍未知时保留租约，直到租约到期。仅认领不会增加 `unresolved_recovery_count`。
 
 Preparation 或 Execution API 服务的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
 
@@ -160,14 +164,14 @@ _图中省略了四条不改变状态的自环：execution 的 `uncertain → un
 
 **`publication_steps` 的两个预算**
 
-| 字段                     | 计量什么                         | 何时增加                                                                       |
-| ------------------------ | -------------------------------- | ------------------------------------------------------------------------------ |
-| `attempt_count`          | 写入副作用的尝试，也就是重试预算 | 尝试启动时就消耗，所以中途死亡的 publisher 与一次失败的尝试消耗同样的额度      |
-| `recovery_attempt_count` | 确认远端结果的尝试               | 一次确认没能得出结论时。查询远端不会重复写入副作用，所以不推进 `attempt_count` |
+| 字段                        | 计量什么                         | 何时增加                                                                       |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| `attempt_count`             | 写入副作用的尝试，也就是重试预算 | 尝试启动时就消耗，所以中途死亡的 publisher 与一次失败的尝试消耗同样的额度      |
+| `unresolved_recovery_count` | 未能确认远端结果的恢复           | 一次确认没能得出结论时。查询远端不会重复写入副作用，所以不推进 `attempt_count` |
 
-<!-- doc-default: MAX_PUBLICATION_STEP_ATTEMPTS, MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS; source=services/review-runs/src/persistence/publication-store.ts -->
+<!-- doc-default: MAX_PUBLICATION_STEP_ATTEMPTS, MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES; source=services/review-runs/src/persistence/publication-store.ts -->
 
-两个预算当前都是三次。`attempt_count` 用尽的步骤不再获准新的尝试，而是交给 connector 核对；`recovery_attempt_count` 用尽的步骤进入 `disconnected`。
+两个预算当前都是三次。`attempt_count` 用尽的步骤不再获准新的尝试，而是交给 connector 核对；`unresolved_recovery_count` 用尽的步骤进入 `disconnected`。
 
 能否再试一次只看 `attempt_count`，不看失败次数、崩溃次数或经过的时间。系统也不另存失败次数：每次 `failed` 迁移已经由 `failure_code`、`failure_message` 和 run 的事件日志记录下来。
 
@@ -244,32 +248,32 @@ service token 用于协调 run 的各个组件，read token 用于脱敏读取�
 <!-- doc-default: review-runs.startReviewRunsServer; source=services/review-runs/src/runtime/server-runtime.ts -->
 <!-- doc-default: EXECUTION_API_REQUEST_TIMEOUT_MS; source=services/review-runs/src/execution-client.ts -->
 
-| 变量                                          | 是否必需                                      | 用途                                                                   |
-| --------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                                | 是                                            | PostgreSQL 连接字符串                                                  |
-| `REVIEW_RUNS_READ_TOKEN`                      | 是                                            | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | 是                                            | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | 否                                            | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
-| `EXECUTION_API_URL`                           | 是                                            | Execution API 服务 base URL                                            |
-| `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API 服务必需 | Execution API 服务认证                                                 |
-| `REVIEW_RUNS_PORT`                            | 否                                            | 监听端口；默认 `8090`                                                  |
-| `CONNECTOR_ID`                                | 否                                            | 协调 namespace；默认 `github-integration:default`                      |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                            | 协调循环间隔；默认 `15000`                                             |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                            | Execution API 服务请求超时；默认 `30000`                               |
-| `EXECUTION_API_REQUEST_RETRIES`               | 否                                            | Execution API 服务 transport 重试次数；默认 `2`                        |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | 否                                            | 初始重试延迟；默认 `500`                                               |
-| `LANGFUSE_BASE_URL`                           | 否                                            | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
-| `LANGFUSE_PUBLIC_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project public key                                            |
-| `LANGFUSE_SECRET_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project secret key                                            |
-| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | 否                                            | 单次 Langfuse 请求超时；默认 `30000`                                   |
-| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | 否                                            | 用量统计协调循环间隔；默认 `15000`                                     |
-| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | 否                                            | 每轮最多处理的到期 run 数；默认 `20`                                   |
-| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | 否                                            | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
-| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | 否                                            | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
-| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | 否                                            | Observation settling 总时间窗口；默认 `600000`                         |
-| `EXECUTION_STATISTICS_MAX_FAILURES`           | 否                                            | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
-| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | 否                                            | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
-| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | 否                                            | Statistics reconciliation claim 超时；默认 `600000`                    |
+| 变量                                            | 是否必需                                      | 用途                                                                   |
+| ----------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                                  | 是                                            | PostgreSQL 连接字符串                                                  |
+| `REVIEW_RUNS_READ_TOKEN`                        | 是                                            | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
+| `REVIEW_RUNS_SERVICE_TOKEN`                     | 是                                            | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
+| `REVIEW_RUNS_ADMIN_TOKEN`                       | 否                                            | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
+| `EXECUTION_API_URL`                             | 是                                            | Execution API 服务 base URL                                            |
+| `EXECUTION_API_TOKEN`                           | 非 loopback 或受保护的 Execution API 服务必需 | Execution API 服务认证                                                 |
+| `REVIEW_RUNS_PORT`                              | 否                                            | 监听端口；默认 `8090`                                                  |
+| `CONNECTOR_ID`                                  | 否                                            | 协调 namespace；默认 `github-integration:default`                      |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS`   | 否                                            | 协调循环间隔；默认 `15000`                                             |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`              | 否                                            | Execution API 服务请求超时；默认 `30000`                               |
+| `EXECUTION_API_REQUEST_RETRIES`                 | 否                                            | Execution API 服务 transport 重试次数；默认 `2`                        |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`             | 否                                            | 初始重试延迟；默认 `500`                                               |
+| `LANGFUSE_BASE_URL`                             | 否                                            | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
+| `LANGFUSE_PUBLIC_KEY`                           | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project public key                                            |
+| `LANGFUSE_SECRET_KEY`                           | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project secret key                                            |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                   | 否                                            | 单次 Langfuse 请求超时；默认 `30000`                                   |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`         | 否                                            | 用量统计协调循环间隔；默认 `15000`                                     |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`       | 否                                            | 每轮最多处理的到期 run 数；默认 `20`                                   |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`         | 否                                            | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`    | 否                                            | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`     | 否                                            | Observation settling 总时间窗口；默认 `600000`                         |
+| `EXECUTION_STATISTICS_MAX_CONSECUTIVE_FAILURES` | 否                                            | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`           | 否                                            | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`         | 否                                            | Statistics reconciliation claim 超时；默认 `600000`                    |
 
 ## 数据库 schema
 

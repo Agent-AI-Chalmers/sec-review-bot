@@ -66,7 +66,7 @@ export interface ReconciliationLookupFailure {
   outcome: 'lookup_failed'
   error: unknown
   recording: 'accepted' | 'not_owned' | 'unknown'
-  expectedRecoveryAttemptCount: number | undefined
+  expectedUnresolvedRecoveryCount: number | undefined
 }
 
 export async function settleExhaustedStep({
@@ -85,9 +85,9 @@ export async function settleExhaustedStep({
   // The count this lookup will be reported against, read before looking. Like an activity
   // failure that carries its attempt number, it identifies this one failure, so reporting it
   // again after a lost response cannot spend the budget a second time.
-  const expectedRecoveryAttemptCount = (
+  const expectedUnresolvedRecoveryCount = (
     await store.listPublicationSteps(runId)
-  ).find((step) => step.step_key === stepKey)?.recovery_attempt_count
+  ).find((step) => step.step_key === stepKey)?.unresolved_recovery_count
   let found: ReconciledRemote | null
   try {
     found = await find()
@@ -108,9 +108,9 @@ export async function settleExhaustedStep({
         { code: failure.code, message: asErrorMessage(error) },
         {
           retry: failure.retry,
-          ...(expectedRecoveryAttemptCount === undefined
+          ...(expectedUnresolvedRecoveryCount === undefined
             ? {}
-            : { expectedRecoveryAttemptCount })
+            : { expectedUnresolvedRecoveryCount })
         }
       )
     let recording: ReconciliationLookupFailure['recording']
@@ -123,7 +123,7 @@ export async function settleExhaustedStep({
       outcome: 'lookup_failed',
       error,
       recording,
-      expectedRecoveryAttemptCount
+      expectedUnresolvedRecoveryCount
     }
   }
   const settled = await store.settleExhaustedPublicationStep(

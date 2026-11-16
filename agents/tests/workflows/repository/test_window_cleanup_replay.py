@@ -155,7 +155,7 @@ async def test_delivery_workflow_refills_isolates_synthesis_failure_and_replays(
         RepositoryDeliveryWorkflow,
         build_repository_delivery_result_activity,
         execute_repository_single_deliveries_activity,
-        project_repository_case_result_for_delivery,
+        select_delivery_cases,
     )
     from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
@@ -198,9 +198,7 @@ async def test_delivery_workflow_refills_isolates_synthesis_failure_and_replays(
         run_artifacts_root=tmp_path,
         workspace_snapshot_tar_path=tmp_path / "baseline.tar",
         deliveries=deliveries,
-        keep_case_results=[
-            project_repository_case_result_for_delivery(case) for case in cases
-        ],
+        keep_case_results=select_delivery_cases(cases),
     )
     plan = DeliveryPlan.model_validate(
         {

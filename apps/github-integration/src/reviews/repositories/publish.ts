@@ -266,8 +266,8 @@ export async function publishDeliveryDraftPrs({
       // One whose recording did not complete is recorded here against the same count, so a write
       // that did commit is not counted twice.
       if (reconciliationFailure?.recording !== 'accepted') {
-        const expectedRecoveryAttemptCount =
-          reconciliationFailure?.expectedRecoveryAttemptCount
+        const expectedUnresolvedRecoveryCount =
+          reconciliationFailure?.expectedUnresolvedRecoveryCount
         await store.failPublicationStep(
           run_id,
           claim_token,
@@ -278,9 +278,9 @@ export async function publishDeliveryDraftPrs({
           },
           {
             retry: failure.retry,
-            ...(expectedRecoveryAttemptCount === undefined
+            ...(expectedUnresolvedRecoveryCount === undefined
               ? {}
-              : { expectedRecoveryAttemptCount })
+              : { expectedUnresolvedRecoveryCount })
           }
         )
       }

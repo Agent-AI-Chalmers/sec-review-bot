@@ -312,32 +312,24 @@ def prepare_repository_case_review_inputs_activity(
     )
 
 
-def _keep_repository_case_results(
-    case_results: Sequence[RepositoryCaseResult],
-) -> list[RepositoryCaseResult]:
-    return [item for item in case_results if item.disposition == "keep"]
-
-
-def project_repository_case_result_for_delivery(
-    case_result: RepositoryCaseResult,
-) -> DeliveryCaseInput:
-    mitigation = case_result.review_record.mitigation
-    return DeliveryCaseInput(
-        case_id=case_result.case_id,
-        disposition=case_result.disposition,
-        reason=case_result.reason,
-        mitigation_overview=mitigation.overview or "",
-        mitigator_file_changes=mitigation.file_changes,
-        mitigator_patch_diff=mitigation.patch_diff,
-    )
-
-
-def _delivery_case_inputs(
+def select_delivery_cases(
     case_results: Sequence[RepositoryCaseResult],
 ) -> list[DeliveryCaseInput]:
+    """Select cases approved for delivery, preserving their order and projecting patch inputs.
+
+    Blocked cases stay in the review report but do not enter delivery planning or execution.
+    """
     return [
-        project_repository_case_result_for_delivery(item)
-        for item in _keep_repository_case_results(case_results)
+        DeliveryCaseInput(
+            case_id=item.case_id,
+            disposition=item.disposition,
+            reason=item.reason,
+            mitigation_overview=item.review_record.mitigation.overview or "",
+            mitigator_file_changes=item.review_record.mitigation.file_changes,
+            mitigator_patch_diff=item.review_record.mitigation.patch_diff,
+        )
+        for item in case_results
+        if item.disposition == "keep"
     ]
 
 
@@ -361,7 +353,7 @@ async def plan_repository_delivery_activity(
         prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    delivery_case_inputs = _delivery_case_inputs(case_results)
+    delivery_case_inputs = select_delivery_cases(case_results)
     if not delivery_case_inputs:
         result = build_skipped_delivery_plan(total_case_count=len(case_results))
         persist_delivery_plan(
@@ -404,7 +396,7 @@ def prepare_repository_delivery_execution_activity(
         prepared_input.workspace_snapshot_tar_path,
         label="workspace_snapshot_tar_path",
     )
-    keep_case_results = _delivery_case_inputs(case_results)
+    keep_case_results = select_delivery_cases(case_results)
     deliveries = list(delivery_plan.deliveries)
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
@@ -850,7 +842,7 @@ __all__ = [
     "plan_repository_delivery_activity",
     "prepare_repository_case_review_inputs_activity",
     "prepare_repository_delivery_execution_activity",
-    "project_repository_case_result_for_delivery",
     "scan_repository_discovery_chunk_activity",
+    "select_delivery_cases",
     "triage_repository_activity",
 ]

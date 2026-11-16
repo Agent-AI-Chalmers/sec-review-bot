@@ -387,7 +387,7 @@ test('a lookup failure whose recording did not complete is reported again agains
           status: 'uncertain',
           attempt_count: 3,
           last_attempt_at: null,
-          recovery_attempt_count: 1,
+          unresolved_recovery_count: 1,
           remote_object_id: null,
           remote_object_url: null,
           failure_code: null,
@@ -400,9 +400,9 @@ test('a lookup failure whose recording did not complete is reported again agains
         _token: string,
         _stepKey: string,
         _error: unknown,
-        options: { expectedRecoveryAttemptCount?: number }
+        options: { expectedUnresolvedRecoveryCount?: number }
       ) => {
-        reported.push(options.expectedRecoveryAttemptCount)
+        reported.push(options.expectedUnresolvedRecoveryCount)
         throw Object.assign(new Error('Review Runs timed out'), {
           status: 504
         })
@@ -423,7 +423,7 @@ test('a lookup failure whose recording did not complete is reported again agains
   )
   assert.match(String(result.error), /502/)
   assert.equal(result.recording, 'unknown')
-  assert.strictEqual(result.expectedRecoveryAttemptCount, 1)
+  assert.strictEqual(result.expectedUnresolvedRecoveryCount, 1)
 })
 
 test('a frozen lookup error is returned unchanged with explicit recording state', async () => {

@@ -46,7 +46,7 @@ test('a statistics pass drains several due runs up to its bound', async () => {
       }
     },
     confirmationDelayMs: 0,
-    maxFailures: 3,
+    maxConsecutiveFailures: 3,
     retryDelayMs: 0,
     onResult() {},
     onError() {
@@ -88,7 +88,7 @@ test('a persistence failure does not spend the Langfuse failure budget', async (
         }
       },
       confirmationDelayMs: 0,
-      maxFailures: 3,
+      maxConsecutiveFailures: 3,
       retryDelayMs: 0,
       onResult() {},
       onError() {
@@ -128,7 +128,7 @@ test('rate limiting defers work without spending the failure budget', async () =
       }
     },
     confirmationDelayMs: 0,
-    maxFailures: 3,
+    maxConsecutiveFailures: 3,
     retryDelayMs: 1_000,
     onResult(_item, result) {
       results.push(result)
@@ -168,7 +168,7 @@ test('rate limiting reports unavailable once the settlement window is exhausted'
       }
     },
     confirmationDelayMs: 0,
-    maxFailures: 3,
+    maxConsecutiveFailures: 3,
     retryDelayMs: 1_000,
     onResult(_item, result) {
       results.push(result)
