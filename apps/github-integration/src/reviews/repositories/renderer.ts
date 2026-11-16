@@ -47,6 +47,7 @@ interface RepositorySummaryWorkflowView {
   run_id: string
   deletion_review_skipped: boolean
   scan_summary: RepositoryScanSummary
+  case_count: number
   cvss_summary: CvssSummary
   case_results: RepositoryCaseResult[]
 }
@@ -157,6 +158,7 @@ export function buildRepositorySummaryWorkflowView(
   const view: RepositorySummaryWorkflowView = {
     run_id: options.run_id ?? 'unknown',
     scan_summary: workflow_result.scan_summary,
+    case_count: workflow_result.case_count,
     deletion_review_skipped: workflow_result.deletion_review_skipped,
     case_results: workflow_result.case_results,
     cvss_summary: buildCvssSummaryFromCases(workflow_result.case_results)
@@ -367,7 +369,7 @@ function renderReferencePatch(patch_diff: unknown): string[] {
 }
 
 function isBlockedConfirmedCase(caseResult: RepositoryCaseResult): boolean {
-  if (caseResult.disposition === 'keep') {
+  if (caseResult.deliverable) {
     return false
   }
   return [
@@ -389,7 +391,7 @@ function renderBlockedConfirmedCases(
     const { analysis, mitigation, verification, cvss } =
       caseResult.review_record
     const case_id = caseResult.case_id
-    const dispositionReason =
+    const deliveryReason =
       nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
 
     const body = [
@@ -406,14 +408,14 @@ function renderBlockedConfirmedCases(
       ...renderFoldedBlock('CVSS', renderCvssScoringBody(cvss)),
       ...renderFoldedBlock(
         'Mitigation',
-        renderMitigationSummaryLines(mitigation, dispositionReason, {
+        renderMitigationSummaryLines(mitigation, deliveryReason, {
           includeReferencePatch: true
         })
       ),
       ...renderFoldedBlock(
         'Verification',
         renderVerificationSummaryLines(verification, {
-          fallback: dispositionReason
+          fallback: deliveryReason
         })
       )
     ]
@@ -471,24 +473,25 @@ export function renderRepositorySecuritySummaryComment({
   const blockedConfirmedCaseCount = case_results.filter(
     isBlockedConfirmedCase
   ).length
-  const keep_case_count = case_results.filter(
-    (item) => String(item?.disposition ?? '') === 'keep'
+  const ready_case_count = case_results.filter(
+    (item) => item.deliverable
   ).length
   const scan_summary = workflow_result.scan_summary
   const scan_mode = String(scan_target?.scan_mode ?? 'full').trim() || 'full'
   const base_sha = String(scan_target?.base_sha ?? '').trim()
   const head_sha = String(scan_target?.head_sha ?? '').trim()
 
-  const scanSummaryLines = [
+  const reviewSummaryLines = [
     `- Scan mode: ${inlineCode(scan_mode)}`,
     `- Scannable files: ${inlineCode(scan_summary.scannable_file_count ?? 0)}`,
     `- Scanned files: ${inlineCode(scan_summary.scanned_file_count ?? 0)}`,
     `- Skipped files: ${inlineCode(scan_summary.skipped_file_count ?? 0)}`,
     `- Discovery candidates: ${inlineCode(scan_summary.candidate_count ?? 0)}`,
-    `- Lightweight cases after triage: ${inlineCode(scan_summary.case_count ?? 0)}`,
+    `- Reviewed cases: ${inlineCode(workflow_result.case_count)}`,
+    `- Cases after triage: ${inlineCode(scan_summary.triaged_case_count ?? 0)}`,
     `- Suppressed candidates: ${inlineCode(scan_summary.suppressed_candidate_count ?? 0)}`,
     `- Deleted files in window: ${inlineCode(scan_summary.deleted_file_count ?? 0)}`,
-    `- Keep cases: ${inlineCode(keep_case_count)}`,
+    `- Ready for delivery: ${inlineCode(ready_case_count)}`,
     `- Blocked confirmed cases: ${inlineCode(blockedConfirmedCaseCount)}`,
     `- Delivery PRs published this run: ${inlineCode(published_delivery_entries.length)}`,
     `- CVSS scored cases: ${inlineCode(cvss_summary.scored_case_count ?? 0)}`,
@@ -502,7 +505,7 @@ export function renderRepositorySecuritySummaryComment({
     `**Branch:** \`${target_branch}\``,
     `**Run ID:** \`${workflow_result.run_id}\``,
     '',
-    '### Scan Summary',
+    '### Review Summary',
     ''
   ]
 
@@ -515,7 +518,7 @@ export function renderRepositorySecuritySummaryComment({
     )
   }
 
-  scanSummaryLines.push(
+  reviewSummaryLines.push(
     `- Case CVSS severities: ${inlineCode(`critical=${cvss_severity_counts.critical ?? 0}`)}, ` +
       `${inlineCode(`high=${cvss_severity_counts.high ?? 0}`)}, ` +
       `${inlineCode(`medium=${cvss_severity_counts.medium ?? 0}`)}, ` +
@@ -524,13 +527,13 @@ export function renderRepositorySecuritySummaryComment({
   )
 
   if (base_sha) {
-    scanSummaryLines.push(`- Base sha: ${inlineCode(base_sha)}`)
+    reviewSummaryLines.push(`- Base sha: ${inlineCode(base_sha)}`)
   }
   if (head_sha) {
-    scanSummaryLines.push(`- Head sha: ${inlineCode(head_sha)}`)
+    reviewSummaryLines.push(`- Head sha: ${inlineCode(head_sha)}`)
   }
 
-  lines.push(...renderFoldedBlock('Scan summary details', scanSummaryLines))
+  lines.push(...renderFoldedBlock('Review summary details', reviewSummaryLines))
 
   const normalizedDeliveryEntries = published_delivery_entries
 

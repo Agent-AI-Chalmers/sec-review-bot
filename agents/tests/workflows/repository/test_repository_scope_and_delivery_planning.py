@@ -43,7 +43,7 @@ from sec_review_agents.workflows.repository.workflow import (
 )
 from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.stage import (
-    derive_case_disposition,
+    derive_case_deliverability,
 )
 from sec_review_agents.workspace.file_changes import UpsertFileChange
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
@@ -87,7 +87,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             case_results=[
                 DeliveryCaseInput(
                     case_id=case.case_id,
-                    disposition="keep",
+                    deliverable=True,
                     reason=None,
                     mitigation_overview=case.overview,
                     mitigator_file_changes=[
@@ -154,7 +154,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 },
                 "cvss": None,
             },
-            "disposition": "keep",
+            "deliverable": True,
             "reason": "unit-test",
         }
 
@@ -258,26 +258,26 @@ class TestRepositoryScopeAndDeliveryPlanning:
         case_results: list[dict[str, Any]] = [
             {
                 "case_id": "case-1",
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "cvss": {"base_score": 9.8, "severity": "critical"},
                 },
             },
             {
                 "case_id": "case-2",
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "cvss": {"base_score": 7.4, "severity": "high"},
                 },
             },
             {
                 "case_id": "case-3",
-                "disposition": "blocked",
+                "deliverable": False,
                 "review_record": {"cvss": None},
             },
             {
                 "case_id": "case-4",
-                "disposition": "blocked",
+                "deliverable": False,
                 "review_record": {
                     "cvss": {
                         "outcome": "not-scored",
@@ -715,7 +715,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             case_results: list[DeliveryCaseInput] = [
                 DeliveryCaseInput(
                     case_id="case-1",
-                    disposition="keep",
+                    deliverable=True,
                     reason=None,
                     mitigation_overview="",
                     mitigator_file_changes=[],
@@ -723,7 +723,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 ),
                 DeliveryCaseInput(
                     case_id="case-2",
-                    disposition="keep",
+                    deliverable=True,
                     reason=None,
                     mitigation_overview="",
                     mitigator_file_changes=[],
@@ -742,7 +742,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ) == "diff --git a/src/a.ts b/src/a.ts\n"
             assert not (patch_root / "case-2.patch").exists()
 
-    def test_case_disposition_allows_full_coverage_without_regression_run(
+    def test_deliverability_allows_full_coverage_without_regression_run(
         self,
     ) -> None:
         """Keep `not-run` delivery-neutral unless project policy changes."""
@@ -758,20 +758,20 @@ class TestRepositoryScopeAndDeliveryPlanning:
             next_step="none",
             validation_level=None,
         )
-        case_disposition = derive_case_disposition(
+        deliverability = derive_case_deliverability(
             mitigator_result=mitigator_result,
             verifier_result=verifier_result,
         )
-        assert case_disposition["disposition"] == "keep"
-        assert "approved by verifier" in case_disposition["reason"]
-        assert set(case_disposition) == {"disposition", "reason"}
+        assert deliverability["deliverable"] is True
+        assert "approved by verifier" in deliverability["reason"]
+        assert set(deliverability) == {"deliverable", "reason"}
 
     @pytest.mark.parametrize("regression", ["failed", "unresolved", None])
-    def test_case_disposition_blocks_uncleared_regression(
+    def test_deliverability_blocks_uncleared_regression(
         self, regression: RegressionStatus | None
     ) -> None:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
-        case_disposition = derive_case_disposition(
+        deliverability = derive_case_deliverability(
             mitigator_result=MitigationStageResult(
                 overview="Test mitigation",
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -786,12 +786,12 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ),
         )
 
-        assert case_disposition["disposition"] == "blocked"
-        assert "regression risk" in case_disposition["reason"]
+        assert deliverability["deliverable"] is False
+        assert "regression risk" in deliverability["reason"]
 
-    def test_case_disposition_blocks_pending_follow_up(self) -> None:
+    def test_deliverability_blocks_pending_follow_up(self) -> None:
         """Block delivery whenever the verifier still requests follow-up."""
-        case_disposition = derive_case_disposition(
+        deliverability = derive_case_deliverability(
             mitigator_result=MitigationStageResult(
                 overview="Test mitigation",
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -806,8 +806,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ),
         )
 
-        assert case_disposition["disposition"] == "blocked"
-        assert "requires follow-up" in case_disposition["reason"]
+        assert deliverability["deliverable"] is False
+        assert "requires follow-up" in deliverability["reason"]
 
     def test_partial_verifier_coverage_is_confirmed_unresolved(self) -> None:
         mitigator_result = MitigationStageResult(
@@ -822,13 +822,13 @@ class TestRepositoryScopeAndDeliveryPlanning:
             validation_level=None,
             regression=None,
         )
-        case_disposition = derive_case_disposition(
+        deliverability = derive_case_deliverability(
             mitigator_result=mitigator_result,
             verifier_result=verifier_result,
         )
-        assert case_disposition["disposition"] == "blocked"
-        assert "fully approve" in case_disposition["reason"]
-        assert set(case_disposition) == {"disposition", "reason"}
+        assert deliverability["deliverable"] is False
+        assert "fully approve" in deliverability["reason"]
+        assert set(deliverability) == {"deliverable", "reason"}
 
     def test_workflow_result_includes_confirmed_unresolved_case_summaries(self) -> None:
         result = build_repository_workflow_result(
@@ -839,7 +839,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 for item in [
                     {
                         "case_id": "case-1",
-                        "disposition": "blocked",
+                        "deliverable": False,
                         "reason": "The verifier did not fully approve the patch.",
                         "review_record": {
                             "analysis": {
@@ -854,7 +854,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     },
                     {
                         "case_id": "case-2",
-                        "disposition": "keep",
+                        "deliverable": True,
                         "review_record": {
                             "analysis": {"verdict": "confirmed-vulnerability"}
                         },
@@ -863,7 +863,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ],
         )
 
-        assert result["case_results"][0]["disposition"] == "blocked"
+        assert result["case_results"][0]["deliverable"] is False
         assert (
             result["case_results"][0]["review_record"]["analysis"]["verdict"]
             == "confirmed-vulnerability"
@@ -877,7 +877,7 @@ def test_delivery_projection_requires_only_selected_case_and_mitigation() -> Non
             RepositoryCaseResult.model_validate(
                 {
                     "case_id": "case-1",
-                    "disposition": "keep",
+                    "deliverable": True,
                     "reason": "ready",
                     "review_record": {
                         "mitigation": {
@@ -894,7 +894,7 @@ def test_delivery_projection_requires_only_selected_case_and_mitigation() -> Non
     )
     assert projected == DeliveryCaseInput(
         case_id="case-1",
-        disposition="keep",
+        deliverable=True,
         reason="ready",
         mitigation_overview="Remove unsafe entrypoint",
         mitigator_file_changes=[{"path": "unsafe.py", "status": "deleted"}],
@@ -903,22 +903,22 @@ def test_delivery_projection_requires_only_selected_case_and_mitigation() -> Non
 
 
 @pytest.mark.parametrize(
-    ("dispositions", "expected_ids"),
+    ("deliverable_values", "expected_ids"),
     [
         ([], []),
-        (["blocked", "blocked"], []),
-        (["keep", "blocked", "keep"], ["case-0", "case-2"]),
+        ([False, False], []),
+        ([True, False, True], ["case-0", "case-2"]),
     ],
 )
 def test_delivery_selection_preserves_order_without_removing_reported_cases(
-    dispositions: list[str], expected_ids: list[str]
+    deliverable_values: list[bool], expected_ids: list[str]
 ) -> None:
     """Approval gates delivery, not whether a reviewed case remains visible in the report."""
     cases = [
         RepositoryCaseResult.model_validate(
             {
                 "case_id": f"case-{index}",
-                "disposition": disposition,
+                "deliverable": deliverable,
                 "review_record": {
                     "mitigation": {
                         "overview": f"repair-{index}",
@@ -929,7 +929,7 @@ def test_delivery_selection_preserves_order_without_removing_reported_cases(
                 },
             }
         )
-        for index, disposition in enumerate(dispositions)
+        for index, deliverable in enumerate(deliverable_values)
     ]
     before = [case.model_dump() for case in cases]
     selected = select_delivery_cases(cases)

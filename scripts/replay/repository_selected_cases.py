@@ -282,7 +282,7 @@ def _summary_from_replayed(case_id: str, replayed: dict[str, Any]) -> dict[str, 
     return {
         "case_id": case_id,
         "title": analysis.get("overview"),
-        "disposition": replayed.get("disposition"),
+        "deliverable": replayed.get("deliverable"),
         "reason": replayed.get("reason"),
         "analysis_status": analysis.get("status"),
         "analysis_verdict": analysis.get("verdict"),
@@ -378,7 +378,7 @@ async def main() -> None:
             {
                 "case_id": case_id,
                 "title": case.summary if case is not None else None,
-                "current_disposition": item.get("disposition"),
+                "current_deliverable": item.get("deliverable"),
                 **_analysis_diagnostics(run_artifacts, case_id),
                 "has_max_tokens_stop": _max_tokens_failure(run_artifacts, case_id),
                 "case_artifacts_path": str(run_artifacts / "cases" / case_id),

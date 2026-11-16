@@ -68,13 +68,13 @@ Analyzer 先核查 candidate 并给出有证据支持的结论，再进入修复
 
 `verifier` 负责独立复核 Analyzer 和 Mitigator 输出。它检查 Analyzer 是否过度表述，补丁是否真正修到点上，以及补丁是否引入明显副作用或绕过。
 
-在仓库审查路径里，`verifier` 同时检查报告和补丁，并为 keep/blocked 决策提供最后一道质量门槛。
+在仓库审查路径里，`verifier` 同时检查报告和补丁，并为 交付资格判断提供最后一道质量门槛。
 
 Verifier 从输入快照恢复独立工作区，并在开始调查前应用修复补丁。工作区提供打补丁后的代码，允许验证命令和测试写入文件。补丁无法应用时，验证失败，不会基于未打补丁的基线代码判断补丁覆盖。
 
 ### `delivery-planning`
 
-只有 `disposition="keep"` 的 case 结果会进入 delivery planning / delivery execution。
+只有 `deliverable=true` 的 case 结果会进入 delivery planning / delivery execution。
 
 `delivery-planning` 将可交付的 case 分组。判断主要依据各 case 已准备的输出，而不是某个共享工作区的最终状态。它优先使用 case item payload、修复概述、变更文件和 workbench state；这些信息不足以判断是否必须合并交付时，才读取各 case 的补丁。
 

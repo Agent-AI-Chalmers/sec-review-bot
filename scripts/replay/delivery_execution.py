@@ -172,14 +172,14 @@ async def main() -> None:
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts,
         deliveries=delivery_plan.deliveries,
-        keep_case_results=delivery_case_inputs,
+        delivery_case_results=delivery_case_inputs,
     )
     workspace_snapshot_tar_path = Path(replay_input.workspace_snapshot_tar_path)
     delivery_execution = build_delivery_execution_input(
         run_artifacts_root=run_artifacts,
         workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         deliveries=delivery_plan.deliveries,
-        keep_case_results=delivery_case_inputs,
+        delivery_case_results=delivery_case_inputs,
     )
     patch_outcomes = []
     for delivery_request in (
@@ -197,7 +197,7 @@ async def main() -> None:
 
     delivery_result = build_delivery_result_from_outcomes(
         deliveries=delivery_execution.deliveries,
-        keep_case_ids=delivery_execution.keep_case_ids,
+        delivery_case_ids=delivery_execution.delivery_case_ids,
         patch_outcomes=patch_outcomes,
     )
     persist_delivery_result(run_artifacts_root=run_artifacts, result=delivery_result)
@@ -216,7 +216,7 @@ async def main() -> None:
                 "run_id": run_artifacts.name,
                 "delivery_plan_status": delivery_plan.status,
                 "delivery_plan_delivery_count": len(delivery_plan.deliveries),
-                "delivery_status": delivery_result.status,
+                "deliverable": delivery_result.status,
                 "delivery_count": len(delivery_result.deliveries),
                 "case_result_count": len(case_results),
                 "result_path": str(run_artifacts / "repository-review-result.json"),

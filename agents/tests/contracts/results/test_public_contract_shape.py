@@ -36,7 +36,7 @@ FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS = {
 
 FORBIDDEN_INTERNAL_REVIEW_RECORD_KEYS = {
     "case_summary",
-    "disposition",
+    "deliverable",
     "raw",
     "strategy",
     "target",
@@ -162,7 +162,7 @@ def test_review_record_builder_output_matches_shared_contract_schema() -> None:
 def test_repository_result_public_shape() -> None:
     case_result = {
         "case_id": "case-1",
-        "disposition": "keep",
+        "deliverable": True,
         "reason": "ready",
         "review_record": {
             "analysis": {
@@ -258,7 +258,7 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
             for item in [
                 {
                     "case_id": "case-1",
-                    "disposition": "keep",
+                    "deliverable": True,
                     "reason": None,
                     "review_record": ReviewRecord.model_validate(
                         {
@@ -305,7 +305,7 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
 def test_repository_case_results_drop_internal_case_fields() -> None:
     case_result = {
         "case_id": "case-1",
-        "disposition": "keep",
+        "deliverable": True,
         "reason": "ready",
         "review_record": {
             "strategy": {"name": "default", "stages": ["analysis"]},
@@ -330,7 +330,7 @@ def test_repository_case_results_drop_internal_case_fields() -> None:
 
     assert set(result["case_results"][0]) == {
         "case_id",
-        "disposition",
+        "deliverable",
         "reason",
         "review_record",
     }
@@ -349,7 +349,7 @@ def test_repository_case_results_normalize_partial_review_record_shape() -> None
             for item in [
                 {
                     "case_id": "case-1",
-                    "disposition": "keep",
+                    "deliverable": True,
                     "reason": None,
                     "review_record": {
                         "analysis": {
@@ -380,12 +380,12 @@ def test_repository_case_result_reason_is_always_present_and_nullable() -> None:
             for item in [
                 {
                     "case_id": "case-1",
-                    "disposition": "blocked",
+                    "deliverable": False,
                     "review_record": not_run_review_record(),
                 },
                 {
                     "case_id": "case-2",
-                    "disposition": "blocked",
+                    "deliverable": False,
                     "reason": "  needs manual review  ",
                     "review_record": not_run_review_record(),
                 },
@@ -406,7 +406,7 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
             for item in [
                 {
                     "case_id": "case-1",
-                    "disposition": "blocked",
+                    "deliverable": False,
                     "reason": "case processing failed",
                     "review_record": not_run_review_record(),
                 },
@@ -416,7 +416,7 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
 
     assert set(result["case_results"][0]) == {
         "case_id",
-        "disposition",
+        "deliverable",
         "reason",
         "review_record",
     }
@@ -433,7 +433,7 @@ def test_repository_case_result_requires_explicit_review_record() -> None:
         RepositoryCaseResult.model_validate(
             {
                 "case_id": "case-1",
-                "disposition": "blocked",
+                "deliverable": False,
                 "reason": "case processing failed",
             }
         )
@@ -442,22 +442,22 @@ def test_repository_case_result_requires_explicit_review_record() -> None:
 @pytest.mark.parametrize(
     "case",
     [
-        {"disposition": "blocked", "review_record": {}},
+        {"deliverable": False, "review_record": {}},
         {"case_id": "case-1", "review_record": {}},
-        {"case_id": "case-1", "disposition": "   ", "review_record": {}},
-        {"case_id": "  ", "disposition": "blocked", "review_record": {}},
+        {"case_id": "case-1", "deliverable": "   ", "review_record": {}},
+        {"case_id": "  ", "deliverable": False, "review_record": {}},
     ],
     ids=[
         "missing-case-id",
-        "missing-disposition",
-        "blank-disposition",
+        "missing-deliverable",
+        "blank-deliverable",
         "blank-case-id",
     ],
 )
 def test_repository_case_result_rejects_a_null_public_identity(
     case: dict[str, Any],
 ) -> None:
-    """The v1 schema requires a non-empty case_id and disposition.
+    """The v1 schema requires a non-empty case_id and deliverable.
 
     Serializing `null` for either makes the integration parser reject the whole run, so
     the builder must fail instead of emitting an invalid public result.

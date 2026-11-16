@@ -180,7 +180,7 @@ async def test_delivery_workflow_refills_isolates_synthesis_failure_and_replays(
         RepositoryCaseResult.model_validate(
             {
                 "case_id": case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "mitigation": {
                         "file_changes": [
@@ -198,7 +198,7 @@ async def test_delivery_workflow_refills_isolates_synthesis_failure_and_replays(
         run_artifacts_root=tmp_path,
         workspace_snapshot_tar_path=tmp_path / "baseline.tar",
         deliveries=deliveries,
-        keep_case_results=select_delivery_cases(cases),
+        delivery_case_results=select_delivery_cases(cases),
     )
     plan = DeliveryPlan.model_validate(
         {

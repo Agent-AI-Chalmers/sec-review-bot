@@ -192,10 +192,14 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
             {"scan": "done"},
             [
                 RepositoryCaseResult(
-                    case_id="case-a", disposition="keep", review_record=ReviewRecord()
+                    case_id="case-a",
+                    deliverable=True,
+                    review_record=ReviewRecord(),
                 ),
                 RepositoryCaseResult(
-                    case_id="case-b", disposition="drop", review_record=ReviewRecord()
+                    case_id="case-b",
+                    deliverable=False,
+                    review_record=ReviewRecord(),
                 ),
             ],
             {"delivery": "done"},

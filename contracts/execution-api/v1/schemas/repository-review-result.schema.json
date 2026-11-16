@@ -9,7 +9,8 @@
     "scan_summary",
     "case_results",
     "deliveries",
-    "deletion_review_skipped"
+    "deletion_review_skipped",
+    "case_count"
   ],
   "properties": {
     "api_version": {
@@ -33,6 +34,11 @@
     "deletion_review_skipped": {
       "$comment": "True when the window removed more files than deletion review covers, so none of its deletions were reviewed. Required so a consumer can never mistake an unreviewed window for an ordinary success. The count itself is scan_summary.deleted_file_count.",
       "type": "boolean"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total review units in case_results, including cases from triage and deleted files and cases whose review failed."
     }
   }
 }

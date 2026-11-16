@@ -150,12 +150,13 @@ async function runPublish(
         scanned_file_count: 0,
         skipped_file_count: 0,
         candidate_count: 0,
-        case_count: 0,
+        triaged_case_count: 0,
         suppressed_candidate_count: 0,
         deleted_file_count: 0
       },
       deliveries: [],
       case_results: [],
+      case_count: 0,
       deletion_review_skipped: false
     },
     store: harness.store,

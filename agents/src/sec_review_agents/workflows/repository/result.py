@@ -14,7 +14,7 @@ class ScanSummary(BaseModel):
     scanned_file_count: int = 0
     skipped_file_count: int = 0
     candidate_count: int = 0
-    case_count: int = 0
+    triaged_case_count: int = 0
     suppressed_candidate_count: int = 0
     # Files the window removed. Reported here because it explains why an incremental run found
     # little: deletions never reach discovery, which has no current content to read for them.
@@ -26,6 +26,7 @@ class ScanSummary(BaseModel):
 class RepositoryWorkflowResult(BaseModel):
     api_version: str = EXECUTION_API_VERSION
     scan_summary: ScanSummary
+    case_count: int = Field(ge=0)
     deliveries: list[DeliveryArtifact] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
     # A window with more deletions than review covers skips deletion review for all of them. The
@@ -54,7 +55,7 @@ def build_scan_summary(
         scanned_file_count=discovery_counts.scanned_file_count,
         skipped_file_count=discovery_counts.skipped_file_count,
         candidate_count=discovery_counts.candidate_count,
-        case_count=triage_counts.case_count,
+        triaged_case_count=triage_counts.case_count,
         suppressed_candidate_count=triage_counts.suppressed_candidate_count,
         deleted_file_count=scan_result.deleted_file_count,
     )
@@ -88,6 +89,7 @@ def build_repository_workflow_result(
                 delivery_result.deliveries if delivery_result is not None else []
             ),
             "case_results": case_results,
+            "case_count": len(case_results),
             "deletion_review_skipped": (
                 scan_result.deletion_review_skipped
                 if scan_result is not None

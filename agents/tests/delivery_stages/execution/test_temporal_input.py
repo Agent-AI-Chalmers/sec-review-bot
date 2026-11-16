@@ -35,7 +35,7 @@ from tests.temporal_test_utils import temporal_time_skipping_environment
 def execution_input(tmp_path: Path) -> DeliveryExecutionInput:
     case: DeliveryCaseInput = DeliveryCaseInput(
         case_id="case-1",
-        disposition="keep",
+        deliverable=True,
         reason=None,
         mitigation_overview="Patched",
         mitigator_file_changes=[
@@ -73,7 +73,7 @@ def execution_input(tmp_path: Path) -> DeliveryExecutionInput:
                 reason="Combined patch",
             ),
         ],
-        keep_case_results=[case],
+        delivery_case_results=[case],
     )
 
 

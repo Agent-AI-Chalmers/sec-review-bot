@@ -203,7 +203,7 @@ async def test_verifier_feedback_repairs_rejected_analysis_without_rewriting_it(
     """Exercise orchestration and real wrappers so the original verdict cannot veto retry."""
     from sec_review_agents.workflows.issue.direct import run_issue_review_direct
     from sec_review_agents.workflows.repository_case.stage import (
-        derive_case_disposition,
+        derive_case_deliverability,
     )
 
     analysis = analysis_fixture(verdict="no-actionable-finding", narratives=[])
@@ -268,7 +268,7 @@ async def test_verifier_feedback_repairs_rejected_analysis_without_rewriting_it(
     assert verify.call_args_list[1].kwargs["retry_context"] is retry
     assert result["review_record"]["analysis"]["verdict"] == "no-actionable-finding"
     assert result["review_record"]["verification"]["coverage"] == "full"
-    assert derive_case_disposition(repaired, approved)["disposition"] == "keep"
+    assert derive_case_deliverability(repaired, approved)["deliverable"] is True
 
 
 @pytest.mark.parametrize(
@@ -280,7 +280,7 @@ def test_full_current_code_coverage_alone_does_not_approve_delivery(
 ):
     """A safe baseline or a patch needing correction must not create a delivery."""
     from sec_review_agents.workflows.repository_case.stage import (
-        derive_case_disposition,
+        derive_case_deliverability,
     )
 
     mitigation = MitigationStageResult(
@@ -298,4 +298,4 @@ def test_full_current_code_coverage_alone_does_not_approve_delivery(
         validation_level="static",
         regression="not-run" if has_changes else "not-applicable",
     )
-    assert derive_case_disposition(mitigation, verification)["disposition"] == "blocked"
+    assert derive_case_deliverability(mitigation, verification)["deliverable"] is False

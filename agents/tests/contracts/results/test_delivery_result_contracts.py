@@ -97,7 +97,7 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
                 reason="single case",
             )
         ],
-        keep_case_ids=["case-1"],
+        delivery_case_ids=["case-1"],
         patch_outcomes=[
             DeliveryExecutionResult.model_validate(
                 {
@@ -209,7 +209,7 @@ def test_delivery_result_builders_emit_json_serializable_public_payloads() -> No
                 reason="single case",
             )
         ],
-        keep_case_ids=["case-1"],
+        delivery_case_ids=["case-1"],
         patch_outcomes=[
             DeliveryExecutionResult.model_validate(
                 {
@@ -247,7 +247,7 @@ def test_delivery_result_persistence_writes_stage_artifacts(tmp_path) -> None:
                 reason="single case",
             )
         ],
-        keep_case_ids=["case-1"],
+        delivery_case_ids=["case-1"],
         patch_outcomes=[
             DeliveryExecutionResult.model_validate(
                 {

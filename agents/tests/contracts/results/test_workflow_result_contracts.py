@@ -126,7 +126,7 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
         "scanned_file_count",
         "skipped_file_count",
         "candidate_count",
-        "case_count",
+        "triaged_case_count",
         "suppressed_candidate_count",
         "deleted_file_count",
     }
@@ -135,6 +135,7 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
         "scan_summary",
         "deliveries",
         "case_results",
+        "case_count",
         "deletion_review_skipped",
     }
 
@@ -160,7 +161,7 @@ def test_repository_workflow_builder_derives_scan_summary_from_scan_results() ->
         "scanned_file_count": 8,
         "skipped_file_count": 2,
         "candidate_count": 4,
-        "case_count": 3,
+        "triaged_case_count": 3,
         "suppressed_candidate_count": 1,
         "deleted_file_count": 5,
     }

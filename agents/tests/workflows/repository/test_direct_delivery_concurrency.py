@@ -47,7 +47,7 @@ def delivery_run(
         RepositoryCaseResult.model_validate(
             {
                 "case_id": case_id,
-                "disposition": "keep",
+                "deliverable": True,
                 "review_record": {
                     "mitigation": {
                         "file_changes": [

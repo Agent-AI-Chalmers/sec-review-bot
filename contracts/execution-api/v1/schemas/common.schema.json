@@ -490,7 +490,7 @@
         "scanned_file_count",
         "skipped_file_count",
         "candidate_count",
-        "case_count",
+        "triaged_case_count",
         "suppressed_candidate_count",
         "deleted_file_count"
       ],
@@ -511,9 +511,10 @@
           "type": "integer",
           "minimum": 0
         },
-        "case_count": {
+        "triaged_case_count": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Cases produced by triage, excluding cases created from deleted files."
         },
         "suppressed_candidate_count": {
           "type": "integer",
@@ -530,7 +531,7 @@
       "additionalProperties": false,
       "required": [
         "case_id",
-        "disposition",
+        "deliverable",
         "reason",
         "review_record"
       ],
@@ -539,9 +540,9 @@
           "type": "string",
           "minLength": 1
         },
-        "disposition": {
-          "type": "string",
-          "minLength": 1
+        "deliverable": {
+          "type": "boolean",
+          "description": "Whether the case repair may enter delivery. This does not report delivery execution or publication success."
         },
         "reason": {
           "type": [

@@ -88,7 +88,7 @@ The current batch draft concurrency limit is the code constant `DELIVERY_PLANNIN
 
 ### Delivery Execution
 
-Delivery execution only consumes cases with `disposition == "keep"`.
+Delivery execution only consumes cases with `deliverable == true`.
 
 `single` delivery does not call an agent and does not enter the patch synthesis concurrency pool. It directly projects case-level `review_record.mitigation.file_changes`.
 

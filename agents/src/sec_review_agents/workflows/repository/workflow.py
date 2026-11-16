@@ -68,44 +68,142 @@ class RepositoryCaseRequestBatch(BaseModel):
     case_requests: list[RepositoryCaseReviewRequest]
 
 
-def build_blocked_repository_case_result(
-    case_request: RepositoryCaseReviewRequest,
-    reason: str,
-) -> RepositoryCaseResult:
-    return RepositoryCaseResult(
-        case_id=case_request.case_execution_input.case_id.strip(),
-        disposition="blocked",
-        reason=reason,
-        review_record=build_review_record(
-            analysis_result=None,
-            mitigation_result=None,
-            verifier_result=None,
-            cvss_result=None,
-        ),
-    )
+@workflow.defn
+class RepositoryReviewWorkflow:
+    @workflow.run
+    async def run(self, request: ReviewWorkflowRequest) -> ReviewWorkflowSuccess:
+        scan_result = await workflow.execute_child_workflow(
+            RepositoryScanWorkflow.run,
+            request,
+            id=f"{request.run_id}:scan",
+        )
+        case_results = await workflow.execute_child_workflow(
+            RepositoryCaseProcessingWorkflow.run,
+            args=[request, scan_result],
+            id=f"{request.run_id}:review",
+        )
+        delivery_result = await workflow.execute_child_workflow(
+            RepositoryDeliveryWorkflow.run,
+            args=[request, case_results],
+            id=f"{request.run_id}:delivery",
+        )
+        result = await workflow.execute_activity(
+            build_repository_review_result_activity,
+            args=[request, scan_result, case_results, delivery_result],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        artifact_root = Path(str(request.prepared_input.artifact_root_path))
+        review_units = [
+            {
+                "unit_id": case_result.case_id,
+                "trajectory_root": str(
+                    artifact_root / "cases" / case_result.case_id / "trajectories"
+                ),
+            }
+            for case_result in case_results
+        ]
+        finalized = await workflow.execute_activity(
+            publish_execution_archive_activity,
+            args=[
+                ExecutionArchivePublicationRequest(
+                    run_id=request.run_id,
+                    artifact_root_path=str(artifact_root),
+                    review_units=review_units,
+                    result=result,
+                    destination_scheme=request.post_processing.execution_archive_scheme,
+                )
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        artifact_storage = finalized.to_artifact_storage()
+        memory_processing: dict[str, list[MemoryExtractionStartResult]] | None = None
+        if review_units:
+            extractions = await schedule_memory_extractions(
+                source_workflow=request.workflow,
+                run_id=request.run_id,
+                execution_archive=finalized.reference,
+                unit_ids=list(finalized.unit_ids),
+                timeout_seconds=request.timeout_seconds,
+                enabled=request.post_processing.memory_processing_enabled,
+            )
+            memory_processing = {"extractions": extractions}
+        return {
+            "ok": True,
+            "result": result,
+            "memory_processing": memory_processing,
+            "artifact_storage": artifact_storage,
+        }
 
 
-def _repository_case_timeout_seconds(
-    request: ReviewWorkflowRequest,
-) -> int:
-    timeout_seconds = request.timeout_seconds
-    if (
-        not isinstance(timeout_seconds, int)
-        or isinstance(timeout_seconds, bool)
-        or timeout_seconds < 1
-    ):
-        raise ValueError("Repository case activity timeout must be a positive integer.")
-    return timeout_seconds
+@workflow.defn
+class RepositoryScanWorkflow:
+    @workflow.run
+    async def run(self, request: ReviewWorkflowRequest) -> RepositoryScanResult:
+        discovery_result = await workflow.execute_child_workflow(
+            RepositoryDiscoveryWorkflow.run,
+            request,
+            id=f"{request.run_id}:discovery",
+        )
+        triage_result = await workflow.execute_activity(
+            triage_repository_activity,
+            args=[request, discovery_result],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        window_deletions = await workflow.execute_activity(
+            window_deletion_summary_activity,
+            args=[request],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        return RepositoryScanResult(
+            discovery_result=discovery_result,
+            triage_result=triage_result,
+            deleted_file_count=window_deletions.deleted_file_count,
+            deletion_review_skipped=window_deletions.deletion_review_skipped,
+        )
 
 
-def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
-    from sec_review_agents.utils.env import bounded_concurrency
+@workflow.defn
+class RepositoryDiscoveryWorkflow:
+    @workflow.run
+    async def run(self, request: ReviewWorkflowRequest) -> DiscoveryResult:
+        manifest = await workflow.execute_activity(
+            build_repository_discovery_manifest_activity,
+            args=[request],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        max_concurrency = max(1, manifest.max_concurrency)
+        chunks = manifest.chunks
 
-    return bounded_concurrency(
-        case_count,
-        "AGENT_CASE_PROCESSING_MAX_CONCURRENCY",
-        DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY,
-    )
+        async def run_chunk(chunk: DiscoveryChunk) -> DiscoveryChunkResult:
+            return await workflow.execute_activity(
+                scan_repository_discovery_chunk_activity,
+                args=[request, manifest, chunk],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
+            )
+
+        chunk_results = await map_bounded(
+            chunks,
+            run_chunk,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
+
+        discovery_result = await workflow.execute_activity(
+            build_repository_discovery_result_activity,
+            args=[
+                manifest,
+                chunk_results,
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        return discovery_result
 
 
 @activity.defn
@@ -226,9 +324,66 @@ async def triage_repository_activity(
 
 
 @activity.defn
+def window_deletion_summary_activity(
+    request: ReviewWorkflowRequest,
+) -> WindowDeletionSummary:
+    assert isinstance(request.prepared_input, PreparedRepositoryInput)
+    from sec_review_agents.workflows.repository.case_execution_input import (
+        window_deletion_summary,
+    )
+
+    return window_deletion_summary(
+        scan_scope=request.prepared_input.scan_scope,
+        scan_mode=str(request.prepared_input.scan_mode),
+    )
+
+
+@workflow.defn
+# Review triage cases and deletion cases in the same stage.
+class RepositoryCaseProcessingWorkflow:
+    @workflow.run
+    async def run(
+        self,
+        request: ReviewWorkflowRequest,
+        scan_result: RepositoryScanResult,
+    ) -> list[RepositoryCaseResult]:
+        triage_cases = scan_result.triage_result.cases
+        case_batch = await workflow.execute_activity(
+            prepare_repository_case_review_inputs_activity,
+            args=[request, triage_cases],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        case_requests = case_batch.case_requests
+        max_concurrency = case_batch.max_concurrency
+
+        async def run_case(
+            case_request: RepositoryCaseReviewRequest,
+        ) -> RepositoryCaseResult:
+            try:
+                return await workflow.execute_child_workflow(
+                    RepositoryCaseReviewWorkflow.run,
+                    case_request,
+                    id=_repository_case_workflow_id(request, case_request),
+                )
+            except Exception as error:
+                return build_blocked_repository_case_result(
+                    case_request,
+                    f"Case processing failed after retries: {error}",
+                )
+
+        return await map_bounded(
+            case_requests,
+            run_case,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
+
+
+@activity.defn
 def prepare_repository_case_review_inputs_activity(
     request: ReviewWorkflowRequest,
-    cases: list[TriageCase],
+    triage_cases: list[TriageCase],
 ) -> RepositoryCaseRequestBatch:
     from sec_review_agents.review_stages.trajectories import (
         review_trajectories_root,
@@ -276,7 +431,10 @@ def prepare_repository_case_review_inputs_activity(
         if scan_mode == "incremental"
         else []
     )
-    all_cases: list[TriageCase | DeletedRepositoryCase] = [*cases, *deletion_cases]
+    all_cases: list[TriageCase | DeletedRepositoryCase] = [
+        *triage_cases,
+        *deletion_cases,
+    ]
     # Both kinds end up as case workflows under one run id, so a repeated id would make two cases
     # collide on the same child workflow and artifact directory.
     case_ids = [case.case_id.strip() for case in all_cases]
@@ -312,6 +470,130 @@ def prepare_repository_case_review_inputs_activity(
     )
 
 
+def build_blocked_repository_case_result(
+    case_request: RepositoryCaseReviewRequest,
+    reason: str,
+) -> RepositoryCaseResult:
+    return RepositoryCaseResult(
+        case_id=case_request.case_execution_input.case_id.strip(),
+        deliverable=False,
+        reason=reason,
+        review_record=build_review_record(
+            analysis_result=None,
+            mitigation_result=None,
+            verifier_result=None,
+            cvss_result=None,
+        ),
+    )
+
+
+def _repository_case_timeout_seconds(
+    request: ReviewWorkflowRequest,
+) -> int:
+    timeout_seconds = request.timeout_seconds
+    if (
+        not isinstance(timeout_seconds, int)
+        or isinstance(timeout_seconds, bool)
+        or timeout_seconds < 1
+    ):
+        raise ValueError("Repository case activity timeout must be a positive integer.")
+    return timeout_seconds
+
+
+def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
+    from sec_review_agents.utils.env import bounded_concurrency
+
+    return bounded_concurrency(
+        case_count,
+        "AGENT_CASE_PROCESSING_MAX_CONCURRENCY",
+        DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY,
+    )
+
+
+def _repository_case_workflow_id(
+    request: ReviewWorkflowRequest,
+    case_request: RepositoryCaseReviewRequest,
+) -> str:
+    case_id = str(case_request.case_execution_input.case_id).strip()
+    return f"{request.run_id}:case:{case_id}"
+
+
+@workflow.defn
+class RepositoryDeliveryWorkflow:
+    @workflow.run
+    async def run(
+        self,
+        request: ReviewWorkflowRequest,
+        case_results: Sequence[RepositoryCaseResult],
+    ) -> DeliveryResult:
+        delivery_plan = await workflow.execute_activity(
+            plan_repository_delivery_activity,
+            args=[request, case_results],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        deliveries = list(delivery_plan.deliveries)
+        if not deliveries:
+            return await workflow.execute_activity(
+                build_skipped_repository_delivery_result_activity,
+                args=[request],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
+            )
+
+        delivery_execution = await workflow.execute_activity(
+            prepare_repository_delivery_execution_activity,
+            args=[request, case_results, delivery_plan],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        single_outcomes = await workflow.execute_activity(
+            execute_repository_single_deliveries_activity,
+            args=[request, delivery_execution],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+        combined_delivery_execution_items = (
+            delivery_execution.combined_delivery_execution_items
+        )
+        max_concurrency = max(1, delivery_execution.max_concurrency)
+        patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
+
+        for index, outcome in single_outcomes.items():
+            patch_outcomes[index] = outcome
+
+        async def run_delivery(
+            delivery_request: DeliveryExecutionItem,
+        ) -> DeliveryExecutionResult | None:
+            return await workflow.execute_activity(
+                execute_repository_combined_delivery_activity,
+                args=[request, delivery_execution, delivery_request],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
+            )
+
+        combined_outcomes = await map_bounded(
+            combined_delivery_execution_items,
+            run_delivery,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
+        for delivery_request, combined_outcome in zip(
+            combined_delivery_execution_items, combined_outcomes, strict=True
+        ):
+            patch_outcomes[delivery_request.index] = combined_outcome
+
+        return await workflow.execute_activity(
+            build_repository_delivery_result_activity,
+            args=[
+                delivery_execution,
+                [outcome for outcome in patch_outcomes if outcome is not None],
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
+        )
+
+
 def select_delivery_cases(
     case_results: Sequence[RepositoryCaseResult],
 ) -> list[DeliveryCaseInput]:
@@ -322,14 +604,14 @@ def select_delivery_cases(
     return [
         DeliveryCaseInput(
             case_id=item.case_id,
-            disposition=item.disposition,
+            deliverable=item.deliverable,
             reason=item.reason,
             mitigation_overview=item.review_record.mitigation.overview or "",
             mitigator_file_changes=item.review_record.mitigation.file_changes,
             mitigator_patch_diff=item.review_record.mitigation.patch_diff,
         )
         for item in case_results
-        if item.disposition == "keep"
+        if item.deliverable
     ]
 
 
@@ -396,18 +678,18 @@ def prepare_repository_delivery_execution_activity(
         prepared_input.workspace_snapshot_tar_path,
         label="workspace_snapshot_tar_path",
     )
-    keep_case_results = select_delivery_cases(case_results)
+    delivery_case_results = select_delivery_cases(case_results)
     deliveries = list(delivery_plan.deliveries)
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         deliveries=deliveries,
-        keep_case_results=keep_case_results,
+        delivery_case_results=delivery_case_results,
     )
     return build_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         deliveries=deliveries,
-        keep_case_results=keep_case_results,
+        delivery_case_results=delivery_case_results,
     )
 
 
@@ -509,7 +791,7 @@ def build_repository_delivery_result_activity(
     run_artifacts_root = Path(delivery_execution.run_artifacts_root_path)
     result = build_delivery_result_from_outcomes(
         deliveries=delivery_execution.deliveries,
-        keep_case_ids=delivery_execution.keep_case_ids,
+        delivery_case_ids=delivery_execution.delivery_case_ids,
         patch_outcomes=patch_outcomes,
     )
     persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)
@@ -544,285 +826,6 @@ def build_repository_review_result_activity(
         workflow_result,
     )
     return workflow_result
-
-
-@workflow.defn
-class RepositoryDiscoveryWorkflow:
-    @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> DiscoveryResult:
-        manifest = await workflow.execute_activity(
-            build_repository_discovery_manifest_activity,
-            args=[request],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        max_concurrency = max(1, manifest.max_concurrency)
-        chunks = manifest.chunks
-
-        async def run_chunk(chunk: DiscoveryChunk) -> DiscoveryChunkResult:
-            return await workflow.execute_activity(
-                scan_repository_discovery_chunk_activity,
-                args=[request, manifest, chunk],
-                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-                retry_policy=activity_retry_policy(),
-            )
-
-        chunk_results = await map_bounded(
-            chunks,
-            run_chunk,
-            max_concurrency=max_concurrency,
-            wait=workflow.wait,
-        )
-
-        discovery_result = await workflow.execute_activity(
-            build_repository_discovery_result_activity,
-            args=[
-                manifest,
-                chunk_results,
-            ],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        return discovery_result
-
-
-@activity.defn
-def window_deletion_summary_activity(
-    request: ReviewWorkflowRequest,
-) -> WindowDeletionSummary:
-    assert isinstance(request.prepared_input, PreparedRepositoryInput)
-    from sec_review_agents.workflows.repository.case_execution_input import (
-        window_deletion_summary,
-    )
-
-    return window_deletion_summary(
-        scan_scope=request.prepared_input.scan_scope,
-        scan_mode=str(request.prepared_input.scan_mode),
-    )
-
-
-@workflow.defn
-class RepositoryScanWorkflow:
-    @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> RepositoryScanResult:
-        discovery_result = await workflow.execute_child_workflow(
-            RepositoryDiscoveryWorkflow.run,
-            request,
-            id=f"{request.run_id}:discovery",
-        )
-        triage_result = await workflow.execute_activity(
-            triage_repository_activity,
-            args=[request, discovery_result],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        window_deletions = await workflow.execute_activity(
-            window_deletion_summary_activity,
-            args=[request],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        return RepositoryScanResult(
-            discovery_result=discovery_result,
-            triage_result=triage_result,
-            deleted_file_count=window_deletions.deleted_file_count,
-            deletion_review_skipped=window_deletions.deletion_review_skipped,
-        )
-
-
-@workflow.defn
-# Repository case-processing stage: runs case review workflows for triaged cases.
-class RepositoryCaseProcessingWorkflow:
-    @workflow.run
-    async def run(
-        self,
-        request: ReviewWorkflowRequest,
-        scan_result: RepositoryScanResult,
-    ) -> list[RepositoryCaseResult]:
-        cases = scan_result.triage_result.cases
-        case_batch = await workflow.execute_activity(
-            prepare_repository_case_review_inputs_activity,
-            args=[request, cases],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        case_requests = case_batch.case_requests
-        max_concurrency = case_batch.max_concurrency
-
-        async def run_case(
-            case_request: RepositoryCaseReviewRequest,
-        ) -> RepositoryCaseResult:
-            try:
-                return await workflow.execute_child_workflow(
-                    RepositoryCaseReviewWorkflow.run,
-                    case_request,
-                    id=_repository_case_workflow_id(request, case_request),
-                )
-            except Exception as error:
-                return build_blocked_repository_case_result(
-                    case_request,
-                    f"Case processing failed after retries: {error}",
-                )
-
-        return await map_bounded(
-            case_requests,
-            run_case,
-            max_concurrency=max_concurrency,
-            wait=workflow.wait,
-        )
-
-
-@workflow.defn
-class RepositoryDeliveryWorkflow:
-    @workflow.run
-    async def run(
-        self,
-        request: ReviewWorkflowRequest,
-        case_results: Sequence[RepositoryCaseResult],
-    ) -> DeliveryResult:
-        delivery_plan = await workflow.execute_activity(
-            plan_repository_delivery_activity,
-            args=[request, case_results],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        deliveries = list(delivery_plan.deliveries)
-        if not deliveries:
-            return await workflow.execute_activity(
-                build_skipped_repository_delivery_result_activity,
-                args=[request],
-                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-                retry_policy=activity_retry_policy(),
-            )
-
-        delivery_execution = await workflow.execute_activity(
-            prepare_repository_delivery_execution_activity,
-            args=[request, case_results, delivery_plan],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        single_outcomes = await workflow.execute_activity(
-            execute_repository_single_deliveries_activity,
-            args=[request, delivery_execution],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        combined_delivery_execution_items = (
-            delivery_execution.combined_delivery_execution_items
-        )
-        max_concurrency = max(1, delivery_execution.max_concurrency)
-        patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
-
-        for index, outcome in single_outcomes.items():
-            patch_outcomes[index] = outcome
-
-        async def run_delivery(
-            delivery_request: DeliveryExecutionItem,
-        ) -> DeliveryExecutionResult | None:
-            return await workflow.execute_activity(
-                execute_repository_combined_delivery_activity,
-                args=[request, delivery_execution, delivery_request],
-                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-                retry_policy=activity_retry_policy(),
-            )
-
-        combined_outcomes = await map_bounded(
-            combined_delivery_execution_items,
-            run_delivery,
-            max_concurrency=max_concurrency,
-            wait=workflow.wait,
-        )
-        for delivery_request, combined_outcome in zip(
-            combined_delivery_execution_items, combined_outcomes, strict=True
-        ):
-            patch_outcomes[delivery_request.index] = combined_outcome
-
-        return await workflow.execute_activity(
-            build_repository_delivery_result_activity,
-            args=[
-                delivery_execution,
-                [outcome for outcome in patch_outcomes if outcome is not None],
-            ],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-
-
-@workflow.defn
-class RepositoryReviewWorkflow:
-    @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> ReviewWorkflowSuccess:
-        scan_result = await workflow.execute_child_workflow(
-            RepositoryScanWorkflow.run,
-            request,
-            id=f"{request.run_id}:scan",
-        )
-        case_results = await workflow.execute_child_workflow(
-            RepositoryCaseProcessingWorkflow.run,
-            args=[request, scan_result],
-            id=f"{request.run_id}:review",
-        )
-        delivery_result = await workflow.execute_child_workflow(
-            RepositoryDeliveryWorkflow.run,
-            args=[request, case_results],
-            id=f"{request.run_id}:delivery",
-        )
-        result = await workflow.execute_activity(
-            build_repository_review_result_activity,
-            args=[request, scan_result, case_results, delivery_result],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        artifact_root = Path(str(request.prepared_input.artifact_root_path))
-        review_units = [
-            {
-                "unit_id": case_result.case_id,
-                "trajectory_root": str(
-                    artifact_root / "cases" / case_result.case_id / "trajectories"
-                ),
-            }
-            for case_result in case_results
-        ]
-        finalized = await workflow.execute_activity(
-            publish_execution_archive_activity,
-            args=[
-                ExecutionArchivePublicationRequest(
-                    run_id=request.run_id,
-                    artifact_root_path=str(artifact_root),
-                    review_units=review_units,
-                    result=result,
-                    destination_scheme=request.post_processing.execution_archive_scheme,
-                )
-            ],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        artifact_storage = finalized.to_artifact_storage()
-        memory_processing: dict[str, list[MemoryExtractionStartResult]] | None = None
-        if review_units:
-            extractions = await schedule_memory_extractions(
-                source_workflow=request.workflow,
-                run_id=request.run_id,
-                execution_archive=finalized.reference,
-                unit_ids=list(finalized.unit_ids),
-                timeout_seconds=request.timeout_seconds,
-                enabled=request.post_processing.memory_processing_enabled,
-            )
-            memory_processing = {"extractions": extractions}
-        return {
-            "ok": True,
-            "result": result,
-            "memory_processing": memory_processing,
-            "artifact_storage": artifact_storage,
-        }
-
-
-def _repository_case_workflow_id(
-    request: ReviewWorkflowRequest,
-    case_request: RepositoryCaseReviewRequest,
-) -> str:
-    case_id = str(case_request.case_execution_input.case_id).strip()
-    return f"{request.run_id}:case:{case_id}"
 
 
 __all__ = [

@@ -43,12 +43,12 @@ class DeliveryResult(BaseModel):
 def _build_delivery_artifact(
     *,
     delivery_entry: DeliveryEntry,
-    keep_case_ids: set[str],
+    delivery_case_ids: set[str],
     patch_outcome: DeliveryExecutionResult,
 ) -> DeliveryArtifact | None:
     delivery_id = delivery_entry.delivery_id
     case_ids = [
-        case_id for case_id in delivery_entry.case_ids if case_id in keep_case_ids
+        case_id for case_id in delivery_entry.case_ids if case_id in delivery_case_ids
     ]
     if not delivery_id or not case_ids:
         return None
@@ -69,13 +69,13 @@ def _build_delivery_artifact(
 def _build_delivery_artifacts(
     *,
     deliveries: Sequence[DeliveryEntry],
-    keep_case_ids: Sequence[str],
+    delivery_case_ids: Sequence[str],
     patch_outcomes: Sequence[DeliveryExecutionResult],
 ) -> list[DeliveryArtifact]:
     outcomes_by_delivery_id = {
         outcome.delivery_id: outcome for outcome in patch_outcomes
     }
-    keep_case_id_set = set(keep_case_ids)
+    delivery_case_id_set = set(delivery_case_ids)
     delivery_artifacts: list[DeliveryArtifact] = []
     for delivery_entry in deliveries:
         delivery_id = delivery_entry.delivery_id
@@ -84,7 +84,7 @@ def _build_delivery_artifacts(
             continue
         artifact = _build_delivery_artifact(
             delivery_entry=delivery_entry,
-            keep_case_ids=keep_case_id_set,
+            delivery_case_ids=delivery_case_id_set,
             patch_outcome=outcome,
         )
         if artifact is not None:
@@ -95,12 +95,12 @@ def _build_delivery_artifacts(
 def build_delivery_result_from_outcomes(
     *,
     deliveries: Sequence[DeliveryEntry],
-    keep_case_ids: Sequence[str],
+    delivery_case_ids: Sequence[str],
     patch_outcomes: Sequence[DeliveryExecutionResult],
 ) -> DeliveryResult:
     delivery_results = _build_delivery_artifacts(
         deliveries=deliveries,
-        keep_case_ids=keep_case_ids,
+        delivery_case_ids=delivery_case_ids,
         patch_outcomes=patch_outcomes,
     )
 

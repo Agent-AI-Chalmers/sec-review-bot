@@ -19,7 +19,7 @@ def test_replay_invalidates_whole_delivery_for_successful_cases(
             {"delivery_id": "b", "case_ids": ["b"]},
         ],
     }
-    cases = [{"case_id": "a", "disposition": "drop"}]
+    cases = [{"case_id": "a", "deliverable": False}]
     result = _repository_result_from_replay(
         result=original, case_results=cases, replayed_case_ids=replayed_ids
     )

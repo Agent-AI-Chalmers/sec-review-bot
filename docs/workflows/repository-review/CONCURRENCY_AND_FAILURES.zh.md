@@ -90,7 +90,7 @@ Delivery planning 可以按滑动窗口执行 batch drafts，然后进入全局 
 
 ### Delivery Execution
 
-Delivery execution 只消费 `disposition == "keep"` 的 case。
+Delivery execution 只消费 `deliverable == true` 的 case。
 
 `single` delivery 不调用 agent，不占用 patch synthesis 并发名额。它直接投影 case 级 `review_record.mitigation.file_changes`。
 

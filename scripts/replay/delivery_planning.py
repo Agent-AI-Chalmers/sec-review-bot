@@ -109,7 +109,7 @@ async def main() -> None:
             {
                 "ok": True,
                 "run_id": run_artifacts.name,
-                "keep_case_count": len(delivery_case_inputs),
+                "ready_case_count": len(delivery_case_inputs),
                 "delivery_plan_status": delivery_plan.status,
                 "delivery_plan_delivery_count": len(delivery_plan.deliveries),
                 "result_path": str(result_path),

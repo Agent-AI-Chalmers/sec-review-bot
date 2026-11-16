@@ -277,19 +277,19 @@ def build_repository_case_result_activity(
     verifier_result: VerificationStageResult | None,
 ) -> RepositoryCaseResult:
     from sec_review_agents.workflows.repository_case.stage import (
-        derive_case_disposition,
+        derive_case_deliverability,
     )
 
     case_execution_input = prepared_case.case_execution_input
     case_id = case_execution_input.case_id.strip()
-    case_disposition = derive_case_disposition(
+    deliverability = derive_case_deliverability(
         mitigation_result,
         verifier_result,
     )
     return RepositoryCaseResult(
         case_id=case_id,
-        disposition=case_disposition["disposition"],
-        reason=case_disposition.get("reason"),
+        deliverable=deliverability["deliverable"],
+        reason=deliverability.get("reason"),
         review_record=build_review_record(
             analysis_result=analysis_result,
             mitigation_result=mitigation_result,
