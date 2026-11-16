@@ -27,8 +27,23 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 - claim 是在一段时间内处理某条记录的权利。领取者拿到一个 claim token，并在工作期间为它的租约续期。租约过期后，其他进程可以领取这份工作。
 - 轴（axis）是 Review Runs 中一个 run 的一条生命周期。每个 run 有三条：preparation、execution 和 publication，各自有独立的状态。
 - publication step 是一次 publication 中的一个外部副作用，例如为某个仓库交付打开的一个 draft pull request。每个 step 有自己的状态和尝试预算。
-- `uncertain` 表示一个副作用可能发生了也可能没发生，connector 必须先去查看才能下结论。`disconnected` 表示自动化已经放弃查看，需要 operator（拥有管理权限的人）来决定。
+- `uncertain` 和 `disconnected` 在不同轴上对应不同的恢复条件；解释运行状态时，必须同时看所属轴和状态值。
 - Memory Catalog 用 `automation.version` 标识自动化开关状态的版本，用 `active_version` 标识当前生效的记忆树版本。写入时带上 `expected_version` 或 `expected_active_version`，服务端据此拒绝基于过时状态的操作。
+
+## 各轴的恢复含义
+
+<!-- doc-default: review-runs.recovery-meaning; source=contracts/review-runs-api/v1/openapi.yaml -->
+
+| 范围             | `uncertain`                                                                 | `disconnected`                                             |
+| ---------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Preparation      | 准备者回报前认领已过期；可以重新认领，确认或重新构造输入。                  | 运行自身的记录不允许自动收尾，例如准备过期时执行已经推进。 |
+| Execution        | 提交可能已到达 Execution Gateway，但响应未确认；恢复时重放同一个 `run_id`。 | 提交恢复预算用尽，仍未得到确定答复。                       |
+| Publication step | 尝试次数用尽，远端写入可能已生效；connector 先核对再下结论。                | 核对预算用尽，仍未得到确定答复。                           |
+| Publication 轴   | 某步骤的远端结果不确定。                                                    | 某步骤的核对已停止，需要操作员决定。                       |
+
+`disconnected` 会停止对应范围的自动恢复。恢复操作将符合条件的范围交回自动处理；准备阶段只有在 execution 仍为 `pending` 时才能恢复。放弃等待记录操作员不再等待的决定，并不能证明远端副作用没有发生。Abandon 则是准备阶段针对矛盾记录的独立操作。允许的操作和后果见 [Review Runs 指南](../../services/review-runs/README.zh.md)及契约。
+
+发布步骤的 `failed` 表示上一次尝试失败：剩余次数允许重试，次数用尽后转为核对。`terminal_failed` 才是步骤的最终失败。轴的 `failed` 则是终态结论。不能脱离所属范围，仅凭 `failed` 判断是否还会重试。
 
 ## 共同原则
 
