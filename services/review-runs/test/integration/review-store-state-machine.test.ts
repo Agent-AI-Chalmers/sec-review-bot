@@ -4043,7 +4043,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
     // The publisher exhausted its attempts and the reconciliation budget, so the step parked.
     await pool.query(
       `UPDATE publication_steps SET status='disconnected', attempt_count=3,
-         recovery_attempt_count=3, claimed_by=NULL WHERE run_id=$1`,
+         unresolved_recovery_count=3, claimed_by=NULL WHERE run_id=$1`,
       [runId]
     )
     await pool.query(
@@ -4689,27 +4689,27 @@ test('a disconnected publication is parked until an operator resumes it', async 
     // contract promises ("published again"): the parked step becomes attemptable again and both
     // budgets are refreshed. It is the operator's decision that unparks a side effect whose
     // outcome nobody established - automation never does this on its own - and it is recorded as
-    // its own event. `recovery_attempt_count` is internal (the summary deliberately does not
+    // its own event. `unresolved_recovery_count` is internal (the summary deliberately does not
     // publish it), so the budgets are read from the row that actually holds them.
     const readStep = async (): Promise<{
       status: string
       attempt_count: number
-      recovery_attempt_count: number
+      unresolved_recovery_count: number
     }> =>
       (
         await pool.query<{
           status: string
           attempt_count: number
-          recovery_attempt_count: number
+          unresolved_recovery_count: number
         }>(
-          `SELECT status,attempt_count,recovery_attempt_count FROM publication_steps
+          `SELECT status,attempt_count,unresolved_recovery_count FROM publication_steps
            WHERE run_id=$1`,
           [runId]
         )
       ).rows[0] as {
         status: string
         attempt_count: number
-        recovery_attempt_count: number
+        unresolved_recovery_count: number
       }
     const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
     assert.strictEqual(
@@ -4745,7 +4745,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
       'the parked step is attemptable again, not merely reconcilable'
     )
     assert.strictEqual(
-      revived.recovery_attempt_count,
+      revived.unresolved_recovery_count,
       0,
       'the operator decision refreshes the reconciliation budget'
     )
@@ -5490,14 +5490,14 @@ test('a reconciliation failure reported twice against one count spends the budge
     )
     const recoveryCount = async () =>
       (await store.publications.listPublicationSteps(runId))[0]
-        ?.recovery_attempt_count
+        ?.unresolved_recovery_count
     const report = async (expected: number) =>
       await store.publications.failPublicationStep(
         runId,
         token,
         step,
         { message: 'GitHub answered 502' },
-        { retry: true, expectedRecoveryAttemptCount: expected }
+        { retry: true, expectedUnresolvedRecoveryCount: expected }
       )
 
     assert.strictEqual(await report(0), true)

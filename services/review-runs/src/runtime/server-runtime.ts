@@ -233,7 +233,10 @@ export async function startReviewRunsServer(): Promise<{
                 'EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS',
                 30_000
               ),
-              maxFailures: integerEnv('EXECUTION_STATISTICS_MAX_FAILURES', 8),
+              maxConsecutiveFailures: integerEnv(
+                'EXECUTION_STATISTICS_MAX_CONSECUTIVE_FAILURES',
+                8
+              ),
               retryDelayMs: integerEnv(
                 'EXECUTION_STATISTICS_RETRY_DELAY_MS',
                 30_000

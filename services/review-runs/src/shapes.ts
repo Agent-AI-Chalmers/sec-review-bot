@@ -57,7 +57,7 @@ export type ArtifactStorage = ReviewRunRecord['artifact_storage']
  * reaches through `remote_object_url` instead. */
 export type PublicationStepSummary = Omit<
   PublicationStepRecord,
-  'remote_object_id' | 'last_attempt_at' | 'recovery_attempt_count'
+  'remote_object_id' | 'last_attempt_at' | 'unresolved_recovery_count'
 >
 
 /** The arguments the store accepts for a new run. */

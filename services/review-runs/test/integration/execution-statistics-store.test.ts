@@ -101,10 +101,27 @@ test('statistics settle only after two identical reads and persist relational gr
     const third = await statistics.claimNext()
     assert.ok(third)
     assert.strictEqual(await statistics.recordFailure(third, 8, 0), 'pending')
+    const failuresBeforeRateLimit = await observer.query<{
+      consecutive_failure_count: number
+    }>(
+      'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
+      [runId]
+    )
+    assert.equal(failuresBeforeRateLimit.rows[0]?.consecutive_failure_count, 1)
     const fourth = await statistics.claimNext()
     assert.ok(fourth)
+    assert.equal(await statistics.recordRateLimit(fourth, 0), 'pending')
+    const failuresAfterRateLimit = await observer.query<{
+      consecutive_failure_count: number
+    }>(
+      'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
+      [runId]
+    )
+    assert.equal(failuresAfterRateLimit.rows[0]?.consecutive_failure_count, 1)
+    const fifth = await statistics.claimNext()
+    assert.ok(fifth)
     assert.strictEqual(
-      await statistics.recordSnapshot(fourth, snapshot, 0),
+      await statistics.recordSnapshot(fifth, snapshot, 0),
       'settled'
     )
 
@@ -112,9 +129,9 @@ test('statistics settle only after two identical reads and persist relational gr
       status: string
       ingestion_status: string
       total_tokens: string
-      failure_count: number
+      consecutive_failure_count: number
     }>(
-      `SELECT status,ingestion_status,total_tokens::text,failure_count
+      `SELECT status,ingestion_status,total_tokens::text,consecutive_failure_count
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
     )
@@ -122,7 +139,7 @@ test('statistics settle only after two identical reads and persist relational gr
       status: 'settled',
       ingestion_status: 'settled',
       total_tokens: '12',
-      failure_count: 0
+      consecutive_failure_count: 0
     })
     const groups = await observer.query<{
       agent_name: string
@@ -346,10 +363,10 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
       ingestion_status: string
       usage_coverage: string
       failure_code: string
-      failure_count: number
+      consecutive_failure_count: number
       settled: boolean
     }>(
-      `SELECT status,ingestion_status,usage_coverage,failure_code,failure_count,
+      `SELECT status,ingestion_status,usage_coverage,failure_code,consecutive_failure_count,
               settled_at IS NOT NULL AS settled
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
@@ -359,7 +376,7 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
       ingestion_status: 'unavailable',
       usage_coverage: 'unavailable',
       failure_code: 'LANGFUSE_RATE_LIMITED',
-      failure_count: 0,
+      consecutive_failure_count: 0,
       settled: true
     })
   } finally {

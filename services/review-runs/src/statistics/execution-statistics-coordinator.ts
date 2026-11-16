@@ -19,7 +19,7 @@ interface ReconciliationOptions {
   store: StatisticsStore
   langfuse: ObservationsReader
   confirmationDelayMs: number
-  maxFailures: number
+  maxConsecutiveFailures: number
   retryDelayMs: number
   onResult: (
     work: ExecutionStatisticsWork,
@@ -39,7 +39,7 @@ async function reconcileClaimedWork(
     store,
     langfuse,
     confirmationDelayMs,
-    maxFailures,
+    maxConsecutiveFailures,
     retryDelayMs,
     onResult,
     onError
@@ -67,7 +67,11 @@ async function reconcileClaimedWork(
       return
     }
     onError(work, error)
-    const result = await store.recordFailure(work, maxFailures, retryDelayMs)
+    const result = await store.recordFailure(
+      work,
+      maxConsecutiveFailures,
+      retryDelayMs
+    )
     if (result === 'unavailable') onResult(work, result)
     return
   }
@@ -86,7 +90,7 @@ export async function reconcileExecutionStatisticsPass({
   store,
   langfuse,
   confirmationDelayMs,
-  maxFailures,
+  maxConsecutiveFailures,
   retryDelayMs,
   onResult,
   onError
@@ -99,7 +103,7 @@ export async function reconcileExecutionStatisticsPass({
       store,
       langfuse,
       confirmationDelayMs,
-      maxFailures,
+      maxConsecutiveFailures,
       retryDelayMs,
       onResult,
       onError

@@ -78,7 +78,7 @@ test('publication step observation exposes operator outcomes without reconciliat
     status: 'failed',
     attempt_count: 3,
     last_attempt_at: '2026-01-01T00:00:05.000Z',
-    recovery_attempt_count: 0,
+    unresolved_recovery_count: 0,
     remote_object_id: '142',
     remote_object_url: 'https://github.com/octo/example/pull/142',
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',

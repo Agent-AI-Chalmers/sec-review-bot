@@ -160,7 +160,7 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
 
     failPublicationStep: async (request) => {
       const { runId, stepKey } = request.params
-      const { token, failure, retry, expected_recovery_attempt_count } =
+      const { token, failure, retry, expected_unresolved_recovery_count } =
         request.body
       return await store.publications.failPublicationStep(
         runId,
@@ -169,9 +169,12 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
         failure,
         {
           ...(retry === undefined ? {} : { retry }),
-          ...(expected_recovery_attempt_count === undefined
+          ...(expected_unresolved_recovery_count === undefined
             ? {}
-            : { expectedRecoveryAttemptCount: expected_recovery_attempt_count })
+            : {
+                expectedUnresolvedRecoveryCount:
+                  expected_unresolved_recovery_count
+              })
         }
       )
     },

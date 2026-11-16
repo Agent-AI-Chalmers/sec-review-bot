@@ -44,7 +44,8 @@ const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
  * Exhaustion requires remote reconciliation before the step can be concluded.
  */
 const MAX_PUBLICATION_STEP_ATTEMPTS = 3
-const MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS = 3
+/** Failed remote lookups that leave a step unresolved; operator resume resets this budget. */
+const MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES = 3
 
 /** Whether the step has spent its write-attempt budget. */
 function isStepExhausted(step: PublicationStepRecord): boolean {
@@ -193,7 +194,7 @@ export class PublicationStore {
     // Each operator resume is audited and grants another recovery cycle without a lifetime cap.
     const resumedSteps = await client.query<{ step_key: string }>(
       `UPDATE publication_steps
-       SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
+       SET status='pending', claimed_by=NULL, attempt_count=0, unresolved_recovery_count=0,
            updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
        RETURNING step_key`,
@@ -397,7 +398,7 @@ export class PublicationStore {
       }
     >(
       `
-      SELECT step_key,status,attempt_count,last_attempt_at,recovery_attempt_count,
+      SELECT step_key,status,attempt_count,last_attempt_at,unresolved_recovery_count,
              remote_object_id,remote_object_url,failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
@@ -699,10 +700,10 @@ export class PublicationStore {
     token: string,
     stepKey: string,
     error: { code?: string | null; message: string },
-    options: { retry?: boolean; expectedRecoveryAttemptCount?: number } = {}
+    options: { retry?: boolean; expectedUnresolvedRecoveryCount?: number } = {}
   ): Promise<boolean> {
     const terminal = options.retry === false
-    const expected = options.expectedRecoveryAttemptCount ?? null
+    const expected = options.expectedUnresolvedRecoveryCount ?? null
     return await this.withOwnedPublication(
       runId,
       token,
@@ -715,13 +716,13 @@ export class PublicationStore {
         // decided before the status guard below, which would refuse a `disconnected` step.
         if (expected !== null) {
           const current = await client.query<{
-            recovery_attempt_count: number
+            unresolved_recovery_count: number
           }>(
-            `SELECT recovery_attempt_count FROM publication_steps
+            `SELECT unresolved_recovery_count FROM publication_steps
            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
             [runId, this.connectorId, stepKey]
           )
-          const stored = current.rows[0]?.recovery_attempt_count
+          const stored = current.rows[0]?.unresolved_recovery_count
           if (stored !== undefined && stored > expected) return true
         }
         // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
@@ -737,15 +738,15 @@ export class PublicationStore {
         UPDATE publication_steps s
         SET status=CASE
               WHEN s.status='uncertain' AND $7::boolean
-                AND s.recovery_attempt_count+1 >= $8 THEN 'disconnected'
+                AND s.unresolved_recovery_count+1 >= $8 THEN 'disconnected'
               WHEN s.status='uncertain' AND $7::boolean THEN 'uncertain'
               ELSE $5
             END,
             claimed_by=NULL,
-            recovery_attempt_count=CASE
+            unresolved_recovery_count=CASE
               WHEN s.status='uncertain' AND $7::boolean
-                THEN s.recovery_attempt_count+1
-              ELSE s.recovery_attempt_count
+                THEN s.unresolved_recovery_count+1
+              ELSE s.unresolved_recovery_count
             END,
             failure_code=$3, failure_message=$4, updated_at=clock_timestamp()
         -- Step reads need no FOR UPDATE under the publication lock; see the module note.
@@ -753,7 +754,7 @@ export class PublicationStore {
               WHERE run_id=$1 AND connector_id=$2 AND step_key=$6) previous
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$6
           AND s.status IN ('running','uncertain')
-          AND ($9::integer IS NULL OR s.recovery_attempt_count = $9)
+          AND ($9::integer IS NULL OR s.unresolved_recovery_count = $9)
         RETURNING previous.status AS from_status, s.status AS to_status
       `,
           [
@@ -764,7 +765,7 @@ export class PublicationStore {
             terminal ? 'terminal_failed' : 'failed',
             stepKey,
             options.retry === true,
-            MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS,
+            MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES,
             expected
           ]
         )

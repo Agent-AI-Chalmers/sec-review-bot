@@ -193,7 +193,7 @@ export class ExecutionStatisticsStore {
              ${TOKEN_COLUMNS.map((column, index) => `${column}=$${11 + index}`).join(',')},
              next_attempt_at=CASE WHEN $17 THEN next_attempt_at
                ELSE clock_timestamp()+($18::bigint * interval '1 millisecond') END,
-             failure_count=0,
+             consecutive_failure_count=0,
              claim_token=NULL,claimed_at=NULL,failure_code=NULL,
              settled_at=CASE WHEN $17 THEN clock_timestamp() ELSE NULL END,
              updated_at=clock_timestamp()
@@ -255,23 +255,23 @@ export class ExecutionStatisticsStore {
   /** Release a failed read for retry, or conclude it once its transport budget is spent. */
   async recordFailure(
     work: ExecutionStatisticsWork,
-    maxFailures: number,
+    maxConsecutiveFailures: number,
     retryDelayMs: number
   ): Promise<'pending' | 'unavailable'> {
     const result = await this.pool.query<{ status: 'pending' | 'unavailable' }>(
       `UPDATE execution_statistics
-       SET failure_count=failure_count+1,
-           status=CASE WHEN failure_count+1 >= $3 THEN 'unavailable' ELSE 'pending' END,
-           ingestion_status=CASE WHEN failure_count+1 >= $3 THEN 'unavailable' ELSE NULL END,
-           usage_coverage=CASE WHEN failure_count+1 >= $3 THEN 'unavailable' ELSE usage_coverage END,
-           failure_code=CASE WHEN failure_count+1 >= $3 THEN 'LANGFUSE_UNAVAILABLE' ELSE NULL END,
+       SET consecutive_failure_count=consecutive_failure_count+1,
+           status=CASE WHEN consecutive_failure_count+1 >= $3 THEN 'unavailable' ELSE 'pending' END,
+           ingestion_status=CASE WHEN consecutive_failure_count+1 >= $3 THEN 'unavailable' ELSE NULL END,
+           usage_coverage=CASE WHEN consecutive_failure_count+1 >= $3 THEN 'unavailable' ELSE usage_coverage END,
+           failure_code=CASE WHEN consecutive_failure_count+1 >= $3 THEN 'LANGFUSE_UNAVAILABLE' ELSE NULL END,
            next_attempt_at=clock_timestamp()+($4::bigint * interval '1 millisecond'),
            claim_token=NULL,claimed_at=NULL,
-           settled_at=CASE WHEN failure_count+1 >= $3 THEN clock_timestamp() ELSE NULL END,
+           settled_at=CASE WHEN consecutive_failure_count+1 >= $3 THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
        WHERE run_id=$1 AND status='reconciling' AND claim_token=$2
        RETURNING status`,
-      [work.runId, work.claimToken, maxFailures, retryDelayMs]
+      [work.runId, work.claimToken, maxConsecutiveFailures, retryDelayMs]
     )
     const status = result.rows[0]?.status
     if (status === undefined)

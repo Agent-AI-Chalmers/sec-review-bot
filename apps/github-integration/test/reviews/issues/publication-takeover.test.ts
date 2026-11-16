@@ -28,7 +28,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
           status: 'pending',
           attempt_count: 0,
           last_attempt_at: null,
-          recovery_attempt_count: 0,
+          unresolved_recovery_count: 0,
           remote_object_id: null,
           remote_object_url: null,
           failure_code: null,

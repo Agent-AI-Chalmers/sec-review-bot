@@ -80,7 +80,10 @@ function store(overrides: Partial<FlatRecoveryStore> = {}): RecoveryStore {
       claimSubmissionRecovery: (runId, limit) =>
         flat.claimSubmissionRecovery(runId, limit),
       disconnectExhaustedSubmissionRecovery: (runId, maxUnresolvedRecoveries) =>
-        flat.disconnectExhaustedSubmissionRecovery(runId, maxUnresolvedRecoveries),
+        flat.disconnectExhaustedSubmissionRecovery(
+          runId,
+          maxUnresolvedRecoveries
+        ),
       recordUnknownRecoveryOutcome: (runId, token) =>
         flat.recordUnknownRecoveryOutcome(runId, token)
     },

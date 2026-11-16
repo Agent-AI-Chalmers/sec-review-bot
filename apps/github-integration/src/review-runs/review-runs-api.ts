@@ -422,11 +422,11 @@ export type PublicationStepRecord = {
    */
   last_attempt_at: string | null
   /**
-   * @description How many reconciliations of this `uncertain` step failed without an answer. A caller reporting the next one sends it back as `expected_recovery_attempt_count`, so a repeated report of the same failure is not counted twice.
+   * @description How many reconciliations of this `uncertain` step failed without an answer. A caller reporting the next one sends it back as `expected_unresolved_recovery_count`, so a repeated report of the same failure is not counted twice.
    * @minimum 0
    * @type integer
    */
-  recovery_attempt_count: number
+  unresolved_recovery_count: number
   remote_object_id: string | null
   /**
    * @description
@@ -1540,11 +1540,11 @@ export type FailPublicationStepBody = {
   }
   retry?: boolean
   /**
-   * @description The step's `recovery_attempt_count` the caller saw before the reconciliation it is reporting. The failure is applied only while the stored count still equals it. A larger stored count means this failure was already recorded (the earlier response was lost), so nothing is written and the call answers true.
+   * @description The step's `unresolved_recovery_count` the caller saw before the reconciliation it is reporting. The failure is applied only while the stored count still equals it. A larger stored count means this failure was already recorded (the earlier response was lost), so nothing is written and the call answers true.
    * @minimum 0
    * @type integer | undefined
    */
-  expected_recovery_attempt_count?: number
+  expected_unresolved_recovery_count?: number
 }
 
 export type FailPublicationStepOptions = {

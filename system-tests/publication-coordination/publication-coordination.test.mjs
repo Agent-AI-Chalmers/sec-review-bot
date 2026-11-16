@@ -501,7 +501,7 @@ test('a lookup failure whose report committed but lost its response spends the b
   const [after] = await store.publications.listPublicationSteps(runId)
   assert.equal(after.status, 'uncertain')
   assert.equal(
-    after.recovery_attempt_count,
+    after.unresolved_recovery_count,
     1,
     'one failed lookup spends one unit of the reconciliation budget'
   )

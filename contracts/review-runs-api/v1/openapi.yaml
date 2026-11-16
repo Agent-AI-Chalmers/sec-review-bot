@@ -425,7 +425,7 @@ components:
         - status
         - attempt_count
         - last_attempt_at
-        - recovery_attempt_count
+        - unresolved_recovery_count
         - remote_object_id
         - remote_object_url
         - failure_code
@@ -461,12 +461,12 @@ components:
             When the latest claim of this step started; null until the step is claimed once.
             Together with `attempt_count` it distinguishes a step that never started from one
             whose publisher died mid-effect.
-        recovery_attempt_count:
+        unresolved_recovery_count:
           type: integer
           minimum: 0
           description: >-
             How many reconciliations of this `uncertain` step failed without an answer. A caller
-            reporting the next one sends it back as `expected_recovery_attempt_count`, so a
+            reporting the next one sends it back as `expected_unresolved_recovery_count`, so a
             repeated report of the same failure is not counted twice.
         remote_object_id:
           type:
@@ -2534,11 +2534,11 @@ paths:
                       type: string
                 retry:
                   type: boolean
-                expected_recovery_attempt_count:
+                expected_unresolved_recovery_count:
                   type: integer
                   minimum: 0
                   description: >-
-                    The step's `recovery_attempt_count` the caller saw before the reconciliation
+                    The step's `unresolved_recovery_count` the caller saw before the reconciliation
                     it is reporting. The failure is applied only while the stored count still
                     equals it. A larger stored count means this failure was already recorded
                     (the earlier response was lost), so nothing is written and the call answers
@@ -2547,7 +2547,7 @@ paths:
         "200":
           description: >-
             Whether the step's failure is recorded: written by this call, or already recorded
-            for `expected_recovery_attempt_count`.
+            for `expected_unresolved_recovery_count`.
           content:
             application/json:
               schema:
