@@ -18,7 +18,7 @@ from sec_review_agents.review_stages.verification.stage import (
     verification_attempt_label,
 )
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_path,
 )
 from sec_review_agents.workflows.review_intent import (
@@ -38,7 +38,7 @@ async def verify_issue(
     mitigation_result: MitigationStageResult | None,
     retry_context: FeedbackRetryContext | None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> VerificationStageResult:
     attempt_label = verification_attempt_label(retry_context)

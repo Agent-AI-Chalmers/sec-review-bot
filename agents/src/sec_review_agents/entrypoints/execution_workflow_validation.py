@@ -15,7 +15,6 @@ from sec_review_agents.contract_versions import EXECUTION_WORKFLOW_VERSION
 from sec_review_agents.entrypoints.execution_workflow import (
     EXECUTION_WORKFLOW_TYPE,
     RUN_ID_PATTERN_TEXT,
-    ExecutionRuntimeConfig,
     ExecutionWorkflowInput,
 )
 
@@ -91,7 +90,6 @@ def parse_execution_workflow_input(value: JsonValue) -> ExecutionWorkflowInput:
     run_id = value["run_id"]
     caller_input = value["input"]
     timeout_seconds = value["timeout_seconds"]
-    runtime_value = value.get("runtime")
     if not isinstance(workflow_name, str):
         raise AssertionError("schema-valid workflow must be a string")
     if not isinstance(run_id, str):
@@ -101,25 +99,11 @@ def parse_execution_workflow_input(value: JsonValue) -> ExecutionWorkflowInput:
     if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
         raise AssertionError("schema-valid timeout_seconds must be an integer")
 
-    runtime: ExecutionRuntimeConfig | None = None
-    if runtime_value is not None:
-        if not isinstance(runtime_value, dict):
-            raise AssertionError("schema-valid runtime must be an object or null")
-        runtime = {}
-        workspace_image = runtime_value.get("workspace_image")
-        if workspace_image is not None:
-            if not isinstance(workspace_image, str):
-                raise AssertionError(
-                    "schema-valid runtime.workspace_image must be a string"
-                )
-            runtime["workspace_image"] = workspace_image
-
     return ExecutionWorkflowInput(
         workflow=workflow_name,
         run_id=run_id,
         input=caller_input,
         timeout_seconds=timeout_seconds,
-        runtime=runtime,
     )
 
 

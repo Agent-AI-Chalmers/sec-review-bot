@@ -1,6 +1,6 @@
 """Internal per-run runtime configuration, including local-only workspace paths.
 
-The Execution Worker parses these values, then workflows and backends read them
+Local execution parses these values, then workflows and backends read them
 while building stage runtime resources.
 
 This is the only per-run override channel; everything a deployment sets for all
@@ -15,7 +15,7 @@ from typing import Any, TypedDict
 from sec_review_agents.utils.env import bool_env
 
 
-class ExecutionRuntimeContext(TypedDict, total=False):
+class RuntimeContext(TypedDict, total=False):
     workspace_image: str
     workspace_path: str
 
@@ -35,7 +35,7 @@ _RESERVED_WORKSPACE_ROOTS = (
 )
 
 
-def runtime_workspace_path(runtime_context: ExecutionRuntimeContext | None) -> str:
+def runtime_workspace_path(runtime_context: RuntimeContext | None) -> str:
     """Resolve the shared file-tool and shell repository root."""
     value = (runtime_context or {}).get("workspace_path", "/workspace")
     if (
@@ -57,7 +57,7 @@ def runtime_workspace_path(runtime_context: ExecutionRuntimeContext | None) -> s
     return value
 
 
-def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
+def runtime_context_from_config(value: Any) -> RuntimeContext:
     if value is None:
         return {}
     if not isinstance(value, dict):
@@ -71,7 +71,7 @@ def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
             "runtime contains unsupported key(s): " + ", ".join(unknown_keys)
         )
 
-    context: ExecutionRuntimeContext = {}
+    context: RuntimeContext = {}
     if "workspace_image" in value:
         if not bool_env(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV, False):
             # Eval harnesses may opt in; production workers should use server config.
@@ -96,7 +96,7 @@ def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
 
 
 def runtime_workspace_image(
-    runtime_context: ExecutionRuntimeContext | None,
+    runtime_context: RuntimeContext | None,
 ) -> str | None:
     value = (runtime_context or {}).get("workspace_image")
     return value if isinstance(value, str) and value.strip() else None
@@ -104,7 +104,7 @@ def runtime_workspace_image(
 
 __all__ = [
     "ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV",
-    "ExecutionRuntimeContext",
+    "RuntimeContext",
     "runtime_context_from_config",
     "runtime_workspace_image",
 ]

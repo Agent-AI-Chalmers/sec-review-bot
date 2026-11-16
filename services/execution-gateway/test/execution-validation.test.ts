@@ -109,33 +109,23 @@ await test('execution workflow input owns the Temporal workflow type', () => {
   )
 })
 
-await test('execution workflow input accepts only the declared runtime override shape', () => {
+await test('execution workflow input rejects runtime overrides', () => {
   const request = {
     workflow: 'issue-review',
     run_id: 'run-runtime-contract',
     input: {},
     timeout_seconds: 60,
   }
-
-  assert.doesNotThrow(() => validateExecutionWorkflowInput(request))
-  assert.doesNotThrow(() =>
-    validateExecutionWorkflowInput({ ...request, runtime: null }),
-  )
-  assert.doesNotThrow(() =>
-    validateExecutionWorkflowInput({
-      ...request,
-      runtime: { workspace_image: 'benchmark:latest' },
-    }),
-  )
   for (const runtime of [
-    'benchmark:latest',
+    null,
+    {},
+    { workspace_image: 'benchmark:latest' },
+    'image',
     [],
-    { workspace_image: '   ' },
-    { unknown: true },
   ]) {
     assert.throws(
       () => validateExecutionWorkflowInput({ ...request, runtime }),
-      /execution-workflow\/v1/,
+      /Execution Workflow input does not match/,
     )
   }
 })

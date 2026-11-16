@@ -11,7 +11,7 @@ from sec_review_agents.agents.analysis.pull_request import (
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_path,
 )
 
@@ -24,7 +24,7 @@ async def analyze_pull_request(
     incremental_window_path: Path,
     analyzer_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> AnalysisStageResult:
     return await run_analysis_stage(

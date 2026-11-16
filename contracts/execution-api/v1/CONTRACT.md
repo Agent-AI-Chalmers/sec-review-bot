@@ -13,7 +13,9 @@ The v1 public result exposes final results for each workflow instead of internal
 
 ## 1. Workflow Inputs
 
-This section defines the workflow `input` object inside the HTTP create-run request body. HTTP envelope fields such as `run_id` and `runtime` are defined in [the Execution API OpenAPI document](openapi.yaml).
+This section defines the workflow `input` object inside the HTTP create-run request body. HTTP envelope fields such as `run_id` are defined in [the Execution API OpenAPI document](openapi.yaml).
+
+The create-run body accepts only `run_id` and `input`.
 
 Every workflow input includes:
 

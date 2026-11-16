@@ -19,7 +19,7 @@ from sec_review_agents.resources.loader import (
     load_prompt_resource,
 )
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_image,
     runtime_workspace_path,
 )
@@ -40,7 +40,7 @@ def build_repository_analyzer_backend_config(
     history_path: Path | None,
     incremental_window_path: Path | None,
     scan_mode: str,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     workspace_directory = runtime_workspace_path(runtime_context)

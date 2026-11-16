@@ -9,7 +9,7 @@ from sec_review_agents.agents.analysis.repository import (
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_path,
 )
 
@@ -23,7 +23,7 @@ async def analyze_repository_case(
     published_trajectory_path: Path | None = None,
     scan_mode: str,
     review_input: str,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> AnalysisStageResult:
     return await run_analysis_stage(

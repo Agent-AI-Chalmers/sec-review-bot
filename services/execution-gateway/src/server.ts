@@ -85,7 +85,6 @@ export async function registerExecutionGatewayRoutes(
           run_id: body.run_id,
           input: body.input,
           timeout_seconds: workflowTimeoutSeconds,
-          ...('runtime' in body ? { runtime: body.runtime } : {}),
         }
         try {
           validateExecutionSubmission(submission)

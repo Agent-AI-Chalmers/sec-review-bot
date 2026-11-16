@@ -34,7 +34,6 @@ function fingerprint(request: ExecutionWorkflowInput): string {
     workflow: request.workflow,
     run_id: request.run_id,
     input: request.input,
-    ...(request.runtime === undefined ? {} : { runtime: request.runtime }),
   }
   return createHash('sha256')
     .update(JSON.stringify(canonicalValue(requestIdentity)))

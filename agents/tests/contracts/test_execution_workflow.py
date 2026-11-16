@@ -7,7 +7,6 @@ from sec_review_agents.contract_versions import EXECUTION_WORKFLOW_VERSION
 from sec_review_agents.entrypoints.execution_workflow import (
     EXECUTION_WORKFLOW_TYPE,
     RUN_ID_PATTERN_TEXT,
-    ExecutionRuntimeConfig,
     ExecutionWorkflowInput,
 )
 from sec_review_agents.entrypoints.execution_workflow_validation import (
@@ -66,13 +65,16 @@ def test_execution_workflow_input_owns_temporal_workflow_type() -> None:
 @pytest.mark.parametrize(
     "runtime",
     [
+        None,
+        {},
+        {"workspace_image": "benchmark:latest"},
         "benchmark:latest",
         [],
         {"workspace_image": "   "},
         {"unknown": True},
     ],
 )
-def test_execution_workflow_input_rejects_undeclared_runtime_shapes(
+def test_execution_workflow_input_rejects_runtime(
     runtime: JsonValue,
 ) -> None:
     with pytest.raises(
@@ -87,20 +89,3 @@ def test_execution_workflow_input_rejects_undeclared_runtime_shapes(
                 "runtime": runtime,
             }
         )
-
-
-@pytest.mark.parametrize(
-    "runtime",
-    [None, {}, {"workspace_image": "benchmark:latest"}],
-)
-def test_execution_workflow_input_accepts_declared_runtime_shapes(
-    runtime: ExecutionRuntimeConfig | None,
-) -> None:
-    request = ExecutionWorkflowInput(
-        workflow="issue-review",
-        run_id="run-runtime-contract",
-        input={},
-        timeout_seconds=60,
-    )
-
-    validate_execution_workflow_input(replace(request, runtime=runtime))

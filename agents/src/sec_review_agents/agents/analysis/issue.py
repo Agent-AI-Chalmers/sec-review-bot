@@ -18,7 +18,7 @@ from sec_review_agents.filesystem.path_views import (
 )
 from sec_review_agents.resources.loader import join_prompt_sections
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_image,
     runtime_workspace_path,
 )
@@ -41,7 +41,7 @@ def build_issue_analyzer_backend_config(
     *,
     workspace_root_path: Path,
     history_path: Path,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     workspace_directory = runtime_workspace_path(runtime_context)

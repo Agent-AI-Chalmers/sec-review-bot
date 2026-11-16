@@ -24,7 +24,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     render_retry_revision_context_section,
 )
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_image,
     runtime_workspace_path,
 )
@@ -67,7 +67,7 @@ def build_issue_mitigation_backend_config(
     *,
     workspace_root: Path,
     history_path: Path,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     workspace_directory = runtime_workspace_path(runtime_context)

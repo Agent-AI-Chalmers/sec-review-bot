@@ -61,7 +61,6 @@ def prepare_execution_run_activity(
     from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.observability.diagnostics import log_diagnostic
     from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
         parsed_request = parse_execution_workflow_input(request)
@@ -84,7 +83,7 @@ def prepare_execution_run_activity(
                     run_id=parsed_request.run_id,
                     workflow=parsed_request.workflow,
                 ),
-                runtime_context=runtime_context_from_config(parsed_request.runtime),
+                runtime_context={},
                 timeout_seconds=parsed_request.timeout_seconds,
                 post_processing=ReviewPostProcessingPolicy(
                     memory_processing_enabled=memory_processing_enabled(),

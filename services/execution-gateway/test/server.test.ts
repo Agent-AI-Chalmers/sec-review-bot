@@ -190,3 +190,25 @@ await test('reports Temporal submission failures as internal errors', async () =
   assert.doesNotMatch(response.body, /Temporal unavailable/)
   await app.close()
 })
+
+for (const runtime of [null, {}, { workspace_image: 'benchmark:latest' }]) {
+  await test(`HTTP submission rejects runtime ${JSON.stringify(runtime)}`, async () => {
+    const client = new FakeExecutionRunClient()
+    const app = await createApp({ client })
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/workflows/issue-review/runs',
+        payload: {
+          run_id: 'run-invalid-runtime',
+          input: fixture('issue-review-input.json'),
+          runtime,
+        },
+      })
+      assert.equal(response.statusCode, 400)
+      assert.equal(client.records.size, 0)
+    } finally {
+      await app.close()
+    }
+  })
+}

@@ -62,7 +62,10 @@ await test('Temporal client submits and identifies execution requests', async ()
     await assert.rejects(
       client.start({
         ...request,
-        runtime: { workspace_image: 'example.invalid/changed:latest' },
+        input: {
+          ...request.input,
+          setup_declaration: 'steps:\n  - run: echo changed\n',
+        },
       }),
       ExecutionRunConflictError,
     )

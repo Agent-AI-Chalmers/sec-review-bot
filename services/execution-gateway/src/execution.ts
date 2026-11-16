@@ -12,7 +12,6 @@ export type ExecutionWorkflowInput = {
     run_id: string
     input: WorkflowInputByName[Workflow]
     timeout_seconds: number
-    runtime?: { workspace_image?: string } | null
   }
 }[ExecutionWorkflow]
 

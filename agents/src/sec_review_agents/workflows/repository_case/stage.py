@@ -12,7 +12,7 @@ from sec_review_agents.review_stages.cvss.stage import persist_cvss_failure
 from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import RuntimeContext
 from sec_review_agents.workflows.repository_case.analysis import (
     analyze_repository_case,
 )
@@ -92,7 +92,7 @@ async def analyze_repository_case_stage(
     *,
     analyzer_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    runtime_context: ExecutionRuntimeContext | None,
+    runtime_context: RuntimeContext | None,
 ) -> AnalysisStageResult:
     case_id = case_execution_input.case_id
     scan_mode = case_execution_input.scan_mode
@@ -188,7 +188,7 @@ async def run_repository_case_mitigation_stage(
     case_execution_input: RepositoryCaseExecutionInput,
     analyzer_result: AnalysisStageResult,
     retry_context: FeedbackRetryContext | None,
-    runtime_context: ExecutionRuntimeContext | None,
+    runtime_context: RuntimeContext | None,
     *,
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
@@ -242,7 +242,7 @@ async def run_repository_case_verification_stage(
     analyzer_result: AnalysisStageResult,
     mitigator_result: MitigationStageResult | None,
     retry_context: FeedbackRetryContext | None,
-    runtime_context: ExecutionRuntimeContext | None,
+    runtime_context: RuntimeContext | None,
     *,
     verifier_artifacts_path: Path,
     published_trajectory_path: Path | None = None,

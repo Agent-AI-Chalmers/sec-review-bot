@@ -53,7 +53,6 @@ async def test_temporal_conversion_preserves_raw_input_until_validation() -> Non
         "run_id": "run-1",
         "input": {},
         "timeout_seconds": 30,
-        "runtime": None,
     }
     encoded_normalized = await DataConverter.default.encode([normalized_payload])
 

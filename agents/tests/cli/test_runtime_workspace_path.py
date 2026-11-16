@@ -3,7 +3,7 @@ from langgraph.runtime import Runtime
 
 from sec_review_agents.agents.analysis.issue import build_issue_analyzer_backend_config
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_context_from_config,
     runtime_workspace_path,
 )
@@ -57,7 +57,7 @@ def test_workspace_path_requires_worker_opt_in(monkeypatch):
 def test_workspace_path_rejects_reserved_routes(root, suffix, monkeypatch):
     """Nested mounts also overlap reserved views, regardless of enabled features."""
     monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
-    context: ExecutionRuntimeContext = {"workspace_path": root + suffix}
+    context: RuntimeContext = {"workspace_path": root + suffix}
     with pytest.raises(ValueError, match="workspace_path.*reserved directory"):
         runtime_context_from_config(context)
     with pytest.raises(ValueError, match="workspace_path.*reserved directory"):

@@ -19,7 +19,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import RuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -44,7 +44,7 @@ class RepositoryCaseReviewRequest(BaseModel):
     cases_artifacts_path: str
     published_trajectories_path: str
     timeout_seconds: int = Field(strict=True, gt=0)
-    runtime_context: ExecutionRuntimeContext
+    runtime_context: RuntimeContext
 
     @field_validator("cases_artifacts_path", "published_trajectories_path")
     @classmethod
