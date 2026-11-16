@@ -335,6 +335,17 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'publishing started'
       },
       {
+        from: 'pending',
+        to: 'uncertain',
+        label: 'publishing resumed with an unresolved step'
+      },
+      {
+        from: 'uncertain',
+        to: 'uncertain',
+        reason: 'PUBLICATION_LEASE_EXPIRED',
+        label: 'reconciliation lease expired'
+      },
+      {
         from: 'publishing',
         to: 'uncertain',
         label: 'a step may have taken effect'

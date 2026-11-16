@@ -48,9 +48,11 @@ test.afterEach(async () => {
 async function createStore(
   options: { connectorId?: string; claimTimeoutMs?: number } = {}
 ): Promise<ReviewRunStore> {
+  const owner = options.connectorId ?? connectorId()
+  if (!connectorIds.includes(owner)) connectorIds.push(owner)
   const store = new ReviewRunStore({
     connectionString: requireTestDatabase(),
-    connectorId: options.connectorId ?? connectorId(),
+    connectorId: owner,
     ...(options.claimTimeoutMs === undefined
       ? {}
       : { claimTimeoutMs: options.claimTimeoutMs })
@@ -1522,11 +1524,15 @@ test('a publication left uncertain by a dead publisher is reclaimed once its lea
     const reclaimed = await sibling.publicationClaims.claim(runId)
     assert.ok(reclaimed, 'an expired uncertain lease must be reclaimable')
     assert.notStrictEqual(reclaimed, token)
+    assert.equal(
+      (await store.queries.getRun(runId))?.publication.status,
+      'uncertain'
+    )
     const event = (await store.queries.listEvents(runId))
       .filter((item) => item.axis === 'publication' && item.step_key === null)
       .at(-1)
     assert.strictEqual(event?.from_status, 'uncertain')
-    assert.strictEqual(event?.to_status, 'publishing')
+    assert.strictEqual(event?.to_status, 'uncertain')
     assert.strictEqual(event?.reason_code, 'PUBLICATION_LEASE_EXPIRED')
   } finally {
     await sibling.close()
@@ -4003,7 +4009,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
       [runId]
     )
     await pool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -4065,7 +4071,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
       [runId]
     )
     await pool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -4117,7 +4123,7 @@ test('a takeover settles a step its predecessor left uncertain instead of failin
     )
     await pool.query(
       `UPDATE publications SET status='uncertain',
-         claimed_at=clock_timestamp()-($2*interval '1 millisecond'), claim_token=NULL
+         claimed_at=clock_timestamp()-($2*interval '1 millisecond')
        WHERE run_id=$1`,
       [runId, 600_000]
     )
@@ -4206,7 +4212,7 @@ test('an operator resume completes on a pool that has exactly one connection', a
       [runId]
     )
     await smallPool.query(
-      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+      `UPDATE publications SET status='disconnected'
        WHERE run_id=$1`,
       [runId]
     )
@@ -5433,6 +5439,357 @@ test('a reconciliation failure reported twice against one count spends the budge
     )
     assert.strictEqual(await recoveryCount(), 3)
   } finally {
+    await store.close()
+  }
+})
+
+for (const selector of ['claim', 'claimNext'] as const) {
+  for (const fromStatus of ['uncertain', 'pending'] as const) {
+    test(`${selector} preserves unresolved steps when claiming from ${fromStatus}`, async () => {
+      // Check each committed boundary: later reconciliation can hide claim-time drift.
+      const store = await createStore({ claimTimeoutMs: 0 })
+      try {
+        const runId = await createSuccessfulRun(store)
+        const token = await store.publicationClaims.claim(runId)
+        assert.ok(token)
+        const keys = ['unresolved', 'other']
+        await store.publications.initializePublicationSteps(runId, token, keys)
+        for (let n = 0; n < 3; n++) {
+          await store.publications.requirePublicationStepClaim(
+            runId,
+            token,
+            'unresolved'
+          )
+          await store.publications.failPublicationStep(
+            runId,
+            token,
+            'unresolved',
+            { message: 'lost' },
+            { retry: true }
+          )
+        }
+        await assert.rejects(
+          store.publications.requirePublicationStepClaim(
+            runId,
+            token,
+            'unresolved'
+          )
+        )
+        if (fromStatus === 'pending')
+          assert.equal(
+            await store.publications.fail(
+              runId,
+              token,
+              { message: 'retry' },
+              { retry: true }
+            ),
+            true
+          )
+        const unresolved = (
+          await store.publications.listPublicationSteps(runId)
+        ).find((s) => s.step_key === 'unresolved')
+        const events = async () =>
+          (await store.queries.listEvents(runId)).filter(
+            (e) => e.axis === 'publication' && e.step_key === null
+          )
+        const before = (await events()).length
+        const work =
+          selector === 'claimNext'
+            ? await store.publicationClaims.claimNext()
+            : null
+        const claimed =
+          selector === 'claim'
+            ? await store.publicationClaims.claim(runId)
+            : work?.claim_token
+        assert.ok(claimed)
+        assert.notEqual(claimed, token)
+        if (work !== null) {
+          assert.equal(work.run_id, runId)
+          assert.equal(work.publication.status, 'uncertain')
+        }
+        const expectUncertain = async () => {
+          assert.equal(
+            (await store.queries.getRun(runId))?.publication.status,
+            'uncertain'
+          )
+          assert.deepEqual(
+            (await store.publications.listPublicationSteps(runId)).find(
+              (s) => s.step_key === 'unresolved'
+            ),
+            unresolved
+          )
+        }
+        await expectUncertain()
+        assert.deepEqual(
+          (await events()).slice(before).map((e) => ({
+            from: e.from_status,
+            to: e.to_status,
+            reason: e.reason_code
+          })),
+          [
+            {
+              from: fromStatus,
+              to: 'uncertain',
+              reason:
+                fromStatus === 'uncertain' ? 'PUBLICATION_LEASE_EXPIRED' : null
+            }
+          ]
+        )
+        assert.equal(await store.publications.renewClaim(runId, token), false)
+        await store.publications.initializePublicationSteps(
+          runId,
+          claimed,
+          keys
+        )
+        await expectUncertain()
+        await store.publications.requirePublicationStepClaim(
+          runId,
+          claimed,
+          'other'
+        )
+        assert.equal(
+          await store.publications.completePublicationStep(
+            runId,
+            token,
+            'other'
+          ),
+          false
+        )
+        assert.equal(
+          await store.publications.completePublicationStep(
+            runId,
+            claimed,
+            'other'
+          ),
+          true
+        )
+        await expectUncertain()
+        assert.equal((await events()).length, before + 1)
+        await assert.rejects(
+          store.publications.requirePublicationStepClaim(
+            runId,
+            claimed,
+            'unresolved'
+          )
+        )
+        assert.equal(
+          await store.publications.settleExhaustedPublicationStep(
+            runId,
+            claimed,
+            'unresolved',
+            { found: true, remote: { id: 'remote' } }
+          ),
+          true
+        )
+        assert.equal(
+          (await store.queries.getRun(runId))?.publication.status,
+          'publishing'
+        )
+        assert.equal(await store.publications.complete(runId, claimed), true)
+      } finally {
+        await store.close()
+      }
+    })
+  }
+}
+
+test('a waiting publication claim reads step uncertainty committed by the lock holder', async () => {
+  const applicationName = `claim-snapshot:${randomUUID()}`
+  const claimantPool = new Pool({
+    connectionString: requireTestDatabase(),
+    application_name: applicationName
+  })
+  const store = new ReviewRunStore({
+    pool: claimantPool,
+    connectorId: connectorId(),
+    claimTimeoutMs: 0
+  })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  await store.initialize()
+  const holder = await observer.connect()
+  let holding = false
+  let pending: Promise<string | null> | undefined
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.publicationClaims.claim(runId)
+    assert.ok(token)
+    await store.publications.initializePublicationSteps(runId, token, ['step'])
+    for (let n = 0; n < 3; n++) {
+      await store.publications.requirePublicationStepClaim(runId, token, 'step')
+      await store.publications.failPublicationStep(
+        runId,
+        token,
+        'step',
+        { message: 'lost' },
+        { retry: true }
+      )
+    }
+    await holder.query('BEGIN')
+    holding = true
+    await holder.query(
+      'SELECT 1 FROM publications WHERE run_id=$1 FOR UPDATE',
+      [runId]
+    )
+    // Hold the valid exhaustion transition uncommitted while the claimant starts.
+    await holder.query(
+      `UPDATE publication_steps SET status='uncertain', claimed_by=NULL WHERE run_id=$1`,
+      [runId]
+    )
+    await holder.query(
+      `UPDATE publications SET status='uncertain' WHERE run_id=$1`,
+      [runId]
+    )
+    pending = store.publicationClaims.claim(runId)
+    let waiting = false
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline) {
+      const activity = await observer.query(
+        `SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`,
+        [applicationName]
+      )
+      if (activity.rowCount) {
+        waiting = true
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    assert.equal(
+      waiting,
+      true,
+      'the claimant must be waiting before the holder commits'
+    )
+    await holder.query('COMMIT')
+    holding = false
+    const claimed = await pending
+    assert.ok(claimed)
+    assert.equal(
+      (await store.queries.getRun(runId))?.publication.status,
+      'uncertain'
+    )
+    const event = (await store.queries.listEvents(runId)).at(-1)
+    assert.equal(event?.from_status, 'uncertain')
+    assert.equal(event?.to_status, 'uncertain')
+    assert.equal(event?.reason_code, 'PUBLICATION_LEASE_EXPIRED')
+  } finally {
+    if (holding) await holder.query('ROLLBACK')
+    await pending?.catch(() => undefined)
+    holder.release()
+    await observer.end()
+    await store.close()
+  }
+})
+
+for (const outcome of ['complete', 'retry', 'fail'] as const) {
+  test(`publication ${outcome} releases its token and lease together`, async () => {
+    const store = await createStore()
+    const pool = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      const runId = await createSuccessfulRun(store)
+      const token = await store.publicationClaims.claim(runId)
+      assert.ok(token)
+      const before = (await store.queries.getRun(runId))?.publication.started_at
+      const changed =
+        outcome === 'complete'
+          ? await store.publications.complete(runId, token)
+          : await store.publications.fail(
+              runId,
+              token,
+              { message: 'publication failed' },
+              { retry: outcome === 'retry' }
+            )
+      assert.equal(changed, true)
+      const row = (
+        await pool.query(
+          'SELECT status, claim_token, claimed_at FROM publications WHERE run_id=$1',
+          [runId]
+        )
+      ).rows[0]
+      assert.deepEqual(row, {
+        status:
+          outcome === 'complete'
+            ? 'published'
+            : outcome === 'retry'
+              ? 'pending'
+              : 'failed',
+        claim_token: null,
+        claimed_at: null
+      })
+      assert.equal(
+        (await store.queries.getRun(runId))?.publication.started_at,
+        before
+      )
+      assert.equal(await store.publications.renewClaim(runId, token), false)
+      if (outcome === 'retry') {
+        const replacement = await store.publicationClaims.claim(runId)
+        assert.ok(replacement)
+        assert.notEqual(replacement, token)
+        assert.equal(await store.publications.complete(runId, token), false)
+        assert.equal(
+          await store.publications.complete(runId, replacement),
+          true
+        )
+      }
+    } finally {
+      await pool.end()
+      await store.close()
+    }
+  })
+}
+
+test('publication ownership constraints reject missing, partial and unexpected leases', async () => {
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    // Probe every status with complete timestamp shapes, so failures identify ownership
+    // protection rather than accidentally exercising the phase timestamp constraint.
+    for (const status of [
+      'pending',
+      'publishing',
+      'uncertain',
+      'disconnected',
+      'published',
+      'failed',
+      'skipped'
+    ]) {
+      const owned = ['publishing', 'uncertain', 'disconnected'].includes(status)
+      for (const hasToken of [false, true]) {
+        for (const hasLease of [false, true]) {
+          const client = await pool.connect()
+          try {
+            await client.query('BEGIN')
+            const update = client.query(
+              `UPDATE publications SET status=$2, claim_token=$3, claimed_at=$4,
+                 started_at=clock_timestamp(),
+                 finished_at=CASE WHEN $2 IN ('published','failed','skipped') THEN clock_timestamp() ELSE NULL END
+               WHERE run_id=$1`,
+              [
+                runId,
+                status,
+                hasToken ? randomUUID() : null,
+                hasLease ? new Date() : null
+              ]
+            )
+            if (hasToken === owned && hasLease === owned) await update
+            else
+              await assert.rejects(
+                update,
+                (error: unknown) =>
+                  error instanceof Error &&
+                  'code' in error &&
+                  error.code === '23514' &&
+                  'constraint' in error &&
+                  error.constraint === 'publications_ownership_check'
+              )
+          } finally {
+            await client.query('ROLLBACK')
+            client.release()
+          }
+        }
+      }
+    }
+  } finally {
+    await pool.end()
     await store.close()
   }
 })

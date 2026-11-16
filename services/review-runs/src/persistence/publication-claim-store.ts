@@ -1,5 +1,6 @@
 // Claims publication ownership only when the execution result is publishable and no publication
-// step is parked. Step-level writes remain in `PublicationStore`.
+// step is parked. Claiming transfers ownership without settling step uncertainty.
+// Step-level writes remain in `PublicationStore`.
 import crypto from 'node:crypto'
 import type { Pool } from 'pg'
 import type { Database } from '../database/database.js'
@@ -31,37 +32,51 @@ export class PublicationClaimStore {
   async claim(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
     return await transaction(this.pool, async (client) => {
+      // Read steps in a statement after acquiring the publication lock. If we
+      // waited for a step writer, the UPDATE needs a fresh READ COMMITTED snapshot.
+      const previous = await client.query<{ status: PublicationStatus }>(
+        `SELECT status FROM publications
+         WHERE run_id=$1 AND connector_id=$2 FOR UPDATE`,
+        [runId, this.connectorId]
+      )
+      const prior = previous.rows[0]
+      if (prior === undefined) return null
       const result = await client.query<{
         claim_token: string
-        from_status: PublicationStatus
+        to_status: PublicationStatus
       }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM publications
-           WHERE run_id=$1 AND connector_id=$3
-           FOR UPDATE
-         )
-         UPDATE publications p
-         SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
+        `UPDATE publications p
+         SET status=CASE WHEN EXISTS (
+               SELECT 1 FROM publication_steps s
+               WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
+                 AND s.status='uncertain'
+             ) THEN 'uncertain' ELSE 'publishing' END,
+             claim_token=$2, claimed_at=clock_timestamp(),
              started_at=COALESCE(p.started_at, clock_timestamp()),
              failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-         FROM previous, executions e
-         WHERE p.run_id=previous.run_id AND previous.run_id=$1 AND p.connector_id=$3
+         FROM executions e
+         WHERE p.run_id=$1 AND p.connector_id=$3
            AND e.run_id=p.run_id AND e.connector_id=p.connector_id
            AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
            AND NOT EXISTS (SELECT 1 FROM publication_steps s
              WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
                AND s.status='disconnected')
            AND (
-             previous.status='pending'
-             OR (previous.status IN ('publishing','uncertain')
+             p.status='pending'
+             OR (p.status IN ('publishing','uncertain')
                AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
            )
-         RETURNING p.claim_token, previous.status AS from_status`,
+         RETURNING p.claim_token, p.status AS to_status`,
         [runId, token, this.connectorId, this.claimTimeoutMs]
       )
       const claimed = result.rows[0]
       if (claimed === undefined) return null
-      await this.appendClaimEvent(client, runId, claimed.from_status)
+      await this.appendClaimEvent(
+        client,
+        runId,
+        prior.status,
+        claimed.to_status
+      )
       return claimed.claim_token
     })
   }
@@ -108,8 +123,14 @@ export class PublicationClaimStore {
       const token = crypto.randomUUID()
       // Restate every claimability condition in the UPDATE. The SELECT lock serializes current
       // callers; the repeated predicate also prevents a future split from weakening the fence.
-      const claimed = await client.query(
-        `UPDATE publications p SET status='publishing', claim_token=$3,
+      const claimed = await client.query<{ to_status: PublicationStatus }>(
+        `UPDATE publications p
+         SET status=CASE WHEN EXISTS (
+               SELECT 1 FROM publication_steps s
+               WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
+                 AND s.status='uncertain'
+             ) THEN 'uncertain' ELSE 'publishing' END,
+           claim_token=$3,
            claimed_at=clock_timestamp(),
            started_at=COALESCE(p.started_at, clock_timestamp()),
            failure_code=NULL, failure_message=NULL,
@@ -125,7 +146,8 @@ export class PublicationClaimStore {
              $4='pending'
              OR ($4 IN ('publishing','uncertain')
                AND p.claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
-           )`,
+           )
+         RETURNING p.status AS to_status`,
         [
           runId,
           this.connectorId,
@@ -134,11 +156,17 @@ export class PublicationClaimStore {
           this.claimTimeoutMs
         ]
       )
-      if (claimed.rowCount !== 1)
+      const updated = claimed.rows[0]
+      if (updated === undefined)
         throw new Error(
           `Publication work changed while being claimed: ${runId}`
         )
-      await this.appendClaimEvent(client, runId, candidateRow.status)
+      await this.appendClaimEvent(
+        client,
+        runId,
+        candidateRow.status,
+        updated.to_status
+      )
       const result = await client.query<ReviewRunRow>(
         `${RUN_SELECT}
          WHERE r.run_id=$1 AND r.connector_id=$2`,
@@ -158,14 +186,15 @@ export class PublicationClaimStore {
   private async appendClaimEvent(
     client: Parameters<typeof appendEvent>[0],
     runId: string,
-    fromStatus: PublicationStatus
+    fromStatus: PublicationStatus,
+    toStatus: PublicationStatus
   ): Promise<void> {
     await appendEvent(client, {
       runId,
       connectorId: this.connectorId,
       axis: 'publication',
       fromStatus,
-      toStatus: 'publishing',
+      toStatus,
       reasonCode:
         fromStatus === 'publishing' || fromStatus === 'uncertain'
           ? 'PUBLICATION_LEASE_EXPIRED'

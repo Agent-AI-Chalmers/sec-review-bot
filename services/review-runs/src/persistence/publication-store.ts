@@ -118,8 +118,8 @@ function isStepExhausted(step: PublicationStepRecord): boolean {
  * overrides a step: `uncertain` and `disconnected` describe where reconciliation got stuck, and
  * `published`/`failed` remain the axis' own conclusion.
  *
- * `publishing` is kept whenever a live publisher exists, so this cannot pull a claimed
- * publication out from under its owner.
+ * Re-deriving the axis preserves its claim token, so the same publisher can
+ * continue other steps while an unresolved step keeps the axis uncertain.
  */
 async function derivePublicationStatus(
   client: PoolClient,
@@ -216,9 +216,9 @@ export class PublicationStore {
   /** Renew the lease of a publication this owner holds.
    *
    * All three actively-owned states renew: `publishing` is normal progress, `uncertain` means the
-   * owner is reconciling a step, and `disconnected` means an operator handed it back and its
-   * steps are being reconciled again. Ownership is the token; the status only says what the steps
-   * are doing. */
+   * owner is reconciling a step, and `disconnected` means automatic recovery stopped pending an
+   * operator decision. Those step states preserve the current token. Lease expiry permits
+   * takeover; renewal still succeeds until the token is replaced or released. */
   async renewClaim(runId: string, token: string): Promise<boolean> {
     const result = await this.pool.query(
       `UPDATE publications SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
@@ -308,7 +308,7 @@ export class PublicationStore {
              AND status = ANY($4::text[]) AND claim_token=$3
            FOR UPDATE
          )
-         UPDATE publications p SET status='published', claim_token=NULL,
+         UPDATE publications p SET status='published', claim_token=NULL, claimed_at=NULL,
            finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
          FROM previous
@@ -353,7 +353,7 @@ export class PublicationStore {
              AND status = ANY($7::text[]) AND claim_token=$3
            FOR UPDATE
          )
-         UPDATE publications p SET status=$4, claim_token=NULL, failure_code=$5,
+         UPDATE publications p SET status=$4, claim_token=NULL, claimed_at=NULL, failure_code=$5,
            failure_message=$6,
            finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
@@ -673,8 +673,8 @@ export class PublicationStore {
    *
    * Both answers are writes because both end the step, and both are fenced the same way: the
    * caller must still own the publication and the step must still be exhausted and un-terminated.
-   * That is what stops a publisher whose claim expired from concluding a step another owner is
-   * already reconciling. */
+   * Replacing the publication token on takeover prevents the previous owner from concluding
+   * a step the new owner is reconciling; lease expiry alone does not invalidate the token. */
   async settleExhaustedPublicationStep(
     runId: string,
     token: string,
@@ -738,8 +738,8 @@ export class PublicationStore {
     stepKey: string,
     remote: { id?: string | null; url?: string | null } = {}
   ): Promise<boolean> {
-    // A publication token fences every step commit, not only the final run state, so a timed-out
-    // worker cannot record stale remote data.
+    // Every step commit checks the current publication token, so a previous owner cannot
+    // record remote data after takeover or release.
     return await this.withOwnedPublication(
       runId,
       token,

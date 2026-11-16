@@ -612,6 +612,10 @@ export const messages = {
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
     edge_execution_running_failed:
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
+    edge_publication_pending_uncertain:
+      'publishing resumed; a step still needs reconciliation',
+    edge_publication_uncertain_uncertain:
+      'publication lease expired; a new owner continues reconciliation',
     edge_publication_pending_publishing:
       'a worker started publishing the result',
     edge_publication_publishing_publishing:
@@ -1214,6 +1218,9 @@ export const messages = {
       '轮询得到确定性失败（报告失败、查不到运行、无结果或响应不合约定）',
     edge_execution_running_failed:
       '轮询得到确定性失败（报告失败、查不到运行、无结果或响应不合约定）',
+    edge_publication_pending_uncertain: '恢复发布，某步骤仍需核对远端结果',
+    edge_publication_uncertain_uncertain:
+      '发布租约已过期，新的发布者继续核对远端结果',
     edge_publication_pending_publishing: '开始发布结果',
     edge_publication_publishing_publishing:
       '发布认领过期，被新的发布者接管（状态本身不变，仅记录时间线）',
