@@ -27,7 +27,7 @@ Review Runs 向 read token 调用方提供脱敏运行记录，向 service token
 - `source_platform` 标识源码托管平台，用于稳定分组；`connector_id` 标识接收并负责该任务的集成类型与实例命名空间；
 - `preparation`、`execution`、`publication` 分别报告准备、执行和发布状态。各自包含 `status`、`started_at`、`finished_at` 和 `updated_at`。其中 `updated_at` 是该组状态最后写入时间，不是阶段起止时间；筛选参数仍使用 `*_status` 命名；
 - `notices` 记录某环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列，多次独立事件分别保留；
-- `execution_statistics` 是可空的用量统计快照，包括统计核对状态、已观察到的模型调用与 token 汇总，以及按流程位置、Agent、服务商和模型分组的统计。问题单元、交付单元、执行轮次、草稿批次和初筛分块等位置字段可以为空，因为多数阶段不涉及这些位置。整个字段为 `null` 表示尚无快照，不代表没有消耗；
+- `execution_statistics` 是可空的用量统计快照，包括统计核对状态、已观察到的模型调用与 token 汇总，以及按流程位置、Agent、服务商和模型分组的统计。问题单元、交付单元、Agent 阶段、反馈重试、草稿批次和初筛分块等位置字段可以为空，因为多数阶段不涉及这些位置。`agent_phase` 标识当前任务，例如首次审查、反馈修正、草稿或复核；`feedback_retry_index` 从 1 开始标识验证反馈重试，其他工作中为 `null`。整个快照为 `null` 表示尚无快照，不代表没有消耗；
 - token 总量采用 OpenTelemetry GenAI 口径：`input_tokens` 包含已报告的缓存输入子集，`output_tokens` 包含已报告的推理输出子集。Langfuse 中互不重叠的计费分项会在写入本契约数据前转换成这一口径；
 - 各 token 字段可以独立为 `null`，表示无法确定所有已覆盖调用的该项用量，不代表零。`total_tokens` 为输入与输出总量之和；任一项未知时，它也为 `null`。缓存和推理用量是总量的子集，不能重复相加；
 - `artifact_storage` 可以不存在；可以是 `unavailable` 或 `failed`，并附带可选的 `error_code` 和 `message`；也可以是 `available`，并包含已保存的执行归档。

@@ -133,7 +133,7 @@ export async function runFixtureRunStatisticsFlow({
   })
   assert.match(
     (await reviewUnits.nth(0).textContent()) ?? '',
-    /Initial review.*Feedback pass 1/s,
+    /Initial review.*Feedback retry 1/s,
     `${name} a case must reveal its own initial and feedback passes`
   )
   if (viewport.width >= 768) {

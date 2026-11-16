@@ -5,6 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
+import { aggregateExecutionStatistics } from '../../src/statistics/execution-statistics.js'
 import { ExecutionStatisticsStore } from '../../src/statistics/execution-statistics-store.js'
 
 function databaseUrl(): string {
@@ -63,8 +64,8 @@ test('statistics settle only after two identical reads and persist relational gr
           agentName: 'issue-analyzer',
           caseId: null,
           deliveryId: null,
-          passKind: 'initial',
-          passIndex: 0,
+          agentPhase: 'initial',
+          feedbackRetryIndex: null,
           batchIndex: 1,
           chunkId: 'discovery-chunk-0001',
           provider: 'anthropic',
@@ -143,23 +144,23 @@ test('statistics settle only after two identical reads and persist relational gr
     })
     const groups = await observer.query<{
       agent_name: string
-      pass_kind: string
-      pass_index: number
+      agent_phase: string
+      feedback_retry_index: number | null
       batch_index: number
       chunk_id: string
       provider: string
       model: string
       model_call_count: number
     }>(
-      `SELECT agent_name,pass_kind,pass_index,batch_index,chunk_id,provider,model,model_call_count
+      `SELECT agent_name,agent_phase,feedback_retry_index,batch_index,chunk_id,provider,model,model_call_count
        FROM execution_statistics_groups WHERE run_id=$1`,
       [runId]
     )
     assert.deepStrictEqual(groups.rows, [
       {
         agent_name: 'issue-analyzer',
-        pass_kind: 'initial',
-        pass_index: 0,
+        agent_phase: 'initial',
+        feedback_retry_index: null,
         batch_index: 1,
         chunk_id: 'discovery-chunk-0001',
         provider: 'anthropic',
@@ -189,8 +190,8 @@ test('statistics settle only after two identical reads and persist relational gr
           agent_name: 'issue-analyzer',
           case_id: null,
           delivery_id: null,
-          pass_kind: 'initial',
-          pass_index: 0,
+          agent_phase: 'initial',
+          feedback_retry_index: null,
           batch_index: 1,
           chunk_id: 'discovery-chunk-0001',
           provider: 'anthropic',
@@ -429,6 +430,88 @@ test('statistics cannot exist without their execution', async () => {
       )
     )
   } finally {
+    await observer.query('DELETE FROM review_runs WHERE run_id=$1', [runId])
+    await observer.end()
+    await reviewStore.close()
+  }
+})
+
+test('task phases and feedback retries survive snapshot persistence and read projection', async () => {
+  const connectorId = `statistics-phases:${randomUUID()}`
+  const runId = `run-${randomUUID()}`
+  const reviewStore = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId
+  })
+  await reviewStore.initialize()
+  const observer = new Pool({ connectionString: databaseUrl() })
+  const statistics = new ExecutionStatisticsStore({
+    connectionString: databaseUrl(),
+    connectorId,
+    claimTimeoutMs: 1_000,
+    initialDelayMs: 0,
+    settlementWindowMs: 60_000
+  })
+  try {
+    await observer.query(
+      "INSERT INTO review_runs (run_id,connector_id,workflow,source_platform) VALUES ($1,$2,'repository-review','github')",
+      [runId, connectorId]
+    )
+    await observer.query(
+      "INSERT INTO executions (run_id,connector_id,status,started_at,finished_at) VALUES ($1,$2,'succeeded',clock_timestamp(),clock_timestamp())",
+      [runId, connectorId]
+    )
+    const coordinates = [
+      { agent: 'repository-triager', phase: 'draft', retry: null },
+      { agent: 'repository-triager', phase: 'refinement', retry: null },
+      { agent: 'repository-mitigator', phase: 'initial', retry: null },
+      { agent: 'repository-mitigator', phase: 'feedback', retry: 1 },
+      { agent: 'repository-mitigator', phase: 'feedback', retry: 2 }
+    ]
+    const snapshot = aggregateExecutionStatistics({
+      roots: [{ id: 'root', traceId: 'trace', metadata: {} }],
+      excludedNonReviewRootCount: 0,
+      generations: coordinates.map(({ agent, phase, retry }, index) => ({
+        id: `generation-${index}`,
+        traceId: 'trace',
+        model: 'probe-model',
+        metadata: {
+          sec_review_agent: agent,
+          sec_review_agent_phase: phase,
+          ...(retry === null
+            ? {}
+            : { sec_review_feedback_retry_index: String(retry) }),
+          ls_provider: 'probe'
+        },
+        usageDetails: { input: 1, output: 1, total: 2 }
+      }))
+    })
+    for (const expected of ['pending', 'settled']) {
+      const work = await statistics.claimNext()
+      assert.ok(work)
+      assert.equal(await statistics.recordSnapshot(work, snapshot, 0), expected)
+    }
+    const read = (
+      await reviewStore.queries.getExecutionStatistics([runId])
+    ).get(runId)
+    assert.ok(read)
+    assert.equal(read.token_usage.total_tokens, 10)
+    assert.deepEqual(
+      read.groups.map((group) => [
+        group.agent_phase,
+        group.feedback_retry_index,
+        group.model_call_count
+      ]),
+      [
+        ['initial', null, 1],
+        ['draft', null, 1],
+        ['refinement', null, 1],
+        ['feedback', 1, 1],
+        ['feedback', 2, 1]
+      ]
+    )
+  } finally {
+    await statistics.close()
     await observer.query('DELETE FROM review_runs WHERE run_id=$1', [runId])
     await observer.end()
     await reviewStore.close()

@@ -405,7 +405,7 @@ class TestRepositoryDeliveryExecution:
         return DeliveryPlan(
             status="completed",
             metadata=DeliveryPlanningMetadata(
-                planning_mode="single", planning_pass_count=1, batch_size=None
+                planning_mode="single", agent_run_count=1, batch_size=None
             ),
             counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
             deliveries=workbench_state.export_deliveries(),
@@ -449,7 +449,7 @@ class TestRepositoryDeliveryExecution:
         delivery_plan = DeliveryPlan(
             status="completed",
             metadata=DeliveryPlanningMetadata(
-                planning_mode="single", planning_pass_count=1, batch_size=None
+                planning_mode="single", agent_run_count=1, batch_size=None
             ),
             counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
             deliveries=[
@@ -484,7 +484,7 @@ class TestRepositoryDeliveryExecution:
             DeliveryPlan(
                 status="completed",
                 metadata=DeliveryPlanningMetadata(
-                    planning_mode="single", planning_pass_count=1, batch_size=None
+                    planning_mode="single", agent_run_count=1, batch_size=None
                 ),
                 counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
                 deliveries=delivery_plan.deliveries,
@@ -1296,7 +1296,7 @@ class TestRepositoryDeliveryExecution:
                 delivery_plan=DeliveryPlan(
                     status="completed",
                     metadata=DeliveryPlanningMetadata(
-                        planning_mode="single", planning_pass_count=1, batch_size=None
+                        planning_mode="single", agent_run_count=1, batch_size=None
                     ),
                     counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
                     deliveries=[
@@ -1339,7 +1339,7 @@ class TestRepositoryDeliveryExecution:
         assert plan_result["deliveries"] == []
         assert plan_result["metadata"] == {
             "planning_mode": "skipped",
-            "planning_pass_count": 0,
+            "agent_run_count": 0,
             "batch_size": None,
         }
         assert plan_result["counts"] == {

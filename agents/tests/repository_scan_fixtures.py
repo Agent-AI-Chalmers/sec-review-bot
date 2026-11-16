@@ -1,4 +1,5 @@
 from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryCandidateResult,
     DiscoveryCounts,
     DiscoveryMetadata,
     DiscoveryResult,
@@ -18,6 +19,7 @@ def scan_result_fixture(
     scanned_file_count: int = 0,
     skipped_file_count: int = 0,
     candidate_count: int = 0,
+    candidates: list[DiscoveryCandidateResult] | None = None,
     case_count: int = 0,
     suppressed_candidate_count: int = 0,
     deleted_file_count: int = 0,
@@ -49,12 +51,12 @@ def scan_result_fixture(
             ),
             files=[],
             skipped_files=[],
-            candidates=[],
+            candidates=candidates or [],
         ),
         triage_result=TriageResult(
             status="completed",
             metadata=TriageMetadata(
-                triage_mode="single", triage_pass_count=0, batch_size=None
+                triage_mode="single", agent_run_count=0, batch_size=None
             ),
             counts=TriageCounts(
                 input_candidate_count=candidate_count,

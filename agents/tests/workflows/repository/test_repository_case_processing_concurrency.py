@@ -203,7 +203,7 @@ async def test_direct_repository_scan_awaits_async_triage_activity() -> None:
             "status": "completed",
             "metadata": {
                 "triage_mode": "single",
-                "triage_pass_count": 1,
+                "agent_run_count": 1,
                 "batch_size": None,
             },
             "counts": {

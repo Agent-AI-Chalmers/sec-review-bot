@@ -66,7 +66,7 @@ def delivery_run(
             "status": "completed",
             "metadata": {
                 "planning_mode": "single",
-                "planning_pass_count": 1,
+                "agent_run_count": 1,
                 "batch_size": None,
             },
             "counts": {

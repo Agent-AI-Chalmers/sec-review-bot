@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from sec_review_agents.delivery_stages.planning import agent_passes as delivery
-from sec_review_agents.scan_stages.triage import agent_passes as triage
+from sec_review_agents.delivery_stages.planning import stage as delivery
+from sec_review_agents.scan_stages.triage import stage as triage
 
 
 @pytest.mark.asyncio
@@ -23,8 +23,8 @@ async def test_draft_window_bounds_tasks_refills_and_drains(
     closed: list[int] = []
     error = RuntimeError("Draft failed.")
 
-    async def draft(*, batch, **kwargs):
-        index = batch["index"] - 1
+    async def draft(*, batch_index, **kwargs):
+        index = batch_index - 1
         started[index].set()
         try:
             await release[index].wait()
@@ -34,6 +34,12 @@ async def test_draft_window_bounds_tasks_refills_and_drains(
         finally:
             closed.append(index)
 
+    refinement_calls: list[str] = []
+
+    async def refine(*, phase, **kwargs):
+        assert sorted(closed) == list(range(6))
+        refinement_calls.append(phase)
+
     operation: Coroutine[Any, Any, tuple[object, int]]
     if stage == "triage":
         monkeypatch.setattr(
@@ -42,10 +48,10 @@ async def test_draft_window_bounds_tasks_refills_and_drains(
             lambda *args, **kwargs: [[] for _ in range(6)],
         )
         monkeypatch.setattr(triage, "_run_triage_batch_draft", draft)
-        operation = triage._run_batched_triage_passes(
+        monkeypatch.setattr(triage, "_invoke_triage_agent", refine)
+        operation = triage._run_batched_triage(
             triage_root=tmp_path,
             triage_candidates=[],
-            max_passes=1,
             max_batch_size=1,
         )
     else:
@@ -55,10 +61,10 @@ async def test_draft_window_bounds_tasks_refills_and_drains(
             lambda *args, **kwargs: [[] for _ in range(6)],
         )
         monkeypatch.setattr(delivery, "_run_delivery_planning_batch_draft", draft)
-        operation = delivery._run_batched_delivery_planning_passes(
+        monkeypatch.setattr(delivery, "_invoke_delivery_planner", refine)
+        operation = delivery._run_batched_delivery_planning(
             delivery_planning_root=tmp_path,
             planning_cases=[],
-            max_passes=1,
             max_batch_size=1,
         )
 
@@ -86,7 +92,8 @@ async def test_draft_window_bounds_tasks_refills_and_drains(
             for event in release:
                 event.set()
             _, pass_count = await asyncio.wait_for(run, timeout=2)
-            assert pass_count == 6
+            assert pass_count == 7
+        assert refinement_calls == (["refinement"] if outcome == "success" else [])
         assert sorted(closed) == (list(range(6)) if outcome == "success" else [0, 1, 2])
         assert not (asyncio.all_tasks() - baseline)
     finally:

@@ -19,8 +19,7 @@ test('execution statistics aggregate native provider/model usage by review agent
         model: 'deepseek-v4-pro',
         metadata: {
           sec_review_agent: 'issue-analyzer',
-          sec_review_pass_kind: 'initial',
-          sec_review_pass_index: '0',
+          sec_review_agent_phase: 'initial',
           sec_review_batch_index: '2',
           sec_review_chunk_id: 'discovery-chunk-0002',
           ls_provider: 'anthropic'
@@ -40,8 +39,8 @@ test('execution statistics aggregate native provider/model usage by review agent
         model: 'deepseek-v4-pro',
         metadata: {
           sec_review_agent: 'issue-analyzer',
-          sec_review_pass_kind: 'feedback',
-          sec_review_pass_index: '1',
+          sec_review_agent_phase: 'feedback',
+          sec_review_feedback_retry_index: '1',
           ls_provider: 'anthropic'
         },
         usageDetails: {
@@ -73,8 +72,8 @@ test('execution statistics aggregate native provider/model usage by review agent
       agentName: 'issue-analyzer',
       caseId: null,
       deliveryId: null,
-      passKind: 'initial',
-      passIndex: 0,
+      agentPhase: 'initial',
+      feedbackRetryIndex: null,
       batchIndex: 2,
       chunkId: 'discovery-chunk-0002',
       provider: 'anthropic',
@@ -94,8 +93,8 @@ test('execution statistics aggregate native provider/model usage by review agent
       agentName: 'issue-analyzer',
       caseId: null,
       deliveryId: null,
-      passKind: 'feedback',
-      passIndex: 1,
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1,
       batchIndex: null,
       chunkId: null,
       provider: 'anthropic',
@@ -187,4 +186,71 @@ test('an empty read reports no observed calls without deciding ingestion', () =>
   assert.strictEqual(snapshot.usageReportedCallCount, 0)
   assert.strictEqual(snapshot.usageCoverage, 'complete_for_observed_calls')
   assert.deepStrictEqual(snapshot.groups, [])
+})
+
+test('task phases and feedback retries remain separate regardless of observation order', () => {
+  const coordinates = [
+    { agent: 'repository-triager', phase: 'draft', retry: null },
+    { agent: 'repository-triager', phase: 'refinement', retry: null },
+    { agent: 'repository-delivery-planner', phase: 'draft', retry: null },
+    { agent: 'repository-delivery-planner', phase: 'refinement', retry: null },
+    { agent: 'issue-mitigator', phase: 'initial', retry: null },
+    { agent: 'issue-mitigator', phase: 'feedback', retry: 1 },
+    { agent: 'issue-mitigator', phase: 'feedback', retry: 2 }
+  ]
+  const generations = coordinates.map(({ agent, phase, retry }, index) => ({
+    id: `generation-${index}`,
+    traceId: `trace-${index}`,
+    model: 'probe-model',
+    metadata: {
+      sec_review_agent: agent,
+      sec_review_agent_phase: phase,
+      ...(retry === null
+        ? {}
+        : { sec_review_feedback_retry_index: String(retry) }),
+      ls_provider: 'probe'
+    },
+    usageDetails: { input: 1, output: 1, total: 2 }
+  }))
+  const read = { roots: [], generations, excludedNonReviewRootCount: 0 }
+  const snapshot = aggregateExecutionStatistics(read)
+  assert.equal(snapshot.observedCallCount, 7)
+  assert.equal(snapshot.groups.length, 7)
+  assert.equal(snapshot.tokenUsage.total_tokens, 14)
+  for (const agent of ['repository-triager', 'repository-delivery-planner']) {
+    assert.deepEqual(
+      snapshot.groups
+        .filter((group) => group.agentName === agent)
+        .map((group) => [
+          group.agentPhase,
+          group.feedbackRetryIndex,
+          group.modelCallCount
+        ]),
+      [
+        ['draft', null, 1],
+        ['refinement', null, 1]
+      ]
+    )
+  }
+  assert.deepEqual(
+    snapshot.groups
+      .filter((group) => group.agentName === 'issue-mitigator')
+      .map((group) => [
+        group.agentPhase,
+        group.feedbackRetryIndex,
+        group.modelCallCount
+      ]),
+    [
+      ['initial', null, 1],
+      ['feedback', 1, 1],
+      ['feedback', 2, 1]
+    ]
+  )
+  assert.deepEqual(
+    aggregateExecutionStatistics({
+      ...read,
+      generations: [...generations].reverse()
+    }),
+    snapshot
+  )
 })

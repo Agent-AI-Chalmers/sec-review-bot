@@ -119,8 +119,7 @@ async def run_issue_single_agent_activity(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            pass_kind="initial",
-            pass_index="0",
+            agent_phase="initial",
         )
     ):
         return await run_issue_single_agent(

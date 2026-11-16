@@ -7,7 +7,7 @@ from sec_review_agents.resources.loader import (
 )
 from sec_review_agents.utils.markdown import inline_code, md
 
-DeliveryPlanningPassKind = Literal["draft", "refinement"]
+DeliveryPlanningPhase = Literal["draft", "refinement"]
 
 REPOSITORY_DELIVERY_PLANNING_INTRO = "\n".join(
     [
@@ -19,17 +19,17 @@ REPOSITORY_DELIVERY_PLANNING_INTRO = "\n".join(
 
 
 def build_repository_delivery_planning_workbench_system_prompt(
-    *, pass_kind: DeliveryPlanningPassKind = "draft"
+    *, phase: DeliveryPlanningPhase = "draft"
 ) -> str:
-    pass_prompt = (
-        "delivery-planning/draft-pass-system.md"
-        if pass_kind == "draft"
-        else "delivery-planning/refinement-pass-system.md"
+    phase_prompt = (
+        "delivery-planning/draft-system.md"
+        if phase == "draft"
+        else "delivery-planning/refinement-system.md"
     )
     return join_prompt_sections(
         [
             "delivery-planning/workbench-system.md",
-            pass_prompt,
+            phase_prompt,
         ]
     )
 
@@ -45,19 +45,17 @@ def build_repository_delivery_planning_filesystem_system_prompt() -> str:
 def build_repository_delivery_planning_user_prompt(
     planning_cases: list[DeliveryPlanningCase],
     *,
-    pass_kind: DeliveryPlanningPassKind | None = None,
+    phase: DeliveryPlanningPhase = "draft",
     draft_origins: list[dict] | None = None,
 ) -> str:
-    resolved_pass_kind = pass_kind or "draft"
-
     sections = [
         REPOSITORY_DELIVERY_PLANNING_INTRO,
         "",
         "## Delivery Planning Context",
         md(t"- `case_count`: `{len(planning_cases)}`"),
-        "- The items below are the complete case inventory for this pass.",
+        "- The items below are the complete case inventory for this run.",
         "- Each item payload is stage-provided evidence for delivery planning.",
-        "- Use only these items and the current workbench groups; do not infer cases outside this pass.",
+        "- Use only these items and the current workbench groups; do not infer cases outside this run.",
     ]
 
     sections.extend(
@@ -65,7 +63,7 @@ def build_repository_delivery_planning_user_prompt(
             "",
             "## Items",
             "",
-            _planning_items_intro(resolved_pass_kind),
+            _planning_items_intro(phase),
             "",
             "```json",
             json.dumps(
@@ -76,7 +74,7 @@ def build_repository_delivery_planning_user_prompt(
             "```",
         ]
     )
-    if resolved_pass_kind == "refinement" and draft_origins:
+    if phase == "refinement" and draft_origins:
         sections.extend(
             [
                 "",
@@ -85,7 +83,7 @@ def build_repository_delivery_planning_user_prompt(
                 (
                     "Use this section only to prioritize refinement attention. "
                     "Groups from different draft scopes may not have been compared "
-                    "in the same pass."
+                    "in the same run."
                 ),
                 "",
                 *_render_draft_origins(draft_origins),
@@ -111,13 +109,13 @@ def _render_draft_origins(draft_origins: list[dict]) -> list[str]:
     return lines
 
 
-def _planning_items_intro(pass_kind: DeliveryPlanningPassKind) -> str:
-    if pass_kind == "refinement":
+def _planning_items_intro(phase: DeliveryPlanningPhase) -> str:
+    if phase == "refinement":
         return (
             "Use these item payloads as the complete evidence inventory for this "
-            "global refinement pass."
+            "global refinement."
         )
-    return "Use these item payloads as the complete evidence inventory for this draft pass."
+    return "Use these item payloads as the complete evidence inventory for this draft."
 
 
 def _planning_prompt_items(planning_cases: list[DeliveryPlanningCase]) -> list[dict]:

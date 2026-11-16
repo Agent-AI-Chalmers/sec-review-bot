@@ -173,8 +173,6 @@ async def test_triage_artifact_preserves_file_only_anchors_and_nullable_metadata
     tmp_path, monkeypatch
 ) -> None:
     """Replay JSON omits absent anchor lines while keeping nullable stage metadata."""
-    from unittest.mock import AsyncMock
-
     from sec_review_agents.agents.discovery.model import (
         DiscoveryCandidate,
         DiscoveryLocation,
@@ -196,10 +194,20 @@ async def test_triage_artifact_preserves_file_only_anchors_and_nullable_metadata
             grounding_status="needs-grounding",
         )
     ]
-    scan.triage_result.cases[0].anchor_locations = [location]
+
+    async def triage_agent(*, workbench_state, phase, **kwargs):
+        if phase == "draft":
+            workbench_state.create_group(
+                kind="keep",
+                item_ids=workbench_state.ordered_item_ids,
+                summary="Route signal",
+                category="xss",
+                evidence=["Route signal"],
+            )
+
     monkeypatch.setattr(
-        "sec_review_agents.scan_stages.triage.agent_passes.run_repository_triage_agent",
-        AsyncMock(return_value=scan.triage_result),
+        "sec_review_agents.scan_stages.triage.stage._invoke_triage_agent",
+        triage_agent,
     )
     result = await run_repository_triage_stage(
         triage_root=tmp_path, discovery_result=scan.discovery_result

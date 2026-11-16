@@ -116,8 +116,7 @@ async def analyze_repository_case_activity(
             workflow_name="repository-review",
             run_id=request.run_id,
             case_id=_repository_case_id_from_request(request),
-            pass_kind="initial",
-            pass_index="0",
+            agent_phase="initial",
         )
     ):
         return await analyze_repository_case_stage(
@@ -149,8 +148,7 @@ async def score_repository_case_cvss_activity(
             workflow_name="repository-review",
             run_id=request.run_id,
             case_id=_repository_case_id_from_request(request),
-            pass_kind="initial",
-            pass_index="0",
+            agent_phase="initial",
         )
     ):
         return await score_repository_case_cvss_stage(
@@ -178,14 +176,15 @@ async def mitigate_repository_case_activity(
     )
 
     mitigator_artifacts_path = Path(prepared_case.artifact_paths.mitigator)
-    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name="repository-review",
             run_id=request.run_id,
             case_id=_repository_case_id_from_request(request),
-            pass_kind="feedback" if retry_context is not None else "initial",
-            pass_index=str(pass_index),
+            agent_phase="feedback" if retry_context is not None else "initial",
+            feedback_retry_index=(
+                str(retry_context.retry_index) if retry_context is not None else None
+            ),
         )
     ):
         return await run_repository_case_mitigation_stage(
@@ -224,14 +223,15 @@ async def verify_repository_case_activity(
     )
 
     verifier_artifacts_path = Path(prepared_case.artifact_paths.verifier)
-    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name="repository-review",
             run_id=request.run_id,
             case_id=_repository_case_id_from_request(request),
-            pass_kind="feedback" if retry_context is not None else "initial",
-            pass_index=str(pass_index),
+            agent_phase="feedback" if retry_context is not None else "initial",
+            feedback_retry_index=(
+                str(retry_context.retry_index) if retry_context is not None else None
+            ),
         )
     ):
         return await run_repository_case_verification_stage(

@@ -181,7 +181,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
     assert(
       workflowRuns.some((run) =>
         run.execution_statistics?.groups.some(
-          (group) => group.pass_kind === 'feedback'
+          (group) => group.agent_phase === 'feedback'
         )
       ),
       `${workflow} fixtures must include a feedback loop`
@@ -190,7 +190,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
       workflowRuns.some(
         (run) =>
           !run.execution_statistics?.groups.some(
-            (group) => group.pass_kind === 'feedback'
+            (group) => group.agent_phase === 'feedback'
           )
       ),
       `${workflow} fixtures must include a run without feedback`

@@ -3,7 +3,7 @@ import json
 import pytest
 
 from sec_review_agents.agents.delivery_planning.prompts import (
-    DeliveryPlanningPassKind,
+    DeliveryPlanningPhase,
     build_repository_delivery_planning_user_prompt,
     build_repository_delivery_planning_workbench_system_prompt,
 )
@@ -11,32 +11,32 @@ from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
 from sec_review_agents.resources.loader import join_prompt_sections
 
 
-def test_delivery_planning_uses_pass_specific_system_prompts() -> None:
-    """Select exactly one pass contract after the shared workbench contract."""
+def test_delivery_planning_uses_phase_specific_system_prompts() -> None:
+    """Select exactly one phase contract after the shared workbench contract."""
     draft_prompt = build_repository_delivery_planning_workbench_system_prompt(
-        pass_kind="draft"
+        phase="draft"
     )
     refinement_prompt = build_repository_delivery_planning_workbench_system_prompt(
-        pass_kind="refinement"
+        phase="refinement"
     )
 
     assert draft_prompt == join_prompt_sections(
         [
             "delivery-planning/workbench-system.md",
-            "delivery-planning/draft-pass-system.md",
+            "delivery-planning/draft-system.md",
         ]
     )
     assert refinement_prompt == join_prompt_sections(
         [
             "delivery-planning/workbench-system.md",
-            "delivery-planning/refinement-pass-system.md",
+            "delivery-planning/refinement-system.md",
         ]
     )
 
 
-@pytest.mark.parametrize("pass_kind", [None, "draft", "refinement"])
+@pytest.mark.parametrize("phase", ["draft", "refinement"])
 def test_delivery_planning_user_prompt_serializes_case_items(
-    pass_kind: DeliveryPlanningPassKind | None,
+    phase: DeliveryPlanningPhase,
 ) -> None:
     user_prompt = build_repository_delivery_planning_user_prompt(
         [
@@ -46,7 +46,7 @@ def test_delivery_planning_user_prompt_serializes_case_items(
                 changed_files=["src/a.ts"],
             )
         ],
-        pass_kind=pass_kind,
+        phase=phase,
     )
 
     json_block = user_prompt.split("```json", 1)[1].split("```", 1)[0]
@@ -61,13 +61,3 @@ def test_delivery_planning_user_prompt_serializes_case_items(
             }
         ]
     }
-
-
-def test_delivery_planning_refinement_prompt_identifies_global_pass() -> None:
-    draft_prompt = build_repository_delivery_planning_user_prompt([])
-    refinement_prompt = build_repository_delivery_planning_user_prompt(
-        [], pass_kind="refinement"
-    )
-
-    assert "global refinement pass" in refinement_prompt
-    assert "global refinement pass" not in draft_prompt

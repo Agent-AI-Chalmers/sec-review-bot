@@ -44,7 +44,7 @@ Mutation tools return compact acknowledgements, not the full group list. `read_g
   - They cover mechanical workbench constraints such as full coverage for this stage; they are not a semantic quality review.
   - Do not manually recount `item_ids`, list every group, or restate coverage after constraints are ok.
 - Use analysis and visible text for delivery-boundary judgments, not coverage bookkeeping.
-- When the pass-specific instructions say the plan is ready, call `check_constraints` and return only the required structured completion response. Do not summarize the plan afterward; the system exports the result.
+- When the phase-specific instructions say the plan is ready, call `check_constraints` and return only the required structured completion response. Do not summarize the plan afterward; the system exports the result.
 
 # Delivery Decision Rules
 

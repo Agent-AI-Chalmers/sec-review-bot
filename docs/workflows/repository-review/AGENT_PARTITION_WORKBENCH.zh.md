@@ -169,7 +169,7 @@ Agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 
 ### Refinement
 
-可重入性让第二轮 refinement 变得自然：第一次 agent run 可以从空工作台创建完整草稿；第二次 agent run 可以继承同一个工作台，把已有 groups 当作 draft 做质量修正。
+Triage 和 delivery planning 先创建草稿，再对完整工作台固定执行一次 refinement。Single 模式直接复核草稿；batch 模式先合并所有 batch drafts，再统一复核。Refinement 结束后，系统检查最终约束；若仍不满足，阶段失败。没有符合条件的输入时，阶段会在调用 Agent 前跳过。
 
 coverage 是系统 constraints checker 的任务，refinement 针对的是别的问题：Agent 在第一次 pass 里常常读完整输入后直接用 `create_groups` 一次性创建草稿，然后很自信地结束。这种草稿通常满足 constraints，但仍可能有 over-merge、missed merge、weak reason 或 keep/suppress 边界错误。
 
@@ -189,7 +189,7 @@ coverage 是系统 constraints checker 的任务，refinement 针对的是别的
 
 在这个工作台模型上，常见执行模式有两种：
 
-- `single + optional refinement`: 一个 agent pass 处理完整 item inventory；如果需要质量修正，再用同一个工作台跑 refinement。
+- `single + refinement`：一个 agent pass 为完整 item inventory 创建草稿，再用同一个工作台固定复核一次。
 - `batch + refinement`: 多个 batch draft 并行处理 item 子集，再把草稿合并到一个全局工作台做 refinement。
 
 batch 是 wall-time 压力下的折中，不是默认更聪明的规划方式。
@@ -214,7 +214,7 @@ batch 的好处是快，**尤其在慢模型上明显**。但它有实际代价�
 建议按 origin scope 列出 group id：
 
 ```markdown
-Use this section only to prioritize refinement attention. Groups from different draft scopes may not have been compared in the same pass.
+Use this section only to prioritize refinement attention. Groups from different draft scopes may not have been compared in the same run.
 
 - `draft batch 0001`: `group-1`, `group-2`, `group-3`
 - `draft batch 0002`: `group-4`, `group-5`

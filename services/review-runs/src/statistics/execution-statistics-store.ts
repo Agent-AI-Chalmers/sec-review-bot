@@ -221,7 +221,7 @@ export class ExecutionStatisticsStore {
       for (const group of snapshot.groups) {
         await client.query(
           `INSERT INTO execution_statistics_groups
-             (run_id,agent_name,case_id,delivery_id,pass_kind,pass_index,batch_index,
+             (run_id,agent_name,case_id,delivery_id,agent_phase,feedback_retry_index,batch_index,
               chunk_id,provider,model,model_call_count,
               usage_reported_call_count,input_tokens,output_tokens,total_tokens,
               cache_read_input_tokens,cache_creation_input_tokens,reasoning_tokens)
@@ -231,8 +231,8 @@ export class ExecutionStatisticsStore {
             group.agentName,
             group.caseId,
             group.deliveryId,
-            group.passKind,
-            group.passIndex,
+            group.agentPhase,
+            group.feedbackRetryIndex,
             group.batchIndex,
             group.chunkId,
             group.provider,

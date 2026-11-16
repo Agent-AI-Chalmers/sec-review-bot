@@ -69,10 +69,12 @@ def _build_metadata(agent_name: str) -> dict[str, str]:
             "sec_review_batch_index": trace_context.get("batch_index"),
             # Delivery item being planned or synthesized.
             "sec_review_delivery_id": trace_context.get("delivery_id"),
-            # Initial or feedback pass; explains repeated agent invocations.
-            "sec_review_pass_kind": trace_context.get("pass_kind"),
-            # Zero-based pass number within the same stage.
-            "sec_review_pass_index": trace_context.get("pass_index"),
+            # Task phase distinguishes initial review, feedback retry, draft and refinement.
+            "sec_review_agent_phase": trace_context.get("agent_phase"),
+            # One-based verifier-feedback retry number; absent outside feedback retries.
+            "sec_review_feedback_retry_index": trace_context.get(
+                "feedback_retry_index"
+            ),
             # Temporal retry attempt; distinguishes infrastructure retries.
             "sec_review_temporal_activity_attempt": trace_context.get(
                 "temporal_activity_attempt"

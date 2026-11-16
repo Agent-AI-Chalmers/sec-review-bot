@@ -51,8 +51,8 @@ export interface ExecutionStatisticsGroup {
   agentName: string
   caseId: string | null
   deliveryId: string | null
-  passKind: string | null
-  passIndex: number | null
+  agentPhase: string | null
+  feedbackRetryIndex: number | null
   batchIndex: number | null
   chunkId: string | null
   provider: string
@@ -77,8 +77,8 @@ interface GroupAccumulator {
   agentName: string
   caseId: string | null
   deliveryId: string | null
-  passKind: string | null
-  passIndex: number | null
+  agentPhase: string | null
+  feedbackRetryIndex: number | null
   batchIndex: number | null
   chunkId: string | null
   provider: string
@@ -87,6 +87,13 @@ interface GroupAccumulator {
   usageReportedCallCount: number
   sums: Record<TokenField, number>
   reported: Record<TokenField, number>
+}
+
+const AGENT_PHASE_ORDER: Record<string, number> = {
+  initial: 0,
+  draft: 1,
+  refinement: 2,
+  feedback: 3
 }
 
 function emptyTokenSums(): Record<TokenField, number> {
@@ -104,10 +111,10 @@ function stringValue(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null
 }
 
-function nonNegativeInteger(value: unknown): number | null {
+function positiveInteger(value: unknown): number | null {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null
   const parsed = Number(value)
-  return Number.isSafeInteger(parsed) ? parsed : null
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 interface ParsedTokenUsage {
@@ -196,9 +203,12 @@ export function aggregateExecutionStatistics(
     const agentName = stringValue(call.metadata.sec_review_agent) ?? 'unknown'
     const caseId = stringValue(call.metadata.sec_review_case_id)
     const deliveryId = stringValue(call.metadata.sec_review_delivery_id)
-    const passKind = stringValue(call.metadata.sec_review_pass_kind)
-    const passIndex = nonNegativeInteger(call.metadata.sec_review_pass_index)
-    const batchIndex = nonNegativeInteger(call.metadata.sec_review_batch_index)
+    const agentPhase = stringValue(call.metadata.sec_review_agent_phase)
+    const feedbackRetryIndex =
+      agentPhase === 'feedback'
+        ? positiveInteger(call.metadata.sec_review_feedback_retry_index)
+        : null
+    const batchIndex = positiveInteger(call.metadata.sec_review_batch_index)
     const chunkId = stringValue(call.metadata.sec_review_chunk_id)
     const provider = stringValue(call.metadata.ls_provider) ?? 'unknown'
     const model =
@@ -207,8 +217,8 @@ export function aggregateExecutionStatistics(
       agentName,
       caseId,
       deliveryId,
-      passKind,
-      passIndex,
+      agentPhase,
+      feedbackRetryIndex,
       batchIndex,
       chunkId,
       provider,
@@ -220,8 +230,8 @@ export function aggregateExecutionStatistics(
         agentName,
         caseId,
         deliveryId,
-        passKind,
-        passIndex,
+        agentPhase,
+        feedbackRetryIndex,
         batchIndex,
         chunkId,
         provider,
@@ -275,7 +285,8 @@ export function aggregateExecutionStatistics(
       [
         left.caseId ?? '',
         left.deliveryId ?? '',
-        left.passIndex ?? -1,
+        AGENT_PHASE_ORDER[left.agentPhase ?? ''] ?? 4,
+        left.feedbackRetryIndex ?? -1,
         left.batchIndex ?? -1,
         left.chunkId ?? '',
         left.agentName,
@@ -287,7 +298,8 @@ export function aggregateExecutionStatistics(
           [
             right.caseId ?? '',
             right.deliveryId ?? '',
-            right.passIndex ?? -1,
+            AGENT_PHASE_ORDER[right.agentPhase ?? ''] ?? 4,
+            right.feedbackRetryIndex ?? -1,
             right.batchIndex ?? -1,
             right.chunkId ?? '',
             right.agentName,
@@ -300,8 +312,8 @@ export function aggregateExecutionStatistics(
       agentName: group.agentName,
       caseId: group.caseId,
       deliveryId: group.deliveryId,
-      passKind: group.passKind,
-      passIndex: group.passIndex,
+      agentPhase: group.agentPhase,
+      feedbackRetryIndex: group.feedbackRetryIndex,
       batchIndex: group.batchIndex,
       chunkId: group.chunkId,
       provider: group.provider,

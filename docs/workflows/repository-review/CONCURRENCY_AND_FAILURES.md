@@ -60,7 +60,7 @@ In the Temporal path, each discovery chunk is an activity and uses Temporal acti
 
 Triage runs inside one activity. Batched triage executes batch drafts with a sliding window, then enters global refinement / workbench state.
 
-<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
+<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/stage.py -->
 
 The current batch draft concurrency limit is the code constant `TRIAGE_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Triage produces a global case set, so a failed batch fails the whole triage stage.
 
@@ -82,7 +82,7 @@ If a case still fails after activity retry, repository review records a blocked 
 
 Delivery planning can execute batch drafts with a sliding window, then enters global refinement / workbench state.
 
-<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
+<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/stage.py -->
 
 The current batch draft concurrency limit is the code constant `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Delivery planning produces a global delivery plan, so a failed batch fails the whole delivery planning stage.
 

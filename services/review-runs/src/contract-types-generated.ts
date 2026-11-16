@@ -533,16 +533,16 @@ export type ExecutionStatisticsGroup = {
    */
   delivery_id: string | null
   /**
-   * @description Runtime pass classification such as initial or feedback when supplied by the agent.
+   * @description Agent task phase such as initial, feedback, draft, or refinement; null when not classified.
    * @type string
    */
-  pass_kind: string | null
+  agent_phase: string | null
   /**
-   * @description Zero-based pass number within the review or case when supplied by the agent.
-   * @minimum 0
+   * @description One-based verifier-feedback retry number; null outside feedback retries.
+   * @minimum 1
    * @type integer
    */
-  pass_index: number | null
+  feedback_retry_index: number | null
   /**
    * @description One-based draft batch number for batched triage or delivery planning; null for non-batched work.
    * @minimum 1

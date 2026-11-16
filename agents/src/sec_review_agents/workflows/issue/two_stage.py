@@ -67,8 +67,7 @@ async def mitigate_issue_self_check_activity(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            pass_kind="initial",
-            pass_index="0",
+            agent_phase="initial",
         )
     ):
         return await mitigate_issue_with_self_check(

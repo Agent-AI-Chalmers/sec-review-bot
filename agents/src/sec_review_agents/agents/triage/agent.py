@@ -10,7 +10,7 @@ from sec_review_agents.agents.triage.backend import (
     create_repository_triage_backend,
 )
 from sec_review_agents.agents.triage.prompts import (
-    TriagePassKind,
+    TriagePhase,
     build_repository_triage_system_prompt,
 )
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
@@ -42,7 +42,7 @@ async def run_repository_triage_agent(
     *,
     backend,
     workbench_state: TriageWorkbenchState | None = None,
-    pass_kind: TriagePassKind = "draft",
+    phase: TriagePhase = "draft",
     user_prompt: str,
     trajectory_paths: tuple[Path, ...] = (),
 ) -> BaseModel:
@@ -67,7 +67,7 @@ async def run_repository_triage_agent(
         agent_middleware.append(
             ModelTurnDiagnosticsMiddleware(agent_name=REPOSITORY_TRIAGER_AGENT_NAME)
         )
-    system_prompt = build_repository_triage_system_prompt(pass_kind=pass_kind)
+    system_prompt = build_repository_triage_system_prompt(phase=phase)
     return await run_agent_runtime_graph(
         user_prompt=user_prompt,
         trajectory_paths=trajectory_paths,

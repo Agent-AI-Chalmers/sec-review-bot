@@ -14,17 +14,14 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryCaseInput,
     DeliveryPlanningCase,
 )
-from sec_review_agents.delivery_stages.planning.agent_passes import (
-    _delivery_planning_pass_artifacts_path,
-    _planning_items,
-    _run_delivery_planning_agent_pass,
-    run_delivery_planning,
-)
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.delivery_stages.planning.input import (
     prepare_delivery_planning_patch_view,
 )
 from sec_review_agents.delivery_stages.planning.stage import (
+    _delivery_planning_artifacts_path,
+    _invoke_delivery_planner,
+    _planning_items,
     generate_delivery_plan,
 )
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
@@ -48,6 +45,7 @@ from sec_review_agents.workflows.repository_case.result import RepositoryCaseRes
 from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
 )
+from sec_review_agents.workspace.file_changes import UpsertFileChange
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
 from tests.repository_scan_fixtures import scan_result_fixture
 
@@ -84,11 +82,27 @@ class TestRepositoryScopeAndDeliveryPlanning:
     async def _run_delivery_planning(
         self, input_data: dict, planning_cases: list[DeliveryPlanningCase], **kwargs
     ):
-        return await run_delivery_planning(
-            delivery_planning_root=Path(input_data["input_bundle_root_path"])
-            / "artifacts"
-            / "delivery-planning",
-            planning_cases=planning_cases,
+        return await generate_delivery_plan(
+            run_artifacts_root=Path(input_data["input_bundle_root_path"]) / "artifacts",
+            case_results=[
+                DeliveryCaseInput(
+                    case_id=case.case_id,
+                    disposition="keep",
+                    reason=None,
+                    mitigation_overview=case.overview,
+                    mitigator_file_changes=[
+                        UpsertFileChange(
+                            path=path,
+                            status="upsert",
+                            content="",
+                            content_encoding="utf-8",
+                        )
+                        for path in case.changed_files
+                    ],
+                    mitigator_patch_diff=None,
+                )
+                for case in planning_cases
+            ],
             **kwargs,
         )
 
@@ -376,17 +390,16 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     {"case_id": "case-b", "overview": "B", "changed_files": []},
                 ]
             ]
-            pass_metas: list[dict | None] = []
+            phases: list[str] = []
 
             def fake_agent_pass(
                 *,
                 workbench_state: DeliveryWorkbenchState,
-                pass_index: int,
-                pass_meta: dict | None = None,
+                phase: str,
                 **_kwargs,
-            ) -> dict:
-                pass_metas.append(pass_meta)
-                if pass_index == 0:
+            ) -> None:
+                phases.append(phase)
+                if phase == "draft":
                     workbench_state.create_groups(
                         groups=[
                             {
@@ -396,10 +409,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                             }
                         ]
                     )
-                return {"passIndex": pass_index}
 
             with patch(
-                "sec_review_agents.delivery_stages.planning.agent_passes._run_delivery_planning_agent_pass",
+                "sec_review_agents.delivery_stages.planning.stage._invoke_delivery_planner",
                 side_effect=fake_agent_pass,
             ):
                 result = await self._run_delivery_planning(
@@ -419,11 +431,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert result.metadata.planning_mode == "single"
         assert "agent_result" not in result.model_dump()
         assert "agent_results" not in result.model_dump()
-        assert result.metadata.planning_pass_count == 2
+        assert result.metadata.agent_run_count == 2
         assert result.counts.input_case_count == 2
         assert result.counts.delivery_count == 1
         assert result.status == "completed"
-        assert pass_metas == [None, {"kind": "refinement"}]
+        assert phases == ["draft", "refinement"]
         assert archived_input == {
             "cases": [case.model_dump(mode="json") for case in planning_cases]
         }
@@ -441,20 +453,19 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     {"case_id": "case-b", "overview": "B", "changed_files": []},
                 ]
             ]
-            pass_kinds: list[str | None] = []
+            phases: list[str | None] = []
 
             def fake_agent_pass(
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
                 planning_cases: list[DeliveryPlanningCase],
-                pass_index: int,
+                phase: str,
                 **_kwargs,
-            ) -> dict:
+            ) -> None:
                 assert delivery_planning_root.name
-                pass_meta = _kwargs.get("pass_meta") or {}
-                pass_kinds.append(pass_meta.get("kind"))
-                if pass_index == 0:
+                phases.append(phase)
+                if phase == "draft":
                     workbench_state.create_groups(
                         groups=[
                             {
@@ -466,17 +477,16 @@ class TestRepositoryScopeAndDeliveryPlanning:
                             }
                         ]
                     )
-                return {"passIndex": pass_index}
 
             with patch(
-                "sec_review_agents.delivery_stages.planning.agent_passes._run_delivery_planning_agent_pass",
+                "sec_review_agents.delivery_stages.planning.stage._invoke_delivery_planner",
                 side_effect=fake_agent_pass,
             ):
                 result = await self._run_delivery_planning(input_data, planning_cases)
 
         assert result.metadata.planning_mode == "batched"
-        assert "batch" in pass_kinds
-        assert "refinement" in pass_kinds
+        assert "draft" in phases
+        assert "refinement" in phases
         assert result.status == "completed"
 
     def test_delivery_planning_batch_and_refinement_artifact_paths(self) -> None:
@@ -489,21 +499,23 @@ class TestRepositoryScopeAndDeliveryPlanning:
             )
 
             assert (
-                _delivery_planning_pass_artifacts_path(
+                _delivery_planning_artifacts_path(
                     planning_root,
-                    {"kind": "batch", "index": 2, "count": 3, "max_batch_size": 30},
+                    phase="draft",
+                    batch_index=2,
                 )
                 == planning_root / "batches" / "batch-0002"
             )
             assert (
-                _delivery_planning_pass_artifacts_path(
+                _delivery_planning_artifacts_path(
                     planning_root,
-                    {"kind": "refinement"},
+                    phase="refinement",
                 )
                 == planning_root / "refinement"
             )
             assert (
-                _delivery_planning_pass_artifacts_path(planning_root) == planning_root
+                _delivery_planning_artifacts_path(planning_root, phase="draft")
+                == planning_root
             )
 
     @pytest.mark.asyncio
@@ -530,11 +542,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
             with (
                 patch(
-                    "sec_review_agents.delivery_stages.planning.agent_passes.run_delivery_planning_agent",
+                    "sec_review_agents.delivery_stages.planning.stage.run_delivery_planning_agent",
                     side_effect=fake_invoke_agent_runtime_graph,
                 ),
             ):
-                await _run_delivery_planning_agent_pass(
+                await _invoke_delivery_planner(
                     delivery_planning_root=delivery_planning_root,
                     workbench_state=DeliveryWorkbenchState.initial(["case-1"]),
                     planning_cases=[
@@ -542,12 +554,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
                             case_id="case-1", overview="", changed_files=[]
                         )
                     ],
-                    pass_meta={
-                        "kind": "batch",
-                        "index": 1,
-                        "count": 2,
-                        "max_batch_size": 30,
-                    },
+                    phase="draft",
+                    batch_index=1,
                 )
 
     @pytest.mark.asyncio
@@ -585,21 +593,20 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ]
             seen_batch_cases: list[list[str]] = []
             refinement_seen_groups: list[dict] = []
-            pass_kinds: list[str | None] = []
+            phases: list[str | None] = []
 
             def fake_agent_pass(
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
                 planning_cases: list[DeliveryPlanningCase],
-                pass_index: int,
+                phase: str,
                 **_kwargs,
-            ) -> dict:
+            ) -> None:
                 assert delivery_planning_root.name
-                pass_meta = _kwargs.get("pass_meta") or {}
-                pass_kinds.append(pass_meta.get("kind"))
+                phases.append(phase)
                 case_ids = [case_entry.case_id for case_entry in planning_cases]
-                if pass_index == 0:
+                if phase == "draft":
                     seen_batch_cases.append(case_ids)
                     workbench_state.create_group(
                         item_ids=case_ids,
@@ -609,10 +616,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     refinement_seen_groups.extend(
                         workbench_state.read_groups()["groups"]
                     )
-                return {"passIndex": pass_index, "case_ids": case_ids}
 
             with patch(
-                "sec_review_agents.delivery_stages.planning.agent_passes._run_delivery_planning_agent_pass",
+                "sec_review_agents.delivery_stages.planning.stage._invoke_delivery_planner",
                 side_effect=fake_agent_pass,
             ):
                 result = await self._run_delivery_planning(
@@ -626,12 +632,12 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ["case-a", "case-b"],
             ["case-c", "case-d"],
         ]
-        assert pass_kinds.count("batch") == 2
-        assert pass_kinds.count("refinement") == 1
+        assert phases.count("draft") == 2
+        assert phases.count("refinement") == 1
         assert len(refinement_seen_groups) == 2
         assert result.status == "completed"
         assert result.metadata.planning_mode == "batched"
-        assert result.metadata.planning_pass_count == 3
+        assert result.metadata.agent_run_count == 3
         assert [item.case_ids for item in result.deliveries] == [
             ["case-a", "case-b"],
             ["case-c", "case-d"],
@@ -646,11 +652,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
             input_data = self._input_data(root)
             captured: dict[str, list[DeliveryPlanningCase]] = {}
 
-            async def run_delivery_planning(**kwargs) -> dict:
+            async def incomplete_agent(**kwargs) -> None:
                 captured["cases"] = kwargs["planning_cases"]
-                raise RuntimeError(
-                    "delivery workbench state is incomplete after agent execution."
-                )
 
             case_results = [
                 self._repository_case_result(
@@ -672,8 +675,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
             with (
                 patch(
-                    "sec_review_agents.delivery_stages.planning.stage.run_delivery_planning",
-                    side_effect=run_delivery_planning,
+                    "sec_review_agents.delivery_stages.planning.stage._invoke_delivery_planner",
+                    side_effect=incomplete_agent,
                 ),
                 pytest.raises(RuntimeError, match="workbench state is incomplete"),
             ):

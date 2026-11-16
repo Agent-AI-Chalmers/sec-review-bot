@@ -91,46 +91,40 @@ type StatisticsGroup = NonNullable<
 const STATISTICS_GROUPS: Record<Workflow, StatisticsGroup[]> = {
   'issue-review': [
     statisticsGroup('issue-analyzer', 1, 3_100, 550, 1_100, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('issue-mitigator', 1, 3_400, 650, 1_200, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('issue-verifier', 1, 2_500, 400, 800, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('issue-mitigator', 1, 3_700, 750, 1_300, {
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     }),
     statisticsGroup('issue-verifier', 1, 2_800, 500, 1_000, {
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     })
   ],
   'pull-request-review': [
     statisticsGroup('pull-request-analyzer', 1, 3_200, 600, 1_000, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('pull-request-mitigator', 1, 4_200, 800, 1_300, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('pull-request-verifier', 1, 2_400, 400, 800, {
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('pull-request-mitigator', 1, 2_400, 400, 800, {
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     }),
     statisticsGroup('pull-request-verifier', 1, 2_400, 450, 800, {
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     })
   ],
   'repository-review': [
@@ -144,82 +138,68 @@ const STATISTICS_GROUPS: Record<Workflow, StatisticsGroup[]> = {
       chunkId: 'discovery-chunk-0003'
     }),
     statisticsGroup('repository-triager', 1, 2_700, 400, 900, {
-      passKind: 'draft',
-      passIndex: 0,
+      agentPhase: 'draft',
       batchIndex: 1
     }),
     statisticsGroup('repository-triager', 1, 2_400, 400, 900, {
-      passKind: 'draft',
-      passIndex: 0,
+      agentPhase: 'draft',
       batchIndex: 2
     }),
     statisticsGroup('repository-triager', 1, 1_800, 300, 600, {
-      passKind: 'refinement',
-      passIndex: 1
+      agentPhase: 'refinement'
     }),
     statisticsGroup('repository-analyzer', 2, 5_200, 1_000, 1_600, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-cvss-v4-scorer', 1, 1_200, 225, 450, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-mitigator', 1, 2_600, 500, 700, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-verifier', 1, 2_900, 550, 800, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-mitigator', 2, 5_000, 1_000, 1_500, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     }),
     statisticsGroup('repository-verifier', 2, 5_400, 1_100, 1_700, {
       caseId: '7d9a2f6c31b4e8',
-      passKind: 'feedback',
-      passIndex: 1
+      agentPhase: 'feedback',
+      feedbackRetryIndex: 1
     }),
     statisticsGroup('repository-analyzer', 2, 5_020, 1_100, 1_580, {
       caseId: 'c4e81a90d2f763',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-cvss-v4-scorer', 1, 1_200, 225, 450, {
       caseId: 'c4e81a90d2f763',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-mitigator', 1, 2_500, 500, 700, {
       caseId: 'c4e81a90d2f763',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-verifier', 1, 2_600, 500, 700, {
       caseId: 'c4e81a90d2f763',
-      passKind: 'initial',
-      passIndex: 0
+      agentPhase: 'initial'
     }),
     statisticsGroup('repository-delivery-planner', 1, 1_600, 300, 400, {
-      passKind: 'draft',
-      passIndex: 0,
+      agentPhase: 'draft',
       batchIndex: 1
     }),
     statisticsGroup('repository-delivery-planner', 1, 1_000, 200, 300, {
-      passKind: 'draft',
-      passIndex: 0,
+      agentPhase: 'draft',
       batchIndex: 2
     }),
     statisticsGroup('repository-delivery-planner', 1, 900, 200, 300, {
-      passKind: 'refinement',
-      passIndex: 1
+      agentPhase: 'refinement'
     })
   ]
 }
@@ -233,8 +213,8 @@ function statisticsGroup(
   context: {
     caseId?: string
     deliveryId?: string
-    passKind?: string
-    passIndex?: number
+    agentPhase?: string
+    feedbackRetryIndex?: number
     batchIndex?: number
     chunkId?: string
   } = {}
@@ -245,8 +225,8 @@ function statisticsGroup(
     agent_name,
     case_id: context.caseId ?? null,
     delivery_id: context.deliveryId ?? null,
-    pass_kind: context.passKind ?? null,
-    pass_index: context.passIndex ?? null,
+    agent_phase: context.agentPhase ?? null,
+    feedback_retry_index: context.feedbackRetryIndex ?? null,
     batch_index: context.batchIndex ?? null,
     chunk_id: context.chunkId ?? null,
     provider: 'anthropic',
@@ -271,7 +251,7 @@ function executionStatisticsFor(
   index: number
 ): Run['execution_statistics'] {
   const baseGroups = STATISTICS_GROUPS[workflow].filter(
-    (group) => includeFeedback || group.pass_kind !== 'feedback'
+    (group) => includeFeedback || group.agent_phase !== 'feedback'
   )
   const groups =
     workflow === 'repository-review'
