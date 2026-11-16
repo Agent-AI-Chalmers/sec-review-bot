@@ -25,8 +25,39 @@ These guarantees hold only when the check and the write are atomic: they run in 
 - A claim is a time-limited right to work on a record. The claimant receives a claim token and renews the claim's lease while it works. When the lease expires, another process may claim the work.
 - An axis is one lifecycle of a Review Runs run. Each run has three: preparation, execution, and publication. They have separate states.
 - A publication step is one external side effect within a publication, for example one draft pull request for one repository delivery. Each step has its own state and attempt budget.
-- `uncertain` means a side effect may or may not have happened and the connector has to look before concluding. `disconnected` means automation gave up looking and an operator, a person with admin access, has to decide.
+- `uncertain` and `disconnected` describe different recovery conditions on each axis; use the axis as well as the status when interpreting a run.
 - Memory Catalog uses `automation.version` to identify the automation switch state and `active_version` to identify the memory tree currently in use. Writes carry `expected_version` or `expected_active_version` so the server can reject operations based on stale state.
+
+## Recovery Meaning By Axis
+
+<!-- doc-default: review-runs.recovery-meaning; source=contracts/review-runs-api/v1/openapi.yaml -->
+
+| Scope            | `uncertain`                                                                                                         | `disconnected`                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Preparation      | The preparer's claim expired before it reported; preparation can be reclaimed to establish or rebuild its input.    | The run's own records prevent automatic conclusion, such as execution already having advanced when preparation expires. |
+| Execution        | Submission may have reached the Execution Gateway without a confirmed response; recovery replays the same `run_id`. | The submission recovery budget ended without a conclusive answer.                                                       |
+| Publication step | Attempts are exhausted and a remote write may have taken effect; the connector reconciles before concluding.        | Reconciliation exhausted its budget without a conclusive answer.                                                        |
+| Publication axis | A step has an uncertain remote outcome.                                                                             | A step requires an operator decision after reconciliation stopped.                                                      |
+
+`disconnected` stops automatic recovery on that scope. Resume returns an eligible scope to recovery; preparation can resume only while execution remains `pending`. Give-up records an operator decision to stop waiting without establishing that a remote effect did not occur. Abandon is a separate preparation operation for contradictory records. The [Review Runs guide](../../services/review-runs/README.md) and contract define the allowed operations and their consequences.
+
+A publication step's `failed` means its last attempt failed; it can still be retried while attempts remain, or reconciled after exhaustion. `terminal_failed` is its final failure. An axis's `failed` is a terminal conclusion. Do not infer retryability from the word `failed` without identifying the scope.
+
+## Other State Boundaries
+
+The run's axes do not describe every queue or publication candidate. [Artifact publication](ARTIFACT_PUBLICATION.md#publication-candidate-states) lists the input and memory candidate transitions.
+
+<!-- doc-default: review-runs.notice-transitions; source=services/review-runs/src/persistence/run-notices.ts -->
+
+A run notice starts `pending`, becomes `delivering` when claimed, and concludes as `delivered` or `failed`. An expired delivery can be reclaimed with a new token while remaining `delivering`. Resuming a disconnected axis supersedes its undelivered attention notices (`pending` or `delivering → superseded`) in the same transaction and invalidates their claims. Delivered notices and failure notices are not superseded by resume. A notice's `failed` describes notification delivery, not the review outcome.
+
+<!-- doc-default: review-runs.statistics-transitions; source=services/review-runs/src/statistics/execution-statistics-store.ts -->
+
+Execution statistics has its own `pending → reconciling` claim loop. A successful read can return to `pending` while waiting for stable observations, or become `settled` when observations stabilize or the collection window ends. Read failures can return to `pending`; exhausted read-failure retries or rate-limit deferral end as `unavailable`. Interrupted claims can be reclaimed. `ingestion_status` explains the collected snapshot's completeness, and `usage_coverage` describes reported usage; neither is an execution lifecycle status.
+
+<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
+
+Execution Gateway projects Temporal state on each read instead of maintaining another run-state table. Temporal `RUNNING` maps to `running`; a completed workflow becomes `succeeded` only when its success envelope, result, workflow identity, and artifact reference pass validation. Invalid or unsuccessful completed results and other terminal Temporal statuses map to `failed`. `queued` can be returned immediately after submission when no execution record is yet available. Review Runs separately records its observations of that API, so a Gateway status and a coordination recovery status answer different questions.
 
 ## Shared Principles
 

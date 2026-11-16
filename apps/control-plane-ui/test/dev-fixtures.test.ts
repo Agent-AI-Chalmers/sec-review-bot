@@ -733,3 +733,41 @@ test('fixture events show a step that failed and was retried inside a publicatio
     await fixture.close()
   }
 })
+
+test('abandoning a contradictory preparation uses the current production reason', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    const parked = (await (
+      await fetch(`${fixture.base}/api/runs/parked`)
+    ).json()) as { blocks: { run_id: string; axis: string }[] }
+    const runId = parked.blocks.find(
+      (block) => block.axis === 'preparation'
+    )?.run_id
+    assert.ok(runId)
+    const response = await fetch(
+      `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/abandon`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-review-runs-admin-token': 'fixture-admin-token'
+        },
+        body: JSON.stringify({
+          reason: 'records contradict the execution outcome'
+        })
+      }
+    )
+    assert.equal(response.status, 200)
+    const { run } = (await response.json()) as {
+      run: {
+        preparation: { status: string; failure_code: string }
+        notices: { reason_code: string }[]
+      }
+    }
+    assert.equal(run.preparation.status, 'failed')
+    assert.equal(run.preparation.failure_code, 'EXECUTION_ALREADY_ADVANCED')
+    assert.equal(run.notices[0]?.reason_code, 'EXECUTION_ALREADY_ADVANCED')
+  } finally {
+    await fixture.close()
+  }
+})

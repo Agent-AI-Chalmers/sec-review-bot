@@ -13,27 +13,27 @@ import test from 'node:test'
 import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
 import { messages } from '../browser/shared/i18n.js'
 
-test('an edge pair the contract has not split is worded for all of its decisions', () => {
-  // The console looks an edge label up by its state pair, so two declared transitions that share
-  // a pair (the contract separates them by `reason`) collapse onto one tooltip. One axis really
-  // does need that: a disconnected preparation has three operator decisions on the same pair. A
-  // pair is therefore acceptable either once, or many times only where the contract says why -
-  // and the wording has to hold for every decision, which is a judgement the key cannot make for
-  // itself. This pins the set of pairs known to be collapsed, so a future decision added to an
-  // existing pair shows up here instead of silently losing its label.
-  const collapsed: string[] = []
-  for (const machine of STATE_MACHINES) {
-    const decisions = new Map<string, number>()
-    for (const edge of machine.transitions) {
-      const pair = `${machine.axis} ${edge.from}->${edge.to}`
-      decisions.set(pair, (decisions.get(pair) ?? 0) + 1)
+test('transitions sharing a state pair retain distinct reason-specific explanations', async () => {
+  const { axisMachine, edgeLabel } =
+    await import('../browser/features/runs/detail/transitions.js')
+  const { translate } = await import('../browser/shared/i18n.js')
+  for (const language of ['en', 'zh'] as const) {
+    const t: import('../browser/shared/i18n.js').Translator = (key, ...args) =>
+      translate(language, key, ...args)
+    for (const machine of STATE_MACHINES) {
+      const groups = Map.groupBy(
+        machine.transitions,
+        (edge) => `${edge.from}->${edge.to}`
+      )
+      for (const edges of groups.values()) {
+        if (edges.length < 2) continue
+        const labels = edges.map((edge) =>
+          edgeLabel(axisMachine(machine), edge, t)
+        )
+        assert.equal(new Set(labels).size, edges.length)
+      }
     }
-    for (const [pair, count] of decisions)
-      if (count > 1) collapsed.push(`${pair} (${count})`)
   }
-  assert.deepStrictEqual(collapsed.sort(), [
-    'preparation disconnected->failed (3)'
-  ])
 })
 
 test('every state-machine label has a key in both languages', () => {

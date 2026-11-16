@@ -230,25 +230,14 @@ export const messages = {
     artifactAvailable: 'Available',
     artifactUnavailable: 'Unavailable',
     soFar: 'so far:',
-    publicationStepSucceeded: 'Succeeded',
     copyDigest: 'Copy digest',
     digestCopied: 'Digest copied',
     expandDigest: 'Show full digest',
     collapseDigest: 'Hide full digest',
     statusPending: 'Pending',
-    statusPreparing: 'Preparing',
-    statusQueued: 'Queued',
-    statusRunning: 'Running',
     statusInProgress: 'In progress',
-    statusSucceeded: 'Succeeded',
-    statusSubmitted: 'Submitted',
-    statusPublishing: 'Publishing',
-    statusPublished: 'Published',
     statusDelivering: 'Delivering',
     statusDelivered: 'Delivered',
-    statusSkipped: 'Skipped',
-    statusUncertain: 'Uncertain',
-    statusDisconnected: 'Disconnected',
     observedAgo: 'observed',
     observationStale: 'may be out of date',
     statusFailed: 'Failed',
@@ -336,8 +325,6 @@ export const messages = {
     // What the system did about it, and what an operator can choose, belongs to the state and the
     // banner around this code; repeating it here says the same thing twice and puts decisions
     // into a vocabulary that is supposed to name facts.
-    failureCodePreparationAbandoned:
-      'An operator ended this run instead of letting it continue, so its preparation was concluded as failed.',
     failureCodeExecutionAlreadyAdvanced:
       'The preparation claim expired while execution was already past pending. A preparation failure means the task never started, which this run contradicts, so the expiry could not be concluded.',
     failureCodeSubmissionUncertain:
@@ -434,7 +421,6 @@ export const messages = {
     execution: 'Execution',
     publication: 'Publication',
     openExternalLink: 'View result',
-    retryPending: 'Retry pending',
     publicationAttempts: 'Attempts',
     failureCode: 'Failure code',
     unable: 'Unable to load this page',
@@ -522,9 +508,9 @@ export const messages = {
     state_publication_step_running_label: 'Running',
     state_publication_step_running_desc:
       'An attempt started. Its owner may still be writing to the remote system, or may have stopped after writing, so a later attempt cannot assume nothing happened.',
-    state_publication_step_failed_label: 'Failed',
+    state_publication_step_failed_label: 'Attempt failed',
     state_publication_step_failed_desc:
-      'The last attempt reported a retryable failure; another attempt may start while attempts remain.',
+      'The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding.',
     state_publication_step_uncertain_label: 'Uncertain',
     state_publication_step_uncertain_desc:
       'No attempts remain, but an earlier attempt may have taken effect remotely, so the step is checked against the remote system before it concludes.',
@@ -579,10 +565,10 @@ export const messages = {
       'the run\u2019s own records contradict concluding it automatically',
     edge_preparation_disconnected_uncertain:
       'an operator handed it back to automatic recovery',
-    // The edge key is the pair, and this axis has three operator decisions that agree on the
-    // pair (the contract separates them by reason). The wording therefore names what all three
-    // have in common: a person concluded a row automation refused to, without claiming that
-    // nothing happened. The per-decision wording is on the run's notice and timeline.
+    edge_preparation_disconnected_failed_given_up:
+      'an operator stopped waiting for preparation',
+    edge_preparation_disconnected_failed_execution_advanced:
+      'an operator concluded preparation whose records conflicted with execution already having advanced',
     edge_preparation_disconnected_failed:
       'an operator concluded the run instead of waiting for it',
     edge_preparation_preparing_failed:
@@ -889,25 +875,14 @@ export const messages = {
     artifactAvailable: '可用',
     artifactUnavailable: '不可用',
     soFar: '已持续',
-    publicationStepSucceeded: '发布成功',
     copyDigest: '复制摘要',
     digestCopied: '摘要已复制',
     expandDigest: '显示完整摘要',
     collapseDigest: '收起完整摘要',
     statusPending: '等待中',
-    statusPreparing: '准备中',
-    statusQueued: '排队中',
-    statusRunning: '执行中',
     statusInProgress: '进行中',
-    statusSucceeded: '执行成功',
-    statusSubmitted: '已提交',
-    statusPublishing: '发布中',
-    statusPublished: '已发布',
     statusDelivering: '投递中',
     statusDelivered: '已送达',
-    statusSkipped: '已跳过',
-    statusUncertain: '待确认',
-    statusDisconnected: '失联',
     observedAgo: '观察到',
     observationStale: '可能已过期',
     statusFailed: '失败',
@@ -990,8 +965,6 @@ export const messages = {
     failureCodePreparationRetryExhausted: '准备阶段反复失败，重试次数已用完。',
     // 每条只说这个码本身的意思：它命名的事实，以及这件事的后果。系统怎么处理、operator 能怎么选，
     // 属于状态和它周围的横幅；在这里重复会把同一件事说两遍，也会把“决定”塞进一个本该只命名事实的词表里。
-    failureCodePreparationAbandoned:
-      '有人主动结束了这个运行，没有让它继续下去，因此准备阶段按失败收尾。',
     failureCodeExecutionAlreadyAdvanced:
       '准备阶段的认领过期时，执行已经不在「等待中」。准备失败意味着任务从未开始，而这个运行与这一点相矛盾，因此这次过期无法收尾。',
     failureCodeSubmissionUncertain: '执行网关没有确认是否接单。',
@@ -1075,7 +1048,6 @@ export const messages = {
     execution: '执行',
     publication: '发布',
     openExternalLink: '查看结果',
-    retryPending: '等待重试',
     publicationAttempts: '尝试次数',
     failureCode: '失败码',
     unable: '无法加载此页面',
@@ -1156,16 +1128,16 @@ export const messages = {
     state_publication_step_running_label: '进行中',
     state_publication_step_running_desc:
       '一次尝试已经开始。执行者可能仍在写入远端，也可能写入后就中止了，因此后续尝试不能假定什么都没发生。',
-    state_publication_step_failed_label: '失败',
+    state_publication_step_failed_label: '尝试失败',
     state_publication_step_failed_desc:
-      '上一次尝试报告了可重试的失败；尝试次数未用完前还会再试。',
+      '上一次尝试失败。还有剩余次数时系统会重试；次数用尽后，先核对远端结果再下结论。',
     state_publication_step_uncertain_label: '待确认',
     state_publication_step_uncertain_desc:
       '尝试次数已用完，但之前的尝试可能已在远端生效，因此先查询远端再下结论。',
     state_publication_step_disconnected_label: '失联',
     state_publication_step_disconnected_desc:
       '查询远端的次数用完仍没有结论，需要 operator 确认远端的实际情况。',
-    state_publication_step_succeeded_label: '成功',
+    state_publication_step_succeeded_label: '发布成功',
     state_publication_step_succeeded_desc:
       '远端的变更已经存在：由某次尝试写入，或由查询发现。',
     state_publication_step_terminal_failed_label: '最终失败',
@@ -1201,8 +1173,9 @@ export const messages = {
     edge_preparation_preparing_disconnected:
       '运行自身的记录不允许自动收尾，因此停手',
     edge_preparation_disconnected_uncertain: 'operator 把它交回自动恢复',
-    // 该轴的三条 operator 决策共用同一个 from->to 键，契约用 reason 区分；这里只描述三者
-    // 的共性——由人替自动化收尾，且不声称什么都没发生。具体决策在通知与时间线上。
+    edge_preparation_disconnected_failed_given_up: '操作员决定不再等待准备结果',
+    edge_preparation_disconnected_failed_execution_advanced:
+      '执行已经推进，与准备阶段的记录矛盾，操作员将准备阶段收尾',
     edge_preparation_disconnected_failed:
       'operator 没有继续等待，而是替自动化收尾了这个运行',
 

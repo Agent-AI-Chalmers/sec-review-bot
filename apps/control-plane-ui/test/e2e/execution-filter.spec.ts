@@ -149,3 +149,25 @@ test('selection fill remains distinct from keyboard navigation and hover', async
     await selected.evaluate((element) => getComputedStyle(element).outlineStyle)
   ).toBe('solid')
 })
+
+test('all coordination recovery states are selectable in each axis filter', async ({
+  page
+}) => {
+  await openAuthenticatedRuns(page)
+  await openRunFilters(page)
+  for (const [axis, labels] of [
+    ['Preparation', ['Uncertain', 'Disconnected']],
+    ['Execution', ['Uncertain', 'Disconnected', 'Skipped']],
+    ['Publication', ['Uncertain', 'Disconnected']]
+  ] as const) {
+    const filter = page.getByRole('combobox', { name: axis, exact: true })
+    for (const label of labels) {
+      await filter.click()
+      await page.getByRole('option', { name: label, exact: true }).click()
+      await expect(filter).toHaveValue(label)
+      await expect(page).toHaveURL(
+        new RegExp(`${axis.toLowerCase()}_status=${label.toLowerCase()}`)
+      )
+    }
+  }
+})

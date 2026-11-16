@@ -6,6 +6,7 @@ import { ICON_SIZE } from '../../../shared/design.js'
 import {
   EXECUTION_STATUSES,
   PREPARATION_STATUSES,
+  PUBLICATION_STATUSES,
   executionStatusLabel,
   preparationStateLabel,
   runPublicationStatusLabel
@@ -56,9 +57,10 @@ export function RunFilters({
     {
       name: 'publication_status',
       label: t('publication'),
-      options: (
-        ['pending', 'publishing', 'published', 'failed', 'skipped'] as const
-      ).map((value) => ({ value, label: runPublicationStatusLabel(value, t) }))
+      options: PUBLICATION_STATUSES.map((value) => ({
+        value,
+        label: runPublicationStatusLabel(value, t)
+      }))
     },
     {
       name: 'range',

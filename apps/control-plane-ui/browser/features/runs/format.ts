@@ -116,7 +116,6 @@ export function isDownloadableArtifact(
  * console already knows the sentence behind it. */
 export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
   PREPARATION_RETRY_EXHAUSTED: 'failureCodePreparationRetryExhausted',
-  PREPARATION_ABANDONED: 'failureCodePreparationAbandoned',
   EXECUTION_ALREADY_ADVANCED: 'failureCodeExecutionAlreadyAdvanced',
   SUBMISSION_STATE_UNCERTAIN: 'failureCodeSubmissionUncertain',
   SUBMISSION_RECOVERY_EXHAUSTED: 'failureCodeSubmissionRecoveryExhausted',

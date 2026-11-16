@@ -28,6 +28,21 @@ sequenceDiagram
   Database-->>Publisher: Commit result
 ```
 
+## Publication Candidate States
+
+<!-- doc-default: input-bundle-candidate-transitions; source=services/review-runs/src/persistence/input-bundle-candidate-store.ts -->
+
+Input bundles use `reserved → present → selected`: reserve records the complete intent, confirmation records the uploader's claim that the object exists, and prepared submission selects it. An owned preparation can abandon a `reserved` or `present` candidate. Unlike Memory Catalog candidates, an abandoned input candidate can be reserved again with identical content under a current preparation claim. `selected` candidates cannot be abandoned.
+
+<!-- doc-default: memory-publication-transitions; source=services/memory-catalog/src/catalog-store.ts -->
+
+| Catalog candidate | Normal transitions              | Abandonment and replay                                                                                                                                                                                                                   |
+| ----------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extraction        | `reserved → present → selected` | No `abandoned` state. Registration must select a confirmed candidate; repeating confirmation preserves `selected`.                                                                                                                       |
+| Memory version    | `reserved → present → selected` | Unselected automatic `learning` or `reorganization` candidates can move from `reserved` or `present` to `abandoned`. That state is final: reserve and confirm retries do not reactivate it. Manual candidates have no abandon operation. |
+
+Selection records which intent was attached to the business result. Confirmation is not a Catalog object-store check: the uploader is responsible for verifying the object. None of these states deletes stored bytes. Pausing memory automation can abandon automatic version candidates, but does not abandon extraction candidates or cancel worker execution.
+
 ## Recovery by Artifact
 
 After an interruption, retries check the recorded publication intent and object state first. A [Temporal Activity retry](https://docs.temporal.io/activity-definition#idempotency) can repeat an upload after a lost completion response; it does not make storage and SQL one transaction.

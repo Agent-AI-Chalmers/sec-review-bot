@@ -1135,9 +1135,8 @@ x-state-machines:
           label: cannot be concluded automatically,
         }
       # Operator decisions can resume the preparation, give up on its outcome, or abandon the
-      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED. PREPARATION_ABANDONED remains
-      # declared because stored records may expose it, and every exposed reason must be named by
-      # the contract. Both failure edges end the preparation as `failed`.
+      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED.
+      # Both failure edges end the preparation as `failed`.
       - {
           from: disconnected,
           to: uncertain,
@@ -1154,12 +1153,6 @@ x-state-machines:
           from: disconnected,
           to: failed,
           reason: EXECUTION_ALREADY_ADVANCED,
-          label: abandoned by an operator,
-        }
-      - {
-          from: disconnected,
-          to: failed,
-          reason: PREPARATION_ABANDONED,
           label: abandoned by an operator,
         }
       # Two write paths reach `failed`: a preparer reporting a terminal error (any
@@ -1195,7 +1188,7 @@ x-state-machines:
           Execution never ran because preparation failed. This is not an execution failure; the
           reason is on the preparation axis.
       uncertain:
-        label: Unconfirmed
+        label: Uncertain
         description: >-
           The task was submitted, but no response arrived, so it is unknown whether the Execution API provider
           accepted it. This is not a failure: the submission is replayed under the same run_id.
@@ -1378,8 +1371,8 @@ x-state-machines:
             An attempt started. Its owner may still be performing the side effect, or may have died
             after performing it, so a later claim cannot assume nothing happened.
         failed:
-          label: Failed
-          description: The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.
+          label: Attempt failed
+          description: The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding.
         uncertain:
           label: Uncertain
           description: >-
