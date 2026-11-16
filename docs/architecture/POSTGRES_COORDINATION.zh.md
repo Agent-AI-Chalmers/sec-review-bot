@@ -28,12 +28,12 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 - 轴（axis）是 Review Runs 中一个 run 的一条生命周期。每个 run 有三条：preparation、execution 和 publication，各自有独立的状态。
 - publication step 是一次 publication 中的一个外部副作用，例如为某个仓库交付打开的一个 draft pull request。每个 step 有自己的状态和尝试预算。
 - `uncertain` 表示一个副作用可能发生了也可能没发生，connector 必须先去查看才能下结论。`disconnected` 表示自动化已经放弃查看，需要 operator（拥有管理权限的人）来决定。
-- generation 和当前 revision 是 Memory Catalog 为自动化开关和当前记忆树使用的版本号。
+- Memory Catalog 用 `automation.version` 标识自动化开关状态的版本，用 `active_version` 标识当前生效的记忆树版本。写入时带上 `expected_version` 或 `expected_active_version`，服务端据此拒绝基于过时状态的操作。
 
 ## 共同原则
 
 - 决定在数据库里做出。每次协调性写入都在修改状态的同一个事务中锁住或比较当前状态。应用代码从不先读出状态、在内存里判断、再在另一步中写回。
-- 调用方说明自己的预期。写入时带上它预期要替换的状态：Review Runs 中是 claim token，Memory Catalog 中是预期的 generation 或当前 revision。不匹配说明另一个写入者赢了。
+- 调用方说明自己的预期。写入时带上它预期要替换的状态：Review Runs 中是 claim token，Memory Catalog 中是预期的 version 或当前 version。不匹配说明另一个写入者赢了。
 - 重试以调用方选定的标识为键。用相同的 `run_id`、入口键或 `operation_id` 和相同内容重复请求，会返回原来的结果。标识相同但内容不同则视为冲突。
 - 执行外部效果之前先记录意图。上传对象或写入远端系统之前，服务先记下它要做什么。重试从这份记录出发，先检查外部系统，而不是假定效果不存在。
 - SQL 紧挨着执行它的代码。只在一处使用的查询保持内嵌，这样解释锁或条件的注释就在它解释的子句旁边。在多条语句中重复出现、承载同一条规则的片段，会提取为具名的模块常量。这种常量只由模块内的字面量构成，从不包含调用方输入。
@@ -44,9 +44,9 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 | ------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | 由谁执行           | 持有 claim 的一方。worker 或 connector 领取工作，并在工作期间续租                              | 每个 HTTP 请求，只在一个事务内持有锁                                                                  |
 | 串行化写入者       | 对工作行使用 `SELECT ... FOR UPDATE` 和 `FOR UPDATE SKIP LOCKED`                               | 对 operation 或 extraction 标识使用 `pg_advisory_xact_lock`，并对单例状态行使用 `FOR UPDATE`          |
-| 发现自己输掉竞争   | claim token 不再匹配，写入不修改任何行，返回 `false`                                           | 预期的 generation 或当前 revision 不再匹配，服务返回 HTTP 409                                         |
+| 发现自己输掉竞争   | claim token 不再匹配，写入不修改任何行，返回 `false`                                           | 预期的 version 或当前 version 不再匹配，服务返回 HTTP 409                                             |
 | 不确定的外部效果   | 行变为 `uncertain`，由 connector 对账。对账得不出结论时变为 `disconnected`                     | 发布意图先预留，上传后确认，注册时选定。存储错误视为不确定，并使本次尝试失败                          |
-| 审计记录           | 每个轴和每个 publication step 的状态转换都在同一事务中写入 `review_run_events`                 | revision、恢复操作和发布意图本身就是持久记录                                                          |
+| 审计记录           | 每个轴和每个 publication step 的状态转换都在同一事务中写入 `review_run_events`                 | version、恢复操作和发布意图本身就是持久记录                                                           |
 | 生命周期的唯一来源 | [Review Runs API 契约](../../contracts/review-runs-api/v1/openapi.yaml)中的 `x-state-machines` | schema 中的 `CHECK` 约束和 [Memory Catalog API 契约](../../contracts/memory-catalog-api/README.zh.md) |
 
 GitHub Integration 自己不保存协调状态。它是 Review Runs 协议的客户端：领取工作、续租，把续租失败视为失去持有权，并在报告不确定 step 的结果之前先核对 GitHub。

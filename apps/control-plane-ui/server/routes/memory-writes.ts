@@ -12,15 +12,15 @@ import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import { buildMemoryTreeArtifact } from '../memory/memory-tree-artifact.js'
 
 type MemoryWriteCommand = { operation_id: string } & (
-  | { action: 'pause' | 'resume'; expected_generation: number }
+  | { action: 'pause' | 'resume'; expected_version: number }
   | {
       action: 'restore'
-      expected_active_revision: number
-      restored_revision: number
+      expected_active_version: number
+      restored_version: number
     }
   | {
       action: 'edit'
-      expected_active_revision: number
+      expected_active_version: number
       files: Map<string, string>
     }
 )
@@ -48,28 +48,28 @@ function parseMemoryWriteCommand(
     return { error: 'invalid_request' }
   const operation_id = value.operation_id
   if (action === 'pause' || action === 'resume') {
-    if (!isIntegerAtLeast(value.expected_generation, 0))
+    if (!isIntegerAtLeast(value.expected_version, 0))
       return { error: 'invalid_request' }
     return {
       action,
       operation_id,
-      expected_generation: value.expected_generation
+      expected_version: value.expected_version
     }
   }
   if (action === 'restore') {
     if (
-      !isIntegerAtLeast(value.expected_active_revision, 1) ||
-      !isIntegerAtLeast(value.restored_revision, 1)
+      !isIntegerAtLeast(value.expected_active_version, 1) ||
+      !isIntegerAtLeast(value.restored_version, 1)
     )
       return { error: 'invalid_request' }
     return {
       action,
       operation_id,
-      expected_active_revision: value.expected_active_revision,
-      restored_revision: value.restored_revision
+      expected_active_version: value.expected_active_version,
+      restored_version: value.restored_version
     }
   }
-  if (action !== 'edit' || !isIntegerAtLeast(value.expected_active_revision, 0))
+  if (action !== 'edit' || !isIntegerAtLeast(value.expected_active_version, 0))
     return { error: 'invalid_request' }
   if (!isRecord(value.files)) return { error: 'invalid_memory_files' }
   const files = new Map<string, string>()
@@ -80,7 +80,7 @@ function parseMemoryWriteCommand(
   return {
     action,
     operation_id,
-    expected_active_revision: value.expected_active_revision,
+    expected_active_version: value.expected_active_version,
     files
   }
 }
@@ -111,7 +111,7 @@ async function publishMemoryEdit({
     return
   }
   const intent = {
-    expected_active_revision: command.expected_active_revision,
+    expected_active_version: command.expected_active_version,
     memory_tree_reference: {
       uri: `s3://${ARTIFACT_BUCKET}/${artifact.objectKey}`,
       digest: artifact.digest,
@@ -121,7 +121,7 @@ async function publishMemoryEdit({
     source: { kind: 'manual', operation_id: command.operation_id }
   }
   const reserved = await catalog.write(
-    '/v1/memory-tree/revisions/publications/reserve',
+    '/v1/memory-tree/versions/publications/reserve',
     intent
   )
   if (reserved.status < 200 || reserved.status >= 300) {
@@ -135,14 +135,14 @@ async function publishMemoryEdit({
     return
   }
   const confirmed = await catalog.write(
-    '/v1/memory-tree/revisions/publications/confirm',
+    '/v1/memory-tree/versions/publications/confirm',
     intent
   )
   if (confirmed.status < 200 || confirmed.status >= 300) {
     writeUpstreamResult(response, confirmed, { cacheControl: 'no-store' })
     return
   }
-  const committed = await catalog.write('/v1/memory-tree/revisions', intent)
+  const committed = await catalog.write('/v1/memory-tree/versions', intent)
   writeUpstreamResult(response, committed, { cacheControl: 'no-store' })
 }
 
@@ -198,7 +198,7 @@ export function createMemoryWriteRoutes({
             `/v1/memory-tree/automation/${command.action}`,
             {
               operation_id: command.operation_id,
-              expected_generation: command.expected_generation
+              expected_version: command.expected_version
             }
           )
           writeUpstreamResult(response, upstream, { cacheControl: 'no-store' })
@@ -207,8 +207,8 @@ export function createMemoryWriteRoutes({
         case 'restore': {
           const upstream = await catalog.write('/v1/memory-tree/restore', {
             operation_id: command.operation_id,
-            expected_active_revision: command.expected_active_revision,
-            restored_revision: command.restored_revision
+            expected_active_version: command.expected_active_version,
+            restored_version: command.restored_version
           })
           writeUpstreamResult(response, upstream, { cacheControl: 'no-store' })
           return

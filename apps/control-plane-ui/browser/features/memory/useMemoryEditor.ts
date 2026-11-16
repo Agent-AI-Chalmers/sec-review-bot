@@ -9,33 +9,33 @@ interface EditorFiles {
 }
 
 interface MemoryEditSession extends EditorFiles {
-  baseRevision: number
+  baseVersion: number
   attempt?: { content: string; operationId: string }
 }
 
 interface MemoryEditor {
   session: EditorFiles | undefined
-  begin(baseRevision: number): Promise<void>
+  begin(baseVersion: number): Promise<void>
   changeFiles(files: Record<string, string>): void
   close(): void
   commit(): Promise<void>
 }
 
-/** Own the edit's base revision and retry identity; the page owns operation feedback and refresh. */
+/** Own the edit's base version and retry identity; the page owns operation feedback and refresh. */
 export function useMemoryEditor(): MemoryEditor {
   const [session, setSession] = React.useState<MemoryEditSession>()
 
-  const begin = async (baseRevision: number): Promise<void> => {
-    // The revision is captured before loading; catalog refreshes cannot change this edit's base.
+  const begin = async (baseVersion: number): Promise<void> => {
+    // The version is captured before loading; catalog refreshes cannot change this edit's base.
     const files =
-      baseRevision === 0
+      baseVersion === 0
         ? { 'MEMORY.md': '# Security Review Experience Memory\n' }
         : (
             await api<MemoryTreeContentResponse>(
-              `/memory/revisions/${baseRevision}/content`
+              `/memory/versions/${baseVersion}/content`
             )
           ).files
-    setSession({ baseRevision, files, initialFiles: files })
+    setSession({ baseVersion, files, initialFiles: files })
   }
 
   const changeFiles = (files: Record<string, string>): void => {
@@ -59,7 +59,7 @@ export function useMemoryEditor(): MemoryEditor {
     setSession({ ...session, attempt })
     await apiPost('/memory/edit', {
       operation_id: attempt.operationId,
-      expected_active_revision: session.baseRevision,
+      expected_active_version: session.baseVersion,
       files: session.files
     })
     close()

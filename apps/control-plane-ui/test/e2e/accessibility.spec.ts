@@ -57,8 +57,8 @@ test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', a
 }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })
-  await page.getByRole('tab', { name: 'Revisions' }).click()
-  await page.locator('.revision-graph-node[data-current]').waitFor()
+  await page.getByRole('tab', { name: 'Versions' }).click()
+  await page.locator('.version-graph-node[data-current]').waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
@@ -112,7 +112,7 @@ test('stable error state has no detectable WCAG A/AA violations', async ({
 test('populated memory files and observations keep readable text', async ({
   page
 }) => {
-  await page.goto('/memory/revisions/2/tree', { waitUntil: 'networkidle' })
+  await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
   await expect(page.locator('.memory-markdown')).toBeVisible()
   await expectNoAccessibilityViolations(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })

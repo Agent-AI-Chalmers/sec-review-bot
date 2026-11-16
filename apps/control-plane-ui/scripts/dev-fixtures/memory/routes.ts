@@ -20,7 +20,7 @@ const trajectoryContent: TrajectoryContentResponse = {
   events: memoryTrajectory.events.map(validateTrajectoryEvent)
 }
 
-const LOAD_ERROR_REVISION = 404
+const LOAD_ERROR_VERSION = 404
 
 type SourceRunIds = Record<
   'repository-review' | 'pull-request-review' | 'issue-review',
@@ -44,12 +44,12 @@ export function createMemoryHandler(
     throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
-    generation: 1,
+    version: 1,
     changed_by: { kind: 'service', id: 'memory-catalog' },
     changed_at: new Date(BASE_TIME).toISOString()
   }
-  let activeMemoryRevision = 2
-  const memoryFilesByRevision = new Map<number, Record<string, string>>([
+  let activeMemoryVersion = 2
+  const memoryFilesByVersion = new Map<number, Record<string, string>>([
     [
       1,
       {
@@ -88,10 +88,10 @@ export function createMemoryHandler(
       }
     ]
   ])
-  const memoryRevisions: Array<Record<string, unknown>> = [
+  const memoryVersions: Array<Record<string, unknown>> = [
     {
-      revision: 3,
-      predecessor_revision: 1,
+      version: 3,
+      predecessor_version: 1,
       created_at: new Date(BASE_TIME + 120_000).toISOString(),
       source: {
         kind: 'manual',
@@ -100,8 +100,8 @@ export function createMemoryHandler(
       }
     },
     {
-      revision: 2,
-      predecessor_revision: 1,
+      version: 2,
+      predecessor_version: 1,
       created_at: new Date(BASE_TIME + 60_000).toISOString(),
       source: {
         kind: 'learning',
@@ -142,8 +142,8 @@ export function createMemoryHandler(
       }
     },
     {
-      revision: 1,
-      predecessor_revision: null,
+      version: 1,
+      predecessor_version: null,
       created_at: new Date(BASE_TIME).toISOString(),
       source: {
         kind: 'manual',
@@ -232,7 +232,7 @@ export function createMemoryHandler(
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
   ]
-  const consumedRevisionByObservation = new Map([
+  const consumedVersionByObservation = new Map([
     ['observation-fixture-extraction-2-1', 2],
     ['observation-fixture-extraction-3-1', 2],
     ['observation-fixture-extraction-4-1', 2]
@@ -241,27 +241,27 @@ export function createMemoryHandler(
   // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
   // Provenance is replaced; chronology, operator edits and reorganization are
   // illustrative. Each observation is registered once, including pending work.
-  for (const record of [...memoryRevisions, ...extractionRecords])
+  for (const record of [...memoryVersions, ...extractionRecords])
     record.created_at = new Date(
       Date.parse(String(record.created_at)) - 64 * 3_600_000
     ).toISOString()
   let sampleIndex = 0
-  for (let revision = 4; revision <= 60; revision += 1) {
-    const predecessor = revision === 4 ? 2 : revision === 56 ? 53 : revision - 1
-    const files = { ...memoryFilesByRevision.get(predecessor)! }
+  for (let version = 4; version <= 60; version += 1) {
+    const predecessor = version === 4 ? 2 : version === 56 ? 53 : version - 1
+    const files = { ...memoryFilesByVersion.get(predecessor)! }
     const createdAt = new Date(
-      BASE_TIME - (61 - revision) * 3_600_000
+      BASE_TIME - (61 - version) * 3_600_000
     ).toISOString()
     let source: Record<string, unknown>
-    if (revision % 7 === 0) {
+    if (version % 7 === 0) {
       files['MEMORY.md'] +=
         '\nReview only guidance relevant to the current trust boundary.\n'
       source = {
         kind: 'manual',
-        operation_id: `fixture-edit-${revision}`,
+        operation_id: `fixture-edit-${version}`,
         actor: { kind: 'user', id: 'review-operator' }
       }
-    } else if (revision % 5 === 0) {
+    } else if (version % 5 === 0) {
       files['MEMORY.md'] =
         '# Security Review Experience Memory\n\nSelect a topic, then verify its applicability against current repository evidence.\n\n' +
         Object.keys(files)
@@ -272,7 +272,7 @@ export function createMemoryHandler(
         '\n'
       source = {
         kind: 'reorganization',
-        operation_id: `fixture-reorganize-${revision}`,
+        operation_id: `fixture-reorganize-${version}`,
         trajectory_reference: trajectoryReference,
         maintenance_report: {
           summary:
@@ -283,10 +283,7 @@ export function createMemoryHandler(
     } else {
       const sample = historySamples[sampleIndex++]!
       const extractionId = `fixture-history-${sampleIndex}`
-      consumedRevisionByObservation.set(
-        `observation-${extractionId}-1`,
-        revision
-      )
+      consumedVersionByObservation.set(`observation-${extractionId}-1`, version)
       extractionRecords.push({
         extraction_id: extractionId,
         source_workflow: 'repository-review',
@@ -307,7 +304,7 @@ export function createMemoryHandler(
         }
       source = {
         kind: 'learning',
-        operation_id: `fixture-learning-${revision}`,
+        operation_id: `fixture-learning-${version}`,
         observation_ids: [`observation-${extractionId}-1`],
         trajectory_reference: trajectoryReference,
         maintenance_report: {
@@ -323,10 +320,10 @@ export function createMemoryHandler(
         }
       }
     }
-    memoryFilesByRevision.set(revision, files)
-    memoryRevisions.unshift({
-      revision,
-      predecessor_revision: predecessor,
+    memoryFilesByVersion.set(version, files)
+    memoryVersions.unshift({
+      version,
+      predecessor_version: predecessor,
       created_at: createdAt,
       source
     })
@@ -349,7 +346,7 @@ export function createMemoryHandler(
     })
   }
   // The operator restored the predecessor after inspecting the latest reorganization.
-  activeMemoryRevision = 59
+  activeMemoryVersion = 59
   extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
   for (const record of extractionRecords)
     for (const [index, observation] of record.observations.entries())
@@ -370,8 +367,8 @@ export function createMemoryHandler(
         source_run_id: record.source_run_id,
         source_unit_id: record.source_unit_id,
         body_markdown: observation.body_markdown,
-        consumed_revision:
-          consumedRevisionByObservation.get(observation.observation_id) ?? null,
+        consumed_version:
+          consumedVersionByObservation.get(observation.observation_id) ?? null,
         created_at: record.created_at
       }))
   )
@@ -412,7 +409,7 @@ export function createMemoryHandler(
       return
     }
     if (requestUrl === '/api/memory/tree' && request.method === 'GET') {
-      response.end(JSON.stringify({ revision: activeMemoryRevision }))
+      response.end(JSON.stringify({ version: activeMemoryVersion }))
       return
     }
     if (
@@ -437,10 +434,10 @@ export function createMemoryHandler(
             ).length,
             observation_count: observations.length,
             pending_observation_count: observations.filter(
-              (observation) => observation.consumed_revision === null
+              (observation) => observation.consumed_version === null
             ).length,
             consumed_observation_count: observations.filter(
-              (observation) => observation.consumed_revision !== null
+              (observation) => observation.consumed_version !== null
             ).length
           },
           trend_granularity: range === 'all' ? 'month' : 'day',
@@ -475,24 +472,23 @@ export function createMemoryHandler(
       return
     }
     if (
-      requestUrl.startsWith('/api/memory/revisions?') &&
+      requestUrl.startsWith('/api/memory/versions?') &&
       request.method === 'GET'
     ) {
-      // Honor before_revision paging like the catalog: newest first, exclusive.
+      // Honor before_version paging like the catalog: newest first, exclusive.
       const query = new URL(requestUrl, 'http://fixture').searchParams
       const limit = Number(query.get('limit') ?? '50')
-      const before = query.get('before_revision')
-      const matching = memoryRevisions.filter(
-        (revision) =>
-          before === null || Number(revision.revision) < Number(before)
+      const before = query.get('before_version')
+      const matching = memoryVersions.filter(
+        (version) => before === null || Number(version.version) < Number(before)
       )
       const page = matching.slice(0, limit)
       response.end(
         JSON.stringify({
-          revisions: page,
-          next_before_revision:
+          versions: page,
+          next_before_version:
             matching.length > limit
-              ? Number(page[page.length - 1]?.revision)
+              ? Number(page[page.length - 1]?.version)
               : null
         })
       )
@@ -502,18 +498,18 @@ export function createMemoryHandler(
       requestUrl.startsWith('/api/memory/observations?') &&
       request.method === 'GET'
     ) {
-      // Honor the catalog's revision filter and cursor so the UI's paging and
+      // Honor the catalog's version filter and cursor so the UI's paging and
       // report-to-observation jump behave as they do against the real catalog.
       const query = new URL(requestUrl, 'http://fixture').searchParams
-      const consumedRevision = query.get('consumed_revision')
+      const consumedVersion = query.get('consumed_version')
       const limit = Number(query.get('limit') ?? '50')
       const offset = Number(query.get('cursor') ?? '0')
       const matching = [...observations]
         .reverse()
         .filter(
           (observation) =>
-            consumedRevision === null ||
-            observation.consumed_revision === Number(consumedRevision)
+            consumedVersion === null ||
+            observation.consumed_version === Number(consumedVersion)
         )
       const page = matching.slice(offset, offset + limit)
       response.end(
@@ -537,25 +533,26 @@ export function createMemoryHandler(
       )
       return
     }
-    const memoryRevisionMatch =
-      /^\/api\/memory\/revisions\/([1-9][0-9]*)$/.exec(requestUrl)
-    if (request.method === 'GET' && memoryRevisionMatch !== null) {
-      const revision = Number(memoryRevisionMatch[1])
-      const record = memoryRevisions.find(
-        (item) => Number(item.revision) === revision
+    const memoryVersionMatch = /^\/api\/memory\/versions\/([1-9][0-9]*)$/.exec(
+      requestUrl
+    )
+    if (request.method === 'GET' && memoryVersionMatch !== null) {
+      const version = Number(memoryVersionMatch[1])
+      const record = memoryVersions.find(
+        (item) => Number(item.version) === version
       )
       if (record === undefined) response.statusCode = 404
-      response.end(JSON.stringify(record ?? { error: 'revision_not_found' }))
+      response.end(JSON.stringify(record ?? { error: 'version_not_found' }))
       return
     }
     const memoryTrajectoryContentMatch =
-      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/trajectory\/content$/.exec(
+      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/trajectory\/content$/.exec(
         requestUrl
       )
     if (request.method === 'GET' && memoryTrajectoryContentMatch !== null) {
       if (
-        memoryTrajectoryContentMatch[1] === 'revisions' &&
-        Number(memoryTrajectoryContentMatch[2]) === LOAD_ERROR_REVISION
+        memoryTrajectoryContentMatch[1] === 'versions' &&
+        Number(memoryTrajectoryContentMatch[2]) === LOAD_ERROR_VERSION
       ) {
         response.statusCode = 503
         response.end(JSON.stringify({ error: 'memory_catalog_unavailable' }))
@@ -565,18 +562,17 @@ export function createMemoryHandler(
       return
     }
     const memoryDownloadMatch =
-      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|trajectory)$/.exec(
+      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/(artifact|trajectory)$/.exec(
         requestUrl
       )
     if (request.method === 'GET' && memoryDownloadMatch !== null) {
       const collection = memoryDownloadMatch[1]
       const identity = memoryDownloadMatch[2] ?? ''
       const kind = memoryDownloadMatch[3]
-      const revision = Number(identity)
+      const version = Number(identity)
       const available =
-        collection === 'revisions'
-          ? memoryFilesByRevision.has(revision) ||
-            revision === LOAD_ERROR_REVISION
+        collection === 'versions'
+          ? memoryFilesByVersion.has(version) || version === LOAD_ERROR_VERSION
           : extractionRecords.some(
               (record) => record.extraction_id === identity
             )
@@ -603,15 +599,15 @@ export function createMemoryHandler(
       return
     }
     const memoryContentMatch =
-      /^\/api\/memory\/revisions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
+      /^\/api\/memory\/versions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
     if (request.method === 'GET' && memoryContentMatch !== null) {
-      const revision = Number(memoryContentMatch[1])
-      if (revision === LOAD_ERROR_REVISION) {
+      const version = Number(memoryContentMatch[1])
+      if (version === LOAD_ERROR_VERSION) {
         response.statusCode = 422
         response.end(JSON.stringify({ error: 'invalid_memory_tree_artifact' }))
         return
       }
-      const files = memoryFilesByRevision.get(revision)
+      const files = memoryFilesByVersion.get(version)
       if (files === undefined) response.statusCode = 404
       response.end(
         JSON.stringify(
@@ -635,14 +631,14 @@ export function createMemoryHandler(
       >
       const action = memoryWriteMatch[1] ?? memoryWriteMatch[2]
       if (action === 'pause' || action === 'resume') {
-        if (body.expected_generation !== memoryAutomation.generation) {
+        if (body.expected_version !== memoryAutomation.version) {
           response.statusCode = 409
-          response.end(JSON.stringify({ error: 'generation_conflict' }))
+          response.end(JSON.stringify({ error: 'version_conflict' }))
           return
         }
         memoryAutomation = {
           state: action === 'pause' ? 'paused' : 'enabled',
-          generation: memoryAutomation.generation + 1,
+          version: memoryAutomation.version + 1,
           changed_by: { kind: 'service', id: 'control-plane-ui' },
           changed_at: new Date().toISOString()
         }
@@ -655,36 +651,36 @@ export function createMemoryHandler(
         )
         return
       }
-      if (body.expected_active_revision !== activeMemoryRevision) {
+      if (body.expected_active_version !== activeMemoryVersion) {
         response.statusCode = 409
-        response.end(JSON.stringify({ error: 'revision_conflict' }))
+        response.end(JSON.stringify({ error: 'version_conflict' }))
         return
       }
       if (action === 'restore') {
-        const restoredRevision = Number(body.restored_revision)
-        if (!memoryFilesByRevision.has(restoredRevision)) {
+        const restoredVersion = Number(body.restored_version)
+        if (!memoryFilesByVersion.has(restoredVersion)) {
           response.statusCode = 404
           response.end(JSON.stringify({ error: 'restore_target_unavailable' }))
           return
         }
-        activeMemoryRevision = restoredRevision
+        activeMemoryVersion = restoredVersion
         response.statusCode = 201
         response.end(
           JSON.stringify({
             created: true,
-            active_revision: restoredRevision,
+            active_version: restoredVersion,
             operation_id: body.operation_id
           })
         )
         return
       }
-      const nextRevision =
-        Math.max(...memoryRevisions.map((item) => Number(item.revision))) + 1
+      const nextVersion =
+        Math.max(...memoryVersions.map((item) => Number(item.version))) + 1
       const files = body.files as Record<string, string>
-      memoryFilesByRevision.set(nextRevision, { ...files })
-      memoryRevisions.unshift({
-        revision: nextRevision,
-        predecessor_revision: activeMemoryRevision,
+      memoryFilesByVersion.set(nextVersion, { ...files })
+      memoryVersions.unshift({
+        version: nextVersion,
+        predecessor_version: activeMemoryVersion,
         created_at: new Date().toISOString(),
         source: {
           kind: 'manual',
@@ -692,9 +688,9 @@ export function createMemoryHandler(
           actor: { kind: 'service', id: 'control-plane-ui' }
         }
       })
-      activeMemoryRevision = nextRevision
+      activeMemoryVersion = nextVersion
       response.statusCode = 201
-      response.end(JSON.stringify(memoryRevisions[0]))
+      response.end(JSON.stringify(memoryVersions[0]))
       return
     }
   }

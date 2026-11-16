@@ -22,21 +22,21 @@ create table observations (
   observation_id text primary key,
   extraction_id text not null references extractions(extraction_id),
   body_markdown text not null,
-  consumed_revision bigint,
+  consumed_version bigint,
   created_at timestamptz not null default clock_timestamp()
 );
 
 comment on table observations is
   'Independent durable observations produced by completed extractions.';
 create index observations_extraction on observations (extraction_id);
-comment on column observations.consumed_revision is
-  'NULL while pending; otherwise the immutable memory revision that consumed this observation.';
+comment on column observations.consumed_version is
+  'NULL while pending; otherwise the immutable memory version that consumed this observation.';
 
--- Immutable memory history. Learning, reorganization, and manual edits share the same revision
+-- Immutable memory history. Learning, reorganization, and manual edits share the same version
 -- sequence; active state advances through a separate pointer.
-create table memory_tree_revisions (
-  revision bigint primary key check (revision > 0),
-  predecessor_revision bigint references memory_tree_revisions(revision),
+create table memory_tree_versions (
+  version bigint primary key check (version > 0),
+  predecessor_version bigint references memory_tree_versions(version),
   memory_tree_reference jsonb not null,
   source_kind text not null check (source_kind in ('learning', 'reorganization', 'manual')),
   operation_id text not null,
@@ -45,7 +45,7 @@ create table memory_tree_revisions (
   actor jsonb,
   created_at timestamptz not null default clock_timestamp(),
   unique (operation_id),
-  constraint memory_tree_revisions_source_shape_check check (
+  constraint memory_tree_versions_source_shape_check check (
     (
       source_kind in ('learning', 'reorganization') and
       trajectory_reference is not null and maintenance_report is not null and
@@ -58,65 +58,65 @@ create table memory_tree_revisions (
   )
 );
 
-comment on table memory_tree_revisions is
-  'Immutable history of learning, reorganization, and manual memory tree revisions.';
-comment on column memory_tree_revisions.predecessor_revision is
-  'Revision that was active when this revision was created; NULL for the first revision.';
-comment on column memory_tree_revisions.memory_tree_reference is
-  'Content-addressed memory tree artifact published before this revision committed.';
-comment on column memory_tree_revisions.trajectory_reference is
-  'Content-addressed compressed trajectory for the maintainer invocation that produced this revision.';
-comment on column memory_tree_revisions.source_kind is
+comment on table memory_tree_versions is
+  'Immutable history of learning, reorganization, and manual memory tree versions.';
+comment on column memory_tree_versions.predecessor_version is
+  'Version that was active when this version was created; NULL for the first version.';
+comment on column memory_tree_versions.memory_tree_reference is
+  'Content-addressed memory tree artifact published before this version committed.';
+comment on column memory_tree_versions.trajectory_reference is
+  'Content-addressed compressed trajectory for the maintainer invocation that produced this version.';
+comment on column memory_tree_versions.source_kind is
   'Tagged provenance kind: learning, reorganization, or manual.';
-comment on column memory_tree_revisions.operation_id is
-  'Globally unique idempotency identity of a revision operation.';
-comment on column memory_tree_revisions.actor is
-  'Server-authenticated actor identity for a manual revision.';
+comment on column memory_tree_versions.operation_id is
+  'Globally unique idempotency identity of a version operation.';
+comment on column memory_tree_versions.actor is
+  'Server-authenticated actor identity for a manual version.';
 
 alter table observations
-  add constraint observations_consumed_revision_fkey
-  foreign key (consumed_revision) references memory_tree_revisions(revision);
+  add constraint observations_consumed_version_fkey
+  foreign key (consumed_version) references memory_tree_versions(version);
 
 create index observations_pending_order
   on observations (created_at, observation_id)
-  where consumed_revision is null;
+  where consumed_version is null;
 
--- This singleton is only the mutable active pointer. Revision zero represents an empty catalog
--- before the first revision commit and deliberately has no memory_tree_revisions row.
+-- This singleton is only the mutable active pointer. Version zero represents an empty catalog
+-- before the first version commit and deliberately has no memory_tree_versions row.
 create table memory_tree_state (
   singleton boolean primary key default true check (singleton),
-  active_revision bigint not null check (active_revision >= 0)
+  active_version bigint not null check (active_version >= 0)
 );
 
 comment on table memory_tree_state is
-  'Mutable pointer to the active immutable memory revision; revision zero means no memory tree has been committed.';
+  'Mutable pointer to the active immutable memory version; version zero means no memory tree has been committed.';
 
-insert into memory_tree_state (singleton, active_revision) values (true, 0);
+insert into memory_tree_state (singleton, active_version) values (true, 0);
 
 create table memory_tree_restore_operations (
   operation_id text primary key,
-  expected_active_revision bigint not null references memory_tree_revisions(revision),
-  restored_revision bigint not null references memory_tree_revisions(revision),
+  expected_active_version bigint not null references memory_tree_versions(version),
+  restored_version bigint not null references memory_tree_versions(version),
   actor jsonb not null,
   created_at timestamptz not null default clock_timestamp()
 );
 
 comment on table memory_tree_restore_operations is
-  'Idempotent audit ledger for active-pointer restores; restores never create revisions.';
+  'Idempotent audit ledger for active-pointer restores; restores never create versions.';
 
 create table memory_tree_automation (
   singleton boolean primary key default true check (singleton),
   state text not null check (state in ('enabled', 'paused')),
-  generation bigint not null check (generation >= 0),
+  version bigint not null check (version >= 0),
   changed_by jsonb not null,
   changed_at timestamptz not null default clock_timestamp()
 );
 
 comment on table memory_tree_automation is
-  'Durable singleton controlling whether new learning and reorganization memory-tree revisions may commit.';
+  'Durable singleton controlling whether new learning and reorganization memory-tree versions may commit.';
 
 insert into memory_tree_automation (
-  singleton, state, generation, changed_by
+  singleton, state, version, changed_by
 ) values (
   true, 'enabled', 0, '{"kind":"service","id":"memory-catalog"}'
 );
@@ -124,7 +124,7 @@ insert into memory_tree_automation (
 create table memory_tree_automation_operations (
   operation_id text primary key,
   target_state text not null check (target_state in ('enabled', 'paused')),
-  expected_generation bigint not null check (expected_generation >= 0),
+  expected_version bigint not null check (expected_version >= 0),
   actor jsonb not null,
   changed_at timestamptz not null
 );
@@ -146,7 +146,7 @@ create table extraction_publications (
 );
 create unique index extraction_publications_selected on extraction_publications (extraction_id) where status = 'selected';
 
-create table memory_revision_publications (
+create table memory_version_publications (
   source_kind text not null check (source_kind in ('learning', 'reorganization', 'manual')),
   operation_id text not null,
   tree_digest text not null,
@@ -165,8 +165,8 @@ create table memory_revision_publications (
   check (tree_digest = intent #>> '{memory_tree_reference,digest}'),
   check (trajectory_digest = coalesce(intent #>> '{source,trajectory_reference,digest}', ''))
 );
-create unique index memory_revision_publications_selected on memory_revision_publications (operation_id) where status = 'selected';
-comment on column memory_revision_publications.abandon_reason is
+create unique index memory_version_publications_selected on memory_version_publications (operation_id) where status = 'selected';
+comment on column memory_version_publications.abandon_reason is
   'Why the candidate was abandoned: worker_cleanup (explicit abandon request) or automation_paused (a commit refused while automation was paused). Null unless status is abandoned.';
-comment on column memory_revision_publications.status_changed_at is
+comment on column memory_version_publications.status_changed_at is
   'When status last changed. Together with abandon_reason it records when and why a candidate stopped being eligible.';

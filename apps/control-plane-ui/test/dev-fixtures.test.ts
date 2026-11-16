@@ -313,11 +313,11 @@ test('dev fixtures serve memory actions as downloads', async () => {
   try {
     for (const [path, filename] of [
       [
-        '/api/memory/revisions/2/artifact',
+        '/api/memory/versions/2/artifact',
         'attachment; filename="memory-tree.v1.tar.zst"'
       ],
       [
-        '/api/memory/revisions/2/trajectory',
+        '/api/memory/versions/2/trajectory',
         'attachment; filename="memory-trajectory.v1.jsonl.zst"'
       ],
       [
@@ -343,13 +343,9 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
   const fixture = await startFixtureServer()
   try {
     for (const [path, status, error] of [
+      ['/api/memory/versions/404/content', 422, 'invalid_memory_tree_artifact'],
       [
-        '/api/memory/revisions/404/content',
-        422,
-        'invalid_memory_tree_artifact'
-      ],
-      [
-        '/api/memory/revisions/404/trajectory/content',
+        '/api/memory/versions/404/trajectory/content',
         503,
         'memory_catalog_unavailable'
       ],
@@ -365,7 +361,7 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
     }
 
     const download = await fetch(
-      `${fixture.base}/api/memory/revisions/404/artifact`
+      `${fixture.base}/api/memory/versions/404/artifact`
     )
     assert.strictEqual(download.status, 200)
     assert.strictEqual(
@@ -475,7 +471,7 @@ test('run fixtures filter by source platform', async () => {
 test('memory fixtures form one coherent provenance graph', async () => {
   const fixture = await startFixtureServer()
   try {
-    const [extractions, observations, overview, revisions] = await Promise.all([
+    const [extractions, observations, overview, versions] = await Promise.all([
       fetch(`${fixture.base}/api/memory/extractions?limit=100`).then(
         (response) => response.json()
       ),
@@ -485,7 +481,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       fetch(`${fixture.base}/api/memory/overview?range=30d`).then((response) =>
         response.json()
       ),
-      fetch(`${fixture.base}/api/memory/revisions?limit=100`).then((response) =>
+      fetch(`${fixture.base}/api/memory/versions?limit=100`).then((response) =>
         response.json()
       )
     ])
@@ -547,14 +543,14 @@ test('memory fixtures form one coherent provenance graph', async () => {
     )
     assert(
       siblings.some(
-        (item: { consumed_revision: number | null }) =>
-          item.consumed_revision === null
+        (item: { consumed_version: number | null }) =>
+          item.consumed_version === null
       )
     )
     assert(
       siblings.some(
-        (item: { consumed_revision: number | null }) =>
-          item.consumed_revision === 2
+        (item: { consumed_version: number | null }) =>
+          item.consumed_version === 2
       )
     )
     assert(
@@ -570,7 +566,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       source_run_id: string
       source_unit_id: string
       body_markdown: string
-      consumed_revision: number | null
+      consumed_version: number | null
     }>) {
       const extraction = extractionById.get(observation.extraction_id)
       assert(extraction, `${observation.extraction_id} must exist`)
@@ -593,23 +589,20 @@ test('memory fixtures form one coherent provenance graph', async () => {
       assert.strictEqual(run.publication.status, 'published')
       assert.strictEqual(run.artifact_storage?.status, 'available')
 
-      if (observation.consumed_revision !== null) {
-        const revision = revisions.revisions.find(
-          (candidate: { revision: number }) =>
-            candidate.revision === observation.consumed_revision
+      if (observation.consumed_version !== null) {
+        const version = versions.versions.find(
+          (candidate: { version: number }) =>
+            candidate.version === observation.consumed_version
         )
-        assert(
-          revision,
-          'a consumed observation must name an existing revision'
-        )
-        assert.strictEqual(revision.source.kind, 'learning')
+        assert(version, 'a consumed observation must name an existing version')
+        assert.strictEqual(version.source.kind, 'learning')
         assert.ok(
-          revision.source.observation_ids.includes(observation.observation_id)
+          version.source.observation_ids.includes(observation.observation_id)
         )
       }
     }
 
-    for (const revision of revisions.revisions as Array<{
+    for (const version of versions.versions as Array<{
       source:
         | {
             kind: 'learning'
@@ -621,27 +614,27 @@ test('memory fixtures form one coherent provenance graph', async () => {
         | { kind: 'manual'; operation_id: string; actor: unknown }
         | { kind: 'reorganization'; operation_id: string }
     }>) {
-      if (revision.source.kind === 'learning') {
+      if (version.source.kind === 'learning') {
         assert.deepStrictEqual(
-          revision.source.maintenance_report.observation_decisions
+          version.source.maintenance_report.observation_decisions
             .map((decision) => decision.observation_id)
             .sort(),
-          revision.source.observation_ids.toSorted(),
+          version.source.observation_ids.toSorted(),
           'maintenance decisions must identify every consumed observation'
         )
-        for (const observationId of revision.source.observation_ids) {
+        for (const observationId of version.source.observation_ids) {
           const observation = observations.observations.find(
             (candidate: { observation_id: string }) =>
               candidate.observation_id === observationId
           )
           assert(
             observation,
-            `${observationId} consumed by a revision must have an observation`
+            `${observationId} consumed by a version must have an observation`
           )
         }
-      } else if (revision.source.kind === 'manual') {
-        assert.ok(revision.source.operation_id)
-        assert.ok(revision.source.actor)
+      } else if (version.source.kind === 'manual') {
+        assert.ok(version.source.operation_id)
+        assert.ok(version.source.actor)
       }
     }
   } finally {

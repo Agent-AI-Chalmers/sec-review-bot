@@ -497,7 +497,7 @@ def test_materialized_memory_view_is_scoped_to_one_invocation(
     )
     catalog_client = Mock(
         get_memory_tree=Mock(
-            return_value={"revision": 3, "memory_tree_reference": reference.as_dict()}
+            return_value={"version": 3, "memory_tree_reference": reference.as_dict()}
         )
     )
     materialize_calls: list[tuple[ArtifactReference, Path]] = []

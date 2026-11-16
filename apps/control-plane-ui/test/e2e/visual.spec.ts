@@ -63,10 +63,10 @@ test('memory workspace', async ({ page }) => {
   await expectPageSnapshot(page, 'memory-light.png')
 })
 
-test('memory revision graph', async ({ page }) => {
+test('memory version graph', async ({ page }) => {
   await openFixturePage(page, '/memory', 'light')
-  await page.getByRole('tab', { name: 'Revisions' }).click()
-  await expect(page.locator('.revision-graph-node')).toHaveCount(50)
+  await page.getByRole('tab', { name: 'Versions' }).click()
+  await expect(page.locator('.version-graph-node')).toHaveCount(50)
   await expectPageSnapshot(page, 'memory-graph-light.png')
 })
 

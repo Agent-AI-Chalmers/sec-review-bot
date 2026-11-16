@@ -13,7 +13,7 @@
     animation: none;
   }
 
-  .revision-graph-node[data-highlighted] {
+  .version-graph-node[data-highlighted] {
     animation-duration: 1ms;
   }
 }
@@ -631,7 +631,7 @@
     margin-bottom: var(--space-1);
   }
 
-  .memory-table .memory-revision-cell,
+  .memory-table .memory-version-cell,
   .memory-table .memory-predecessor-cell,
   .memory-table .memory-observation-index {
     width: 100%;
@@ -640,7 +640,7 @@
     text-align: start;
   }
 
-  .memory-table .memory-revision-actions {
+  .memory-table .memory-version-actions {
     width: 100%;
     display: flex;
     flex-wrap: wrap;

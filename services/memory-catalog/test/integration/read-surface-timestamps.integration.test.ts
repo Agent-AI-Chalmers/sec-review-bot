@@ -90,8 +90,8 @@ await test('store reads return contract timestamps as ISO strings, not Dates', a
       'observation.created_at',
     )
 
-    const revisionInput = {
-      expected_active_revision: 0,
+    const versionInput = {
+      expected_active_version: 0,
       memory_tree_reference: artifact('trees/memory-tree.v1.tar.zst', 'a'),
       source: {
         kind: 'learning' as const,
@@ -104,22 +104,22 @@ await test('store reads return contract timestamps as ISO strings, not Dates', a
         maintenance_report: learningReport([extraction.extraction_id]),
       },
     }
-    await store.reserveRevisionPublication(revisionInput)
-    await store.confirmRevisionPublication(revisionInput)
-    await store.createMemoryTreeRevision(revisionInput)
+    await store.reserveVersionPublication(versionInput)
+    await store.confirmVersionPublication(versionInput)
+    await store.createMemoryTreeVersion(versionInput)
     assertIsoTimestamp(
-      (await store.queries.getMemoryTreeRevision(1))?.created_at,
-      'revision.created_at',
+      (await store.queries.getMemoryTreeVersion(1))?.created_at,
+      'version.created_at',
     )
-    const history = await store.queries.listMemoryTreeRevisions(undefined, 10)
+    const history = await store.queries.listMemoryTreeVersions(undefined, 10)
     assertIsoTimestamp(
-      history.revisions[0]?.created_at,
-      'listMemoryTreeRevisions.created_at',
+      history.versions[0]?.created_at,
+      'listMemoryTreeVersions.created_at',
     )
 
     const paused = await store.changeMemoryTreeAutomation('paused', {
       operation_id: 'pause-automation',
-      expected_generation: 0,
+      expected_version: 0,
       actor,
     })
     assertIsoTimestamp(paused.automation.changed_at, 'changed automation')

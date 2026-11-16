@@ -1,13 +1,13 @@
 import { expect, test } from './fixtures.js'
 
-test('narrow revision selection keeps its actions on screen', async ({
+test('narrow version selection keeps its actions on screen', async ({
   page
 }) => {
   await page.setViewportSize({ width: 320, height: 900 })
   await page.goto('/memory', { waitUntil: 'networkidle' })
-  await page.getByRole('tab', { name: 'Revisions', exact: true }).click()
-  await page.locator('[data-revision-node="60"]').click()
-  const selection = page.locator('.revision-graph-selection')
+  await page.getByRole('tab', { name: 'Versions', exact: true }).click()
+  await page.locator('[data-version-node="60"]').click()
+  const selection = page.locator('.version-graph-selection')
   await expect(selection).toBeFocused()
   await expect(selection).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
@@ -59,7 +59,7 @@ test('memory lists keep identity and actions together at phone width', async ({
       .locator('.memory-table')
       .evaluate((el) => el.scrollWidth <= el.clientWidth)
   ).toBe(true)
-  await page.getByRole('tab', { name: 'Revisions', exact: true }).click()
+  await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page.getByText('List', { exact: true }).click()
   await expect(
     page.locator('.memory-table:visible tbody tr').first()
@@ -73,16 +73,16 @@ test('memory lists keep identity and actions together at phone width', async ({
 
 test('failed file previews retry in place', async ({ page }) => {
   let failed = false
-  await page.route('**/api/memory/revisions/2/content', async (route) => {
+  await page.route('**/api/memory/versions/2/content', async (route) => {
     if (!failed) {
       failed = true
       await route.fulfill({ status: 500, json: { error: 'temporary' } })
     } else await route.continue()
   })
-  await page.goto('/memory/revisions/2/tree', { waitUntil: 'networkidle' })
+  await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(page.locator('.memory-markdown')).toBeVisible()
-  await expect(page).toHaveURL(/\/memory\/revisions\/2\/tree$/)
+  await expect(page).toHaveURL(/\/memory\/versions\/2\/tree$/)
 })
 
 test('restore failures stay inside the confirmation dialog', async ({
@@ -92,10 +92,10 @@ test('restore failures stay inside the confirmation dialog', async ({
     route.fulfill({ status: 409, json: { error: 'conflict' } })
   )
   await page.goto('/memory', { waitUntil: 'networkidle' })
-  await page.getByRole('tab', { name: 'Revisions', exact: true }).click()
-  await page.locator('[data-revision-node="60"]').click()
+  await page.getByRole('tab', { name: 'Versions', exact: true }).click()
+  await page.locator('[data-version-node="60"]').click()
   await page
-    .locator('.revision-graph-selection')
+    .locator('.version-graph-selection')
     .getByRole('button', { name: 'Set current', exact: true })
     .click()
   const dialog = page.getByRole('dialog')
@@ -103,7 +103,7 @@ test('restore failures stay inside the confirmation dialog', async ({
     .getByRole('button', { name: 'Set as current', exact: true })
     .click()
   await expect(
-    dialog.getByRole('alert').filter({ hasText: 'active revision changed' })
+    dialog.getByRole('alert').filter({ hasText: 'active version changed' })
   ).toBeVisible()
 })
 
@@ -113,9 +113,9 @@ test('file tree scrollbar cannot intercept the sticky modal close button', async
   // The inner scrollbar crosses the sticky header when the outer dialog scrolls.
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/memory', { waitUntil: 'networkidle' })
-  await page.getByRole('tab', { name: 'Revisions', exact: true }).click()
+  await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page
-    .locator('.revision-graph-selection')
+    .locator('.version-graph-selection')
     .getByRole('button', { name: 'Files', exact: true })
     .click()
   const dialog = page.getByRole('dialog')

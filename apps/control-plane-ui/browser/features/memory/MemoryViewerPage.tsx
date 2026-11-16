@@ -13,61 +13,61 @@ import { useParams } from 'react-router-dom'
 import { useMessages } from '../../shared/i18n.js'
 import { isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
 import { LoadingState } from '../../shared/StateMessage.js'
-import type { MemoryTreeRevision } from './api-types.generated.js'
+import type { MemoryTreeVersion } from './api-types.generated.js'
 import { MemoryFilesContent } from './MemoryFilesViewer.js'
 import {
-  loadRevisionRecord,
-  MemoryRevisionDiffContent,
-  MemoryRevisionDiffTitle
-} from './MemoryRevisionDiff.js'
+  loadVersionRecord,
+  MemoryVersionDiffContent,
+  MemoryVersionDiffTitle
+} from './MemoryVersionDiff.js'
 import { TrajectoryContent } from '../trajectory/TrajectoryContent.js'
 import type { TrajectoryTarget } from '../trajectory/TrajectoryViewer.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-function numericRevision(value: string | undefined): number | undefined {
+function numericVersion(value: string | undefined): number | undefined {
   if (!value || !/^\d+$/.test(value)) return undefined
-  const revision = Number(value)
-  return Number.isSafeInteger(revision) && revision > 0 ? revision : undefined
+  const version = Number(value)
+  return Number.isSafeInteger(version) && version > 0 ? version : undefined
 }
 
 export function MemoryFilesPage(): React.JSX.Element {
   const t = useMessages()
-  const revision = numericRevision(useParams().revision)
-  if (revision === undefined) return <></>
+  const version = numericVersion(useParams().version)
+  if (version === undefined) return <></>
   return (
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>
       <Title order={1} mb="lg">
-        {t('memoryFilesRevision', { revision: String(revision) })}
+        {t('memoryFilesVersion', { version: String(version) })}
       </Title>
-      <MemoryFilesContent revision={revision} fullPage />
+      <MemoryFilesContent version={version} fullPage />
     </Container>
   )
 }
 
-export function RevisionTrajectoryPage(): React.JSX.Element {
+export function VersionTrajectoryPage(): React.JSX.Element {
   const t = useMessages()
-  const revision = numericRevision(useParams().revision)
-  if (revision === undefined) return <></>
+  const version = numericVersion(useParams().version)
+  if (version === undefined) return <></>
   const target: TrajectoryTarget = {
     title: t('memoryMaintainerTrajectory'),
-    contentHref: `/memory/revisions/${revision}/trajectory/content`,
-    downloadHref: `/api/memory/revisions/${revision}/trajectory`,
-    pageHref: `/memory/revisions/${revision}/trajectory`
+    contentHref: `/memory/versions/${version}/trajectory/content`,
+    downloadHref: `/api/memory/versions/${version}/trajectory`,
+    pageHref: `/memory/versions/${version}/trajectory`
   }
   return <TrajectoryPage target={target} />
 }
 
-export function MemoryRevisionDiffPage(): React.JSX.Element {
+export function MemoryVersionDiffPage(): React.JSX.Element {
   const t = useMessages()
-  const revision = numericRevision(useParams().revision)
-  const [record, setRecord] = React.useState<MemoryTreeRevision>()
+  const version = numericVersion(useParams().version)
+  const [record, setRecord] = React.useState<MemoryTreeVersion>()
   const [failure, setFailure] = React.useState<unknown>()
   React.useEffect(() => {
-    if (revision === undefined) return
+    if (version === undefined) return
     const controller = new AbortController()
     setRecord(undefined)
     setFailure(undefined)
-    void loadRevisionRecord(revision, controller.signal).then(
+    void loadVersionRecord(version, controller.signal).then(
       (nextRecord) => {
         if (!controller.signal.aborted) setRecord(nextRecord)
       },
@@ -77,8 +77,8 @@ export function MemoryRevisionDiffPage(): React.JSX.Element {
       }
     )
     return (): void => controller.abort()
-  }, [revision])
-  if (revision === undefined) return <></>
+  }, [version])
+  if (version === undefined) return <></>
   throwIfUnauthorized(failure)
   if (failure !== undefined)
     return (
@@ -95,14 +95,14 @@ export function MemoryRevisionDiffPage(): React.JSX.Element {
   return (
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>
       <Title order={1} mb="lg">
-        <MemoryRevisionDiffTitle
-          revision={record.revision}
-          predecessorRevision={record.predecessor_revision}
+        <MemoryVersionDiffTitle
+          version={record.version}
+          predecessorVersion={record.predecessor_version}
         />
       </Title>
-      <MemoryRevisionDiffContent
-        revision={record.revision}
-        predecessorRevision={record.predecessor_revision}
+      <MemoryVersionDiffContent
+        version={record.version}
+        predecessorVersion={record.predecessor_version}
         fullPage
       />
     </Container>

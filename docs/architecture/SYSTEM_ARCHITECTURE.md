@@ -19,9 +19,9 @@ Distinguish the review task, its execution, and its delivery:
 
 Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Langfuse appears outside the repository deployment boundary: workers optionally export LLM observations to it, and Review Runs reads those observations asynchronously to persist model-usage snapshots. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
-Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. When memory consumption is enabled and an active revision exists, a review invocation materializes that memory tree into a temporary directory for the agent and removes it afterward.
+Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. When memory consumption is enabled and an active version exists, a review invocation materializes that memory tree into a temporary directory for the agent and removes it afterward.
 
-Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). The browser receives no Catalog tokens, storage credentials, or `s3://` references. The BFF checks artifact references, size, and digest before returning downloaded content. Authenticated operators can pause or resume automatic memory-tree revision commits, commit manual edits, and restore an existing revision. New revisions record the revision active at creation as their predecessor, while revision numbers remain globally increasing. The BFF can create immutable memory-tree objects but has read-only access to review artifacts and memory trajectories.
+Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). The browser receives no Catalog tokens, storage credentials, or `s3://` references. The BFF checks artifact references, size, and digest before returning downloaded content. Authenticated operators can pause or resume automatic memory-tree version commits, commit manual edits, and restore an existing version. New versions record the version active at creation as their predecessor, while version numbers remain globally increasing. The BFF can create immutable memory-tree objects but has read-only access to review artifacts and memory trajectories.
 
 ## Runtime ownership map
 
@@ -33,8 +33,8 @@ Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). 
 | Execution Gateway         | `services/execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation                                                 | [README](../../services/execution-gateway/README.md) |
 | Execution Worker          | `agents/`                     | Review workflows, activities, agent runtime, stage artifacts, and execution archive publication              | [README](../../agents/README.md)                     |
 | Memory Extraction Worker  | `agents/`                     | Per-execution archive consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md)                     |
-| Memory Maintenance Worker | `agents/`                     | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit   | [README](../../agents/README.md)                     |
-| Memory Catalog Server     | `services/memory-catalog/`    | Observation catalog, immutable memory revision history, and active revision coordination                     | [README](../../services/memory-catalog/README.md)    |
+| Memory Maintenance Worker | `agents/`                     | Batched maintenance input consumption, maintainer invocation, memory tree publication, and version commit    | [README](../../agents/README.md)                     |
+| Memory Catalog Server     | `services/memory-catalog/`    | Observation catalog, immutable memory version history, and active version coordination                       | [README](../../services/memory-catalog/README.md)    |
 
 The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). `services/` groups the internal HTTP service packages; each retains its own configuration, build, and deployment. Package location does not determine process topology: `agents/` implements independently deployed Temporal workers. Applications under `apps/` remain independently deployed services.
 
@@ -94,7 +94,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: Dispatch maintenance work
     Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
     MaintenanceWorker->>Catalog: Select a batch of pending observations
-    Catalog-->>MaintenanceWorker: Observations, observation IDs, expected active revision, and current memory tree reference
+    Catalog-->>MaintenanceWorker: Observations, observation IDs, expected active version, and current memory tree reference
     opt Current memory tree exists
       MaintenanceWorker->>Storage: Download current memory tree artifact
       Storage-->>MaintenanceWorker: Memory tree artifact
@@ -103,11 +103,11 @@ sequenceDiagram
     Note over MaintenanceWorker: Run maintainer
     MaintenanceWorker->>Storage: Store maintainer trajectory
     MaintenanceWorker->>Storage: Store new memory tree artifact
-    MaintenanceWorker-->>Temporal: Artifact references, observation IDs, and expected active revision
+    MaintenanceWorker-->>Temporal: Artifact references, observation IDs, and expected active version
     Note over Temporal: Later commit retries reuse this activity result
-    Temporal->>MaintenanceWorker: Dispatch revision commit
-    MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and expected-active-revision CAS
-    Catalog-->>MaintenanceWorker: Created or idempotently replayed revision, or revision conflict
+    Temporal->>MaintenanceWorker: Dispatch version commit
+    MaintenanceWorker->>Catalog: Create memory tree version with maintenance ID and expected-active-version CAS
+    Catalog-->>MaintenanceWorker: Created or idempotently replayed version, or version conflict
   end
 ```
 

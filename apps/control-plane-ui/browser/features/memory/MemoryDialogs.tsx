@@ -77,7 +77,7 @@ export function MemoryEditorDialog({
             {t('cancel')}
           </Button>
           <Button loading={busy} disabled={!dirty} onClick={onCommit}>
-            {t('commitRevision')}
+            {t('commitVersion')}
           </Button>
         </Group>
       </Modal>
@@ -108,13 +108,13 @@ export function MemoryEditorDialog({
 }
 
 export function MemoryRestoreDialog({
-  revision,
+  version,
   busy,
   error,
   onClose,
   onConfirm
 }: {
-  revision: number | undefined
+  version: number | undefined
   busy: boolean
   error: string
   onClose: () => void
@@ -124,9 +124,9 @@ export function MemoryRestoreDialog({
 
   return (
     <Modal
-      opened={revision !== undefined}
+      opened={version !== undefined}
       onClose={onClose}
-      title={t('restoreRevisionTitle', { revision: String(revision ?? '') })}
+      title={t('restoreVersionTitle', { version: String(version ?? '') })}
       centered
     >
       {error && (
@@ -135,7 +135,7 @@ export function MemoryRestoreDialog({
         </Alert>
       )}
       <Alert color="yellow" mb="md">
-        {t('restoreRevisionWarning', { revision: String(revision ?? '') })}
+        {t('restoreVersionWarning', { version: String(version ?? '') })}
       </Alert>
       <Group justify="end" mt="md">
         <Button variant="default" onClick={onClose}>

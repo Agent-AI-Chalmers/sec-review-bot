@@ -8,7 +8,7 @@
 
 ## 双写问题
 
-本系统中的审查输入发布、经验提取登记、自动维护修订和人工编辑修订，都需要分别向对象存储上传文件、向 PostgreSQL 登记结果。两者无法在一个本地事务中同时完成，因此会遇到[双写一致性问题（dual-write problem）](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)：文件上传成功后，进程可能在登记数据库前中断，留下没有数据库引用的对象；如果先登记数据库，上传失败又可能留下指向不存在文件的引用。
+本系统中的审查输入发布、经验提取登记、自动维护版本和人工编辑版本，都需要分别向对象存储上传文件、向 PostgreSQL 登记结果。两者无法在一个本地事务中同时完成，因此会遇到[双写一致性问题（dual-write problem）](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)：文件上传成功后，进程可能在登记数据库前中断，留下没有数据库引用的对象；如果先登记数据库，上传失败又可能留下指向不存在文件的引用。
 
 ## 发布协议
 
@@ -38,11 +38,11 @@ sequenceDiagram
 | ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | 审查输入材料包                  | Review Runs 发布意图：产物引用、已准备的输入和发布上下文                                               | 接管输入准备的调用方可在对象存在时复用原发布意图；只有确认对象不存在时，才能放弃未选中的候选记录并重新准备。         |
 | 经验提取轨迹                    | Memory Catalog 发布意图：轨迹引用、observation 和摘要                                                  | 重试先检查已有候选记录，再决定是否重新调用模型；选定记录和登记 extraction 在同一事务中完成。                         |
-| learning 或 reorganization 修订 | Memory Catalog 发布意图：记忆树、轨迹、operation ID、预期生效修订，以及 learning 使用的 observation ID | 不同模型输出可以对应不同候选记录；选定记录、创建修订、learning 对 observation 的消费和更新生效版本在同一事务中完成。 |
-| manual 修订                     | Memory Catalog 发布意图：记忆树引用、operation ID 和预期生效修订；UI BFF 上传记忆树                    | 编辑器保持打开且内容未变时，重试复用 operation ID 和最初预期的修订。BFF 重新执行预留、条件上传、确认和幂等修订创建。 |
+| learning 或 reorganization 版本 | Memory Catalog 发布意图：记忆树、轨迹、operation ID、预期生效版本，以及 learning 使用的 observation ID | 不同模型输出可以对应不同候选记录；选定记录、创建版本、learning 对 observation 的消费和更新生效版本在同一事务中完成。 |
+| manual 版本                     | Memory Catalog 发布意图：记忆树引用、operation ID 和预期生效版本；UI BFF 上传记忆树                    | 编辑器保持打开且内容未变时，重试复用 operation ID 和最初预期的版本。BFF 重新执行预留、条件上传、确认和幂等版本创建。 |
 | S3 中的执行归档                 | Temporal 发布请求和固定的 run 对象键                                                                   | 恢复时先按请求校验已上传的归档，再考虑本地文件。如果完整归档和本地产物都已丢失，仅凭请求无法重建归档内容。           |
 
-UI 恢复版本在 Catalog 事务中将生效版本指针移到已有修订，不创建修订或对象，也不会修复丢失的字节。
+UI 恢复版本在 Catalog 事务中将生效版本指针移到已有版本，不创建版本或对象，也不会修复丢失的字节。
 
 输入材料和记忆产物的具体协议见 [Review Runs](../../services/review-runs/README.zh.md) 和 [Memory Catalog](../../services/memory-catalog/README.md)。存储错误仍是不确定状态，会使本次尝试失败，不能当作对象不存在。已记录的发布意图支持重试，但不提供重试耗尽后的自动后台完成机制。
 
@@ -52,4 +52,4 @@ UI 恢复版本在 Catalog 事务中将生效版本指针移到已有修订，�
 
 [条件 PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) 阻止遵守协议的发布方覆盖已有对象键，但不保证对象能抵抗其他具有覆盖或删除权限的身份。读取方在使用前校验大小与 SHA-256：这能拒绝替换内容，却不能找回丢失的字节。S3 兼容部署必须针对实际部署的存储版本验证所依赖的 API 与策略条件。
 
-放弃候选发布记录不会删除对象，目前也没有自动对象垃圾回收。旧上传进程仍可能完成上传，不同候选发布记录也可能共享内容对象键。当前未被数据库引用的对象不一定可以删除：未来清理必须考虑历史修订、经验提取引用，以及 Temporal 历史记录中保留的尚未挂接引用。
+放弃候选发布记录不会删除对象，目前也没有自动对象垃圾回收。旧上传进程仍可能完成上传，不同候选发布记录也可能共享内容对象键。当前未被数据库引用的对象不一定可以删除：未来清理必须考虑历史版本、经验提取引用，以及 Temporal 历史记录中保留的尚未挂接引用。

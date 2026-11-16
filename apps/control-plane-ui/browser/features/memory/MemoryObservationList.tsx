@@ -19,22 +19,22 @@ export function MemoryObservationList({
   loading,
   error,
   pagination,
-  revisionFilter,
-  onClearRevisionFilter,
+  versionFilter,
+  onClearVersionFilter,
   highlightedObservation,
   onHighlightEnd,
-  onRevealRevision,
+  onRevealVersion,
   onViewTrajectory
 }: {
   observations: Observation[]
   loading: boolean
   error: string
   pagination: React.ComponentProps<typeof CursorPagination>
-  revisionFilter: number | undefined
-  onClearRevisionFilter: () => void
+  versionFilter: number | undefined
+  onClearVersionFilter: () => void
   highlightedObservation: string | undefined
   onHighlightEnd: () => void
-  onRevealRevision: (revision: number) => void
+  onRevealVersion: (version: number) => void
   onViewTrajectory: (observation: Observation) => void
 }): React.JSX.Element {
   const t = useMessages()
@@ -60,13 +60,13 @@ export function MemoryObservationList({
   const targetMissing =
     highlightedObservation !== undefined && !targetLoaded && !loading && !error
 
-  const filterBanner = revisionFilter !== undefined && (
+  const filterBanner = versionFilter !== undefined && (
     <Alert color="gray" mb="md">
       <Group justify="space-between" gap="xs">
         <span>
-          {t('observationsForRevision', { revision: String(revisionFilter) })}
+          {t('observationsForVersion', { version: String(versionFilter) })}
         </span>
-        <Button size="xs" variant="subtle" onClick={onClearRevisionFilter}>
+        <Button size="xs" variant="subtle" onClick={onClearVersionFilter}>
           {t('showAllObservations')}
         </Button>
       </Group>
@@ -147,20 +147,18 @@ export function MemoryObservationList({
                   </Anchor>
                 </Table.Td>
                 <Table.Td data-label={t('observationOutcome')}>
-                  {item.consumed_revision ? (
+                  {item.consumed_version ? (
                     <span className="memory-incorporation">
                       <span>{t('incorporatedInto')}</span>
                       <Anchor
                         c="var(--link)"
                         component="button"
                         type="button"
-                        className="memory-revision-link"
-                        onClick={() =>
-                          onRevealRevision(item.consumed_revision!)
-                        }
+                        className="memory-version-link"
+                        onClick={() => onRevealVersion(item.consumed_version!)}
                       >
-                        {t('revisionReference', {
-                          revision: String(item.consumed_revision)
+                        {t('versionReference', {
+                          version: String(item.consumed_version)
                         })}
                       </Anchor>
                     </span>

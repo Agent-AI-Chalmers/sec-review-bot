@@ -1,6 +1,6 @@
 import { requestUpstream, type UpstreamResult } from './request.js'
 
-export type MemoryArtifactCollection = 'revisions' | 'extractions'
+export type MemoryArtifactCollection = 'versions' | 'extractions'
 
 export interface MemoryCatalogClient {
   read(path: string): Promise<UpstreamResult>
@@ -34,7 +34,7 @@ export function createMemoryCatalogClient({
     getArtifactRecord: (collection, identity) =>
       requestUpstream(
         `${baseUrl}/v1/${
-          collection === 'revisions' ? 'memory-tree/revisions' : 'extractions'
+          collection === 'versions' ? 'memory-tree/versions' : 'extractions'
         }/${encodeURIComponent(identity)}`,
         { headers },
         options

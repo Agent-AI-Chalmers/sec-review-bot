@@ -108,7 +108,7 @@ async function waitUntilBlocked(pid: number, count: number): Promise<void> {
 
 await test('an overlapping retry of an automation change replays instead of conflicting', async () => {
   await withStore(async (store, pool) => {
-    const pause = { operation_id: 'pause-1', expected_generation: 0, actor }
+    const pause = { operation_id: 'pause-1', expected_version: 0, actor }
     const results = await overlapBehindLock(
       pool,
       'select 1 from memory_tree_automation where singleton=true for update',
@@ -132,11 +132,11 @@ await test('an overlapping retry of an automation change replays instead of conf
 
 await test('an overlapping retry of a restore replays instead of conflicting', async () => {
   await withStore(async (store, pool) => {
-    // Revision 1 must exist to be restored to; it is inserted directly so the test depends only on
+    // Version 1 must exist to be restored to; it is inserted directly so the test depends only on
     // the restore path.
     await pool.query(
-      `insert into memory_tree_revisions (
-         revision, predecessor_revision, memory_tree_reference, source_kind, operation_id, actor
+      `insert into memory_tree_versions (
+         version, predecessor_version, memory_tree_reference, source_kind, operation_id, actor
        ) values (1, null, $1, 'manual', 'seed', $2)`,
       [
         {
@@ -149,12 +149,12 @@ await test('an overlapping retry of a restore replays instead of conflicting', a
       ],
     )
     await pool.query(
-      'update memory_tree_state set active_revision=1 where singleton=true',
+      'update memory_tree_state set active_version=1 where singleton=true',
     )
     const restore = {
       operation_id: 'restore-1',
-      expected_active_revision: 1,
-      restored_revision: 1,
+      expected_active_version: 1,
+      restored_version: 1,
       actor,
     }
     const results = await overlapBehindLock(

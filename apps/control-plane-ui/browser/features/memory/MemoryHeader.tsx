@@ -17,7 +17,7 @@ import { ICON_SIZE } from '../../shared/design.js'
 
 export function MemoryHeader({
   automation,
-  activeRevision,
+  activeVersion,
   busy,
   automationLoading,
   treeLoading,
@@ -30,7 +30,7 @@ export function MemoryHeader({
   onEdit
 }: {
   automation: MemoryTreeAutomation | undefined
-  activeRevision: number | undefined
+  activeVersion: number | undefined
   busy: boolean
   automationLoading: boolean
   treeLoading: boolean
@@ -76,7 +76,7 @@ export function MemoryHeader({
           <Button
             variant="default"
             leftSection={<IconEdit size={ICON_SIZE.md} />}
-            disabled={activeRevision === undefined || treeLoading}
+            disabled={activeVersion === undefined || treeLoading}
             onClick={onEdit}
           >
             {t('editMemoryTree')}
@@ -89,7 +89,7 @@ export function MemoryHeader({
         />
       </Group>
       {((automationLoading && !automation) ||
-        (treeLoading && activeRevision === undefined)) && <p>{t('loading')}</p>}
+        (treeLoading && activeVersion === undefined)) && <p>{t('loading')}</p>}
       {automationError && (
         <Alert color="red" mt="md">
           {automationError}

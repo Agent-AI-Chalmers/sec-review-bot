@@ -154,7 +154,7 @@ await test('actual write routes reject shared malformed requests before reaching
         contractFixture('valid-memory-tree-restore-operation-result.json'),
       )
     },
-    abandonRevisionPublications: () => {
+    abandonVersionPublications: () => {
       calls++
       return Promise.resolve([])
     },
@@ -164,15 +164,15 @@ await test('actual write routes reject shared malformed requests before reaching
         contractFixture('valid-extraction-publication.json'),
       )
     },
-    createMemoryTreeRevision: () => {
+    createMemoryTreeVersion: () => {
       calls++
       return Promise.resolve(
-        contractFixture('valid-memory-tree-revision-creation-result.json'),
+        contractFixture('valid-memory-tree-version-creation-result.json'),
       )
     },
-    reserveRevisionPublication: () => {
+    reserveVersionPublication: () => {
       calls++
-      return Promise.resolve(contractFixture('valid-revision-publication.json'))
+      return Promise.resolve(contractFixture('valid-version-publication.json'))
     },
   } as unknown as MemoryCatalogStore
   const app = await createApp({
@@ -189,8 +189,8 @@ await test('actual write routes reject shared malformed requests before reaching
     ],
     ['MemoryTreeRestoreOperation', '/v1/memory-tree/restore', 'operator'],
     [
-      'AutomaticRevisionPublicationOwner',
-      '/v1/memory-tree/revisions/publications/abandon',
+      'AutomaticVersionPublicationOwner',
+      '/v1/memory-tree/versions/publications/abandon',
       'worker',
     ],
     [
@@ -198,10 +198,10 @@ await test('actual write routes reject shared malformed requests before reaching
       '/v1/extractions/publications/reserve',
       'worker',
     ],
-    ['MemoryTreeRevisionCreation', '/v1/memory-tree/revisions', 'worker'],
+    ['MemoryTreeVersionCreation', '/v1/memory-tree/versions', 'worker'],
     [
-      'MemoryTreeRevisionCreation',
-      '/v1/memory-tree/revisions/publications/reserve',
+      'MemoryTreeVersionCreation',
+      '/v1/memory-tree/versions/publications/reserve',
       'worker',
     ],
   ] as const
@@ -239,6 +239,62 @@ await test('actual write routes reject shared malformed requests before reaching
         }
       }
     }
+  } finally {
+    await app.close()
+  }
+})
+
+await test('obsolete version fields and history routes are rejected without reaching storage', async () => {
+  let calls = 0
+  const store = {
+    changeMemoryTreeAutomation: () => {
+      calls++
+      throw new Error('unexpected write')
+    },
+    createMemoryTreeVersion: () => {
+      calls++
+      throw new Error('unexpected write')
+    },
+    queries: {
+      listMemoryTreeVersions: () => {
+        calls++
+        throw new Error('unexpected read')
+      },
+    },
+  } as unknown as MemoryCatalogStore
+  const app = await createApp({
+    store,
+    workerToken: 'worker',
+    operatorToken: 'operator',
+  })
+  try {
+    const automation = await app.inject({
+      method: 'POST',
+      url: '/v1/memory-tree/automation/pause',
+      headers: { authorization: 'Bearer operator' },
+      payload: { operation_id: 'pause-old', expected_generation: 0 },
+    })
+    assert.equal(automation.statusCode, 400)
+    const { expected_active_version, ...creation } = contractFixture(
+      'valid-memory-tree-version-creation.json',
+    ) as Record<string, unknown>
+    const oldCreation = await app.inject({
+      method: 'POST',
+      url: '/v1/memory-tree/versions',
+      headers: { authorization: 'Bearer worker' },
+      payload: {
+        ...creation,
+        expected_active_revision: expected_active_version,
+      },
+    })
+    assert.equal(oldCreation.statusCode, 400)
+    const history = await app.inject({
+      method: 'GET',
+      url: '/v1/memory-tree/revisions',
+      headers: { authorization: 'Bearer worker' },
+    })
+    assert.equal(history.statusCode, 404)
+    assert.equal(calls, 0)
   } finally {
     await app.close()
   }

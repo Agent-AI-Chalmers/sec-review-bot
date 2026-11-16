@@ -12,12 +12,12 @@ test.each([
   [5, 200, 51],
   [5, 12, 13]
 ])(
-  'centers revision %i within history ending at %i',
+  'centers version %i within history ending at %i',
   async (target, newest, before) => {
     vi.mocked(api).mockImplementation(async (url) =>
-      url === '/memory/revisions?limit=1'
-        ? { revisions: [{ revision: newest }], next_before_revision: null }
-        : { revisions: [], next_before_revision: null }
+      url === '/memory/versions?limit=1'
+        ? { versions: [{ version: newest }], next_before_version: null }
+        : { versions: [], next_before_version: null }
     )
     const { result } = renderHook(() => useMemoryResources())
     await waitFor(() => expect(result.current.refreshing).toBe(false))
@@ -25,15 +25,15 @@ test.each([
       await result.current.showGraph(target)
     })
     expect(api).toHaveBeenCalledWith(
-      `/memory/revisions?limit=50&before_revision=${before}`,
+      `/memory/versions?limit=50&before_version=${before}`,
       expect.anything()
     )
     vi.mocked(api).mockClear()
     await act(async () => {
-      await result.current.graphRevisions.reload()
+      await result.current.graphVersions.reload()
     })
     expect(api).toHaveBeenCalledWith(
-      `/memory/revisions?limit=50&before_revision=${before}`,
+      `/memory/versions?limit=50&before_version=${before}`,
       expect.anything()
     )
     await act(async () => {
@@ -41,7 +41,7 @@ test.each([
     })
     expect(result.current.graphTarget).toBeUndefined()
     expect(api).toHaveBeenLastCalledWith(
-      '/memory/revisions?limit=50',
+      '/memory/versions?limit=50',
       expect.anything()
     )
   }

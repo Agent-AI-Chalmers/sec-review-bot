@@ -18,7 +18,7 @@ function observation(index: number): ObservationRecord {
     source_run_id: `run-${index}`,
     source_unit_id: 'unit',
     body_markdown: `Observation ${index}`,
-    consumed_revision: 2,
+    consumed_version: 2,
     created_at: '2026-11-09T00:00:00Z'
   }
 }
@@ -40,11 +40,11 @@ function renderList(
           onPreviousPage: vi.fn(),
           onNextPage: vi.fn()
         }}
-        revisionFilter={undefined}
-        onClearRevisionFilter={vi.fn()}
+        versionFilter={undefined}
+        onClearVersionFilter={vi.fn()}
         highlightedObservation={undefined}
         onHighlightEnd={vi.fn()}
-        onRevealRevision={vi.fn()}
+        onRevealVersion={vi.fn()}
         onViewTrajectory={vi.fn()}
         {...props}
       />
@@ -52,10 +52,10 @@ function renderList(
   )
 }
 
-test('the revision filter banner names the filtered revision', () => {
-  renderList({ revisionFilter: 2 })
+test('the version filter banner names the filtered version', () => {
+  renderList({ versionFilter: 2 })
   expect(
-    screen.getByText('Showing observations included in revision 2.')
+    screen.getByText('Showing observations included in version 2.')
   ).toBeInTheDocument()
 })
 

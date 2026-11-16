@@ -14,8 +14,8 @@ from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     CoordinatedReorganizationResult,
 )
-from sec_review_agents.memory.revision_commit_input import (
-    MemoryTreeRevisionCommitInput,
+from sec_review_agents.memory.version_commit_input import (
+    MemoryTreeVersionCommitInput,
 )
 from sec_review_agents.workflows.memory import (
     extraction as extraction_workflow,
@@ -67,10 +67,10 @@ def _report(observation_ids: tuple[str, ...]) -> MemoryMaintenanceOutput:
 
 def _commit_input(
     *, observation_ids: tuple[str, ...] = ("extraction-1",)
-) -> MemoryTreeRevisionCommitInput:
-    return MemoryTreeRevisionCommitInput(
+) -> MemoryTreeVersionCommitInput:
+    return MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=observation_ids,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -82,8 +82,8 @@ def _commit_input(
     ("overrides", "message"),
     [
         ({"operation_id": ""}, "operation_id"),
-        ({"expected_active_revision": True}, "expected_active_revision"),
-        ({"expected_active_revision": -1}, "expected_active_revision"),
+        ({"expected_active_version": True}, "expected_active_version"),
+        ({"expected_active_version": -1}, "expected_active_version"),
         ({"observation_ids": ()}, "observation_ids"),
         ({"observation_ids": ("extraction-1", "extraction-1")}, "unique"),
         ({"maintenance_report": _report(("extraction-2",))}, "exactly once"),
@@ -96,7 +96,7 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
 ) -> None:
     values: dict[str, object] = {
         "operation_id": "memory-tree-run-1",
-        "expected_active_revision": 3,
+        "expected_active_version": 3,
         "observation_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
@@ -105,13 +105,13 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
     values.update(overrides)
 
     with pytest.raises((TypeError, ValueError), match=message):
-        MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
+        MemoryTreeVersionCommitInput(**values)  # type: ignore[arg-type]
 
 
 def test_reorganization_commit_input_accepts_empty_observation_ids() -> None:
-    value = MemoryTreeRevisionCommitInput(
+    value = MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -139,7 +139,7 @@ def test_commit_input_enforces_source_kind_extraction_invariants(
 ) -> None:
     values: dict[str, object] = {
         "operation_id": "memory-tree-run-1",
-        "expected_active_revision": 3,
+        "expected_active_version": 3,
         "observation_ids": (),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
@@ -148,7 +148,7 @@ def test_commit_input_enforces_source_kind_extraction_invariants(
     }
     values.update(overrides)
     with pytest.raises((TypeError, ValueError), match=message):
-        MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
+        MemoryTreeVersionCommitInput(**values)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -224,7 +224,7 @@ def test_maintenance_preparation_result_rejects_mixed_variants() -> None:
             summary="Already complete.",
         )
 
-    with pytest.raises(ValueError, match="only a revision commit input"):
+    with pytest.raises(ValueError, match="only a version commit input"):
         MemoryMaintenancePreparationResult(
             kind="prepared",
             commit_input=_commit_input(),
@@ -907,16 +907,16 @@ async def test_coordinated_maintenance_commits_recorded_preparation(
         MemoryMaintenanceRequest(timeout_seconds=30),
     )
     assert calls[2] == (
-        maintenance_workflow.commit_memory_tree_revision_activity,
+        maintenance_workflow.commit_memory_tree_version_activity,
         commit_input,
     )
 
 
 @pytest.mark.asyncio
-async def test_maintenance_workflow_retries_commit_with_history_revision() -> None:
-    commit_input = MemoryTreeRevisionCommitInput(
+async def test_maintenance_workflow_retries_commit_with_history_version() -> None:
+    commit_input = MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=("extraction-1", "extraction-2"),
         memory_tree_reference=_reference(),
         trajectory_reference=ArtifactReference(
@@ -931,7 +931,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         maintenance_report=_report(("extraction-1", "extraction-2")),
     )
     prepare_calls = 0
-    commit_revisions: list[MemoryTreeRevisionCommitInput] = []
+    commit_versions: list[MemoryTreeVersionCommitInput] = []
 
     @activity.defn(name="count_pending_memory_observations_activity")
     def fake_pending_summary() -> dict[str, Any]:
@@ -953,10 +953,10 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
             commit_input=commit_input,
         )
 
-    @activity.defn(name="commit_memory_tree_revision_activity")
-    def fake_commit(revision: MemoryTreeRevisionCommitInput) -> dict[str, Any]:
-        commit_revisions.append(revision)
-        if len(commit_revisions) == 1:
+    @activity.defn(name="commit_memory_tree_version_activity")
+    def fake_commit(version: MemoryTreeVersionCommitInput) -> dict[str, Any]:
+        commit_versions.append(version)
+        if len(commit_versions) == 1:
             raise RuntimeError("response lost after catalog persistence")
         return {
             "ok": True,
@@ -989,27 +989,27 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         "processed_count": 2,
     }
     assert prepare_calls == 1
-    assert commit_revisions == [commit_input, commit_input]
+    assert commit_versions == [commit_input, commit_input]
 
 
 @pytest.mark.asyncio
-async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
+async def test_catalog_version_conflict_is_not_retried(monkeypatch) -> None:
     from temporalio.exceptions import ApplicationError
 
     from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
 
     def conflict(**_kwargs):
-        raise MemoryCatalogConflictError("stale expected active revision")
+        raise MemoryCatalogConflictError("stale expected active version")
 
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
-        Mock(return_value=SimpleNamespace(create_learning_revision=conflict)),
+        Mock(return_value=SimpleNamespace(create_learning_version=conflict)),
     )
 
     with pytest.raises(ApplicationError) as captured:
-        maintenance_workflow.commit_memory_tree_revision_activity(_commit_input())
+        maintenance_workflow.commit_memory_tree_version_activity(_commit_input())
 
-    assert captured.value.type == "MEMORY_CATALOG_REVISION_CONFLICT"
+    assert captured.value.type == "MEMORY_CATALOG_VERSION_CONFLICT"
     assert captured.value.non_retryable is True
 
 
@@ -1026,7 +1026,7 @@ def test_commit_pause_and_abandonment_complete_without_failure(
     )
 
     client = Mock()
-    client.create_learning_revision.side_effect = (
+    client.create_learning_version.side_effect = (
         MemoryAutomationPausedError("paused")
         if error_type == "paused"
         else MemoryPublicationAbandonedError("abandoned")
@@ -1035,7 +1035,7 @@ def test_commit_pause_and_abandonment_complete_without_failure(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    assert maintenance_workflow.commit_memory_tree_revision_activity(
+    assert maintenance_workflow.commit_memory_tree_version_activity(
         _commit_input()
     ) == {
         "ok": True,
@@ -1045,13 +1045,13 @@ def test_commit_pause_and_abandonment_complete_without_failure(
     }
 
 
-def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_disabled(
+def test_commit_memory_tree_version_uses_prepared_payload_after_processing_is_disabled(
     monkeypatch,
 ) -> None:
     client = Mock()
-    client.create_learning_revision.return_value = {
+    client.create_learning_version.return_value = {
         "created": True,
-        "revision": 4,
+        "version": 4,
         "source": {
             "kind": "learning",
             "operation_id": "memory-tree-run-1",
@@ -1064,15 +1064,15 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
     )
     prepared = _commit_input(observation_ids=("extraction-1", "extraction-2"))
 
-    assert maintenance_workflow.commit_memory_tree_revision_activity(prepared) == {
+    assert maintenance_workflow.commit_memory_tree_version_activity(prepared) == {
         "ok": True,
         "skipped": False,
         "summary": "Processed 2 memory observations.",
         "processed_count": 2,
     }
-    client.create_learning_revision.assert_called_once_with(
+    client.create_learning_version.assert_called_once_with(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -1085,9 +1085,9 @@ async def test_maintenance_prepare_reorganization_uses_active_memory(
     monkeypatch,
 ) -> None:
     client = Mock()
-    commit_input = MemoryTreeRevisionCommitInput(
+    commit_input = MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -1097,7 +1097,7 @@ async def test_maintenance_prepare_reorganization_uses_active_memory(
     prepare = AsyncMock(
         return_value=CoordinatedReorganizationResult(
             commit_input=commit_input,
-            summary="Prepared reorganization revision.",
+            summary="Prepared reorganization version.",
         )
     )
     monkeypatch.setattr(
@@ -1164,13 +1164,13 @@ async def test_maintenance_prepare_reorganization_completes_without_active_memor
     )
 
 
-def test_commit_reorganization_revision_uses_reorganization_client(
+def test_commit_reorganization_version_uses_reorganization_client(
     monkeypatch,
 ) -> None:
     client = Mock()
-    client.create_reorganization_revision.return_value = {
+    client.create_reorganization_version.return_value = {
         "created": True,
-        "revision": 4,
+        "version": 4,
         "source": {
             "kind": "reorganization",
             "operation_id": "memory-tree-run-1",
@@ -1180,9 +1180,9 @@ def test_commit_reorganization_revision_uses_reorganization_client(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    prepared = MemoryTreeRevisionCommitInput(
+    prepared = MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -1190,29 +1190,29 @@ def test_commit_reorganization_revision_uses_reorganization_client(
         source_kind="reorganization",
     )
 
-    assert maintenance_workflow.commit_memory_tree_revision_activity(prepared) == {
+    assert maintenance_workflow.commit_memory_tree_version_activity(prepared) == {
         "ok": True,
         "skipped": False,
         "summary": "Reorganized the active memory tree.",
         "processed_count": 0,
     }
-    client.create_reorganization_revision.assert_called_once_with(
+    client.create_reorganization_version.assert_called_once_with(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
         maintenance_report=_report(()),
     )
-    client.create_learning_revision.assert_not_called()
+    client.create_learning_version.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_reorganization_workflow_skips_pending_observation_checks(
     monkeypatch,
 ) -> None:
-    commit_input = MemoryTreeRevisionCommitInput(
+    commit_input = MemoryTreeVersionCommitInput(
         operation_id="memory-tree-run-1",
-        expected_active_revision=3,
+        expected_active_version=3,
         observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
@@ -1243,7 +1243,7 @@ async def test_reorganization_workflow_skips_pending_observation_checks(
     assert result == {"ok": True, "processed_count": 0}
     assert calls == [
         maintenance_workflow.prepare_memory_maintenance_activity,
-        maintenance_workflow.commit_memory_tree_revision_activity,
+        maintenance_workflow.commit_memory_tree_version_activity,
     ]
 
 
@@ -1271,19 +1271,19 @@ async def test_prepare_memory_maintenance_exits_while_control_is_paused(
         kind="complete",
         reason="automation_paused",
     )
-    client.abandon_revision_publications.assert_called_once_with(
+    client.abandon_version_publications.assert_called_once_with(
         "memory-tree-paused-run", kind="learning"
     )
     client.get_learning_input.assert_not_called()
 
 
-def test_commit_memory_tree_revision_retry_reuses_prepared_references(
+def test_commit_memory_tree_version_retry_reuses_prepared_references(
     monkeypatch,
 ) -> None:
     client = Mock()
-    client.create_learning_revision.return_value = {
+    client.create_learning_version.return_value = {
         "created": False,
-        "revision": 4,
+        "version": 4,
         "source": {
             "kind": "learning",
             "operation_id": "memory-tree-run-1",
@@ -1295,21 +1295,21 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
     )
     prepared = _commit_input(observation_ids=("extraction-1", "extraction-2"))
 
-    first = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
-    second = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
+    first = maintenance_workflow.commit_memory_tree_version_activity(prepared)
+    second = maintenance_workflow.commit_memory_tree_version_activity(prepared)
 
     assert first["processed_count"] == second["processed_count"] == 2
     expected = {
         "operation_id": "memory-tree-run-1",
-        "expected_active_revision": 3,
+        "expected_active_version": 3,
         "observation_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
         "maintenance_report": _report(("extraction-1", "extraction-2")),
     }
-    assert client.create_learning_revision.call_count == 2
-    assert client.create_learning_revision.call_args_list[0].kwargs == expected
-    assert client.create_learning_revision.call_args_list[1].kwargs == expected
+    assert client.create_learning_version.call_count == 2
+    assert client.create_learning_version.call_args_list[0].kwargs == expected
+    assert client.create_learning_version.call_args_list[1].kwargs == expected
 
 
 @pytest.mark.asyncio

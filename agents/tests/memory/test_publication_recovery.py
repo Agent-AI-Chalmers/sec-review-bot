@@ -100,7 +100,7 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
     monkeypatch, storage_result
 ):
     intent = {
-        "expected_active_revision": 2,
+        "expected_active_version": 2,
         "memory_tree_reference": reference("a"),
         "source": {
             "kind": "learning",
@@ -111,7 +111,7 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
         },
     }
     catalog = Mock()
-    catalog.list_revision_publications.return_value = [
+    catalog.list_version_publications.return_value = [
         {"status": "selected", "intent": intent}
     ]
     probe = (
@@ -127,7 +127,7 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
             catalog_client=catalog, operation_id="maintain-1", batch_size=10
         )
     catalog.get_learning_input.assert_not_called()
-    catalog.reserve_revision_publication.assert_not_called()
+    catalog.reserve_version_publication.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -135,7 +135,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
     monkeypatch,
 ):
     intent = {
-        "expected_active_revision": 2,
+        "expected_active_version": 2,
         "memory_tree_reference": reference("a"),
         "source": {
             "kind": "learning",
@@ -146,7 +146,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         },
     }
     catalog = Mock()
-    catalog.list_revision_publications.return_value = [
+    catalog.list_version_publications.return_value = [
         {"status": "reserved", "intent": intent}
     ]
     probe = Mock(return_value=True)
@@ -157,7 +157,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         catalog_client=catalog, operation_id="maintain-1", batch_size=10
     )
     assert result is not None
-    assert result.expected_active_revision == 2
+    assert result.expected_active_version == 2
     assert result.observation_ids == ("extract-1", "extract-2")
     assert result.memory_tree_reference.as_dict() == intent["memory_tree_reference"]
     assert (
@@ -171,7 +171,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         == intent["source"]["maintenance_report"]
     )
     assert probe.call_count == 2
-    catalog.confirm_revision_publication.assert_called_once_with(intent)
+    catalog.confirm_version_publication.assert_called_once_with(intent)
     catalog.get_learning_input.assert_not_called()
 
 
@@ -180,7 +180,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
     monkeypatch,
 ):
     first = {
-        "expected_active_revision": 2,
+        "expected_active_version": 2,
         "memory_tree_reference": reference("a"),
         "source": {
             "kind": "learning",
@@ -191,7 +191,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         },
     }
     complete = {
-        "expected_active_revision": 3,
+        "expected_active_version": 3,
         "memory_tree_reference": reference("c"),
         "source": {
             "kind": "learning",
@@ -202,7 +202,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         },
     }
     catalog = Mock()
-    catalog.list_revision_publications.return_value = [
+    catalog.list_version_publications.return_value = [
         {"status": "reserved", "intent": first},
         {"status": "reserved", "intent": complete},
     ]
@@ -214,14 +214,14 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         catalog_client=catalog, operation_id="maintain-1", batch_size=10
     )
     assert result is not None
-    assert result.expected_active_revision == 3
+    assert result.expected_active_version == 3
     assert result.observation_ids == ("extract-2",)
     assert result.memory_tree_reference.as_dict() == complete["memory_tree_reference"]
     assert (
         result.trajectory_reference.as_dict()
         == complete["source"]["trajectory_reference"]
     )
-    catalog.confirm_revision_publication.assert_called_once_with(complete)
+    catalog.confirm_version_publication.assert_called_once_with(complete)
     catalog.get_learning_input.assert_not_called()
 
 
@@ -230,7 +230,7 @@ async def test_abandoned_publication_never_recovers_or_runs_model(monkeypatch):
     from sec_review_agents.memory.catalog_client import MemoryPublicationAbandonedError
 
     catalog = Mock()
-    catalog.list_revision_publications.return_value = [
+    catalog.list_version_publications.return_value = [
         {"status": "abandoned", "intent": {}}
     ]
     exists = Mock(
@@ -244,5 +244,5 @@ async def test_abandoned_publication_never_recovers_or_runs_model(monkeypatch):
             catalog_client=catalog, operation_id="abandoned-1", batch_size=10
         )
     catalog.get_learning_input.assert_not_called()
-    catalog.confirm_revision_publication.assert_not_called()
+    catalog.confirm_version_publication.assert_not_called()
     exists.assert_not_called()

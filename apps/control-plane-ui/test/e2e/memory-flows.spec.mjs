@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import {
   runMemoryChineseFlow,
   runMemoryOverviewFlow,
-  runMemoryRevisionFlow,
+  runMemoryVersionFlow,
   runMemoryFilesFlow,
   runMemoryTrajectoryFlow,
   runMemoryEditFlow,
@@ -72,16 +72,16 @@ test.describe('local memory fixtures', () => {
     })
   })
 
-  test('memory revision graph and list layout', async ({ page }, testInfo) => {
-    await runMemoryRevisionFlow({
+  test('memory version graph and list layout', async ({ page }, testInfo) => {
+    await runMemoryVersionFlow({
       page,
       name: testInfo.project.name,
       viewport: page.viewportSize(),
-      screenshotPath: testInfo.outputPath('memory-revisions.png')
+      screenshotPath: testInfo.outputPath('memory-versions.png')
     })
   })
 
-  test('memory files and revision diff viewers', async ({
+  test('memory files and version diff viewers', async ({
     page,
     context,
     fixtureRuntime
@@ -106,7 +106,7 @@ test.describe('local memory fixtures', () => {
     })
   })
 
-  test('memory restore and edit retry preserve revision identity', async ({
+  test('memory restore and edit retry preserve version identity', async ({
     page
   }, testInfo) => {
     await runMemoryEditFlow({

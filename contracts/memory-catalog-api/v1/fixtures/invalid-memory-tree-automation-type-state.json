@@ -1,6 +1,6 @@
 {
   "state": 42,
-  "generation": 0,
+  "version": 0,
   "changed_by": {
     "kind": "user",
     "id": "sample"

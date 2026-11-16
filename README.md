@@ -59,7 +59,7 @@ Choose an entry point for your goal:
 
 ## Architecture Overview
 
-GitHub Integration receives review requests from GitHub and publishes review results back to GitHub. Review Runs persists task state and coordinates input preparation, execution, and publication. Execution Gateway submits execution requests to Temporal, and Execution Worker runs the review workflows. Memory Extraction Worker and Memory Maintenance Worker extract and maintain review experience, Memory Catalog records extraction results and manages memory-tree revision history and the active revision, and Control Plane UI provides the operator interface.
+GitHub Integration receives review requests from GitHub and publishes review results back to GitHub. Review Runs persists task state and coordinates input preparation, execution, and publication. Execution Gateway submits execution requests to Temporal, and Execution Worker runs the review workflows. Memory Extraction Worker and Memory Maintenance Worker extract and maintain review experience, Memory Catalog records extraction results and manages memory-tree version history and the active version, and Control Plane UI provides the operator interface.
 
 Temporal schedules workflows and activities, PostgreSQL stores coordination state, and object storage holds inputs and artifacts. Langfuse is deployed independently for model-call tracing and usage statistics; core review execution does not depend on it.
 

@@ -7,29 +7,29 @@ import { useMessages } from '../../shared/i18n.js'
 import { ArtifactWorkspace } from '../workspace/ArtifactWorkspace.js'
 
 export function MemoryFilesContent({
-  revision,
+  version,
   fullPage = false
 }: {
-  revision: number
+  version: number
   fullPage?: boolean
 }): React.JSX.Element {
   return (
     <ArtifactWorkspace
-      key={revision}
+      key={version}
       fullPage={fullPage}
       source={{
         load: async (signal) => {
           const body = await api<MemoryTreeContentResponse>(
-            `/memory/revisions/${revision}/content`,
+            `/memory/versions/${version}/content`,
             { signal }
           )
           return { files: body.files }
         },
         preferredFile: 'MEMORY.md',
-        pageHref: `/memory/revisions/${revision}/tree`,
+        pageHref: `/memory/versions/${version}/tree`,
         loadFailedMessage: 'memoryFilesLoadFailed',
         download: {
-          href: `/api/memory/revisions/${revision}/artifact`,
+          href: `/api/memory/versions/${version}/artifact`,
           label: 'downloadMemoryTree'
         }
       }}
@@ -38,22 +38,22 @@ export function MemoryFilesContent({
 }
 
 export function MemoryFilesViewer({
-  revision,
+  version,
   onClose
 }: {
-  revision: number | undefined
+  version: number | undefined
   onClose: () => void
 }): React.JSX.Element {
   const t = useMessages()
   return (
     <Modal
-      opened={revision !== undefined}
+      opened={version !== undefined}
       onClose={onClose}
-      title={t('memoryFilesRevision', { revision: String(revision ?? '') })}
+      title={t('memoryFilesVersion', { version: String(version ?? '') })}
       size="calc(100vw - 64px)"
       classNames={{ body: 'file-workspace-modal' }}
     >
-      {revision !== undefined && <MemoryFilesContent revision={revision} />}
+      {version !== undefined && <MemoryFilesContent version={version} />}
     </Modal>
   )
 }

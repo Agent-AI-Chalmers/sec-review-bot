@@ -31,7 +31,7 @@ const DECISION_COLORS = {
   conflict: 'orange'
 } as const satisfies Record<Decision['action'], string>
 
-// Shared by the revision list and graph so both views open the same report.
+// Shared by the version list and graph so both views open the same report.
 export function MaintenanceReportButton({
   report,
   onRevealObservation

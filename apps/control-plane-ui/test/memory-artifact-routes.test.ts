@@ -40,7 +40,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         source: {
           kind: 'learning',
           trajectory_reference: {
@@ -73,7 +73,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(
-      `${base}/api/memory/revisions/2/trajectory/content`,
+      `${base}/api/memory/versions/2/trajectory/content`,
       { headers: { cookie } }
     )
     assert.strictEqual(response.status, 200)
@@ -114,7 +114,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         memory_tree_reference: {
           uri: `s3://sec-review/memory/trees/${'b'.repeat(64)}/memory-tree.v1.tar.zst`,
           digest,
@@ -151,7 +151,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+    const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
     assert.strictEqual(response.status, 409)
@@ -178,7 +178,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         memory_tree_reference: {
           uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
           digest,
@@ -215,7 +215,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+    const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
     assert.strictEqual(response.status, 413)
@@ -237,7 +237,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         memory_tree_reference: {
           uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
           digest,
@@ -280,7 +280,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+    const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
     assert.strictEqual(response.status, 502)
@@ -302,7 +302,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         memory_tree_reference: {
           uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
           digest,
@@ -349,7 +349,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
   try {
     const cookie = await loginCookie(base)
     const response = await Promise.race([
-      fetch(`${base}/api/memory/revisions/2/artifact`, {
+      fetch(`${base}/api/memory/versions/2/artifact`, {
         headers: { cookie }
       }),
       new Promise<never>((_, reject) =>
@@ -379,7 +379,7 @@ test('BFF rejects same-size memory content that does not match the stored digest
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
       JSON.stringify({
-        revision: 2,
+        version: 2,
         memory_tree_reference: {
           uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
           digest,
@@ -414,7 +414,7 @@ test('BFF rejects same-size memory content that does not match the stored digest
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+    const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
     assert.strictEqual(response.status, 502)
@@ -537,9 +537,9 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
 test('memory artifact routes select the declared source for downloads and content previews', async (t) => {
   const fixture = await memoryArtifactFixture(t)
   for (const [path, bytes, filename] of [
-    ['/revisions/2/artifact', fixture.tree, 'memory-tree.v1.tar.zst'],
+    ['/versions/2/artifact', fixture.tree, 'memory-tree.v1.tar.zst'],
     [
-      '/revisions/2/trajectory',
+      '/versions/2/trajectory',
       fixture.maintenance,
       'memory-trajectory.v1.jsonl.zst'
     ],
@@ -558,11 +558,11 @@ test('memory artifact routes select the declared source for downloads and conten
     assert.equal(response.headers.get('cache-control'), 'no-store')
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes)
   }
-  const tree = await fixture.get('/revisions/2/content')
+  const tree = await fixture.get('/versions/2/content')
   assert.equal(tree.status, 200)
   assert.deepEqual(await tree.json(), { files: { 'MEMORY.md': '# Memory\n' } })
   for (const [path, content] of [
-    ['/revisions/2/trajectory/content', 'Maintenance trajectory'],
+    ['/versions/2/trajectory/content', 'Maintenance trajectory'],
     ['/extractions/extract-1/trajectory/content', 'Extraction trajectory']
   ]) {
     const response = await fixture.get(path)
@@ -584,11 +584,11 @@ test('memory artifact routes select the declared source for downloads and conten
   }
   assert.equal(fixture.objectReads.length, 6)
   assert.deepEqual(fixture.catalogReads, [
-    '/v1/memory-tree/revisions/2',
-    '/v1/memory-tree/revisions/2',
+    '/v1/memory-tree/versions/2',
+    '/v1/memory-tree/versions/2',
     '/v1/extractions/extract-1',
-    '/v1/memory-tree/revisions/2',
-    '/v1/memory-tree/revisions/2',
+    '/v1/memory-tree/versions/2',
+    '/v1/memory-tree/versions/2',
     '/v1/extractions/extract-1'
   ])
 })
@@ -598,9 +598,9 @@ test('invalid artifact identities and extraction tree requests never reach Catal
   for (const path of [
     '/extractions/extract-1/artifact',
     '/extractions/extract-1/content',
-    '/revisions/0/artifact',
-    '/revisions/01/content',
-    '/revisions/abc/trajectory',
+    '/versions/0/artifact',
+    '/versions/01/content',
+    '/versions/abc/trajectory',
     '/extractions/invalid%2Fid/trajectory'
   ]) {
     const response = await fixture.get(path)
@@ -617,7 +617,7 @@ test('malformed Catalog records fail as upstream errors before reading object st
   const fixture = await memoryArtifactFixture(t)
   for (const body of ['null', '[]', '"record"', '42', '{']) {
     fixture.catalogReply.body = body
-    const response = await fixture.get('/revisions/2/artifact')
+    const response = await fixture.get('/versions/2/artifact')
     assert.equal(response.status, 502, body)
     assert.deepEqual(await response.json(), {
       error: 'memory_artifact_download_failed'
@@ -626,7 +626,7 @@ test('malformed Catalog records fail as upstream errors before reading object st
   assert.deepEqual(fixture.objectReads, [])
 })
 
-test('revision trajectories reject non-maintainer sources while unavailable references remain 409', async (t) => {
+test('version trajectories reject non-maintainer sources while unavailable references remain 409', async (t) => {
   const fixture = await memoryArtifactFixture(t)
   const record: unknown = JSON.parse(fixture.catalogReply.body)
   assert(
@@ -643,7 +643,7 @@ test('revision trajectories reject non-maintainer sources while unavailable refe
       source,
       trajectory_reference: record.trajectory_reference
     })
-    const response = await fixture.get('/revisions/2/trajectory')
+    const response = await fixture.get('/versions/2/trajectory')
     assert.equal(response.status, 409)
     assert.deepEqual(await response.json(), {
       error: 'memory_artifact_unavailable'
@@ -657,13 +657,13 @@ test('reorganization trajectories support verified download and content preview'
   const record = JSON.parse(fixture.catalogReply.body)
   record.source.kind = 'reorganization'
   fixture.catalogReply.body = JSON.stringify(record)
-  const download = await fixture.get('/revisions/2/trajectory')
+  const download = await fixture.get('/versions/2/trajectory')
   assert.equal(download.status, 200)
   assert.deepEqual(
     Buffer.from(await download.arrayBuffer()),
     fixture.maintenance
   )
-  const preview = await fixture.get('/revisions/2/trajectory/content')
+  const preview = await fixture.get('/versions/2/trajectory/content')
   assert.equal(preview.status, 200)
   const content = await preview.json()
   assert.equal(content.events[0].message.content, 'Maintenance trajectory')

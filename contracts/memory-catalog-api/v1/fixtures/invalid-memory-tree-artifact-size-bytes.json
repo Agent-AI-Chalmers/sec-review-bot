@@ -1,5 +1,5 @@
 {
-  "revision": 0,
+  "version": 0,
   "memory_tree_reference": {
     "uri": "s3://catalog/memory/tree.tar.zst",
     "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
