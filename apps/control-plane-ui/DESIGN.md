@@ -41,9 +41,3 @@ A query change must not leave old results looking like matches for the new query
 On narrow screens, arrange each record so its identity, state, and actions stay together. Collapsible filters must retain an applied-filter summary. Long identifiers and translated labels must not hide essential controls. Support keyboard navigation and visible focus alongside touch and pointer input.
 
 Keep investigation context when navigating between related records. Before an action changes active memory or another operational state, identify its target and consequence. Present errors inside the relevant operation so the operator can recover without losing their place.
-
-## Verification
-
-Use the fixture-backed preview described in the README to inspect representative states without live services. Check both languages, light and dark themes, and desktop and mobile layouts. Include loading, empty, failure, recovery, and long-content cases relevant to the change.
-
-Run the package checks documented in the README. Color and icon checks catch departures from the shared definitions. Component and browser tests check behavior, while accessibility and visual tests check the rendered interface. Inspect changed screenshots before accepting new baselines. Record design decisions here; maintain the values in their source files.
