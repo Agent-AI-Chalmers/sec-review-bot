@@ -5,7 +5,8 @@
     "review-run-record-artifact-unavailable.json": "review-run-record.schema.json",
     "review-run-record-publication-failed.json": "review-run-record.schema.json",
     "observed-run-token-usage-unreported.json": "observed-run.schema.json",
-    "observed-run-token-usage-partial.json": "observed-run.schema.json"
+    "observed-run-token-usage-partial.json": "observed-run.schema.json",
+    "observed-run-agent-phases.json": "observed-run.schema.json"
   },
   "invalid_schema_fixtures": {
     "invalid-observed-run-extra-field.json": "observed-run.schema.json",
@@ -17,6 +18,7 @@
     "invalid-review-run-record-available-without-artifact.json": "review-run-record.schema.json",
     "invalid-review-run-record-error-with-artifact.json": "review-run-record.schema.json",
     "invalid-review-run-record-available-with-error-code.json": "review-run-record.schema.json",
-    "invalid-observed-run-comment-url-not-a-uri.json": "observed-run.schema.json"
+    "invalid-observed-run-comment-url-not-a-uri.json": "observed-run.schema.json",
+    "invalid-observed-run-feedback-retry-zero.json": "observed-run.schema.json"
   }
 }

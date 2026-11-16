@@ -573,8 +573,8 @@ CREATE TABLE execution_statistics_groups (
   agent_name text NOT NULL,
   case_id text,
   delivery_id text,
-  pass_kind text,
-  pass_index integer CHECK (pass_index >= 0),
+  agent_phase text,
+  feedback_retry_index integer CHECK (feedback_retry_index >= 1),
   batch_index integer CHECK (batch_index >= 1),
   chunk_id text,
   provider text NOT NULL,
@@ -588,7 +588,7 @@ CREATE TABLE execution_statistics_groups (
   cache_creation_input_tokens bigint CHECK (cache_creation_input_tokens >= 0),
   reasoning_tokens bigint CHECK (reasoning_tokens >= 0),
   UNIQUE NULLS NOT DISTINCT (
-    run_id, agent_name, case_id, delivery_id, pass_kind, pass_index, batch_index,
+    run_id, agent_name, case_id, delivery_id, agent_phase, feedback_retry_index, batch_index,
     chunk_id, provider, model
   ),
   CHECK (usage_reported_call_count <= model_call_count)
@@ -596,6 +596,10 @@ CREATE TABLE execution_statistics_groups (
 
 COMMENT ON TABLE execution_statistics_groups IS
   'Run statistics grouped by workflow coordinates, review agent, and Langfuse native provider/model identity. Call-level observations remain in Langfuse.';
+COMMENT ON COLUMN execution_statistics_groups.agent_phase IS
+  'Agent task phase: initial, feedback, draft or refinement when classified.';
+COMMENT ON COLUMN execution_statistics_groups.feedback_retry_index IS
+  'One-based verifier-feedback retry number, absent for work outside feedback retries.';
 COMMENT ON COLUMN execution_statistics_groups.input_tokens IS
   'Inclusive OpenTelemetry GenAI input total. Cache-read and cache-creation columns are subsets.';
 COMMENT ON COLUMN execution_statistics_groups.output_tokens IS

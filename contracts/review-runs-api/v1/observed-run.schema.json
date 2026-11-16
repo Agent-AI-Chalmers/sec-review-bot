@@ -239,8 +239,8 @@
                   "agent_name",
                   "case_id",
                   "delivery_id",
-                  "pass_kind",
-                  "pass_index",
+                  "agent_phase",
+                  "feedback_retry_index",
                   "batch_index",
                   "chunk_id",
                   "provider",
@@ -262,14 +262,14 @@
                     "type": ["string", "null"],
                     "description": "Repository delivery identity, or null outside delivery execution."
                   },
-                  "pass_kind": {
+                  "agent_phase": {
                     "type": ["string", "null"],
-                    "description": "Runtime pass classification such as initial or feedback when supplied by the agent."
+                    "description": "Agent task phase such as initial, feedback, draft, or refinement; null when not classified."
                   },
-                  "pass_index": {
+                  "feedback_retry_index": {
                     "type": ["integer", "null"],
-                    "minimum": 0,
-                    "description": "Zero-based pass number within the review or case when supplied by the agent."
+                    "minimum": 1,
+                    "description": "One-based verifier-feedback retry number; null outside feedback retries."
                   },
                   "batch_index": {
                     "type": ["integer", "null"],

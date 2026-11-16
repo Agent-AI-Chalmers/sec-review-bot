@@ -104,22 +104,26 @@ function UsageMetric({
   )
 }
 
-function passLabel(
+function phaseLabel(
   group: StatisticsGroup,
   t: ReturnType<typeof useMessages>
 ): string {
-  if (group.pass_kind === 'feedback')
-    return `${t('statisticsFeedbackPass')} ${group.pass_index ?? 1}`
-  if (group.pass_kind === 'initial') return t('statisticsInitialPass')
-  if (group.pass_kind === 'draft')
+  if (group.agent_phase === 'feedback') {
+    const label = t('statisticsFeedbackRetry')
+    return group.feedback_retry_index === null
+      ? label
+      : `${label} ${group.feedback_retry_index}`
+  }
+  if (group.agent_phase === 'initial') return t('statisticsInitialReview')
+  if (group.agent_phase === 'draft')
     return group.batch_index === null
-      ? t('statisticsDraftPass')
+      ? t('statisticsDraft')
       : `${t('statisticsDraftBatch')} ${group.batch_index}`
-  if (group.pass_kind === 'refinement') return t('statisticsRefinementPass')
-  return t('statisticsUnclassifiedPass')
+  if (group.agent_phase === 'refinement') return t('statisticsRefinement')
+  return t('statisticsUnclassified')
 }
 
-function passSections(
+function phaseSections(
   groups: StatisticsGroup[],
   t: ReturnType<typeof useMessages>
 ): UsageSection[] {
@@ -127,12 +131,12 @@ function passSections(
     ...Map.groupBy(
       groups,
       (group) =>
-        `${group.pass_kind ?? 'unknown'}:${group.pass_index ?? -1}:${group.batch_index ?? -1}`
+        `${group.agent_phase ?? 'unknown'}:${group.feedback_retry_index ?? -1}:${group.batch_index ?? -1}`
     )
-  ].map(([key, passGroups]) => ({
+  ].map(([key, phaseGroups]) => ({
     key,
-    label: passLabel(passGroups[0]!, t),
-    groups: passGroups
+    label: phaseLabel(phaseGroups[0]!, t),
+    groups: phaseGroups
   }))
 }
 
@@ -197,8 +201,8 @@ function summarizeAgents(
         ...first,
         case_id: null,
         delivery_id: null,
-        pass_kind: null,
-        pass_index: null,
+        agent_phase: null,
+        feedback_retry_index: null,
         batch_index: null,
         chunk_id: null,
         model_call_count: groupCallCount(agentGroups),
@@ -225,14 +229,11 @@ function summarizeAgents(
   }
 }
 
-function isOnlyInitialPass(sections: UsageSection[]): boolean {
+function isOnlyInitialReview(sections: UsageSection[]): boolean {
   return (
     sections.length === 1 &&
     sections[0]?.groups.every(
-      (group) =>
-        group.pass_kind === 'initial' &&
-        group.pass_index === 0 &&
-        group.batch_index === null
+      (group) => group.agent_phase === 'initial' && group.batch_index === null
     ) === true
   )
 }
@@ -486,12 +487,12 @@ function RepositoryBreakdown({
   }
   const scanSummary = summarizeAgents(scanGroups, (group) =>
     group.agent_name === 'repository-triager'
-      ? passLabel(group, t)
+      ? phaseLabel(group, t)
       : group.chunk_id
   )
   const deliverySummary = summarizeAgents(deliveryStageGroups, (group) => {
     if (group.agent_name === 'repository-delivery-planner')
-      return passLabel(group, t)
+      return phaseLabel(group, t)
     return group.delivery_id
   })
 
@@ -545,8 +546,8 @@ function RepositoryBreakdown({
               chevronPosition="left"
             >
               {[...caseGroups].map(([caseId, caseUsageGroups]) => {
-                const sections = passSections(caseUsageGroups, t)
-                const onlyInitialPass = isOnlyInitialPass(sections)
+                const sections = phaseSections(caseUsageGroups, t)
+                const onlyInitialReview = isOnlyInitialReview(sections)
                 return (
                   <Accordion.Item
                     key={caseId}
@@ -563,11 +564,11 @@ function RepositoryBreakdown({
                     </Accordion.Control>
                     <Accordion.Panel className="statistics-unit-panel">
                       <div className="statistics-unit-body">
-                        {onlyInitialPass ? (
+                        {onlyInitialReview ? (
                           <StatisticsTable
                             section={{
                               ...sections[0],
-                              key: `case:${caseId}:initial:0`,
+                              key: `case:${caseId}:initial`,
                               label: ''
                             }}
                             expandedGroups={expandedGroups}
@@ -622,7 +623,7 @@ function RepositoryBreakdown({
   )
 }
 
-function PassBreakdown({
+function PhaseBreakdown({
   sections,
   expandedGroups,
   toggleGroup,
@@ -635,7 +636,7 @@ function PassBreakdown({
   openStages: string[]
   onStagesChange: (value: string[]) => void
 }): React.JSX.Element {
-  if (isOnlyInitialPass(sections)) {
+  if (isOnlyInitialReview(sections)) {
     const section = sections[0]
     return (
       <StatisticsTable
@@ -712,7 +713,7 @@ export function ExecutionStatistics({
     statistics.observed_call_count > 0 ||
     statistics.token_usage.total_tokens !== null
   const hasDetails = hasObservedUsage || statistics.groups.length > 0
-  const sections = passSections(statistics.groups, t)
+  const sections = phaseSections(statistics.groups, t)
   const stageIds =
     workflow === 'repository-review'
       ? ['scan', 'review', 'delivery']
@@ -841,7 +842,7 @@ export function ExecutionStatistics({
                   onCasesChange={setOpenCases}
                 />
               ) : (
-                <PassBreakdown
+                <PhaseBreakdown
                   sections={sections}
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}

@@ -279,7 +279,7 @@ service token 用于协调 run 的各个组件，read token 用于脱敏读取�
 
 Schema 文件位于 `src/database/schema-versions`。已执行版本及 SHA-256 checksum 记录在 `schema_versions`。启动时使用 PostgreSQL advisory lock 串行执行 schema，并在数据库记录的 checksum 与当前文件不一致时拒绝启动。实验部署策略允许破坏性 schema reset。
 
-Execution statistics 存储在 `execution_statistics` 和 `execution_statistics_groups` 中：前者保存 reconciliation 状态和 run totals，后者保存按 case、delivery、pass、draft batch、discovery chunk、agent、provider 和 model 聚合的 totals。每次模型调用的记录继续保留在外部 Langfuse。至少包含一个审查 root 的连续两次读取结果相同后，snapshot 才是 `settled`；先到达 reconciliation 截止时间则标记为 `partial_window`，如果截止前没有出现审查 root，则标记为 `no_observations`。Usage coverage 只描述 Langfuse 返回的 calls，不证明所有真实模型调用都已上传。
+Execution statistics 存储在 `execution_statistics` 和 `execution_statistics_groups` 中：前者保存 reconciliation 状态和 run totals，后者保存按 case、delivery、Agent 阶段、反馈重试、draft batch、discovery chunk、agent、provider 和 model 聚合的 totals。每次模型调用的记录继续保留在外部 Langfuse。至少包含一个审查 root 的连续两次读取结果相同后，snapshot 才是 `settled`；先到达 reconciliation 截止时间则标记为 `partial_window`，如果截止前没有出现审查 root，则标记为 `no_observations`。Usage coverage 只描述 Langfuse 返回的 calls，不证明所有真实模型调用都已上传。
 
 Statistics 边界会把 Langfuse 的互斥计费 bucket 标准化为 OpenTelemetry GenAI token 语义。`input_tokens` 包含 cache read 与 cache creation 输入，`output_tokens` 包含 reasoning 输出；cache 与 reasoning 字段继续作为子集提供，而不是额外总量。
 

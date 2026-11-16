@@ -66,8 +66,7 @@ async def analyze_pull_request_activity(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            pass_kind="initial",
-            pass_index="0",
+            agent_phase="initial",
         )
     ):
         return await analyze_pull_request(
@@ -126,13 +125,14 @@ async def mitigate_pull_request_activity(
         prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            pass_kind="feedback" if retry_context is not None else "initial",
-            pass_index=str(pass_index),
+            agent_phase="feedback" if retry_context is not None else "initial",
+            feedback_retry_index=(
+                str(retry_context.retry_index) if retry_context is not None else None
+            ),
         )
     ):
         return await mitigate_pull_request(
@@ -201,13 +201,14 @@ async def verify_pull_request_activity(
         prepared_input.workspace_snapshot_tar_path,
         label="workspace_snapshot_tar_path",
     )
-    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            pass_kind="feedback" if retry_context is not None else "initial",
-            pass_index=str(pass_index),
+            agent_phase="feedback" if retry_context is not None else "initial",
+            feedback_retry_index=(
+                str(retry_context.retry_index) if retry_context is not None else None
+            ),
         )
     ):
         return await verify_pull_request(

@@ -221,8 +221,8 @@ export class ReviewRunQueries {
               'agent_name', g.agent_name,
               'case_id', g.case_id,
               'delivery_id', g.delivery_id,
-              'pass_kind', g.pass_kind,
-              'pass_index', g.pass_index,
+              'agent_phase', g.agent_phase,
+              'feedback_retry_index', g.feedback_retry_index,
               'batch_index', g.batch_index,
               'chunk_id', g.chunk_id,
               'provider', g.provider,
@@ -238,7 +238,9 @@ export class ReviewRunQueries {
                 'reasoning_tokens', g.reasoning_tokens
               )
             ) ORDER BY g.case_id NULLS FIRST,g.delivery_id NULLS FIRST,
-              g.pass_index NULLS FIRST,g.batch_index NULLS FIRST,g.chunk_id NULLS FIRST,
+              CASE g.agent_phase WHEN 'initial' THEN 0 WHEN 'draft' THEN 1
+                WHEN 'refinement' THEN 2 WHEN 'feedback' THEN 3 ELSE 4 END,
+              g.feedback_retry_index NULLS FIRST,g.batch_index NULLS FIRST,g.chunk_id NULLS FIRST,
               g.agent_name,g.provider,g.model NULLS FIRST)
             FROM execution_statistics_groups g WHERE g.run_id=s.run_id
           ), '[]'::jsonb),

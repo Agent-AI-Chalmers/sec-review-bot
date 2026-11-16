@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from sec_review_agents.observability.trace_context import current_trace_context
 from sec_review_agents.review_stages.feedback_loop import feedback_retry_context
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.types import Verdict
@@ -71,8 +72,18 @@ async def test_analysis_verdict_does_not_prevent_stage_execution(
         if retry
         else None
     )
-    mit_mock = AsyncMock(return_value=mitigation)
-    ver_mock = AsyncMock(return_value=verification)
+    trace_contexts: list[dict[str, str]] = []
+
+    async def mitigate(*args, **kwargs):
+        trace_contexts.append(current_trace_context())
+        return mitigation
+
+    async def verify(*args, **kwargs):
+        trace_contexts.append(current_trace_context())
+        return verification
+
+    mit_mock = AsyncMock(side_effect=mitigate)
+    ver_mock = AsyncMock(side_effect=verify)
     if scope == "repository_case":
         case_input = RepositoryCaseExecutionInput(
             case_id="case-1",
@@ -176,6 +187,13 @@ async def test_analysis_verdict_does_not_prevent_stage_execution(
         assert ver_mock.call_args.kwargs["test_changes"] == "deny"
     mit_mock.assert_awaited_once()
     ver_mock.assert_awaited_once()
+
+    assert [context.get("agent_phase") for context in trace_contexts] == [
+        "feedback" if retry else "initial"
+    ] * 2
+    assert [context.get("feedback_retry_index") for context in trace_contexts] == [
+        "1" if retry else None
+    ] * 2
 
 
 @pytest.mark.asyncio

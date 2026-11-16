@@ -31,3 +31,12 @@ export const TAR_ZSTD_CORPUS_ROOT = path.join(
   'v1',
   'corpus'
 )
+
+export function reviewRunsFixture(name: string): unknown {
+  return JSON.parse(
+    readFileSync(
+      path.join(contractsRoot, 'review-runs-api', 'v1', 'fixtures', name),
+      'utf8'
+    )
+  ) as unknown
+}

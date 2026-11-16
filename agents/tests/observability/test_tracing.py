@@ -36,14 +36,21 @@ def test_tracing_metadata_uses_agent_name(monkeypatch) -> None:
     }
 
 
-def test_tracing_metadata_uses_bound_trace_context(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("phase", "retry_index"),
+    [("initial", None), ("draft", None), ("refinement", None), ("feedback", "2")],
+)
+def test_tracing_metadata_uses_bound_trace_context(
+    monkeypatch, phase, retry_index
+) -> None:
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
     monkeypatch.delenv("LANGFUSE_BASE_URL", raising=False)
     bind_trace_context(
         workflow="repository-review",
         run_id="run-1",
-        agent_phase="refinement",
+        agent_phase=phase,
+        feedback_retry_index=retry_index,
     )
 
     config = build_tracing_config(
@@ -53,7 +60,12 @@ def test_tracing_metadata_uses_bound_trace_context(monkeypatch) -> None:
     assert config.metadata == {
         "sec_review_agent": "repository-analyzer",
         "sec_review_workflow": "repository-review",
-        "sec_review_agent_phase": "refinement",
+        "sec_review_agent_phase": phase,
+        **(
+            {"sec_review_feedback_retry_index": retry_index}
+            if retry_index is not None
+            else {}
+        ),
         "langfuse_session_id": "run-1",
     }
 
