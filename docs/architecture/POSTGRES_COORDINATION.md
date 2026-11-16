@@ -43,6 +43,22 @@ These guarantees hold only when the check and the write are atomic: they run in 
 
 A publication step's `failed` means its last attempt failed; it can still be retried while attempts remain, or reconciled after exhaustion. `terminal_failed` is its final failure. An axis's `failed` is a terminal conclusion. Do not infer retryability from the word `failed` without identifying the scope.
 
+## Other State Boundaries
+
+The run's axes do not describe every queue or publication candidate. [Artifact publication](ARTIFACT_PUBLICATION.md#publication-candidate-states) lists the input and memory candidate transitions.
+
+<!-- doc-default: review-runs.notice-transitions; source=services/review-runs/src/persistence/run-notices.ts -->
+
+A run notice starts `pending`, becomes `delivering` when claimed, and concludes as `delivered` or `failed`. An expired delivery can be reclaimed with a new token while remaining `delivering`. Resuming a disconnected axis supersedes its undelivered attention notices (`pending` or `delivering → superseded`) in the same transaction and invalidates their claims. Delivered notices and failure notices are not superseded by resume. A notice's `failed` describes notification delivery, not the review outcome.
+
+<!-- doc-default: review-runs.statistics-transitions; source=services/review-runs/src/statistics/execution-statistics-store.ts -->
+
+Execution statistics has its own `pending → reconciling` claim loop. A successful read can return to `pending` while waiting for stable observations, or become `settled` when observations stabilize or the collection window ends. Read failures can return to `pending`; exhausted read-failure retries or rate-limit deferral end as `unavailable`. Interrupted claims can be reclaimed. `ingestion_status` explains the collected snapshot's completeness, and `usage_coverage` describes reported usage; neither is an execution lifecycle status.
+
+<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
+
+Execution Gateway projects Temporal state on each read instead of maintaining another run-state table. Temporal `RUNNING` maps to `running`; a completed workflow becomes `succeeded` only when its success envelope, result, workflow identity, and artifact reference pass validation. Invalid or unsuccessful completed results and other terminal Temporal statuses map to `failed`. `queued` can be returned immediately after submission when no execution record is yet available. Review Runs separately records its observations of that API, so a Gateway status and a coordination recovery status answer different questions.
+
 ## Shared Principles
 
 - The decision happens in the database. Every coordinating write locks or compares the current state in the same transaction that changes it. Application code never reads a state, decides in memory, and writes the result back in a separate step.

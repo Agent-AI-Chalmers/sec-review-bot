@@ -30,6 +30,21 @@ sequenceDiagram
   Database-->>Publisher: 提交结果
 ```
 
+## 发布候选状态
+
+<!-- doc-default: input-bundle-candidate-transitions; source=services/review-runs/src/persistence/input-bundle-candidate-store.ts -->
+
+Input bundle 按 `reserved → present → selected` 推进：预留保存完整意图，确认记录上传者对对象存在的声明，提交准备结果时选定候选。持有准备认领者可以放弃 `reserved` 或 `present` 候选。与 Memory Catalog 候选不同，已放弃的输入候选可以在当前准备认领下，以相同内容重新预留。`selected` 候选不能被放弃。
+
+<!-- doc-default: memory-publication-transitions; source=services/memory-catalog/src/catalog-store.ts -->
+
+| Catalog 候选   | 正常转换                        | 放弃与重放                                                                                                                                                          |
+| -------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extraction     | `reserved → present → selected` | 没有 `abandoned` 状态。登记必须选定已确认的候选；重复确认保留 `selected`。                                                                                          |
+| Memory version | `reserved → present → selected` | 未选定的自动 `learning` 或 `reorganization` 候选可以从 `reserved` 或 `present` 进入 `abandoned`。该状态不可逆，重试预留或确认不会重新激活它。人工候选没有放弃操作。 |
+
+选定记录哪个意图已附加到业务结果。确认不代表 Catalog 检查过对象存储：上传者负责验证对象。这些状态都不会删除已存储的文件。暂停记忆自动更新可以放弃自动版本候选，但不会放弃 extraction 候选，也不会取消 worker 执行。
+
 ## 按 artifact 恢复
 
 中途失败后，重试先检查已记录的发布意图和对象状态。[Temporal Activity 重试](https://docs.temporal.io/activity-definition#idempotency)可能在完成响应丢失后重复上传，但不会把对象存储与 SQL 合成一个事务。
