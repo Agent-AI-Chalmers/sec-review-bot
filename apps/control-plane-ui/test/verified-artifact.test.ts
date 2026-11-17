@@ -19,13 +19,14 @@ for (const failure of ['metadata', 'storage'] as const) {
     const releaseOpen = Promise.withResolvers<void>()
     const sinkDestroyed = Promise.withResolvers<void>()
     let filename = ''
+    // Record observations inside the spies and assert after completion, so cleanup code
+    // that catches close/rm errors cannot swallow a failed ordering assertion.
+    const directoryExistedAtClose: boolean[] = []
+    const closesBeforeRemoval: number[] = []
     const observedClose = vi
       .spyOn(fs, 'close')
       .mockImplementation((...args: Parameters<typeof fs.close>) => {
-        expect(
-          fs.existsSync(path.dirname(filename)),
-          'the directory must survive until the sink closes'
-        ).toBe(true)
+        directoryExistedAtClose.push(fs.existsSync(path.dirname(filename)))
         return close(...args)
       })
     const delayedOpen = vi
@@ -44,12 +45,8 @@ for (const failure of ['metadata', 'storage'] as const) {
     const observedRemoval = vi
       .spyOn(fsPromises, 'rm')
       .mockImplementation(async (...args: Parameters<typeof fsPromises.rm>) => {
-        const closed = observedClose.mock.calls.length
+        closesBeforeRemoval.push(observedClose.mock.calls.length)
         await rm(...args)
-        expect(
-          closed,
-          'directory removal must start after the file closes'
-        ).toBe(1)
       })
     // The implementation uses the named fs/promises export; keep it bound to the spy.
     syncBuiltinESMExports()
@@ -88,6 +85,14 @@ for (const failure of ['metadata', 'storage'] as const) {
         observedClose,
         'rejection must wait for the sink to close'
       ).toHaveBeenCalledTimes(1)
+      expect(
+        directoryExistedAtClose,
+        'the directory must survive until the sink closes'
+      ).toEqual([true])
+      expect(
+        closesBeforeRemoval,
+        'directory removal must start after the file closes'
+      ).toEqual([1])
       expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
       releaseOpen.resolve()
