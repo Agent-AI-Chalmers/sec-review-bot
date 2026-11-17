@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
@@ -155,9 +154,9 @@ async function runPublish(
 
 test('issue publish opens a draft PR when the run opted in', async () => {
   const harness = await runPublish(true)
-  assert.strictEqual(harness.createdPullRequests.length, 1)
-  assert.strictEqual(harness.createdComments.length, 1)
-  assert.deepStrictEqual(harness.initializedSteps[0], [
+  expect(harness.createdPullRequests.length).toBe(1)
+  expect(harness.createdComments.length).toBe(1)
+  expect(harness.initializedSteps[0]).toStrictEqual([
     'issue:draft-pr',
     'issue:summary-comment'
   ])
@@ -165,9 +164,9 @@ test('issue publish opens a draft PR when the run opted in', async () => {
 
 test('issue publish keeps the patch in the summary comment when not opted in', async () => {
   const harness = await runPublish(false)
-  assert.strictEqual(harness.createdPullRequests.length, 0)
-  assert.strictEqual(harness.createdComments.length, 1)
-  assert.deepStrictEqual(harness.initializedSteps[0], ['issue:summary-comment'])
+  expect(harness.createdPullRequests.length).toBe(0)
+  expect(harness.createdComments.length).toBe(1)
+  expect(harness.initializedSteps[0]).toStrictEqual(['issue:summary-comment'])
 })
 
 for (const next_step of ['retry-ai', 'manual-review'] as const) {
@@ -176,8 +175,8 @@ for (const next_step of ['retry-ai', 'manual-review'] as const) {
     review_record.verification.next_step = next_step
     review_record.verification.findings = ['Revert the unrelated change.']
     const harness = await runPublish(true, review_record)
-    assert.equal(harness.createdPullRequests.length, 0)
-    assert.equal(harness.createdComments.length, 1)
-    assert.deepEqual(harness.initializedSteps[0], ['issue:summary-comment'])
+    expect(harness.createdPullRequests.length).toBe(0)
+    expect(harness.createdComments.length).toBe(1)
+    expect(harness.initializedSteps[0]).toStrictEqual(['issue:summary-comment'])
   })
 }

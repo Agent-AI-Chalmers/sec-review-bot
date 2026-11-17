@@ -1,8 +1,7 @@
 import { CATALOG_CONTRACT_ROOT } from './contract-fixtures.js'
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import Fastify from 'fastify'
 import { parse } from 'yaml'
@@ -27,24 +26,22 @@ const defs = JSON.parse(
 ) as Record<string, object>
 const manifest = contractFixtureManifest()
 
-await test('shared fixtures cover every schema and all files exactly once', () => {
+test('shared fixtures cover every schema and all files exactly once', () => {
   const names = [
     ...Object.keys(manifest.schema_fixtures),
     ...Object.keys(manifest.invalid_schema_fixtures),
   ]
-  assert.equal(new Set(names).size, names.length)
-  assert.deepEqual(names.sort(), contractFixtureNames())
-  assert.deepEqual(
+  expect(new Set(names).size).toBe(names.length)
+  expect(names.sort()).toStrictEqual(contractFixtureNames())
+  expect(
     [...new Set(Object.values(manifest.schema_fixtures))].sort(),
-    Object.keys(defs).sort(),
-  )
-  assert.deepEqual(
+  ).toStrictEqual(Object.keys(defs).sort())
+  expect(
     [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort(),
-    Object.keys(defs).sort(),
-  )
+  ).toStrictEqual(Object.keys(defs).sort())
 })
 
-await test('response object validation accepts and rejects the shared schema cases', async () => {
+test('response object validation accepts and rejects the shared schema cases', async () => {
   const app = Fastify()
   registerResponseValidation(app)
   let value: unknown
@@ -74,8 +71,8 @@ await test('response object validation accepts and rejects the shared schema cas
       for (const [name, schema] of Object.entries(cases)) {
         value = contractFixture(name)
         const response = await app.inject(`/fixture/${schema}`)
-        assert.equal(response.statusCode, valid ? 200 : 500, name)
-        if (valid) assert.deepEqual(response.json(), { value }, name)
+        expect(response.statusCode, name).toBe(valid ? 200 : 500)
+        if (valid) expect(response.json(), name).toStrictEqual({ value })
       }
     }
   } finally {
@@ -83,7 +80,7 @@ await test('response object validation accepts and rejects the shared schema cas
   }
 })
 
-await test('actual catalog routes reject malformed query results before emitting success', async () => {
+test('actual catalog routes reject malformed query results before emitting success', async () => {
   let value: unknown
   // Deliberately allow corrupt store output: this test protects the HTTP exit, not TS types.
   const store = {
@@ -119,14 +116,13 @@ await test('actual catalog routes reject malformed query results before emitting
             url: url!,
             headers: { authorization: 'Bearer worker' },
           })
-          assert.equal(response.statusCode, valid ? 200 : 500, name)
-          if (valid) assert.deepEqual(response.json(), value, name)
+          expect(response.statusCode, name).toBe(valid ? 200 : 500)
+          if (valid) expect(response.json(), name).toStrictEqual(value)
           else
-            assert.deepEqual(
-              response.json(),
-              { error: 'Internal server error', code: 'INTERNAL_ERROR' },
-              name,
-            )
+            expect(response.json(), name).toStrictEqual({
+              error: 'Internal server error',
+              code: 'INTERNAL_ERROR',
+            })
         }
       }
     }
@@ -135,7 +131,7 @@ await test('actual catalog routes reject malformed query results before emitting
   }
 })
 
-await test('actual write routes reject shared malformed requests before reaching the store', async () => {
+test('actual write routes reject shared malformed requests before reaching the store', async () => {
   let calls = 0
   const store = {
     registerExtraction: () => {
@@ -227,14 +223,14 @@ await test('actual write routes reject shared malformed requests before reaching
             payload: JSON.stringify(payload),
           })
           if (valid) {
-            assert.ok(
+            expect.assert(
               response.statusCode === 200 || response.statusCode === 201,
               `${name}: ${response.body}`,
             )
-            assert.equal(calls, before + 1, name)
+            expect(calls, name).toBe(before + 1)
           } else {
-            assert.equal(response.statusCode, 400, name)
-            assert.equal(calls, before, name)
+            expect(response.statusCode, name).toBe(400)
+            expect(calls, name).toBe(before)
           }
         }
       }
@@ -244,7 +240,7 @@ await test('actual write routes reject shared malformed requests before reaching
   }
 })
 
-await test('obsolete version fields and history routes are rejected without reaching storage', async () => {
+test('obsolete version fields and history routes are rejected without reaching storage', async () => {
   let calls = 0
   const store = {
     changeMemoryTreeAutomation: () => {
@@ -274,7 +270,7 @@ await test('obsolete version fields and history routes are rejected without reac
       headers: { authorization: 'Bearer operator' },
       payload: { operation_id: 'pause-old', expected_generation: 0 },
     })
-    assert.equal(automation.statusCode, 400)
+    expect(automation.statusCode).toBe(400)
     const { expected_active_version, ...creation } = contractFixture(
       'valid-memory-tree-version-creation.json',
     ) as Record<string, unknown>
@@ -287,14 +283,14 @@ await test('obsolete version fields and history routes are rejected without reac
         expected_active_revision: expected_active_version,
       },
     })
-    assert.equal(oldCreation.statusCode, 400)
+    expect(oldCreation.statusCode).toBe(400)
     const history = await app.inject({
       method: 'GET',
       url: '/v1/memory-tree/revisions',
       headers: { authorization: 'Bearer worker' },
     })
-    assert.equal(history.statusCode, 404)
-    assert.equal(calls, 0)
+    expect(history.statusCode).toBe(404)
+    expect(calls).toBe(0)
   } finally {
     await app.close()
   }

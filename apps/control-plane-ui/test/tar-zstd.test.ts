@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import { test } from 'node:test'
+import { expect, test } from 'vitest'
 import { zstdDecompressSync } from 'node:zlib'
 
 import { validateRestrictedPaxTar } from '../server/artifacts/tar-zstd.js'
@@ -18,9 +17,11 @@ test('restricted PAX reader matches the shared corpus', () => {
       void validateRestrictedPaxTar(
         zstdDecompressSync(fs.readFileSync(path.join(corpus, item.file)))
       )
-    if (item.expected === 'valid') assert.doesNotThrow(read, item.file)
+    if (item.expected === 'valid') expect(read, item.file).not.toThrow()
     else
-      assert.throws(read, { message: 'invalid_tar_zstd_envelope' }, item.file)
+      expect(read, item.file).toThrow(
+        expect.objectContaining({ message: 'invalid_tar_zstd_envelope' })
+      )
   }
 })
 
@@ -31,7 +32,7 @@ test('restricted PAX reader returns the validated canonical header', () => {
     )
   )
 
-  assert.deepEqual(entries, [
+  expect(entries).toStrictEqual([
     {
       path: 'tree/file.txt',
       typeFlag: '0',

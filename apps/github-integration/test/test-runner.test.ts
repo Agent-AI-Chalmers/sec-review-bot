@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { test } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
@@ -14,6 +14,10 @@ test('test runner isolates inherited Git settings while preserving repository at
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-isolation-test-'))
   try {
     await fs.mkdir(path.join(root, 'test'))
+    await fs.copyFile(
+      path.join(packageRoot, 'vitest.config.ts'),
+      path.join(root, 'vitest.config.ts')
+    )
     await fs.mkdir(path.join(root, 'xdg', 'git'), { recursive: true })
     await fs.symlink(
       path.join(packageRoot, 'node_modules'),

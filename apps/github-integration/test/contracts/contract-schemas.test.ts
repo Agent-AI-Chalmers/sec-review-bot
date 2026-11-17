@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Ajv2020, type AnySchemaObject } from 'ajv/dist/2020.js'
 
@@ -19,13 +18,13 @@ interface FixtureManifest {
 
 function invalidFixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.strictEqual(typeof manifest.invalid_schema_fixtures, 'object')
+  expect(typeof manifest.invalid_schema_fixtures).toBe('object')
   return Object.entries(manifest.invalid_schema_fixtures)
 }
 
 function fixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.strictEqual(typeof manifest.schema_fixtures, 'object')
+  expect(typeof manifest.schema_fixtures).toBe('object')
   return Object.entries(manifest.schema_fixtures)
 }
 
@@ -56,11 +55,10 @@ test('shared v1 contract fixtures match JSON schemas', () => {
     }
     const valid = validate(contractFixture(fixtureName))
 
-    assert.strictEqual(
+    expect(
       valid,
-      true,
       `${fixtureName} failed ${schemaName}: ${ajv.errorsText(validate.errors)}`
-    )
+    ).toBe(true)
   }
 })
 
@@ -72,11 +70,10 @@ test('shared v1 contract fixture manifest covers fixture and schema files', () =
   )
   const schemaNames = new Set(contractSchemaFiles())
 
-  assert.deepStrictEqual(
-    [...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(),
-    fixtureNames
-  )
-  assert.ok(
+  expect(
+    [...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort()
+  ).toStrictEqual(fixtureNames)
+  expect.assert(
     [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every(
       (schemaName) => schemaNames.has(schemaName)
     )
@@ -85,11 +82,10 @@ test('shared v1 contract fixture manifest covers fixture and schema files', () =
 
 test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.deepStrictEqual(
+  expect(
     Object.keys(manifest.invalid_fixture_error_paths).sort(),
-    Object.keys(manifest.invalid_schema_fixtures).sort(),
     'every invalid fixture must declare where it is expected to fail'
-  )
+  ).toStrictEqual(Object.keys(manifest.invalid_schema_fixtures).sort())
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
     validate(contractFixture(fixtureName))
@@ -112,10 +108,11 @@ test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
           )
       )
     )
-    assert.deepStrictEqual(
+    expect(
       failing,
-      new Set([manifest.invalid_fixture_error_paths[fixtureName]]),
       `${fixtureName} should fail only at its declared path`
+    ).toStrictEqual(
+      new Set([manifest.invalid_fixture_error_paths[fixtureName]])
     )
   }
 })
@@ -127,7 +124,7 @@ test('v1 pull request input schema requires audit objective', () => {
   }
   payload.review_intent.objective = 'repair'
 
-  assert.strictEqual(validate(payload), false)
+  expect(validate(payload)).toBe(false)
 })
 
 test('v1 repository input schema requires audit objective', () => {
@@ -139,7 +136,7 @@ test('v1 repository input schema requires audit objective', () => {
   }
   payload.review_intent.objective = 'repair'
 
-  assert.strictEqual(validate(payload), false)
+  expect(validate(payload)).toBe(false)
 })
 
 test('v1 repository full scan schema rejects incremental window fields', () => {
@@ -159,7 +156,7 @@ test('v1 repository full scan schema rejects incremental window fields', () => {
     { path: 'src/webhook.ts', status: 'modified', previous_path: null }
   ]
 
-  assert.strictEqual(validate(payload), false)
+  expect(validate(payload)).toBe(false)
 })
 
 test('v1 repository incremental schema rejects missing window fields', () => {
@@ -176,11 +173,7 @@ test('v1 repository incremental schema rejects missing window fields', () => {
     }
     Object.assign(payload.scan_target, scanTargetPatch)
 
-    assert.strictEqual(
-      validate(payload),
-      false,
-      JSON.stringify(scanTargetPatch)
-    )
+    expect(validate(payload), JSON.stringify(scanTargetPatch)).toBe(false)
   }
 })
 
@@ -195,7 +188,7 @@ test('v1 repository incremental schema allows empty changed file scope', () => {
   }
   payload.scan_scope.incremental_changed_files = []
 
-  assert.strictEqual(validate(payload), true)
+  expect(validate(payload)).toBe(true)
 })
 
 test('v1 review record schema rejects unsafe file change paths', () => {
@@ -219,13 +212,9 @@ test('v1 review record schema rejects unsafe file change paths', () => {
       }
     }
     const [fileChange] = payload.mitigation.file_changes
-    assert.ok(fileChange)
+    expect.assert(fileChange)
     fileChange.path = path
 
-    assert.strictEqual(
-      validate(payload),
-      false,
-      `${path} should not be schema-valid`
-    )
+    expect(validate(payload), `${path} should not be schema-valid`).toBe(false)
   }
 })

@@ -4,8 +4,7 @@
 // GitHub contents API, so a path that escapes the repository, targets `.git`, or rewrites a
 // security control (CI workflows, CODEOWNERS) must be rejected. The publish paths exercise them
 // indirectly, but only for two sample values; the cases below pin each branch of the check.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   validateContractPublishableRepoRelativePath,
@@ -21,8 +20,8 @@ test('accepts ordinary repository-relative paths unchanged', () => {
     'docs/CODEOWNERS.md',
     'file-with.dots.md'
   ]) {
-    assert.strictEqual(validateRepoRelativePath(path), path)
-    assert.strictEqual(validateContractPublishableRepoRelativePath(path), path)
+    expect(validateRepoRelativePath(path)).toBe(path)
+    expect(validateContractPublishableRepoRelativePath(path)).toBe(path)
   }
 })
 
@@ -37,11 +36,10 @@ test('rejects paths that are empty, whitespace-padded, or absolute', () => {
     'C:/Windows/system32',
     'c:relative'
   ]) {
-    assert.throws(
+    expect(
       () => validateRepoRelativePathShape(path),
-      /Unsafe repository file path/,
       `${JSON.stringify(path)} must be rejected`
-    )
+    ).toThrow(/Unsafe repository file path/)
   }
 })
 
@@ -54,17 +52,15 @@ test('rejects traversal segments, empty segments, and dot segments', () => {
     'a/..',
     './a'
   ]) {
-    assert.throws(
+    expect(
       () => validateRepoRelativePathShape(path),
-      /Unsafe repository file path/,
       `${JSON.stringify(path)} must be rejected`
-    )
+    ).toThrow(/Unsafe repository file path/)
   }
 })
 
 test('rejects backslashes, which some platforms would treat as separators', () => {
-  assert.throws(
-    () => validateRepoRelativePathShape('a\\b.txt'),
+  expect(() => validateRepoRelativePathShape('a\\b.txt')).toThrow(
     /Unsafe repository file path/
   )
 })
@@ -72,8 +68,7 @@ test('rejects backslashes, which some platforms would treat as separators', () =
 test('rejects any path that touches .git', () => {
   // `.git/config` could redirect where objects are written; a nested `.git` is still refused.
   for (const path of ['.git/config', 'sub/.git/HEAD', '.git']) {
-    assert.throws(
-      () => validateRepoRelativePathShape(path),
+    expect(() => validateRepoRelativePathShape(path)).toThrow(
       /Unsafe repository file path targets \.git/
     )
   }
@@ -81,7 +76,7 @@ test('rejects any path that touches .git', () => {
 
 test('normalizes trimming and backslashes before checking the shape', () => {
   // `validateRepoRelativePath` repairs a slash-separated path, then re-validates it.
-  assert.strictEqual(validateRepoRelativePath(' src/app.ts '), 'src/app.ts')
+  expect(validateRepoRelativePath(' src/app.ts ')).toBe('src/app.ts')
 })
 
 test('rejects security-control paths in both publishing validators', () => {
@@ -94,16 +89,14 @@ test('rejects security-control paths in both publishing validators', () => {
     '.github/CODEOWNERS',
     'docs/CODEOWNERS'
   ]) {
-    assert.throws(
+    expect(
       () => validateRepoRelativePath(path),
-      /Sensitive repository file path/,
       `${JSON.stringify(path)} must be rejected by validateRepoRelativePath`
-    )
-    assert.throws(
+    ).toThrow(/Sensitive repository file path/)
+    expect(
       () => validateContractPublishableRepoRelativePath(path),
-      /Sensitive repository file path/,
       `${JSON.stringify(path)} must be rejected by validateContractPublishableRepoRelativePath`
-    )
+    ).toThrow(/Sensitive repository file path/)
   }
 })
 
@@ -111,8 +104,7 @@ test('the structural check alone permits a sensitive path', () => {
   // `validateRepoRelativePathShape` is contract-shape only; policy lives in the two validators.
   // Pinning that keeps a future refactor from silently moving policy into the shape check (or
   // removing it from the validators).
-  assert.strictEqual(
-    validateRepoRelativePathShape('.github/workflows/ci.yml'),
+  expect(validateRepoRelativePathShape('.github/workflows/ci.yml')).toBe(
     '.github/workflows/ci.yml'
   )
 })

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   parseIssueReviewPublishContext,
@@ -9,60 +8,58 @@ import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error
 import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 
 function assertInvalidPublishContext(operation: () => unknown): void {
-  assert.throws(operation, (error) => {
-    assert.strictEqual(
-      (error as { code?: unknown }).code,
-      EXECUTION_PUBLISH_ERROR_CODES.publish_context_invalid
-    )
-    return true
-  })
+  expect(operation).toThrow(
+    expect.toSatisfy((error) => {
+      expect((error as { code?: unknown }).code).toBe(
+        EXECUTION_PUBLISH_ERROR_CODES.publish_context_invalid
+      )
+      return true
+    })
+  )
 }
 
 test('workflow parsers retain only fields needed to resume publication', () => {
-  assert.deepStrictEqual(
+  expect(
     parsePublishContextForWorkflow(
       'issue-review',
       publishContextForWorkflow('issue-review')
-    ),
-    {
-      issue: {
-        owner_login: 'octo',
-        repo_name: 'example',
-        repo_full_name: 'octo/example',
-        default_branch: 'main',
-        issue_number: 7,
-        issue_title: 'Example issue'
-      },
-      workspace_ref: 'workspace-sha',
-      event_type: 'manual_review',
-      open_pr: false
-    }
-  )
-  assert.deepStrictEqual(
+    )
+  ).toStrictEqual({
+    issue: {
+      owner_login: 'octo',
+      repo_name: 'example',
+      repo_full_name: 'octo/example',
+      default_branch: 'main',
+      issue_number: 7,
+      issue_title: 'Example issue'
+    },
+    workspace_ref: 'workspace-sha',
+    event_type: 'manual_review',
+    open_pr: false
+  })
+  expect(
     parsePublishContextForWorkflow(
       'pull-request-review',
       publishContextForWorkflow('pull-request-review')
-    ),
-    {
-      pr: {
-        owner_login: 'octo',
-        repo_name: 'example',
-        repo_full_name: 'octo/example',
-        pr_number: 7,
-        pr_author: 'alice',
-        head_sha: 'head-sha'
-      },
-      files: [],
-      event_type: 'manual_review'
-    }
-  )
-  assert.deepStrictEqual(
+    )
+  ).toStrictEqual({
+    pr: {
+      owner_login: 'octo',
+      repo_name: 'example',
+      repo_full_name: 'octo/example',
+      pr_number: 7,
+      pr_author: 'alice',
+      head_sha: 'head-sha'
+    },
+    files: [],
+    event_type: 'manual_review'
+  })
+  expect(
     parsePublishContextForWorkflow(
       'repository-review',
       publishContextForWorkflow('repository-review')
-    ),
-    publishContextForWorkflow('repository-review')
-  )
+    )
+  ).toStrictEqual(publishContextForWorkflow('repository-review'))
 })
 
 test('publish context rejects an unknown event instead of changing its meaning', () => {
@@ -115,7 +112,7 @@ test('issue publish context defaults a missing open_pr to false', () => {
     unknown
   >
   delete context.open_pr
-  assert.strictEqual(parseIssueReviewPublishContext(context).open_pr, false)
+  expect(parseIssueReviewPublishContext(context).open_pr).toBe(false)
 })
 
 test('issue publish context preserves an explicit open_pr opt-in', () => {
@@ -123,7 +120,7 @@ test('issue publish context preserves an explicit open_pr opt-in', () => {
     ...publishContextForWorkflow('issue-review'),
     open_pr: true
   })
-  assert.strictEqual(parsed.open_pr, true)
+  expect(parsed.open_pr).toBe(true)
 })
 
 test('issue publish context rejects a non-boolean open_pr', () => {
@@ -140,5 +137,5 @@ test('publish context projects away fields that publication does not own', () =>
     ...publishContextForWorkflow('issue-review'),
     request_only_metadata: 'not persisted by the parser'
   })
-  assert.strictEqual('request_only_metadata' in parsed, false)
+  expect('request_only_metadata' in parsed).toBe(false)
 })

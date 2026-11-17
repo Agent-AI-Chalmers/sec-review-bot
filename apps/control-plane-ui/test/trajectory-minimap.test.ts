@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   MAX_MINIMAP_MARKS,
@@ -16,8 +15,8 @@ test('a long message stays current while it covers the viewport center', () => {
   ]
   // The short follower's center is closer to 0.8 than the long message's
   // center, but the viewport center is still inside the long message.
-  assert.equal(nearestSegment(segments, 0.8), 0)
-  assert.equal(nearestSegment(segments, 0.95), 1)
+  expect(nearestSegment(segments, 0.8)).toBe(0)
+  expect(nearestSegment(segments, 0.95)).toBe(1)
 })
 
 test('a viewport center between messages falls back to the nearest center', () => {
@@ -25,19 +24,19 @@ test('a viewport center between messages falls back to the nearest center', () =
     { top: 0, height: 0.2 },
     { top: 0.5, height: 0.2 }
   ]
-  assert.equal(nearestSegment(segments, 0.3), 0)
-  assert.equal(nearestSegment(segments, 0.42), 1)
+  expect(nearestSegment(segments, 0.3)).toBe(0)
+  expect(nearestSegment(segments, 0.42)).toBe(1)
 })
 
 test('an empty trajectory has no current segment to pick', () => {
-  assert.equal(nearestSegment([], 0.5), 0)
+  expect(nearestSegment([], 0.5)).toBe(0)
 })
 
 test('mark width encodes state, not message size', () => {
-  assert.equal(minimapMarkWidth(false, false), 12)
-  assert.equal(minimapMarkWidth(false, true), 18)
-  assert.equal(minimapMarkWidth(true, false), 20)
-  assert.equal(minimapMarkWidth(true, true), 20)
+  expect(minimapMarkWidth(false, false)).toBe(12)
+  expect(minimapMarkWidth(false, true)).toBe(18)
+  expect(minimapMarkWidth(true, false)).toBe(20)
+  expect(minimapMarkWidth(true, true)).toBe(20)
 })
 
 test('dense trajectories bucket marks without overlapping', () => {
@@ -45,15 +44,15 @@ test('dense trajectories bucket marks without overlapping', () => {
   const ticks = minimapTicks(count)
   const buckets = minimapBuckets(count, ticks)
 
-  assert.equal(buckets.length, MAX_MINIMAP_MARKS)
-  assert.equal(buckets[0]?.start, 0)
-  assert.equal(buckets.at(-1)?.end, count - 1)
+  expect(buckets.length).toBe(MAX_MINIMAP_MARKS)
+  expect(buckets[0]?.start).toBe(0)
+  expect(buckets.at(-1)?.end).toBe(count - 1)
   for (let index = 1; index < buckets.length; index += 1)
-    assert.ok(buckets[index]!.top > buckets[index - 1]!.top)
+    expect.assert(buckets[index]!.top > buckets[index - 1]!.top)
   const gaps = buckets
     .slice(1)
     .map((bucket, index) => bucket.top - buckets[index]!.top)
-  assert.ok(
+  expect.assert(
     Math.min(...gaps) > 2,
     `bucket marks must not overlap: ${gaps.join(', ')}`
   )
@@ -63,10 +62,7 @@ test('a sparse trajectory keeps one bucket per message', () => {
   const ticks = minimapTicks(3)
   const buckets = minimapBuckets(3, ticks)
 
-  assert.equal(buckets.length, 3)
-  assert.deepEqual(
-    buckets.map((bucket) => bucket.start),
-    [0, 1, 2]
-  )
-  assert.equal(buckets[1]?.top, ticks.start + ticks.gap)
+  expect(buckets.length).toBe(3)
+  expect(buckets.map((bucket) => bucket.start)).toStrictEqual([0, 1, 2])
+  expect(buckets[1]?.top).toBe(ticks.start + ticks.gap)
 })

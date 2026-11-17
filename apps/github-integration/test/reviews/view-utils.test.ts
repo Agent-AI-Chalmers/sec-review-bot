@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   inlineCode,
@@ -9,18 +8,18 @@ import {
 } from '../../src/reviews/view-utils.js'
 
 test('view utils render missing inline code values with explicit fallback', () => {
-  assert.strictEqual(inlineCode(null), '`unknown`')
-  assert.strictEqual(inlineCode(undefined, 'n/a'), '`n/a`')
+  expect(inlineCode(null)).toBe('`unknown`')
+  expect(inlineCode(undefined, 'n/a')).toBe('`n/a`')
 })
 
 test('view utils use a longer code span fence around embedded backticks', () => {
-  assert.strictEqual(inlineCode('user`name'), '``user`name``')
-  assert.strictEqual(inlineCode('user``name'), '```user``name```')
-  assert.strictEqual(inlineCode('`quoted`'), '`` `quoted` ``')
+  expect(inlineCode('user`name')).toBe('``user`name``')
+  expect(inlineCode('user``name')).toBe('```user``name```')
+  expect(inlineCode('`quoted`')).toBe('`` `quoted` ``')
 })
 
 test('view utils render changed files with a safe inline code fence', () => {
-  assert.deepStrictEqual(renderChangedFilesLines(['src/uses`tick.ts']), [
+  expect(renderChangedFilesLines(['src/uses`tick.ts'])).toStrictEqual([
     'Changed files:',
     '',
     '- ``src/uses`tick.ts``'
@@ -28,7 +27,7 @@ test('view utils render changed files with a safe inline code fence', () => {
 })
 
 test('view utils render verification summary with stable order and finding summaries', () => {
-  assert.deepStrictEqual(
+  expect(
     renderVerificationSummaryLines(
       {
         coverage: 'full',
@@ -44,28 +43,27 @@ test('view utils render verification summary with stable order and finding summa
         includeOverview: false,
         includeUnknownNextStep: true
       }
-    ),
-    [
-      '- Coverage: `full`',
-      '- Regression: `not-run`',
-      '- Next step: `none`',
-      '- Validation level: `static`',
-      '',
-      'Target claim:',
-      '',
-      'The patch covers retry payloads.',
-      '',
-      'Findings:',
-      '- Patch updates retry validation.',
-      '',
-      'Evidence:',
-      '- No regression suite was run.'
-    ]
-  )
+    )
+  ).toStrictEqual([
+    '- Coverage: `full`',
+    '- Regression: `not-run`',
+    '- Next step: `none`',
+    '- Validation level: `static`',
+    '',
+    'Target claim:',
+    '',
+    'The patch covers retry payloads.',
+    '',
+    'Findings:',
+    '- Patch updates retry validation.',
+    '',
+    'Evidence:',
+    '- No regression suite was run.'
+  ])
 })
 
 test('view utils preserve inline code in review prose', () => {
-  assert.deepStrictEqual(
+  expect(
     renderVerificationSummaryLines(
       {
         coverage: 'full',
@@ -81,21 +79,20 @@ test('view utils preserve inline code in review prose', () => {
       {
         includeOverview: false
       }
-    ),
-    [
-      '- Coverage: `full`',
-      '- Regression: `passed`',
-      '- Next step: `none`',
-      '- Validation level: `static`',
-      '',
-      'Target claim:',
-      '',
-      'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
-      '',
-      'Evidence:',
-      '- `MemoryObservationOutput` remains unchanged.'
-    ]
-  )
+    )
+  ).toStrictEqual([
+    '- Coverage: `full`',
+    '- Regression: `passed`',
+    '- Next step: `none`',
+    '- Validation level: `static`',
+    '',
+    'Target claim:',
+    '',
+    'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
+    '',
+    'Evidence:',
+    '- `MemoryObservationOutput` remains unchanged.'
+  ])
 })
 
 test('view utils keep narrative scope decisions visible', () => {
@@ -123,7 +120,7 @@ test('view utils keep narrative scope decisions visible', () => {
   ])
   const rendered = lines.join('\n')
 
-  assert.ok(rendered.includes('path.join(EXPORT_ROOT, file)'))
-  assert.ok(rendered.includes('Only this route builds an export path.'))
-  assert.ok(rendered.includes('src/server.ts route mounting'))
+  expect.assert(rendered.includes('path.join(EXPORT_ROOT, file)'))
+  expect.assert(rendered.includes('Only this route builds an export path.'))
+  expect.assert(rendered.includes('src/server.ts route mounting'))
 })

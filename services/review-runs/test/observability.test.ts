@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { expect, test } from 'vitest'
 
 import { observePublicationStep, observeRun } from '../src/observability.js'
 
@@ -38,7 +37,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     execution_input: { secret: 'must-not-leak' },
     publish_context: { repository: 'octo/example' }
   })
-  assert.deepStrictEqual(observed, {
+  expect(observed).toStrictEqual({
     run_id: 'run-1',
     workflow: 'issue-review',
     source_platform: 'github',
@@ -84,7 +83,7 @@ test('publication step observation exposes operator outcomes without reconciliat
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'
   })
-  assert.deepStrictEqual(observed, {
+  expect(observed).toStrictEqual({
     step_key: 'issue:draft-pr',
     status: 'failed',
     attempt_count: 3,
@@ -92,5 +91,5 @@ test('publication step observation exposes operator outcomes without reconciliat
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'
   })
-  assert.strictEqual('remote_object_id' in observed, false)
+  expect('remote_object_id' in observed).toBe(false)
 })

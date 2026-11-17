@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { readTrajectoryJsonl } from '../shared/trajectory-events.js'
 
@@ -62,43 +61,35 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
     }
   ])
 
-  assert.strictEqual(document.messages[0]?.content, 'Inspecting the boundary.')
-  assert.strictEqual(document.messages[0]?.modelProvider, 'deepseek')
-  assert.strictEqual(document.messages[0]?.modelName, 'deepseek-v4-pro')
-  assert.match(document.messages[0]?.searchable ?? '', /deepseek-v4-pro/)
+  expect(document.messages[0]?.content).toBe('Inspecting the boundary.')
+  expect(document.messages[0]?.modelProvider).toBe('deepseek')
+  expect(document.messages[0]?.modelName).toBe('deepseek-v4-pro')
+  expect(document.messages[0]?.searchable ?? '').toMatch(/deepseek-v4-pro/)
   // Assistant names are hidden in the header, so they must not be searchable.
-  assert.doesNotMatch(
-    document.messages[0]?.searchable ?? '',
+  expect(document.messages[0]?.searchable ?? '').not.toMatch(
     /issue-single-agent/
   )
   // Tool names stay searchable because the header still shows them.
-  assert.match(document.messages[1]?.searchable ?? '', /read_file/)
-  assert.strictEqual(
-    document.messages[0]?.reasoning,
-    'Need repository evidence.'
-  )
-  assert.strictEqual(
-    document.messages[0]?.toolCalls[0]?.resultMessageId,
-    'tool-1'
-  )
-  assert.strictEqual(document.messages[1]?.toolCallId, 'call-1')
-  assert.match(
-    document.messages[0]?.toolCalls[0]?.diff ?? '',
+  expect(document.messages[1]?.searchable ?? '').toMatch(/read_file/)
+  expect(document.messages[0]?.reasoning).toBe('Need repository evidence.')
+  expect(document.messages[0]?.toolCalls[0]?.resultMessageId).toBe('tool-1')
+  expect(document.messages[1]?.toolCallId).toBe('call-1')
+  expect(document.messages[0]?.toolCalls[0]?.diff ?? '').toMatch(
     /^Index: diff-only/
   )
   // The diff is rendered with the call, so its text must be searchable there.
-  assert.match(document.messages[0]?.searchable ?? '', /diff-only\/path\.ts/)
-  assert.equal(document.messages[0]?.toolCalls[0]?.diffTruncated, true)
-  assert.deepStrictEqual(document.messages[1]?.artifact, {
+  expect(document.messages[0]?.searchable ?? '').toMatch(/diff-only\/path\.ts/)
+  expect(document.messages[0]?.toolCalls[0]?.diffTruncated).toBe(true)
+  expect(document.messages[1]?.artifact).toStrictEqual({
     source: 'workspace',
     truncated: false
   })
-  assert.strictEqual(document.totalUsage.total, 15)
-  assert.strictEqual(document.totalUsage.input, 10)
-  assert.strictEqual(document.totalUsage.output, 5)
-  assert.strictEqual(document.totalUsage.cacheRead, 7)
-  assert.strictEqual(document.totalUsage.cacheCreation, 2)
-  assert.strictEqual(document.totalUsage.reasoning, 1)
+  expect(document.totalUsage.total).toBe(15)
+  expect(document.totalUsage.input).toBe(10)
+  expect(document.totalUsage.output).toBe(5)
+  expect(document.totalUsage.cacheRead).toBe(7)
+  expect(document.totalUsage.cacheCreation).toBe(2)
+  expect(document.totalUsage.reasoning).toBe(1)
 })
 
 test('explicit zero cache counters remain known zero', () => {
@@ -122,10 +113,10 @@ test('explicit zero cache counters remain known zero', () => {
     }
   ])
 
-  assert.strictEqual(document.messages[0]?.usage?.cacheRead, 0)
-  assert.strictEqual(document.messages[0]?.usage?.cacheCreation, 0)
-  assert.strictEqual(document.totalUsage.cacheRead, 0)
-  assert.strictEqual(document.totalUsage.cacheCreation, 0)
+  expect(document.messages[0]?.usage?.cacheRead).toBe(0)
+  expect(document.messages[0]?.usage?.cacheCreation).toBe(0)
+  expect(document.totalUsage.cacheRead).toBe(0)
+  expect(document.totalUsage.cacheCreation).toBe(0)
 })
 
 test('message-array tool results are not guessed when the ordered run is incomplete', () => {
@@ -149,11 +140,8 @@ test('message-array tool results are not guessed when the ordered run is incompl
     }
   ])
 
-  assert.strictEqual(
-    document.messages[0]?.toolCalls[0]?.resultMessageId,
-    undefined
-  )
-  assert.strictEqual(document.messages[1]?.toolCallId, undefined)
+  expect(document.messages[0]?.toolCalls[0]?.resultMessageId).toBe(undefined)
+  expect(document.messages[1]?.toolCallId).toBe(undefined)
 })
 
 test('Responses function calls render once, while unmatched blocks remain inspectable', () => {
@@ -183,9 +171,9 @@ test('Responses function calls render once, while unmatched blocks remain inspec
       }
     }
   ])
-  assert.doesNotMatch(document.messages[0]!.content, /ls-1/)
-  assert.match(document.messages[0]!.content, /unmatched/)
-  assert.deepEqual(document.messages[0]!.toolCalls[0]!.args, {
+  expect(document.messages[0]!.content).not.toMatch(/ls-1/)
+  expect(document.messages[0]!.content).toMatch(/unmatched/)
+  expect(document.messages[0]!.toolCalls[0]!.args).toStrictEqual({
     path: '/workspace'
   })
 })
@@ -201,24 +189,26 @@ test('failed analysis fixture preserves empty arguments, errors and repeated pro
   const systems = document.messages.filter(
     (message) => message.role === 'system'
   )
-  assert.equal(systems.length, 5)
-  assert.equal(systems[0]!.repeatedSystemId, undefined)
-  assert.ok(
+  expect(systems.length).toBe(5)
+  expect(systems[0]!.repeatedSystemId).toBe(undefined)
+  expect.assert(
     systems
       .slice(1)
       .every((message) => message.repeatedSystemId === systems[0]!.id)
   )
   const response = document.messages.find((message) => message.seq === 10)!
-  assert.equal(response.content, '')
-  assert.equal(response.toolCalls.length, 5)
+  expect(response.content).toBe('')
+  expect(response.toolCalls.length).toBe(5)
   for (const call of response.toolCalls) {
-    assert.deepEqual(call.args, {})
-    assert.equal(call.resultStatus, 'error')
-    assert.ok(call.resultMessageId)
+    expect(call.args).toStrictEqual({})
+    expect(call.resultStatus).toBe('error')
+    expect.assert(call.resultMessageId)
   }
   const final = document.messages.find((message) => message.seq === 29)!
-  assert.deepEqual(final.toolCalls[0]!.args, { path: '/workspace/project/src' })
-  assert.equal(final.toolCalls[0]!.resultMessageId, undefined)
+  expect(final.toolCalls[0]!.args).toStrictEqual({
+    path: '/workspace/project/src'
+  })
+  expect(final.toolCalls[0]!.resultMessageId).toBe(undefined)
 })
 
 test('system prompt references never cross branches or skip changed instructions', () => {
@@ -257,7 +247,7 @@ test('system prompt references never cross branches or skip changed instructions
       message: { id: 'unknown', role: 'system', content: 'A' }
     }
   ])
-  assert.ok(
+  expect.assert(
     document.messages.every((message) => message.repeatedSystemId === undefined)
   )
 })

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import {
   api,
@@ -12,56 +11,58 @@ import {
 test('only a 401 ApiError is classified as a UI session failure', () => {
   const unauthorized = new ApiError(401, 'unauthorized')
 
-  assert.equal(isUnauthorizedApiError(unauthorized), true)
-  assert.equal(isUnauthorizedApiError(new ApiError(403)), false)
-  assert.equal(isUnauthorizedApiError(new Error('network unavailable')), false)
+  expect(isUnauthorizedApiError(unauthorized)).toBe(true)
+  expect(isUnauthorizedApiError(new ApiError(403))).toBe(false)
+  expect(isUnauthorizedApiError(new Error('network unavailable'))).toBe(false)
 })
 
 test('request cancellation is distinct from API and transport failures', () => {
-  assert.equal(isAbortError(new DOMException('Aborted', 'AbortError')), true)
-  assert.equal(isAbortError({ name: 'AbortError' }), true)
-  assert.equal(isAbortError(Object.create({ name: 'AbortError' })), true)
-  assert.equal(isAbortError('AbortError'), false)
-  assert.equal(isAbortError({ name: 'Error' }), false)
-  assert.equal(isAbortError(new ApiError(401, 'unauthorized')), false)
-  assert.equal(isAbortError(new Error('network unavailable')), false)
+  expect(isAbortError(new DOMException('Aborted', 'AbortError'))).toBe(true)
+  expect(isAbortError({ name: 'AbortError' })).toBe(true)
+  expect(isAbortError(Object.create({ name: 'AbortError' }))).toBe(true)
+  expect(isAbortError('AbortError')).toBe(false)
+  expect(isAbortError({ name: 'Error' })).toBe(false)
+  expect(isAbortError(new ApiError(401, 'unauthorized'))).toBe(false)
+  expect(isAbortError(new Error('network unavailable'))).toBe(false)
 })
 
-test('api forwards AbortSignal and rejects cancellation without wrapping it', async () => {
-  const originalFetch = globalThis.fetch
+test('api forwards AbortSignal and rejects cancellation without wrapping it', async ({
+  onTestFinished
+}) => {
   const controller = new AbortController()
-  let receivedSignal: AbortSignal | null | undefined
-  globalThis.fetch = (_input, init): Promise<Response> => {
-    receivedSignal = init?.signal
-    return new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => {
-        reject(new DOMException('Aborted', 'AbortError'))
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(
+    (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        })
       })
-    })
-  }
-  try {
-    const request = api('/slow', { signal: controller.signal })
-    controller.abort()
-    await assert.rejects(request, isAbortError)
-    assert.equal(receivedSignal, controller.signal)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+  )
+  onTestFinished(() => fetch.mockRestore())
+
+  const request = api('/slow', { signal: controller.signal })
+  controller.abort()
+
+  await expect(request).rejects.toSatisfy(isAbortError)
+  expect(fetch).toHaveBeenCalledExactlyOnceWith(
+    '/api/slow',
+    expect.objectContaining({ signal: controller.signal })
+  )
+  expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
 })
 
 test('an unauthorized query failure is rethrown unchanged for the ErrorBoundary', () => {
   const unauthorized = new ApiError(401, 'unauthorized')
 
-  assert.throws(
-    () => throwIfUnauthorized(unauthorized),
-    (error) => error === unauthorized
+  expect(() => throwIfUnauthorized(unauthorized)).toThrow(
+    expect.toSatisfy((error: unknown) => error === unauthorized)
   )
 })
 
 test('resource and transport failures remain available for local error UI', () => {
-  assert.doesNotThrow(() => throwIfUnauthorized(new ApiError(404)))
-  assert.doesNotThrow(() =>
+  expect(() => throwIfUnauthorized(new ApiError(404))).not.toThrow()
+  expect(() =>
     throwIfUnauthorized(new Error('network unavailable'))
-  )
-  assert.doesNotThrow(() => throwIfUnauthorized(undefined))
+  ).not.toThrow()
+  expect(() => throwIfUnauthorized(undefined)).not.toThrow()
 })

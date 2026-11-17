@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
-import { mock, test } from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import { withVerifiedArtifactFile } from '../server/artifacts/verified-artifact.js'
 
@@ -13,28 +12,23 @@ for (const failure of ['metadata', 'storage'] as const) {
     const open = fs.open
     const close = fs.close
     let filename = ''
-    const observedClose = mock.method(
-      fs,
-      'close',
-      (...args: Parameters<typeof fs.close>) => {
-        assert.equal(
+    const observedClose = vi
+      .spyOn(fs, 'close')
+      .mockImplementation((...args: Parameters<typeof fs.close>) => {
+        expect(
           fs.existsSync(path.dirname(filename)),
-          true,
           'the directory must survive until the sink closes'
-        )
+        ).toBe(true)
         return close(...args)
-      }
-    )
-    const delayedOpen = mock.method(
-      fs,
-      'open',
-      (...args: Parameters<typeof fs.open>) => {
+      })
+    const delayedOpen = vi
+      .spyOn(fs, 'open')
+      .mockImplementation((...args: Parameters<typeof fs.open>) => {
         filename = String(args[0])
         setTimeout(() => open(...args), 25)
-      }
-    )
+      })
     try {
-      await assert.rejects(
+      await expect(
         withVerifiedArtifactFile(
           {
             getObject: async () => {
@@ -49,21 +43,22 @@ for (const failure of ['metadata', 'storage'] as const) {
             maximumSize: 8
           },
           { idleTimeoutMs: 1000, filename: 'artifact.tar.zst' },
-          async () => assert.fail('an unverified artifact must not be served')
-        ),
+          async () =>
+            expect.unreachable('an unverified artifact must not be served')
+        )
+      ).rejects.toThrow(
         failure === 'metadata'
           ? /artifact_identity_mismatch/
           : /storage unavailable/
       )
-      assert.equal(
-        observedClose.mock.callCount(),
-        1,
+      expect(
+        observedClose.mock.calls.length,
         'rejection must wait for the sink to close'
-      )
-      assert.equal(fs.existsSync(path.dirname(filename)), false)
+      ).toBe(1)
+      expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
-      delayedOpen.mock.restore()
-      observedClose.mock.restore()
+      delayedOpen.mockRestore()
+      observedClose.mockRestore()
     }
   })
 }

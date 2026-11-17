@@ -2,8 +2,7 @@
 // produced geometry, not pixels: every state has its own cell, no edge passes through a state it
 // does not connect, every declared transition is on some line, and every listed return edge is
 // one the contract declares.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   NODE_H,
@@ -19,17 +18,15 @@ import { STATE_MACHINES } from '../browser/features/runs/state-machines.generate
 test('every drawn state has its own cell, and no cell names an undeclared state', () => {
   for (const machine of STATE_MACHINES) {
     const layout = STATE_LAYOUT[machine.axis]
-    assert.deepStrictEqual(
+    expect(
       Object.keys(layout).sort(),
-      [...machine.states].sort(),
       `${machine.axis} layout must place exactly its states`
-    )
+    ).toStrictEqual([...machine.states].sort())
     const cells = Object.values(layout).map(({ col, row }) => `${col}:${row}`)
-    assert.strictEqual(
+    expect(
       new Set(cells).size,
-      cells.length,
       `${machine.axis} states must not share a cell`
-    )
+    ).toBe(cells.length)
   }
 })
 
@@ -39,7 +36,7 @@ test('every listed return edge is a transition the contract declares', () => {
       machine.transitions.map((edge) => `${edge.from}->${edge.to}`)
     )
     for (const edge of RETURN_EDGES[machine.axis])
-      assert.ok(
+      expect.assert(
         declared.has(edge),
         `${machine.axis} lists ${edge} as a return edge, but the contract does not declare it`
       )
@@ -50,13 +47,12 @@ test('every declared transition is drawn on exactly one line', () => {
   for (const machine of STATE_MACHINES) {
     const { edges } = diagramGeometry(machine)
     const drawn = edges.flatMap((edge) => edge.transitions)
-    assert.strictEqual(drawn.length, machine.transitions.length)
+    expect(drawn.length).toBe(machine.transitions.length)
     const pairs = edges.map((edge) => `${edge.from}->${edge.to}`)
-    assert.strictEqual(
+    expect(
       new Set(pairs).size,
-      pairs.length,
       `${machine.axis} draws one state pair on more than one line`
-    )
+    ).toBe(pairs.length)
   }
 })
 
@@ -74,11 +70,10 @@ test('no edge passes through a state it does not connect', () => {
             Math.abs(point.x - node.center.x) < NODE_W / 2 &&
             Math.abs(point.y - node.center.y) < NODE_H / 2
         )
-        assert.strictEqual(
+        expect(
           hit,
-          undefined,
           `${machine.axis} ${edge.from}->${edge.to} passes through ${node.state}`
-        )
+        ).toBe(undefined)
       }
     }
   }
@@ -93,14 +88,14 @@ test('the view box contains every node and edge', () => {
       x <= viewBox.x + viewBox.width &&
       y <= viewBox.y + viewBox.height
     for (const node of nodes)
-      assert.ok(
+      expect.assert(
         inside(node.center.x - NODE_W / 2, node.center.y - NODE_H / 2) &&
           inside(node.center.x + NODE_W / 2, node.center.y + NODE_H / 2),
         `${machine.axis}.${node.state} is clipped`
       )
     for (const edge of edges)
       for (const point of edge.samples)
-        assert.ok(
+        expect.assert(
           inside(point.x, point.y),
           `${machine.axis} ${edge.from}->${edge.to} is clipped`
         )

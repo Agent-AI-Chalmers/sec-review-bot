@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { writeInputBundleManifest } from '../../src/execution/input-bundle-manifest.js'
 
@@ -20,10 +19,10 @@ test('writes the API v1 manifest without a setup declaration field', async () =>
       include_incremental_window: false
     })
     const manifest = await readManifest(root)
-    assert.strictEqual(manifest.api_version, 'v1')
-    assert.strictEqual('kind' in manifest, false)
+    expect(manifest.api_version).toBe('v1')
+    expect('kind' in manifest).toBe(false)
     // The setup declaration travels inline in the workflow input, not the manifest.
-    assert.strictEqual('setup_declaration' in manifest, false)
+    expect('setup_declaration' in manifest).toBe(false)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

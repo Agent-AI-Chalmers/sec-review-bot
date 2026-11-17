@@ -11,9 +11,8 @@ import { MAX_UNRESOLVED_SUBMISSION_RECOVERIES } from '../../src/runtime/submissi
 // direction against a hand-maintained list of edge names, which could only ever agree with
 // itself: it passed while a renamed transition (`delivering->skipped` becoming
 // `delivering->failed`) had gone stale in the very list it was asserting on.
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   STATE_MACHINES,
@@ -58,7 +57,7 @@ async function createQueuedRun(
     run_id: runId,
     publish_context: context
   })
-  assert.ok(admission.preparation_token)
+  expect.assert(admission.preparation_token)
   await store.submissionTransitions.markQueued(
     runId,
     admission.preparation_token,
@@ -165,21 +164,20 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         run_id: runId,
         publish_context: {}
       })
-      assert.ok(admission.preparation_token)
+      expect.assert(admission.preparation_token)
       runIds.push(runId)
       return { runId, token: admission.preparation_token }
     }
     const newSuccessRun = async (): Promise<string> => {
       const runId = await createQueuedRun(store)
       runIds.push(runId)
-      assert.strictEqual(
+      expect(
         await store.executions.recordExecutionSuccess(
           runId,
           { run_id: runId },
           { status: 'unavailable' }
-        ),
-        true
-      )
+        )
+      ).toBe(true)
       return runId
     }
     const newPublishingRun = async (): Promise<{
@@ -188,7 +186,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     }> => {
       const runId = await newSuccessRun()
       const token = await store.publicationClaims.claim(runId)
-      assert.notStrictEqual(token, null)
+      expect(token).not.toBe(null)
       await store.publications.initializePublicationSteps(
         runId,
         token as string,
@@ -214,7 +212,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     const preparedNotice = await store.notices.claimNext()
-    assert.notStrictEqual(preparedNotice, null)
+    expect(preparedNotice).not.toBe(null)
     await store.notices.complete(
       preparedNotice?.notice_id ?? '',
       preparedNotice?.claim_token ?? '',
@@ -231,7 +229,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    assert.notStrictEqual(await store.notices.claimNext(), null)
+    expect(await store.notices.claimNext()).not.toBe(null)
     // Expire the delivering lease by backdating it. Waiting on the clock instead would make
     // this assertion depend on how fast the worker happens to be.
     await pool.query(
@@ -239,7 +237,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE connector_id=$1 AND status='delivering'`,
       [store.connectorId]
     )
-    assert.notStrictEqual(await store.notices.claimNext(), null)
+    expect(await store.notices.claimNext()).not.toBe(null)
 
     // notice: delivering -> failed when the provider cannot be reached.
     const undeliverable = await newPreparingRun()
@@ -267,7 +265,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: true }
     )
     const reclaimed = await store.preparations.claimNext()
-    assert.notStrictEqual(reclaimed, null)
+    expect(reclaimed).not.toBe(null)
 
     // preparation: preparing -> uncertain when the lease lapses without exhausting retries, and
     // uncertain -> preparing when a preparer picks it up again. The origin state is Control
@@ -280,9 +278,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [lapsing.runId]
     )
     const expiry = await store.preparations.expireStale()
-    assert.ok(expiry.concluded >= 1)
+    expect.assert(expiry.concluded >= 1)
     const fromUncertain = await store.preparations.claimNext()
-    assert.notStrictEqual(fromUncertain, null)
+    expect(fromUncertain).not.toBe(null)
 
     // execution: pending -> uncertain on an unconfirmed submission, then the recovery claim
     // records uncertain -> uncertain before resolving it.
@@ -297,16 +295,15 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       uncertain.runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.notStrictEqual(recovery, null)
+    expect(recovery).not.toBe(null)
     // Resolving the replay moves the run back to `queued`. The unresolved branch stays
     // `uncertain` and is covered by the recovery's own expiry paths in the store tests.
-    assert.strictEqual(
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         uncertain.runId,
         recovery as string
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     // execution: uncertain -> disconnected when automatic recovery reaches its budget. This is
     // deliberately not a failure: a prior idempotent submission may still exist at the Execution.
@@ -317,13 +314,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    assert.strictEqual(
+    expect(
       await store.executions.disconnectExhaustedSubmissionRecovery(
         uncertainDisconnects.runId,
         0
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     // execution: disconnected -> uncertain when an operator hands it back. Without this the run
     // would stay parked forever: automatic recovery only claims `uncertain`.
     await store.operatorDecisions.resumeDisconnectedExecution(
@@ -339,13 +335,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    assert.strictEqual(
+    expect(
       await store.executions.disconnectExhaustedSubmissionRecovery(
         giveUpExecution.runId,
         0
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     await store.operatorDecisions.giveUpDisconnectedRun(
       giveUpExecution.runId,
       'operator stopped waiting'
@@ -363,15 +358,14 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       uncertainFails.runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.notStrictEqual(failingRecovery, null)
-    assert.strictEqual(
+    expect(failingRecovery).not.toBe(null)
+    expect(
       await store.submissionTransitions.failSubmissionRecovery(
         uncertainFails.runId,
         failingRecovery as string,
         { code: 'EXECUTION_FAILED', message: 'replay rejected' }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     // execution: pending -> queued -> running -> succeeded.
     const observed = await newPreparingRun()
@@ -421,7 +415,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     )
     // Re-claiming after the lease expires issues a new token, and the old one is fenced out.
     const renewedToken = await store.publicationClaims.claim(published.runId)
-    assert.notStrictEqual(renewedToken, null)
+    expect(renewedToken).not.toBe(null)
     await store.publications.requirePublicationStepClaim(
       published.runId,
       renewedToken as string,
@@ -474,13 +468,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
     }
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         publishUncertain.runId,
         publishUncertain.token,
         'issue:summary-comment'
       )
-    )
+    ).rejects.toSatisfy(() => true)
 
     await pool.query(
       `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
@@ -489,11 +483,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     const uncertainTakeover = await store.publicationClaims.claim(
       publishUncertain.runId
     )
-    assert.ok(uncertainTakeover)
-    assert.equal(
-      (await store.queries.getRun(publishUncertain.runId))?.publication.status,
-      'uncertain'
-    )
+    expect.assert(uncertainTakeover)
+    expect(
+      (await store.queries.getRun(publishUncertain.runId))?.publication.status
+    ).toBe('uncertain')
     await store.publications.fail(
       publishUncertain.runId,
       uncertainTakeover,
@@ -503,11 +496,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     const resumedUncertain = await store.publicationClaims.claim(
       publishUncertain.runId
     )
-    assert.ok(resumedUncertain)
-    assert.equal(
-      (await store.queries.getRun(publishUncertain.runId))?.publication.status,
-      'uncertain'
-    )
+    expect.assert(resumedUncertain)
+    expect(
+      (await store.queries.getRun(publishUncertain.runId))?.publication.status
+    ).toBe('uncertain')
 
     // publication: publishing -> disconnected when a reconciliation itself runs out of budget
     // without an answer. The step is what becomes disconnected; the axis follows it.
@@ -526,22 +518,21 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
     }
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         publishDisconnected.runId,
         publishDisconnected.token,
         'issue:summary-comment'
       )
-    )
+    ).rejects.toSatisfy(() => true)
     // The step is now `uncertain`, waiting on a reconciliation. Three reconciliation rounds that
     // cannot reach the remote system spend its own budget, after which it stops answering for
     // itself and asks a person to look.
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(publishDisconnected.runId))?.publication
         .status,
-      'uncertain',
       'an exhausted step makes the axis uncertain before its reconciliation runs'
-    )
+    ).toBe('uncertain')
     for (let round = 0; round < 3; round += 1) {
       await store.publications.failPublicationStep(
         publishDisconnected.runId,
@@ -551,12 +542,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
     }
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(publishDisconnected.runId))?.publication
         .status,
-      'disconnected',
       'the axis has to follow its step into disconnected'
-    )
+    ).toBe('disconnected')
 
     // publication: uncertain -> publishing when the reconciliation settles the step. The axis
     // returns to publishing because the publisher still owns the claim and continues with the
@@ -577,24 +567,23 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
     }
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         publishSettled.runId,
         publishSettled.token,
         'issue:summary-comment'
       )
-    )
+    ).rejects.toSatisfy(() => true)
     await store.publications.settleExhaustedPublicationStep(
       publishSettled.runId,
       publishSettled.token,
       'issue:summary-comment',
       { found: true, remote: { id: '9', url: 'https://example.test/c/9' } }
     )
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(publishSettled.runId))?.publication.status,
-      'publishing',
       'a settled step hands the axis back to its publisher'
-    )
+    ).toBe('publishing')
 
     // publication step: running -> running when an expired publication lease lets a new owner
     // take over a step its predecessor started.
@@ -610,7 +599,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [takenOver.runId]
     )
     const newOwner = await store.publicationClaims.claim(takenOver.runId)
-    assert.ok(newOwner)
+    expect.assert(newOwner)
     await store.publications.requirePublicationStepClaim(
       takenOver.runId,
       newOwner,
@@ -639,13 +628,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       neverReported.token,
       'issue:summary-comment'
     )
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         neverReported.runId,
         neverReported.token,
         'issue:summary-comment'
       )
-    )
+    ).rejects.toSatisfy(() => true)
 
     // publication step: uncertain -> failed when a reconciling publisher reports a failure
     // without asking to retry (the next refused claim returns it to uncertain), and
@@ -668,13 +657,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
           { retry: true }
         )
       }
-      await assert.rejects(
+      await expect(
         store.publications.requirePublicationStepClaim(
           run.runId,
           run.token,
           'issue:summary-comment'
         )
-      )
+      ).rejects.toSatisfy(() => true)
     }
     await store.publications.failPublicationStep(
       reconciledAbsent.runId,
@@ -682,13 +671,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       'issue:summary-comment',
       { message: 'reconciliation errored' }
     )
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         reconciledAbsent.runId,
         reconciledAbsent.token,
         'issue:summary-comment'
       )
-    )
+    ).rejects.toSatisfy(() => true)
     await store.publications.settleExhaustedPublicationStep(
       reconciledAbsent.runId,
       reconciledAbsent.token,
@@ -722,17 +711,16 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
           { retry: true }
         )
       }
-      await assert.rejects(
+      await expect(
         store.publications.requirePublicationStepClaim(
           reconciling.runId,
           reconciling.token,
           'issue:summary-comment'
         )
-      )
-      assert.strictEqual(
-        (await store.queries.getRun(reconciling.runId))?.publication.status,
-        'uncertain'
-      )
+      ).rejects.toSatisfy(() => true)
+      expect(
+        (await store.queries.getRun(reconciling.runId))?.publication.status
+      ).toBe('uncertain')
       await store.publications.fail(
         reconciling.runId,
         reconciling.token,
@@ -783,10 +771,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE run_id=$1`,
       [blocked.runId]
     )
-    assert.strictEqual(
-      (await store.preparations.expireStale()).blocked.length,
-      1
-    )
+    expect((await store.preparations.expireStale()).blocked.length).toBe(1)
 
     // preparation: disconnected -> uncertain when an operator hands the row back to automatic
     // recovery. A second run is arranged for it so the abandonment below still starts from a
@@ -802,10 +787,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [resumed.runId]
     )
-    assert.strictEqual(
-      (await store.preparations.expireStale()).blocked.length,
-      1
-    )
+    expect((await store.preparations.expireStale()).blocked.length).toBe(1)
     await store.operatorDecisions.resumeDisconnectedPreparation(resumed.runId)
 
     // preparation: disconnected -> failed when an operator gives up on it, which is the plain
@@ -934,25 +916,21 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         )
         .catch(() => undefined)
     }
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(resumedPublication.runId))?.publication
         .status,
-      'disconnected',
       'the resume below has to start from a parked publication'
-    )
+    ).toBe('disconnected')
     await store.operatorDecisions.resumeDisconnectedRun(
       resumedPublication.runId
     )
-    assert.strictEqual(
-      (await store.queries.getRun(resumedPublication.runId))?.publication
-        .status,
-      'pending'
-    )
-    assert.strictEqual(
+    expect(
+      (await store.queries.getRun(resumedPublication.runId))?.publication.status
+    ).toBe('pending')
+    expect(
       (await store.queries.getRun(blocked.runId))?.preparation?.status,
-      'disconnected',
       'the abandonment below has to start from a disconnected row'
-    )
+    ).toBe('disconnected')
 
     await store.operatorDecisions.abandonBlockedPreparation(
       blocked.runId,
@@ -967,11 +945,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          AND status IN ('publishing','uncertain','disconnected')`,
       [runIds]
     )
-    assert.strictEqual(
+    expect(
       live.rows.length,
-      3,
       'the driver must leave live publications in all three owned states'
-    )
+    ).toBe(3)
 
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
@@ -1005,7 +982,7 @@ test('every transition a run records is declared in the contract', async () => {
   const recorded = await recordEveryPathOnce()
   for (const { machine, edge } of recorded) {
     const declared = AUDITED_MACHINES.get(machine)
-    assert.ok(
+    expect.assert(
       declared !== undefined && declaredEdges(declared).has(edge),
       `${machine} recorded ${edge}, which the contract does not declare`
     )
@@ -1026,7 +1003,7 @@ test('every declared edge is reachable by a write path', async () => {
   }
   for (const [name, machine] of AUDITED_MACHINES) {
     for (const edge of declaredEdges(machine)) {
-      assert.ok(
+      expect.assert(
         observed.get(name)?.has(edge),
         `${name} declares ${edge}, but no write path produces it`
       )
@@ -1064,10 +1041,10 @@ test('a reason the audit log writes is the reason the contract declares', async 
   for (const { machine, edge, reason } of recorded) {
     const key = `${machine} ${edge}`
     const expected = declared.get(key)
-    assert.ok(expected !== undefined, `${key} is not declared`)
+    expect.assert(expected !== undefined, `${key} is not declared`)
     // An edge that accepts any reason makes the whole pair open.
     if (expected.some((value) => value === null)) continue
-    assert.ok(
+    expect.assert(
       expected.includes(reason),
       `${key} was recorded with ${String(reason)} but the contract declares ${expected.join(' or ')}`
     )

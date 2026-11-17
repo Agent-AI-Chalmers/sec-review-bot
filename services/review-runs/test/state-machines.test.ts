@@ -4,9 +4,8 @@
 // themselves live on the request/response schemas. If a state were added to one and not the
 // other, the diagram would tell an operator that a state exists (or does not) contrary to the
 // contract. This asserts the two agree in both directions.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse as parseYaml } from 'yaml'
 
@@ -72,11 +71,10 @@ test('each state-machine axis matches the enum of the field it describes', () =>
   for (const [name, machine] of ALL_MACHINES) {
     const enumValues = enumFor(spec, machine.field)
     const states = [...machine.states].sort()
-    assert.deepStrictEqual(
+    expect(
       [...enumValues].sort(),
-      states,
       `${name} states must equal the enum of ${machine.field}`
-    )
+    ).toStrictEqual(states)
   }
 })
 
@@ -84,28 +82,30 @@ test('every state declares a label and hover description in both languages', () 
   for (const [name, machine] of ALL_MACHINES) {
     for (const state of machine.states) {
       const detail = machine.details[state]
-      assert.ok(detail, `${name}.${state} has no details`)
+      expect.assert(detail, `${name}.${state} has no details`)
       for (const key of ['label', 'description'] as const)
-        assert.ok(
+        expect.assert(
           detail[key] && detail[key].trim().length > 0,
           `${name}.${state}.${key} must be non-empty`
         )
     }
     // The details map must not describe states the machine does not declare.
-    assert.deepStrictEqual(
+    expect(
       Object.keys(machine.details).sort(),
-      [...machine.states].sort(),
       `${name} details must cover exactly its states`
-    )
+    ).toStrictEqual([...machine.states].sort())
   }
 })
 
 test('every transition names states the machine declares, and every state is reachable', () => {
   for (const [name, machine] of ALL_MACHINES) {
     const states = new Set(machine.states)
-    assert.ok(states.has(machine.initial), `${name} initial is a state`)
+    expect.assert(states.has(machine.initial), `${name} initial is a state`)
     for (const terminal of machine.terminal)
-      assert.ok(states.has(terminal), `${name} terminal ${terminal} is a state`)
+      expect.assert(
+        states.has(terminal),
+        `${name} terminal ${terminal} is a state`
+      )
     const reached = new Set<string>([machine.initial])
     // Breadth-first over the declared edges: a state with no path from the initial one is a
     // diagram lie (it would be drawn but never entered).
@@ -113,7 +113,7 @@ test('every transition names states the machine declares, and every state is rea
     while (changed) {
       changed = false
       for (const edge of machine.transitions) {
-        assert.ok(
+        expect.assert(
           states.has(edge.from) && states.has(edge.to),
           `${name} edge ${edge.from}->${edge.to}`
         )
@@ -124,6 +124,6 @@ test('every transition names states the machine declares, and every state is rea
       }
     }
     for (const state of machine.states)
-      assert.ok(reached.has(state), `${name} state ${state} is unreachable`)
+      expect.assert(reached.has(state), `${name} state ${state} is unreachable`)
   }
 })

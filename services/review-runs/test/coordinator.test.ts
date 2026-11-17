@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   coordinateReviewRunsOnce,
@@ -97,7 +96,7 @@ test('coordination expires preparations before recovery and active observation',
     }
   })
 
-  assert.deepStrictEqual(events, [
+  expect(events).toStrictEqual([
     'expire',
     'recover:recover-1',
     'read',
@@ -144,8 +143,8 @@ test('one pass reads every active run status in a single request', async () => {
     }
   })
 
-  assert.deepStrictEqual(reads, [['active-1', 'active-2', 'active-3']])
-  assert.deepStrictEqual(observed, ['active-1', 'active-2', 'active-3'])
+  expect(reads).toStrictEqual([['active-1', 'active-2', 'active-3']])
+  expect(observed).toStrictEqual(['active-1', 'active-2', 'active-3'])
 })
 
 test('a pass with no active runs asks the Execution nothing', async () => {
@@ -181,7 +180,7 @@ test('a pass with no active runs asks the Execution nothing', async () => {
     }
   })
 
-  assert.deepStrictEqual(reads, [])
+  expect(reads).toStrictEqual([])
 })
 
 test('a single row the contract cannot represent degrades that run, not the pass', async () => {
@@ -232,12 +231,11 @@ test('a single row the contract cannot represent degrades that run, not the pass
     }
   })
 
-  assert.deepStrictEqual(
-    observed,
-    ['active-1', 'active-2'],
-    'the healthy runs are still observed'
-  )
-  assert.deepStrictEqual(reported, [
+  expect(observed, 'the healthy runs are still observed').toStrictEqual([
+    'active-1',
+    'active-2'
+  ])
+  expect(reported).toStrictEqual([
     { run_id: 'recover-bad', message: 'poison' },
     { run_id: 'active-bad', message: 'unrepresentable artifact' }
   ])
@@ -255,36 +253,39 @@ test('an unclassified submission recovery failure aborts the coordination pass',
       ])
     },
     async listActiveRuns() {
-      assert.fail('active runs must not be read after recovery aborts the pass')
+      expect.unreachable(
+        'active runs must not be read after recovery aborts the pass'
+      )
     }
   }
   const recovered: string[] = []
 
-  await assert.rejects(
+  await expect(
     coordinateReviewRunsOnce(coordinationStore(store), {
       async recoverSubmission(entry) {
         recovered.push(entry.run_id)
         throw new Error('database unavailable')
       },
       async readExecutionStatuses() {
-        assert.fail('Execution must not be read after recovery aborts the pass')
+        expect.unreachable(
+          'Execution must not be read after recovery aborts the pass'
+        )
       },
       async observeActiveRun() {
-        assert.fail(
+        expect.unreachable(
           'no active run can be observed after recovery aborts the pass'
         )
       },
       onDroppedRunRow() {
-        assert.fail('this pass drops no rows')
+        expect.unreachable('this pass drops no rows')
       },
       onBlockedPreparationExpiry() {
-        assert.fail('this pass blocks no expiries')
+        expect.unreachable('this pass blocks no expiries')
       }
-    }),
-    /database unavailable/
-  )
+    })
+  ).rejects.toThrow(/database unavailable/)
 
-  assert.deepStrictEqual(recovered, ['recover-failing'])
+  expect(recovered).toStrictEqual(['recover-failing'])
 })
 
 test('an unclassified execution observation failure aborts the coordination pass', async () => {
@@ -304,10 +305,10 @@ test('an unclassified execution observation failure aborts the coordination pass
   }
   const observed: string[] = []
 
-  await assert.rejects(
+  await expect(
     coordinateReviewRunsOnce(coordinationStore(store), {
       async recoverSubmission() {
-        assert.fail('this pass has no submission recovery')
+        expect.unreachable('this pass has no submission recovery')
       },
       async readExecutionStatuses() {
         return { runs: [], missing: [], byRunId: new Map() }
@@ -317,16 +318,15 @@ test('an unclassified execution observation failure aborts the coordination pass
         throw new Error('transaction failed')
       },
       onDroppedRunRow() {
-        assert.fail('this pass drops no rows')
+        expect.unreachable('this pass drops no rows')
       },
       onBlockedPreparationExpiry() {
-        assert.fail('this pass blocks no expiries')
+        expect.unreachable('this pass blocks no expiries')
       }
-    }),
-    /transaction failed/
-  )
+    })
+  ).rejects.toThrow(/transaction failed/)
 
-  assert.deepStrictEqual(observed, ['active-failing'])
+  expect(observed).toStrictEqual(['active-failing'])
 })
 
 test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
@@ -345,7 +345,7 @@ test('coordinator loop does not overlap passes and stop drains the active pass',
 
   await new Promise((resolve) => setTimeout(resolve, 10))
   const stopping = loop.stop()
-  assert.strictEqual(passes, 1)
+  expect(passes).toBe(1)
   release()
   await stopping
 })

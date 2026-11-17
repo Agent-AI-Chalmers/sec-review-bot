@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   MAX_UNRESOLVED_SUBMISSION_RECOVERIES,
@@ -116,8 +115,8 @@ test('submission recovery replays the persisted input and commits its claim', as
     }
   )
 
-  assert.strictEqual(result.outcome, 'recovered')
-  assert.deepStrictEqual(events, [
+  expect(result.outcome).toBe('recovered')
+  expect(events).toStrictEqual([
     [
       'submit',
       {
@@ -135,11 +134,11 @@ test('submission recovery propagates a commit failure after Execution accepts', 
   const databaseError = new Error('database unavailable')
   const failures: unknown[] = []
   let accepted = false
-  await assert.rejects(
+  await expect(
     recoverReviewRunSubmission(
       store({
         async completeSubmissionRecovery() {
-          assert.strictEqual(accepted, true)
+          expect(accepted).toBe(true)
           throw databaseError
         },
         async failSubmissionRecovery(...args) {
@@ -157,10 +156,13 @@ test('submission recovery propagates a commit failure after Execution accepts', 
           message: String(error)
         })
       }
-    ),
-    databaseError
-  )
-  assert.deepStrictEqual(failures, [])
+    )
+  ).rejects.toMatchObject({
+    ...databaseError,
+    name: databaseError.name,
+    message: databaseError.message
+  })
+  expect(failures).toStrictEqual([])
 })
 
 test('submission recovery leaves an uncertain replay untouched', async () => {
@@ -195,15 +197,14 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
     }
   )
 
-  assert.deepStrictEqual(result, { outcome: 'deferred', error: transportError })
+  expect(result).toStrictEqual({ outcome: 'deferred', error: transportError })
   // The attempt is counted even though nothing is concluded: the budget is what eventually lets
   // an otherwise endless uncertainty end, so it has to advance on every unknown outcome.
-  assert.deepStrictEqual(counted, ['claim-1'])
-  assert.deepStrictEqual(
+  expect(counted).toStrictEqual(['claim-1'])
+  expect(
     concluded,
-    [],
     'nothing may be concluded while the outcome is unknown'
-  )
+  ).toStrictEqual([])
 })
 
 test('submission recovery records missing persisted input without calling Execution', async () => {
@@ -227,9 +228,9 @@ test('submission recovery records missing persisted input without calling Execut
     }
   )
 
-  assert.strictEqual(result.outcome, 'input_missing')
-  assert.strictEqual(submitted, false)
-  assert.strictEqual(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
+  expect(result.outcome).toBe('input_missing')
+  expect(submitted).toBe(false)
+  expect(failure?.code).toBe('SUBMISSION_RECOVERY_INPUT_MISSING')
 })
 
 const acceptedSubmission = {
@@ -243,7 +244,7 @@ test('recovery disconnects an exhausted run before claiming or submitting', asyn
   const result = await recoverReviewRunSubmission(
     store({
       async disconnectExhaustedSubmissionRecovery(_runId, limit) {
-        assert.equal(limit, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
+        expect(limit).toBe(MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
         return true
       },
       async claimSubmissionRecovery() {
@@ -258,7 +259,7 @@ test('recovery disconnects an exhausted run before claiming or submitting', asyn
       }
     }
   )
-  assert.deepEqual(result, { outcome: 'disconnected' })
+  expect(result).toStrictEqual({ outcome: 'disconnected' })
 })
 
 test('recovery checks the budget before claiming and replaying', async () => {
@@ -270,7 +271,7 @@ test('recovery checks the budget before claiming and replaying', async () => {
         return false
       },
       async claimSubmissionRecovery(_runId, limit) {
-        assert.equal(limit, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
+        expect(limit).toBe(MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
         events.push('claim')
         return 'claim'
       }
@@ -283,8 +284,8 @@ test('recovery checks the budget before claiming and replaying', async () => {
       }
     }
   )
-  assert.equal(result.outcome, 'recovered')
-  assert.deepEqual(events, ['check', 'claim', 'submit'])
+  expect(result.outcome).toBe('recovered')
+  expect(events).toStrictEqual(['check', 'claim', 'submit'])
 })
 
 test('recovery does not replay when neither disconnection nor claim is available', async () => {
@@ -305,7 +306,7 @@ test('recovery does not replay when neither disconnection nor claim is available
       }
     }
   )
-  assert.deepEqual(result, { outcome: 'claim_unavailable' })
+  expect(result).toStrictEqual({ outcome: 'claim_unavailable' })
 })
 
 for (const outcome of [
@@ -339,7 +340,7 @@ for (const outcome of [
         })
       }
     )
-    assert.deepEqual(result, { outcome: 'claim_lost' })
+    expect(result).toStrictEqual({ outcome: 'claim_lost' })
   })
 }
 
@@ -351,5 +352,5 @@ test('a confirmed rejection reports failure only after recording it', async () =
     },
     classifyError: (error) => ({ uncertain: false, message: String(error) })
   })
-  assert.deepEqual(result, { outcome: 'failed', error })
+  expect(result).toStrictEqual({ outcome: 'failed', error })
 })

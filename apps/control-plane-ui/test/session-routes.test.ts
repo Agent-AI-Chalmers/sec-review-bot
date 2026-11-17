@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
 import { loginCookie } from './server-support.js'
@@ -14,7 +13,7 @@ test('BFF marks session cookies secure for HTTPS proxy deployments', async () =>
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const origin = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${origin}/api/session`, {
@@ -23,7 +22,7 @@ test('BFF marks session cookies secure for HTTPS proxy deployments', async () =>
       body: '{"token":"login-secret"}'
     })
 
-    assert.match(login.headers.get('set-cookie') ?? '', /; Secure(?:;|$)/)
+    expect(login.headers.get('set-cookie') ?? '').toMatch(/; Secure(?:;|$)/)
   } finally {
     await new Promise<void>((resolve, reject) =>
       ui.close((error) => (error ? reject(error) : resolve()))
@@ -38,7 +37,7 @@ test('BFF bounds browser sessions by evicting the oldest login', async () => {
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -47,22 +46,20 @@ test('BFF bounds browser sessions by evicting the oldest login', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
     const first = await loginCookie(base)
     const second = await loginCookie(base)
     const third = await loginCookie(base)
 
-    assert.strictEqual(
-      (await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status,
-      401
-    )
+    expect(
+      (await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status
+    ).toBe(401)
     for (const cookie of [second, third])
-      assert.strictEqual(
-        (await fetch(`${base}/api/runs`, { headers: { cookie } })).status,
-        200
-      )
+      expect(
+        (await fetch(`${base}/api/runs`, { headers: { cookie } })).status
+      ).toBe(200)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -83,7 +80,7 @@ test('BFF sign-out expires the session cookie it issued', async () => {
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -91,7 +88,7 @@ test('BFF sign-out expires the session cookie it issued', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
     const login = await fetch(`${base}/api/session`, {
@@ -100,11 +97,10 @@ test('BFF sign-out expires the session cookie it issued', async () => {
       body: '{"token":"login-secret"}'
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie !== null)
-    assert.strictEqual(
-      (await fetch(`${base}/api/runs`, { headers: { cookie } })).status,
-      200
-    )
+    expect.assert(cookie !== null)
+    expect(
+      (await fetch(`${base}/api/runs`, { headers: { cookie } })).status
+    ).toBe(200)
 
     // A browser attaches `Origin` to a non-GET request, even same-origin; sign-out is
     // refused without it (see the cross-site test below).
@@ -112,19 +108,18 @@ test('BFF sign-out expires the session cookie it issued', async () => {
       method: 'DELETE',
       headers: { origin: base }
     })
-    assert.strictEqual(signOut.status, 204)
+    expect(signOut.status).toBe(204)
     const cleared = signOut.headers.get('set-cookie')
     // Without Max-Age=0 the browser would keep the original cookie and stay signed in.
-    assert(cleared?.includes('Max-Age=0'))
-    assert(cleared?.includes('HttpOnly'))
+    expect.assert(cleared?.includes('Max-Age=0'))
+    expect.assert(cleared?.includes('HttpOnly'))
 
     // The cleared value must not authenticate, even if a client replays it verbatim.
     const replayed = cleared ?? ''
-    assert.strictEqual(
+    expect(
       (await fetch(`${base}/api/runs`, { headers: { cookie: replayed } }))
-        .status,
-      401
-    )
+        .status
+    ).toBe(401)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -146,7 +141,7 @@ test('BFF refuses a cross-site sign-in', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const crossSite = await fetch(`${base}/api/session`, {
@@ -157,12 +152,12 @@ test('BFF refuses a cross-site sign-in', async () => {
       },
       body: '{"token":"login-secret"}'
     })
-    assert.strictEqual(crossSite.status, 403)
-    assert.deepStrictEqual(await crossSite.json(), {
+    expect(crossSite.status).toBe(403)
+    expect(await crossSite.json()).toStrictEqual({
       error: 'cross_site_request'
     })
     // The refused request still must not mint a session.
-    assert.strictEqual(crossSite.headers.get('set-cookie'), null)
+    expect(crossSite.headers.get('set-cookie')).toBe(null)
   } finally {
     await new Promise<void>((resolve) => ui.close(() => resolve()))
   }
@@ -182,7 +177,7 @@ test('BFF refuses a cross-site sign-out', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     // A different origin, and the shape an attacker can actually produce.
@@ -190,20 +185,19 @@ test('BFF refuses a cross-site sign-out', async () => {
       method: 'DELETE',
       headers: { origin: 'https://attacker.example' }
     })
-    assert.strictEqual(crossSite.status, 403)
-    assert.deepStrictEqual(await crossSite.json(), {
+    expect(crossSite.status).toBe(403)
+    expect(await crossSite.json()).toStrictEqual({
       error: 'cross_site_request'
     })
     // No cookie is cleared on the rejected path: an attacker cannot even produce the
     // side effect they were after.
-    assert.strictEqual(crossSite.headers.get('set-cookie'), null)
+    expect(crossSite.headers.get('set-cookie')).toBe(null)
 
     // A request that carries neither `Origin` nor `Referer` is also refused, since an
     // attacker can omit both.
-    assert.strictEqual(
-      (await fetch(`${base}/api/session`, { method: 'DELETE' })).status,
-      403
-    )
+    expect(
+      (await fetch(`${base}/api/session`, { method: 'DELETE' })).status
+    ).toBe(403)
 
     // `Referer` alone is enough, so a same-origin caller that could not set `Origin`
     // still signs out.
@@ -211,7 +205,7 @@ test('BFF refuses a cross-site sign-out', async () => {
       method: 'DELETE',
       headers: { referer: `${base}/runs` }
     })
-    assert.strictEqual(viaReferer.status, 204)
+    expect(viaReferer.status).toBe(204)
   } finally {
     await new Promise<void>((resolve) => ui.close(() => resolve()))
   }

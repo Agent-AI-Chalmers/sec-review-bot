@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, beforeEach, test } from 'vitest'
 
 import {
   currentAppBotLogin,
@@ -11,59 +10,52 @@ import {
 import { isSelfOriginatedWebhookEvent } from '../../src/github/webhook-origin-guard.js'
 import { classifyPublicationFailure } from '../../src/review-runs/publication-failure.js'
 
-test.beforeEach(() => {
+beforeEach(() => {
   setGitHubAppMetadata({ slug: 'sec-review-bot' })
 })
 
 test('normalizeLogin lowercases and trims, and rejects non-strings', () => {
-  assert.strictEqual(
-    normalizeLogin('  Sec-Review-Bot[bot] '),
-    'sec-review-bot[bot]'
-  )
-  assert.strictEqual(normalizeLogin(''), null)
-  assert.strictEqual(normalizeLogin('   '), null)
-  assert.strictEqual(normalizeLogin(undefined), null)
-  assert.strictEqual(normalizeLogin(42), null)
+  expect(normalizeLogin('  Sec-Review-Bot[bot] ')).toBe('sec-review-bot[bot]')
+  expect(normalizeLogin('')).toBe(null)
+  expect(normalizeLogin('   ')).toBe(null)
+  expect(normalizeLogin(undefined)).toBe(null)
+  expect(normalizeLogin(42)).toBe(null)
 })
 
 test('currentAppBotLogin derives the bot login from the app slug', () => {
-  assert.strictEqual(currentAppBotLogin(), 'sec-review-bot[bot]')
+  expect(currentAppBotLogin()).toBe('sec-review-bot[bot]')
   setGitHubAppMetadata({})
-  assert.strictEqual(currentAppBotLogin(), null)
+  expect(currentAppBotLogin()).toBe(null)
 })
 
 test('wasAuthoredByCurrentAppBot recognizes only this app bot', () => {
-  assert.strictEqual(
+  expect(
     wasAuthoredByCurrentAppBot({
       login: 'Sec-Review-Bot[bot]',
       type: 'Bot'
-    }),
-    true
-  )
+    })
+  ).toBe(true)
   // A different bot is not us, even with a similar login.
-  assert.strictEqual(
-    wasAuthoredByCurrentAppBot({ login: 'other-bot[bot]', type: 'Bot' }),
-    false
-  )
+  expect(
+    wasAuthoredByCurrentAppBot({ login: 'other-bot[bot]', type: 'Bot' })
+  ).toBe(false)
   // A human account with the same login string is not a bot.
-  assert.strictEqual(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' }),
-    false
-  )
-  assert.strictEqual(wasAuthoredByCurrentAppBot(null), false)
+  expect(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })
+  ).toBe(false)
+  expect(wasAuthoredByCurrentAppBot(null)).toBe(false)
 })
 
 test('isCurrentAppBotLogin compares only a stored login, and says so', () => {
   // A persisted PR author keeps a login but no user `type`. This narrower check exists so a
   // caller does not fabricate `type: 'Bot'` and silently make half of the full guard true.
-  assert.strictEqual(isCurrentAppBotLogin('Sec-Review-Bot[bot]'), true)
-  assert.strictEqual(isCurrentAppBotLogin('other-bot[bot]'), false)
-  assert.strictEqual(isCurrentAppBotLogin('alice'), false)
-  assert.strictEqual(isCurrentAppBotLogin(null), false)
+  expect(isCurrentAppBotLogin('Sec-Review-Bot[bot]')).toBe(true)
+  expect(isCurrentAppBotLogin('other-bot[bot]')).toBe(false)
+  expect(isCurrentAppBotLogin('alice')).toBe(false)
+  expect(isCurrentAppBotLogin(null)).toBe(false)
   // It fails closed exactly like the full check: no metadata means no safe answer.
   setGitHubAppMetadata({})
-  assert.throws(
-    () => isCurrentAppBotLogin('sec-review-bot[bot]'),
+  expect(() => isCurrentAppBotLogin('sec-review-bot[bot]')).toThrow(
     /metadata is not loaded/
   )
 })
@@ -71,28 +63,24 @@ test('isCurrentAppBotLogin compares only a stored login, and says so', () => {
 test('wasAuthoredByCurrentAppBot still rejects a human account with a bot login', () => {
   // The full check keeps both halves: the login must match AND the entity must be a Bot. This
   // is why callers without a `type` use the narrower function instead of passing a fake one.
-  assert.strictEqual(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' }),
-    false
-  )
-  assert.strictEqual(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' }),
-    true
-  )
+  expect(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })
+  ).toBe(false)
+  expect(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' })
+  ).toBe(true)
 })
 
 test('wasAuthoredByCurrentAppBot refuses to attribute when metadata is unloaded', () => {
   // With no app metadata there is no safe expectation: returning false would let a marker
   // be re-published, so the helper must surface the startup fault instead.
   setGitHubAppMetadata({})
-  assert.throws(
-    () =>
-      wasAuthoredByCurrentAppBot({
-        login: 'sec-review-bot[bot]',
-        type: 'Bot'
-      }),
-    /metadata is not loaded/
-  )
+  expect(() =>
+    wasAuthoredByCurrentAppBot({
+      login: 'sec-review-bot[bot]',
+      type: 'Bot'
+    })
+  ).toThrow(/metadata is not loaded/)
 })
 
 test('unattributable metadata is a deterministic publish failure, not a retryable one', () => {
@@ -106,37 +94,33 @@ test('unattributable metadata is a deterministic publish failure, not a retryabl
   } catch (error) {
     thrown = error
   }
-  assert.ok(thrown instanceof Error, 'unattributable metadata must throw')
-  assert.deepStrictEqual(
+  expect.assert(thrown instanceof Error, 'unattributable metadata must throw')
+  expect(
     (({ retry, code, reason }) => ({ retry, code, reason }))(
       classifyPublicationFailure(thrown)
-    ),
-    {
-      retry: false,
-      code: 'APP_METADATA_UNAVAILABLE',
-      reason: 'deterministic-publish-result'
-    }
-  )
+    )
+  ).toStrictEqual({
+    retry: false,
+    code: 'APP_METADATA_UNAVAILABLE',
+    reason: 'deterministic-publish-result'
+  })
 })
 
 test('isSelfOriginatedWebhookEvent ignores this app bot and other bots when attributing', () => {
   const event = (login: string, type: string) => ({
     sender: { login, type }
   })
-  assert.strictEqual(
+  expect(
     isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot')),
-    true,
     'our own bot event must be skipped to avoid a publish/trigger loop'
-  )
-  assert.strictEqual(
+  ).toBe(true)
+  expect(
     isSelfOriginatedWebhookEvent(event('human', 'User')),
-    false,
     'a human event is external'
-  )
+  ).toBe(false)
   // An unattributable bot is treated as self-originated (fail closed) rather than processed.
   setGitHubAppMetadata({})
-  assert.strictEqual(
-    isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot')),
-    true
-  )
+  expect(
+    isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot'))
+  ).toBe(true)
 })

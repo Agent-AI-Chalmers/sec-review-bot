@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { isBranchAlreadyExists } from '../../../src/reviews/shared/branch-already-exists.js'
 
@@ -15,12 +14,11 @@ test('isBranchAlreadyExists only trusts the GitHub response message', () => {
   // message decides. Only the response payload is a GitHub statement; the top-level error
   // message can come from a proxy or a wrapped error, so it must not be able to turn an
   // unrelated 422 into "the branch is already there, verify and reuse it".
-  assert.strictEqual(
+  expect(
     isBranchAlreadyExists(
       githubError(422, { message: 'Reference already exists' })
-    ),
-    true
-  )
+    )
+  ).toBe(true)
 
   // The regression this guards: a 422 with no response payload but a top-level message that
   // happens to contain the phrase. It must fail closed, not be treated as a recovery checkpoint.
@@ -28,22 +26,20 @@ test('isBranchAlreadyExists only trusts the GitHub response message', () => {
     new Error('upstream said: reference already exists somewhere'),
     { status: 422, response: { status: 422, data: undefined } }
   )
-  assert.strictEqual(isBranchAlreadyExists(noPayload), false)
+  expect(isBranchAlreadyExists(noPayload)).toBe(false)
 
   // The other 422 reason must never be read as a recovery checkpoint.
-  assert.strictEqual(
-    isBranchAlreadyExists(githubError(422, { message: 'Invalid ref name' })),
-    false
-  )
+  expect(
+    isBranchAlreadyExists(githubError(422, { message: 'Invalid ref name' }))
+  ).toBe(false)
 
   // A different status is never a branch-exists signal, even with a matching message.
-  assert.strictEqual(
+  expect(
     isBranchAlreadyExists(
       githubError(500, { message: 'Reference already exists' })
-    ),
-    false
-  )
+    )
+  ).toBe(false)
 
   // A bare error carries no GitHub payload at all.
-  assert.strictEqual(isBranchAlreadyExists(new Error('already exists')), false)
+  expect(isBranchAlreadyExists(new Error('already exists'))).toBe(false)
 })

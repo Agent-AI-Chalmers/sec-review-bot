@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { buildDeliveryDraftPrTitle } from '../../../src/reviews/repositories/delivery-title.js'
 
@@ -11,10 +10,7 @@ test('repository draft PR title uses the primary changed code file and case id',
     case_count: 1
   })
 
-  assert.strictEqual(
-    title,
-    '[sec] Fix security issue in src/server.js (case-1)'
-  )
+  expect(title).toBe('[sec] Fix security issue in src/server.js (case-1)')
 })
 
 test('repository draft PR title falls back to delivery id when case id is missing', () => {
@@ -25,10 +21,7 @@ test('repository draft PR title falls back to delivery id when case id is missin
     case_count: 1
   })
 
-  assert.strictEqual(
-    title,
-    '[sec] Fix security issue in src/server.js (delivery-1)'
-  )
+  expect(title).toBe('[sec] Fix security issue in src/server.js (delivery-1)')
 })
 
 test('repository draft PR title uses primary case id and related count for combined deliveries', () => {
@@ -42,8 +35,7 @@ test('repository draft PR title uses primary case id and related count for combi
     case_count: 2
   })
 
-  assert.strictEqual(
-    title,
+  expect(title).toBe(
     '[sec] Fix security issue in src/server.js (case-1 +1 related case)'
   )
 })

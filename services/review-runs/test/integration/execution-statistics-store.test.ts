@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool } from 'pg'
 
@@ -85,46 +84,40 @@ test('statistics settle only after two identical reads and persist relational gr
     }
 
     const first = await statistics.claimNext()
-    assert.ok(first)
-    assert.strictEqual(
-      await statistics.recordSnapshot(first, snapshot, 0),
-      'pending'
-    )
+    expect.assert(first)
+    expect(await statistics.recordSnapshot(first, snapshot, 0)).toBe('pending')
     const deadline = await observer.query<{ future: boolean }>(
       `SELECT reconciliation_deadline_at > clock_timestamp() AS future
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(deadline.rows[0]?.future, true)
+    expect(deadline.rows[0]?.future).toBe(true)
     const second = await statistics.claimNext()
-    assert.ok(second)
-    assert.strictEqual(await statistics.recordRateLimit(second, 0), 'pending')
+    expect.assert(second)
+    expect(await statistics.recordRateLimit(second, 0)).toBe('pending')
     const third = await statistics.claimNext()
-    assert.ok(third)
-    assert.strictEqual(await statistics.recordFailure(third, 8, 0), 'pending')
+    expect.assert(third)
+    expect(await statistics.recordFailure(third, 8, 0)).toBe('pending')
     const failuresBeforeRateLimit = await observer.query<{
       consecutive_failure_count: number
     }>(
       'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
       [runId]
     )
-    assert.equal(failuresBeforeRateLimit.rows[0]?.consecutive_failure_count, 1)
+    expect(failuresBeforeRateLimit.rows[0]?.consecutive_failure_count).toBe(1)
     const fourth = await statistics.claimNext()
-    assert.ok(fourth)
-    assert.equal(await statistics.recordRateLimit(fourth, 0), 'pending')
+    expect.assert(fourth)
+    expect(await statistics.recordRateLimit(fourth, 0)).toBe('pending')
     const failuresAfterRateLimit = await observer.query<{
       consecutive_failure_count: number
     }>(
       'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
       [runId]
     )
-    assert.equal(failuresAfterRateLimit.rows[0]?.consecutive_failure_count, 1)
+    expect(failuresAfterRateLimit.rows[0]?.consecutive_failure_count).toBe(1)
     const fifth = await statistics.claimNext()
-    assert.ok(fifth)
-    assert.strictEqual(
-      await statistics.recordSnapshot(fifth, snapshot, 0),
-      'settled'
-    )
+    expect.assert(fifth)
+    expect(await statistics.recordSnapshot(fifth, snapshot, 0)).toBe('settled')
 
     const total = await observer.query<{
       status: string
@@ -136,7 +129,7 @@ test('statistics settle only after two identical reads and persist relational gr
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
     )
-    assert.deepStrictEqual(total.rows[0], {
+    expect(total.rows[0]).toStrictEqual({
       status: 'settled',
       ingestion_status: 'settled',
       total_tokens: '12',
@@ -156,7 +149,7 @@ test('statistics settle only after two identical reads and persist relational gr
        FROM execution_statistics_groups WHERE run_id=$1`,
       [runId]
     )
-    assert.deepStrictEqual(groups.rows, [
+    expect(groups.rows).toStrictEqual([
       {
         agent_name: 'issue-analyzer',
         agent_phase: 'initial',
@@ -169,7 +162,7 @@ test('statistics settle only after two identical reads and persist relational gr
       }
     ])
     const readModel = await reviewStore.queries.getExecutionStatistics([runId])
-    assert.deepStrictEqual(readModel.get(runId), {
+    expect(readModel.get(runId)).toStrictEqual({
       reconciliation_status: 'settled',
       ingestion_status: 'settled',
       usage_coverage: 'complete_for_observed_calls',
@@ -211,8 +204,8 @@ test('statistics settle only after two identical reads and persist relational gr
       settled_at: (readModel.get(runId) as { settled_at: string }).settled_at,
       updated_at: (readModel.get(runId) as { updated_at: string }).updated_at
     })
-    assert.match(readModel.get(runId)?.settled_at ?? '', /^2026-|^20/)
-    assert.match(readModel.get(runId)?.updated_at ?? '', /^2026-|^20/)
+    expect(readModel.get(runId)?.settled_at ?? '').toMatch(/^2026-|^20/)
+    expect(readModel.get(runId)?.updated_at ?? '').toMatch(/^2026-|^20/)
   } finally {
     await statistics.close()
     await observer.end()
@@ -268,15 +261,13 @@ test('an empty observation set waits for the full window instead of settling as 
     )
 
     const first = await statistics.claimNext()
-    assert.ok(first)
-    assert.strictEqual(
-      await statistics.recordSnapshot(first, emptySnapshot, 0),
+    expect.assert(first)
+    expect(await statistics.recordSnapshot(first, emptySnapshot, 0)).toBe(
       'pending'
     )
     const second = await statistics.claimNext()
-    assert.ok(second)
-    assert.strictEqual(
-      await statistics.recordSnapshot(second, emptySnapshot, 0),
+    expect.assert(second)
+    expect(await statistics.recordSnapshot(second, emptySnapshot, 0)).toBe(
       'pending'
     )
 
@@ -287,9 +278,8 @@ test('an empty observation set waits for the full window instead of settling as 
       [runId]
     )
     const final = await statistics.claimNext()
-    assert.ok(final)
-    assert.strictEqual(
-      await statistics.recordSnapshot(final, emptySnapshot, 0),
+    expect.assert(final)
+    expect(await statistics.recordSnapshot(final, emptySnapshot, 0)).toBe(
       'no_observations'
     )
 
@@ -303,7 +293,7 @@ test('an empty observation set waits for the full window instead of settling as 
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
     )
-    assert.deepStrictEqual(persisted.rows[0], {
+    expect(persisted.rows[0]).toStrictEqual({
       status: 'settled',
       ingestion_status: 'no_observations',
       usage_coverage: null,
@@ -347,7 +337,7 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
     )
 
     const claimed = await statistics.claimNext()
-    assert.ok(claimed)
+    expect.assert(claimed)
     await observer.query(
       `UPDATE execution_statistics
        SET reconciliation_deadline_at=clock_timestamp()-interval '1 second'
@@ -355,8 +345,7 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
       [runId]
     )
 
-    assert.strictEqual(
-      await statistics.recordRateLimit(claimed, 30_000),
+    expect(await statistics.recordRateLimit(claimed, 30_000)).toBe(
       'unavailable'
     )
     const persisted = await observer.query<{
@@ -372,7 +361,7 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
        FROM execution_statistics WHERE run_id=$1`,
       [runId]
     )
-    assert.deepStrictEqual(persisted.rows[0], {
+    expect(persisted.rows[0]).toStrictEqual({
       status: 'unavailable',
       ingestion_status: 'unavailable',
       usage_coverage: 'unavailable',
@@ -403,13 +392,14 @@ test('statistics cannot exist without their execution', async () => {
        VALUES ($1,$2,'issue-review','github')`,
       [runId, connectorId]
     )
-    await assert.rejects(
+    await expect(
       observer.query(
         `INSERT INTO execution_statistics
            (run_id,status,next_attempt_at,reconciliation_deadline_at)
          VALUES ($1,'pending',clock_timestamp(),clock_timestamp())`,
         [runId]
-      ),
+      )
+    ).rejects.toSatisfy(
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
@@ -421,13 +411,11 @@ test('statistics cannot exist without their execution', async () => {
        VALUES ($1,$2,'pending')`,
       [runId, connectorId]
     )
-    await assert.doesNotReject(
-      observer.query(
-        `INSERT INTO execution_statistics
+    await observer.query(
+      `INSERT INTO execution_statistics
            (run_id,status,next_attempt_at,reconciliation_deadline_at)
          VALUES ($1,'pending',clock_timestamp(),clock_timestamp())`,
-        [runId]
-      )
+      [runId]
     )
   } finally {
     await observer.query('DELETE FROM review_runs WHERE run_id=$1', [runId])
@@ -488,28 +476,27 @@ test('task phases and feedback retries survive snapshot persistence and read pro
     })
     for (const expected of ['pending', 'settled']) {
       const work = await statistics.claimNext()
-      assert.ok(work)
-      assert.equal(await statistics.recordSnapshot(work, snapshot, 0), expected)
+      expect.assert(work)
+      expect(await statistics.recordSnapshot(work, snapshot, 0)).toBe(expected)
     }
     const read = (
       await reviewStore.queries.getExecutionStatistics([runId])
     ).get(runId)
-    assert.ok(read)
-    assert.equal(read.token_usage.total_tokens, 10)
-    assert.deepEqual(
+    expect.assert(read)
+    expect(read.token_usage.total_tokens).toBe(10)
+    expect(
       read.groups.map((group) => [
         group.agent_phase,
         group.feedback_retry_index,
         group.model_call_count
-      ]),
-      [
-        ['initial', null, 1],
-        ['draft', null, 1],
-        ['refinement', null, 1],
-        ['feedback', 1, 1],
-        ['feedback', 2, 1]
-      ]
-    )
+      ])
+    ).toStrictEqual([
+      ['initial', null, 1],
+      ['draft', null, 1],
+      ['refinement', null, 1],
+      ['feedback', 1, 1],
+      ['feedback', 2, 1]
+    ])
   } finally {
     await statistics.close()
     await observer.query('DELETE FROM review_runs WHERE run_id=$1', [runId])

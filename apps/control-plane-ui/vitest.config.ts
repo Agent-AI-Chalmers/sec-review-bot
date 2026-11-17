@@ -4,8 +4,25 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
-    include: ['test/components/**/*.test.tsx'],
-    setupFiles: ['./test/components/setup.ts']
+    maxWorkers: 3,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'logic',
+          environment: 'node',
+          include: ['test/*.test.ts']
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'components',
+          environment: 'jsdom',
+          include: ['test/components/**/*.test.tsx'],
+          setupFiles: ['./test/components/setup.ts']
+        }
+      }
+    ]
   }
 })

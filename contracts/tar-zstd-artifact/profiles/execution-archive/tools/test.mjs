@@ -1,15 +1,13 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 test('execution-archive corpus manifest covers every archive', () => {
   const corpus = path.resolve(import.meta.dirname, '../v1/corpus')
   const manifest = JSON.parse(
     fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')
   )
-  assert.deepEqual(
-    manifest.corpus.map((item) => item.file).sort(),
+  expect(manifest.corpus.map((item) => item.file).sort()).toStrictEqual(
     fs
       .readdirSync(corpus)
       .filter((name) => name.endsWith('.tar.zst'))
@@ -22,7 +20,7 @@ test('generated artifact manifest covers the execution-archive corpus', () => {
   const generated = JSON.parse(
     fs.readFileSync(path.join(toolRoot, 'generated-artifacts.json'), 'utf8')
   )
-  assert.equal(generated.family, 'tar-zstd-artifact/profiles/execution-archive')
+  expect(generated.family).toBe('tar-zstd-artifact/profiles/execution-archive')
   const corpus = path.resolve(toolRoot, '../v1/corpus')
   const expected = fs
     .readdirSync(corpus)
@@ -31,5 +29,5 @@ test('generated artifact manifest covers the execution-archive corpus', () => {
         `contracts/tar-zstd-artifact/profiles/execution-archive/v1/corpus/${name}`
     )
     .sort()
-  assert.deepEqual(generated.generators[0].outputs.toSorted(), expected)
+  expect(generated.generators[0].outputs.toSorted()).toStrictEqual(expected)
 })

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handlePullRequestOpenedWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-opened.js'
 import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata-service.js'
@@ -105,7 +104,7 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
     }
   )
 
-  assert.strictEqual(reviewCalled, false)
+  expect(reviewCalled).toBe(false)
 })
 
 test('pull-request-opened skips self-originated payload before pull request extraction', async () => {
@@ -132,7 +131,7 @@ test('pull-request-opened skips self-originated payload before pull request extr
       }
     )
 
-    assert.strictEqual(configFetched, false)
+    expect(configFetched).toBe(false)
   } finally {
     setGitHubAppMetadata()
   }
@@ -159,8 +158,8 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
     }
   )
 
-  assert.strictEqual(reviewCalled, true)
-  assert.deepStrictEqual(forwarded, {
+  expect(reviewCalled).toBe(true)
+  expect(forwarded).toStrictEqual({
     default_branch: 'main',
     head_sha: 'main-sha'
   })
@@ -175,7 +174,7 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
     reason: 'invalid-trigger-mode'
   })
 
-  await assert.rejects(
+  await expect(
     handlePullRequestOpenedWithDeps(
       {
         id: 'delivery-test',
@@ -190,9 +189,12 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
           error
         ): error is RepositoryTriggerConfigError => Boolean(error)
       }
-    ),
-    configError
-  )
+    )
+  ).rejects.toMatchObject({
+    ...configError,
+    name: configError.name,
+    message: configError.message
+  })
 })
 
 test('pull-request-opened skips automatic review for fork PRs', async () => {
@@ -218,10 +220,8 @@ test('pull-request-opened skips automatic review for fork PRs', async () => {
     }
   )
 
-  assert.strictEqual(reviewCalled, false, 'fork PR must not auto-review')
-  assert.strictEqual(
-    configFetched,
-    false,
-    'fork PR must be skipped before config fetch'
+  expect(reviewCalled, 'fork PR must not auto-review').toBe(false)
+  expect(configFetched, 'fork PR must be skipped before config fetch').toBe(
+    false
   )
 })

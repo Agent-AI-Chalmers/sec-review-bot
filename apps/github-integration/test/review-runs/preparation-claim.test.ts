@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   PreparationClaimLostError,
@@ -24,12 +23,12 @@ test('preparation heartbeat renews the claim while work remains active', async (
   while (renewals < 2 && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 10))
   }
-  assert.strictEqual(await heartbeat.stop(), true)
-  assert.ok(renewals >= 2)
+  expect(await heartbeat.stop()).toBe(true)
+  expect.assert(renewals >= 2)
 })
 
 test('preparation heartbeat rejects an already stale owner before work starts', async () => {
-  await assert.rejects(
+  await expect(
     startPreparationClaimHeartbeat(
       {
         renewPreparationClaim: async () => false,
@@ -37,9 +36,8 @@ test('preparation heartbeat rejects an already stale owner before work starts', 
       },
       'run-1',
       'stale-claim'
-    ),
-    PreparationClaimLostError
-  )
+    )
+  ).rejects.toThrow(PreparationClaimLostError)
 })
 
 test('preparation heartbeat fences active work when its claim is lost', async () => {
@@ -54,8 +52,10 @@ test('preparation heartbeat fences active work when its claim is lost', async ()
   )
 
   current = false
-  await assert.rejects(heartbeat.assertOwned(), PreparationClaimLostError)
-  assert.strictEqual(await heartbeat.stop(), false)
+  await expect(heartbeat.assertOwned()).rejects.toThrow(
+    PreparationClaimLostError
+  )
+  expect(await heartbeat.stop()).toBe(false)
 })
 
 test('a transport failure during renewal blocks further work but does not claim the lease was lost', async () => {
@@ -77,6 +77,6 @@ test('a transport failure during renewal blocks further work but does not claim 
   )
 
   reachable = false
-  await assert.rejects(heartbeat.assertOwned(), /ECONNREFUSED/)
-  assert.strictEqual(await heartbeat.stop(), true)
+  await expect(heartbeat.assertOwned()).rejects.toThrow(/ECONNREFUSED/)
+  expect(await heartbeat.stop()).toBe(true)
 })

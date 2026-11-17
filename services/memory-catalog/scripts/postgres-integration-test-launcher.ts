@@ -2,7 +2,7 @@
 // or a short-lived local Docker PostgreSQL instance, then always removes any instance it owns.
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { parse } from 'yaml'
@@ -98,19 +98,18 @@ async function waitForPostgres(containerName: string): Promise<void> {
   throw new Error('Timed out waiting for temporary PostgreSQL to become ready.')
 }
 
-async function integrationTestFiles(): Promise<string[]> {
-  const directory = path.join(catalogDirectory, 'test', 'integration')
-  return (await readdir(directory))
-    .filter((entry) => entry.endsWith('.test.ts'))
-    .map((entry) => path.join('test', 'integration', entry))
-    .sort()
-}
-
 async function runTests(databaseUrl: string): Promise<void> {
   await run('pnpm', ['run', 'build'])
   await run(
-    process.execPath,
-    ['--import', 'tsx', '--test', ...(await integrationTestFiles())],
+    'pnpm',
+    [
+      'exec',
+      'vitest',
+      'run',
+      '--project',
+      'integration',
+      ...process.argv.slice(2),
+    ],
     { ...process.env, TEST_DATABASE_URL: databaseUrl },
   )
 }

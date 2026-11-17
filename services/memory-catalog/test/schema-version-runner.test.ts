@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Pool, PoolClient } from 'pg'
 
@@ -26,23 +25,23 @@ function poolWithAppliedVersions(
   } as unknown as Pool
 }
 
-await test('applies the complete catalog schema as version 1', async () => {
+test('applies the complete catalog schema as version 1', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
 
   await applySchemaVersions(poolWithAppliedVersions([], statements))
 
-  assert.ok(
+  expect.assert(
     statements.some(({ sql }) =>
       sql.includes('create table memory_tree_versions'),
     ),
   )
-  assert.ok(
+  expect.assert(
     statements.some(({ sql }) =>
       sql.includes('create table memory_tree_automation'),
     ),
   )
-  assert.ok(statements.some(({ sql }) => sql.includes('source_kind text')))
-  assert.ok(
+  expect.assert(statements.some(({ sql }) => sql.includes('source_kind text')))
+  expect.assert(
     statements.some(({ sql }) =>
       sql.includes('create table memory_tree_automation_operations'),
     ),
@@ -50,26 +49,24 @@ await test('applies the complete catalog schema as version 1', async () => {
   const ledgerInserts = statements.filter(({ sql }) =>
     sql.includes('insert into schema_versions'),
   )
-  assert.deepEqual(
+  expect(
     ledgerInserts.map(({ parameters }) => parameters?.slice(0, 2)),
-    [[1, 'initial_catalog']],
-  )
+  ).toStrictEqual([[1, 'initial_catalog']])
   for (const insert of ledgerInserts)
-    assert.match(String(insert.parameters?.[2]), /^[a-f0-9]{64}$/)
+    expect(String(insert.parameters?.[2])).toMatch(/^[a-f0-9]{64}$/)
 })
 
-await test('rejects a database schema newer than this catalog understands', async () => {
-  await assert.rejects(
+test('rejects a database schema newer than this catalog understands', async () => {
+  await expect(
     applySchemaVersions(
       poolWithAppliedVersions([
         { version: 2, name: 'future', checksum: 'future' },
       ]),
     ),
-    /schema version 2 is newer/,
-  )
+  ).rejects.toThrow(/schema version 2 is newer/)
 })
 
-await test('rejects changes to an applied schema version', async () => {
+test('rejects changes to an applied schema version', async () => {
   const sql = await readFile(
     new URL(
       '../src/database/schema-versions/001_initial_catalog.sql',
@@ -79,12 +76,11 @@ await test('rejects changes to an applied schema version', async () => {
   )
   const checksum = crypto.createHash('sha256').update(sql).digest('hex')
 
-  await assert.rejects(
+  await expect(
     applySchemaVersions(
       poolWithAppliedVersions([
         { version: 1, name: 'initial_catalog', checksum: `${checksum}changed` },
       ]),
     ),
-    /no longer matches its checked-in SQL file/,
-  )
+  ).rejects.toThrow(/no longer matches its checked-in SQL file/)
 })

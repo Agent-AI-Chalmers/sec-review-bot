@@ -75,7 +75,11 @@ pnpm test
 pnpm run test:integration
 ```
 
-`pnpm test` runs the isolated unit and server tests. `pnpm run test:integration` exercises the PostgreSQL store against an explicitly supplied `TEST_DATABASE_URL`; when it is unset, the launcher creates and removes a temporary local Docker PostgreSQL instance using the image configured in the repository `compose.yaml`. The launcher deliberately ignores the service's ordinary `MEMORY_CATALOG_DATABASE_URL` so a test cannot modify a shared database by accident.
+<!-- doc-default: memory-catalog.test-projects; source=services/memory-catalog/vitest.config.ts -->
+
+`pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
+
+`pnpm run test:integration` exercises the PostgreSQL store against an explicitly supplied `TEST_DATABASE_URL`; when it is unset, the launcher creates and removes a temporary local Docker PostgreSQL instance using the image configured in the repository `compose.yaml`. The launcher deliberately ignores the service's ordinary `MEMORY_CATALOG_DATABASE_URL` so a test cannot modify a shared database by accident.
 
 Each extraction produces zero or more observations. `extraction_id` identifies the invocation and its provenance; `observation_id` identifies an independently maintained lesson. Extraction registration publishes the complete `observations` array atomically. Learning consumes `observation_ids` and reports one decision per observation.
 

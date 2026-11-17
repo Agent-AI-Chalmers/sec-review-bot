@@ -2,7 +2,7 @@
 // or a short-lived local Docker Temporal instance, then always removes any instance it owns.
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { parse } from 'yaml'
@@ -109,19 +109,18 @@ async function waitForTemporal(containerName: string): Promise<void> {
   throw new Error('Timed out waiting for temporary Temporal to become ready.')
 }
 
-async function integrationTestFiles(): Promise<string[]> {
-  const directory = path.join(gatewayDirectory, 'test', 'integration')
-  return (await readdir(directory))
-    .filter((entry) => entry.endsWith('.test.ts'))
-    .map((entry) => path.join('test', 'integration', entry))
-    .sort()
-}
-
 async function runTests(temporalAddress: string): Promise<void> {
   await run('pnpm', ['run', 'build'])
   await run(
-    process.execPath,
-    ['--import', 'tsx', '--test', ...(await integrationTestFiles())],
+    'pnpm',
+    [
+      'exec',
+      'vitest',
+      'run',
+      '--project',
+      'integration',
+      ...process.argv.slice(2),
+    ],
     { ...process.env, TEST_TEMPORAL_ADDRESS: temporalAddress },
   )
 }

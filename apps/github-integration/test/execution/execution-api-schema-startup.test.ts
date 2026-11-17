@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { verifyContractSchemasLoadable } from '../../src/execution/execution-api-schema.js'
 
@@ -25,9 +24,8 @@ test('an explicit contract root is authoritative', () => {
       }
     )
 
-    assert.notEqual(result.status, 0)
-    assert.match(
-      `${result.stdout}${result.stderr}`,
+    expect(result.status).not.toBe(0)
+    expect(`${result.stdout}${result.stderr}`).toMatch(
       /SEC_REVIEW_CONTRACTS_ROOT=.*does not contain/
     )
   } finally {
@@ -45,5 +43,5 @@ test('an explicit contract root is authoritative', () => {
 // first `assertWorkflowResult` call would take -- just moved to startup.
 
 test('verifyContractSchemasLoadable loads the canonical schemas', () => {
-  assert.doesNotThrow(() => verifyContractSchemasLoadable())
+  expect(() => verifyContractSchemasLoadable()).not.toThrow()
 })

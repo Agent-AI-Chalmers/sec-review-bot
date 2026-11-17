@@ -2,8 +2,7 @@
 // The console explains the ones it knows and shows the rest verbatim. Getting this wrong is not
 // cosmetic - an operator reading an unexplained code has to guess whether the run can be retried
 // or is terminal.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   abandonFailureMessageKey,
@@ -22,14 +21,14 @@ test('every code the console explains has a sentence in both languages', () => {
   // sharing a sentence would have made this assert against the wrong key.
   for (const [code, messageKey] of Object.entries(KNOWN_FAILURE_CODE_KEYS)) {
     const result = failureCodeLabel(code, t)
-    assert.strictEqual(result.code, code, 'the code itself is always returned')
-    assert.ok(
+    expect(result.code, 'the code itself is always returned').toBe(code)
+    expect.assert(
       result.explanation !== null && result.explanation.length > 0,
       `${code} must have an explanation`
     )
     for (const language of ['en', 'zh'] as const) {
       const value = (messages[language] as Record<string, string>)[messageKey]
-      assert.ok(
+      expect.assert(
         typeof value === 'string' && value.length > 0,
         `${code} has no ${language} translation for ${messageKey}`
       )
@@ -39,8 +38,8 @@ test('every code the console explains has a sentence in both languages', () => {
 
 test('a connector-supplied failure code is shown without an invented explanation', () => {
   const result = failureCodeLabel('SOMETHING_THE_CONNECTOR_INVENTED', t)
-  assert.strictEqual(result.code, 'SOMETHING_THE_CONNECTOR_INVENTED')
-  assert.strictEqual(result.explanation, null)
+  expect(result.code).toBe('SOMETHING_THE_CONNECTOR_INVENTED')
+  expect(result.explanation).toBe(null)
 })
 
 test('a code whose sentence is missing from the active language renders no tooltip', () => {
@@ -49,8 +48,8 @@ test('a code whose sentence is missing from the active language renders no toolt
   // rendered an empty tooltip instead of falling back to the bare code.
   const missingTable = (() => undefined) as unknown as Translator
   const result = failureCodeLabel('PREPARATION_RETRY_EXHAUSTED', missingTable)
-  assert.strictEqual(result.code, 'PREPARATION_RETRY_EXHAUSTED')
-  assert.strictEqual(result.explanation, null)
+  expect(result.code).toBe('PREPARATION_RETRY_EXHAUSTED')
+  expect(result.explanation).toBe(null)
 })
 
 test('an abandon failure names the credential that was actually rejected', () => {
@@ -66,7 +65,7 @@ test('an abandon failure names the credential that was actually rejected', () =>
     [new Error('network down'), 'abandonFailed']
   ]
   for (const [error, expected] of cases) {
-    assert.strictEqual(abandonFailureMessageKey(error), expected)
+    expect(abandonFailureMessageKey(error)).toBe(expected)
   }
 })
 
@@ -78,7 +77,7 @@ test('every abandon failure message has a translation in both languages', () => 
   ] as const) {
     for (const language of ['en', 'zh'] as const) {
       const value = (messages[language] as Record<string, string>)[key]
-      assert.ok(
+      expect.assert(
         typeof value === 'string' && value.length > 0,
         `${key} is missing from ${language}`
       )

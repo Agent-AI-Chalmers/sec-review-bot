@@ -3,10 +3,9 @@
 // `generated-artifacts.json` lists what is derived from this family's contract and where it
 // lands. If it drifts from the generators it guards nothing, so the manifest and the code
 // check each other rather than each being trusted alone.
-import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse } from 'yaml'
 
@@ -38,27 +37,24 @@ const ACTUAL_OUTPUTS: Record<string, string[]> = {
 
 test('every committed artifact matches a fresh render', async () => {
   const stale = await staleGeneratedArtifacts()
-  assert.deepStrictEqual(
+  expect(
     stale,
-    [],
     `these are stale:\n${stale.map((s) => `  ${s.output} -> ${s.command}`).join('\n')}`
-  )
+  ).toStrictEqual([])
 })
 
 test('the manifest lists exactly the artifacts the generators write', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   const byName = new Map(manifest.generators.map((g) => [g.name, g.outputs]))
-  assert.deepStrictEqual(
+  expect(
     [...byName.keys()].sort(),
-    Object.keys(ACTUAL_OUTPUTS).sort(),
     'the manifest lists a different set of generators than the code has'
-  )
+  ).toStrictEqual(Object.keys(ACTUAL_OUTPUTS).sort())
   for (const [name, outputs] of Object.entries(ACTUAL_OUTPUTS)) {
-    assert.deepStrictEqual(
+    expect(
       [...(byName.get(name) ?? [])].sort(),
-      [...outputs].sort(),
       `manifest outputs for ${name} do not match the generator`
-    )
+    ).toStrictEqual([...outputs].sort())
   }
 })
 
@@ -69,7 +65,7 @@ test('every input the manifest names exists', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   for (const generator of manifest.generators) {
     for (const input of generator.inputs) {
-      assert.ok(
+      expect.assert(
         existsSync(path.join(REPO_ROOT, input)),
         `${generator.name} declares input ${input}, which does not exist`
       )
@@ -82,10 +78,10 @@ test('every file the manifest names exists', () => {
     JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   ).generators) {
     for (const output of generator.outputs) {
-      assert.doesNotThrow(
+      expect(
         () => readFileSync(path.join(REPO_ROOT, output), 'utf8'),
         `${output} is listed in the manifest but cannot be read`
-      )
+      ).not.toThrow()
     }
   }
 })
@@ -120,13 +116,13 @@ test('the contract-tools CI filter triggers on every artifact of this family', (
     )
   ) as Record<string, string[]>
   const patterns = filters['contract-tools'] ?? []
-  assert.ok(patterns.length > 0, 'no patterns for the contract-tools area')
+  expect.assert(patterns.length > 0, 'no patterns for the contract-tools area')
 
   const required = (
     JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   ).generators.flatMap((generator) => generator.outputs)
   for (const output of required) {
-    assert.ok(
+    expect.assert(
       globCovers(patterns, output),
       `the contract-tools CI filter does not cover ${output}; a hand edit of it would run no ` +
         'job that detects the drift'

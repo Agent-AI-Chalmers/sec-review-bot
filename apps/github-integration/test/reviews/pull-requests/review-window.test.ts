@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { resolveReviewWindowFiles } from '../../../src/reviews/pull-requests/review-window.js'
 import type { PullRequestFile } from '../../../src/github/pull-request-service.js'
@@ -33,13 +32,12 @@ test('a non-synchronize event always uses the full pull request window', async (
   // A previous head on a non-synchronize event must not narrow the review: the
   // event is a full review, and pairing its files with a push range would make
   // the patch and the file list describe different changes.
-  assert.deepStrictEqual(calls, ['full'])
-  assert.strictEqual(result.window.kind, 'full')
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['whole-pr.ts']
-  )
-  assert.strictEqual(result.window.reason, 'pull-request-scope')
+  expect(calls).toStrictEqual(['full'])
+  expect(result.window.kind).toBe('full')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.window.reason).toBe('pull-request-scope')
 })
 
 test('a synchronize with a usable push window keeps the push window', async () => {
@@ -47,7 +45,7 @@ test('a synchronize with a usable push window keeps the push window', async () =
     event_type: 'synchronize',
     pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'cafe1234' },
     list_push_window_files: async (base_sha) => {
-      assert.strictEqual(base_sha, 'cafe1234')
+      expect(base_sha).toBe('cafe1234')
       return { files: [file('pushed.ts')], previous_head_is_ancestor: true }
     },
     list_full_window_files: async () => {
@@ -55,12 +53,11 @@ test('a synchronize with a usable push window keeps the push window', async () =
     }
   })
 
-  assert.strictEqual(result.window.kind, 'push')
-  assert.strictEqual(result.window.reason, 'synchronize-scope')
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['pushed.ts']
-  )
+  expect(result.window.kind).toBe('push')
+  expect(result.window.reason).toBe('synchronize-scope')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['pushed.ts'])
 })
 
 test('a synchronize without a previous head falls back to the full window', async () => {
@@ -76,12 +73,11 @@ test('a synchronize without a previous head falls back to the full window', asyn
   // Without a previous head there is no push range. Returning an empty file list
   // here would leave the analyzer with a full pull request patch and no files,
   // which is the inconsistency this resolver exists to prevent.
-  assert.strictEqual(result.window.kind, 'full')
-  assert.strictEqual(result.window.reason, 'synchronize-previous-head-missing')
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['whole-pr.ts']
-  )
+  expect(result.window.kind).toBe('full')
+  expect(result.window.reason).toBe('synchronize-previous-head-missing')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['whole-pr.ts'])
 })
 
 function httpError(
@@ -115,16 +111,12 @@ test('an unreachable previous head falls back instead of failing the run', async
     }
   })
 
-  assert.strictEqual(full_calls, 1)
-  assert.strictEqual(result.window.kind, 'full')
-  assert.strictEqual(
-    result.window.reason,
-    'synchronize-previous-head-unreachable'
-  )
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['whole-pr.ts']
-  )
+  expect(full_calls).toBe(1)
+  expect(result.window.kind).toBe('full')
+  expect(result.window.reason).toBe('synchronize-previous-head-unreachable')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['whole-pr.ts'])
 })
 
 test('a synchronize that changed no files falls back to the full window', async () => {
@@ -141,12 +133,11 @@ test('a synchronize that changed no files falls back to the full window', async 
     list_full_window_files: async () => [file('whole-pr.ts')]
   })
 
-  assert.strictEqual(result.window.kind, 'full')
-  assert.strictEqual(result.window.reason, 'synchronize-no-files-changed')
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['whole-pr.ts']
-  )
+  expect(result.window.kind).toBe('full')
+  expect(result.window.reason).toBe('synchronize-no-files-changed')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['whole-pr.ts'])
 })
 
 test('compare failures other than 404 propagate instead of triggering a full review', async () => {
@@ -155,7 +146,7 @@ test('compare failures other than 404 propagate instead of triggering a full rev
   // request merely times out. Each of those must surface to the caller.
   for (const status of [403, 429, 500, 503]) {
     let full_calls = 0
-    await assert.rejects(
+    await expect(
       resolveReviewWindowFiles({
         event_type: 'synchronize',
         pr: {
@@ -170,10 +161,9 @@ test('compare failures other than 404 propagate instead of triggering a full rev
           full_calls += 1
           return [file('whole-pr.ts')]
         }
-      }),
-      (error: Error) => error.message === `HTTP ${status}`
-    )
-    assert.strictEqual(full_calls, 0, `HTTP ${status} must not fetch files`)
+      })
+    ).rejects.toSatisfy((error: Error) => error.message === `HTTP ${status}`)
+    expect(full_calls, `HTTP ${status} must not fetch files`).toBe(0)
   }
 })
 
@@ -181,7 +171,7 @@ test('a compare failure without an HTTP status propagates', async () => {
   // A timeout or programming error carries no status, and must not be read as
   // "the previous head is unreachable".
   let full_calls = 0
-  await assert.rejects(
+  await expect(
     resolveReviewWindowFiles({
       event_type: 'synchronize',
       pr: {
@@ -196,10 +186,9 @@ test('a compare failure without an HTTP status propagates', async () => {
         full_calls += 1
         return [file('whole-pr.ts')]
       }
-    }),
-    /fetch failed/
-  )
-  assert.strictEqual(full_calls, 0)
+    })
+  ).rejects.toThrow(/fetch failed/)
+  expect(full_calls).toBe(0)
 })
 
 test('a force-pushed previous head falls back instead of reviewing a broken window', async () => {
@@ -221,14 +210,10 @@ test('a force-pushed previous head falls back instead of reviewing a broken wind
     }
   })
 
-  assert.strictEqual(full_calls, 1)
-  assert.strictEqual(result.window.kind, 'full')
-  assert.strictEqual(
-    result.window.reason,
-    'synchronize-previous-head-not-ancestor'
-  )
-  assert.deepStrictEqual(
-    result.files.map((item: PullRequestFile) => item.filename),
-    ['whole-pr.ts']
-  )
+  expect(full_calls).toBe(1)
+  expect(result.window.kind).toBe('full')
+  expect(result.window.reason).toBe('synchronize-previous-head-not-ancestor')
+  expect(
+    result.files.map((item: PullRequestFile) => item.filename)
+  ).toStrictEqual(['whole-pr.ts'])
 })

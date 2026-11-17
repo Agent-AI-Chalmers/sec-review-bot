@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { prepareIssueReview } from '../../../src/reviews/issues/prepare-review.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
@@ -79,7 +78,7 @@ async function runWith(
     },
     { prepare_input }
   )
-  assert.deepStrictEqual(prepared.review, {
+  expect(prepared.review).toStrictEqual({
     issue: issueContext(),
     run_id: 'run-issue-1',
     workspace_ref: 'workspace-ref',
@@ -87,33 +86,33 @@ async function runWith(
     event_type: 'manual_review',
     open_pr: false
   })
-  assert.strictEqual(prepared.input.api_version, EXECUTION_API_VERSION)
+  expect(prepared.input.api_version).toBe(EXECUTION_API_VERSION)
   return calls
 }
 
 test('audit review forwards an explicit test_changes to the execution input', async () => {
   // The regression this guards: an issue comment now always audits, but audit can still
   // reach the repair stage, so a user-chosen test_changes must not be silently dropped.
-  assert.deepStrictEqual(await runWith('audit', 'deny'), [
+  expect(await runWith('audit', 'deny')).toStrictEqual([
     { review_objective: 'audit', test_changes: 'deny' }
   ])
 })
 
 test('audit review without a test_changes leaves the field absent', async () => {
-  assert.deepStrictEqual(await runWith('audit', null), [
+  expect(await runWith('audit', null)).toStrictEqual([
     { review_objective: 'audit' }
   ])
 })
 
 test('repair review without a test_changes leaves the field absent', async () => {
   // The Execution Worker owns the default (`allow`); the GitHub integration never injects one.
-  assert.deepStrictEqual(await runWith('repair', null), [
+  expect(await runWith('repair', null)).toStrictEqual([
     { review_objective: 'repair' }
   ])
 })
 
 test('repair review forwards an explicit test_changes', async () => {
-  assert.deepStrictEqual(await runWith('repair', 'deny'), [
+  expect(await runWith('repair', 'deny')).toStrictEqual([
     { review_objective: 'repair', test_changes: 'deny' }
   ])
 })

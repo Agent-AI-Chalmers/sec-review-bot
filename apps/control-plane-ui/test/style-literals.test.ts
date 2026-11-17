@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { findStyleLiterals } from '../scripts/style-literals.js'
 
@@ -16,7 +15,7 @@ test('style literal reporting classifies only nonzero px and rem values', () => 
     `
   })
 
-  assert.deepEqual(findings, [
+  expect(findings).toStrictEqual([
     {
       kind: 'radius',
       file: 'example.css',

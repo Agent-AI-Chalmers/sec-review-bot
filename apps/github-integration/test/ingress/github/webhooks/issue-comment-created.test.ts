@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata-service.js'
 import type { ManualCommandAuthorizationDecision } from '../../../../src/github/manual-command-authorization.js'
@@ -158,8 +157,8 @@ test('issue-comment-created skips manual command when commenter lacks write perm
     }
   )
 
-  assert.strictEqual(issueReviewCalled, false)
-  assert.strictEqual(pullRequestReviewCalled, false)
+  expect(issueReviewCalled).toBe(false)
+  expect(pullRequestReviewCalled).toBe(false)
 })
 
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
@@ -198,11 +197,11 @@ test('issue-comment-created starts an audited issue manual review for write comm
 
   // An issue is an unverified claim, so a comment can only start an audit; the objective the
   // command path passes is always `audit`, never a user-chosen `repair`.
-  assert.strictEqual(review_objective, 'audit')
+  expect(review_objective).toBe('audit')
   // A plain comment does not opt in to opening a draft PR.
-  assert.strictEqual(open_pr, false)
+  expect(open_pr).toBe(false)
   // The resolved trusted branch reaches the issue command.
-  assert.deepStrictEqual(forwarded_trusted, {
+  expect(forwarded_trusted).toStrictEqual({
     default_branch: 'main',
     head_sha: 'default-sha'
   })
@@ -232,7 +231,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
     }
   )
 
-  assert.strictEqual(open_pr, true)
+  expect(open_pr).toBe(true)
 })
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {
@@ -264,17 +263,17 @@ test('issue-comment-created starts pull request manual review for write commente
       }) => {
         pullRequestReviewCalled = true
         forwarded_trusted = trusted_default_branch
-        assert.ok(pr_reference)
-        assert.ok(deps?.get_pull_request_context)
+        expect.assert(pr_reference)
+        expect.assert(deps?.get_pull_request_context)
         const pr = await deps.get_pull_request_context(octokit, pr_reference)
-        assert.ok(pr)
+        expect.assert(pr)
         return submittedPullRequestRun(pr)
       }
     }
   )
 
-  assert.strictEqual(pullRequestReviewCalled, true)
-  assert.deepStrictEqual(forwarded_trusted, {
+  expect(pullRequestReviewCalled).toBe(true)
+  expect(forwarded_trusted).toStrictEqual({
     default_branch: 'main',
     head_sha: 'default-sha'
   })
@@ -310,25 +309,24 @@ test('issue-comment-created delegates PR context loading until after command adm
         on_admitted
       }) => {
         commandStarted = true
-        assert.strictEqual(contextLoaded, false)
-        assert.ok(pr_reference)
-        assert.ok(deps?.get_pull_request_context)
+        expect(contextLoaded).toBe(false)
+        expect.assert(pr_reference)
+        expect.assert(deps?.get_pull_request_context)
         on_admitted?.({
           run_id: 'run-pr-context',
           status: 'pending',
           replayed: false
         })
-        await assert.rejects(
-          deps.get_pull_request_context(octokit, pr_reference),
-          /GitHub PR lookup failed/
-        )
+        await expect(
+          deps.get_pull_request_context(octokit, pr_reference)
+        ).rejects.toThrow(/GitHub PR lookup failed/)
         return { run_id: 'run-pr-context' }
       }
     }
   )
 
-  assert.strictEqual(commandStarted, true)
-  assert.strictEqual(contextLoaded, true)
+  expect(commandStarted).toBe(true)
+  expect(contextLoaded).toBe(true)
 })
 
 test('an unrecognized mention logs at most once per repository per window', async () => {
@@ -336,14 +334,12 @@ test('an unrecognized mention logs at most once per repository per window', asyn
   // handler consults the throttle before logging; here the throttle is driven directly so the
   // assertion does not depend on wall-clock time or on other tests' traffic.
   const logged: Array<Record<string, unknown>> = []
-  const originalWrite = process.stdout.write.bind(process.stdout)
-  process.stdout.write = ((chunk: unknown) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((chunk: unknown) => {
     const text = String(chunk)
     if (text.includes('comment_mention_not_recognized')) {
       logged.push({ line: text })
     }
-    return true
-  }) as typeof process.stdout.write
+  })
 
   // The real throttle, with a frozen clock so "same window" is deterministic and independent of
   // other tests that may already have logged for these repositories.
@@ -373,12 +369,11 @@ test('an unrecognized mention logs at most once per repository per window', asyn
       }
     }
   } finally {
-    process.stdout.write = originalWrite
+    log.mockRestore()
   }
 
-  assert.strictEqual(
+  expect(
     logged.length,
-    2,
     'one diagnostic line per repository, not one per comment'
-  )
+  ).toBe(2)
 })

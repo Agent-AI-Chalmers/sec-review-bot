@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
@@ -30,20 +29,19 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
     run_id: runId,
     publish_context: {}
   })
-  assert.ok(admission.preparation_token)
+  expect.assert(admission.preparation_token)
   await store.submissionTransitions.markQueued(
     runId,
     admission.preparation_token,
     {}
   )
-  assert.strictEqual(
+  expect(
     await store.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
-    ),
-    true
-  )
+    )
+  ).toBe(true)
   return runId
 }
 
@@ -62,8 +60,8 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
     const work = await pending
     const elapsed = Date.now() - started
 
-    assert.strictEqual(work?.run_id, runId)
-    assert.ok(
+    expect(work?.run_id).toBe(runId)
+    expect.assert(
       elapsed < 5_000,
       `the claim should have returned early, took ${elapsed}ms`
     )
@@ -81,8 +79,11 @@ test('a waiting claim gives up when its wait elapses', async () => {
     const work = await store.publicationClaims.claimNext(800)
     const elapsed = Date.now() - started
 
-    assert.strictEqual(work, null)
-    assert.ok(elapsed >= 700, `the claim should have waited, took ${elapsed}ms`)
+    expect(work).toBe(null)
+    expect.assert(
+      elapsed >= 700,
+      `the claim should have waited, took ${elapsed}ms`
+    )
   } finally {
     await store.close()
   }

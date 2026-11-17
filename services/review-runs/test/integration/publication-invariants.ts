@@ -1,8 +1,8 @@
+import { expect } from 'vitest'
 // The publication axis stores a copy of its strongest step state, re-derived by every step write.
 // A write path that forgot the re-derivation would leave the copy stale while every edge it
 // recorded still looked legal, so integration tests compare the stored axis with its steps after
 // each test instead of trusting each path to remember.
-import assert from 'node:assert/strict'
 import type { Pool } from 'pg'
 
 /** Assert that every live publication of these connectors equals the strongest state of its
@@ -32,9 +32,8 @@ export async function assertPublicationAxesFollowSteps(
      GROUP BY p.run_id, p.status`,
     [connectorIds]
   )
-  assert.deepStrictEqual(
+  expect(
     drift.rows.filter((row) => row.stored !== row.derived),
-    [],
     'a live publication axis must equal the strongest state of its steps'
-  )
+  ).toStrictEqual([])
 }

@@ -4,8 +4,7 @@
 // comment) and died before recording it. The step then runs out of attempts. Without
 // reconciliation the publication reports a failure while the issue or comment is on GitHub, so
 // the requester is told nothing was published.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handleRepositoryReviewRun } from '../../../src/reviews/repositories/publish.js'
 import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
@@ -174,14 +173,13 @@ test('an exhausted summary issue step is settled from the existing summary issue
   })
   await runPublish(harness)
 
-  assert.deepStrictEqual(harness.settles, [
+  expect(harness.settles).toStrictEqual([
     { stepKey: 'repository:summary-issue', found: { remote: { id: 17 } } }
   ])
-  assert.deepStrictEqual(
+  expect(
     harness.postedIssues,
-    [],
     'a settled step must not create a second summary issue'
-  )
+  ).toStrictEqual([])
 })
 
 test('an exhausted summary comment step is settled from the comment already posted', async () => {
@@ -192,15 +190,14 @@ test('an exhausted summary comment step is settled from the comment already post
   })
   await runPublish(harness)
 
-  assert.deepStrictEqual(harness.settles, [
+  expect(harness.settles).toStrictEqual([
     {
       stepKey: 'repository:summary-comment',
       found: { remote: { id: 55, url: 'https://example.test/c/55' } }
     }
   ])
-  assert.deepStrictEqual(
+  expect(
     harness.postedComments,
-    [],
     'a settled step must not post the summary comment again'
-  )
+  ).toStrictEqual([])
 })

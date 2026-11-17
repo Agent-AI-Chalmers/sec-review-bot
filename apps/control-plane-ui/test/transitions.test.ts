@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Run, RunEvent } from '../browser/features/runs/api.js'
 import {
@@ -41,10 +40,9 @@ test('transitions exclude synthetic initialization events', () => {
     to_status: 'pending'
   })
   const actual = event({ event_id: 3 })
-  assert.deepStrictEqual(
-    actualTransitions([initial, actual]).map((candidate) => candidate.event_id),
-    [3]
-  )
+  expect(
+    actualTransitions([initial, actual]).map((candidate) => candidate.event_id)
+  ).toStrictEqual([3])
 })
 
 test('the default axis follows the latest actual transition', () => {
@@ -71,8 +69,8 @@ test('the default axis follows the latest actual transition', () => {
       occurred_at: '2026-10-28T10:00:02.000Z'
     })
   ]
-  assert.strictEqual(latestTransitionAxis(events), 'execution')
-  assert.strictEqual(latestTransitionAxis([]), 'execution')
+  expect(latestTransitionAxis(events)).toBe('execution')
+  expect(latestTransitionAxis([])).toBe('execution')
 })
 
 test('a transition lasts until the next event on the same axis', () => {
@@ -88,24 +86,22 @@ test('a transition lasts until the next event on the same axis', () => {
     to_status: 'running',
     occurred_at: '2026-10-28T10:00:05.000Z'
   })
-  assert.deepStrictEqual(
+  expect(
     transitionDuration(
       first,
       [first, second],
       run(),
       Date.parse('2026-10-28T10:00:10.000Z')
-    ),
-    { kind: 'duration', ms: 5000 }
-  )
-  assert.deepStrictEqual(
+    )
+  ).toStrictEqual({ kind: 'duration', ms: 5000 })
+  expect(
     transitionDuration(
       second,
       [first, second],
       run(),
       Date.parse('2026-10-28T10:00:10.000Z')
-    ),
-    { kind: 'duration', ms: 5000 }
-  )
+    )
+  ).toStrictEqual({ kind: 'duration', ms: 5000 })
 })
 
 test('a step transition lasts until the next event of the same step', () => {
@@ -123,19 +119,18 @@ test('a step transition lasts until the next event of the same step', () => {
   const comment = step(1, 'comment', '2026-10-28T10:00:00.000Z')
   const review = step(2, 'review', '2026-10-28T10:00:02.000Z')
   const commentDone = step(3, 'comment', '2026-10-28T10:00:07.000Z')
-  assert.deepStrictEqual(
+  expect(
     transitionDuration(
       comment,
       [comment, review, commentDone],
       run(),
       Date.parse('2026-10-28T10:01:00.000Z')
-    ),
-    { kind: 'duration', ms: 7000 }
-  )
+    )
+  ).toStrictEqual({ kind: 'duration', ms: 7000 })
 })
 
 test('a step event opens its axis diagram', () => {
-  assert.strictEqual(
+  expect(
     latestTransitionAxis([
       event({ event_id: 1, occurred_at: '2026-10-28T10:00:00.000Z' }),
       event({
@@ -146,9 +141,8 @@ test('a step event opens its axis diagram', () => {
         to_status: 'running',
         occurred_at: '2026-10-28T10:00:05.000Z'
       })
-    ]),
-    'publication'
-  )
+    ])
+  ).toBe('publication')
 })
 
 test('a terminal transition has no growing duration', () => {
@@ -158,7 +152,7 @@ test('a terminal transition has no growing duration', () => {
     to_status: 'succeeded',
     occurred_at: '2026-10-28T10:00:05.000Z'
   })
-  assert.deepStrictEqual(
+  expect(
     transitionDuration(
       terminal,
       [terminal],
@@ -166,17 +160,16 @@ test('a terminal transition has no growing duration', () => {
         execution: { finished_at: '2026-10-28T10:00:06.000Z' }
       } as Partial<Run>),
       Date.parse('2026-10-28T10:00:10.000Z')
-    ),
-    { kind: 'final' }
-  )
+    )
+  ).toStrictEqual({ kind: 'final' })
 })
 
 test('transition explanations come from the state-machine edge', () => {
-  assert.strictEqual(transitionExplanation(event({}), 'en'), 'input submitted')
+  expect(transitionExplanation(event({}), 'en')).toBe('input submitted')
 })
 
 test('transitions use a twelve-row page', () => {
-  assert.strictEqual(TRANSITIONS_PAGE_SIZE, 12)
+  expect(TRANSITIONS_PAGE_SIZE).toBe(12)
 })
 
 test('operator conclusions retain their reason while absent and unknown reasons stay generic', async () => {
@@ -197,7 +190,7 @@ test('operator conclusions retain their reason while absent and unknown reasons 
         { ...base, reason_code: reason },
         language
       )
-      assert.ok(explanation)
+      expect.assert(explanation)
       explanations.add(explanation)
       const machine = stateMachine('preparation', language)
       const edge = machine.transitions.find(
@@ -206,24 +199,23 @@ test('operator conclusions retain their reason while absent and unknown reasons 
           item.to === 'failed' &&
           item.reason === reason
       )
-      assert.ok(edge)
-      assert.equal(edgeLabel(machine, edge), explanation)
+      expect.assert(edge)
+      expect(edgeLabel(machine, edge)).toBe(explanation)
     }
-    assert.equal(explanations.size, 2)
+    expect(explanations.size).toBe(2)
     // Every transition on this pair names a reason, so an absent or unknown reason identifies
     // none of the operator decisions: the explanation describes the reached state instead of
     // guessing a decision.
     const reached = stateMachine('preparation', language).details.failed
       ?.summary
-    assert.ok(reached)
-    assert.ok(!explanations.has(reached))
-    assert.equal(transitionExplanation(base, language), reached)
-    assert.equal(
+    expect.assert(reached)
+    expect.assert(!explanations.has(reached))
+    expect(transitionExplanation(base, language)).toBe(reached)
+    expect(
       transitionExplanation(
         { ...base, reason_code: 'UNKNOWN_REASON' },
         language
-      ),
-      reached
-    )
+      )
+    ).toBe(reached)
   }
 })

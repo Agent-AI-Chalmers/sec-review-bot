@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import Fastify from 'fastify'
 import { Pool } from 'pg'
 
@@ -49,7 +48,7 @@ test('an axis row cannot be written under a connector the trunk does not own', a
       'preparations',
       'publications'
     ] as const) {
-      await assert.rejects(
+      await expect(
         pool.query(
           `INSERT INTO ${table} (run_id, connector_id, status${
             table === 'publications'
@@ -66,31 +65,28 @@ test('an axis row cannot be written under a connector the trunk does not own', a
           })`,
           [runId]
         ),
-        /violates foreign key constraint/,
         `${table} must reject a connector its trunk does not own`
-      )
+      ).rejects.toThrow(/violates foreign key constraint/)
     }
     // The two append/progress tables carry the same connector fence. They are not lifecycle
     // axes, but both are read with a connector filter (`listPublicationSteps`, `listEvents`), so
     // a row under the wrong connector would disappear from the run instead of being rejected.
-    await assert.rejects(
+    await expect(
       pool.query(
         `INSERT INTO publication_steps (connector_id, run_id, step_key, status)
          VALUES ('intruder', $1, 'step', 'pending')`,
         [runId]
       ),
-      /violates foreign key constraint/,
       'publication_steps must reject a connector its trunk does not own'
-    )
-    await assert.rejects(
+    ).rejects.toThrow(/violates foreign key constraint/)
+    await expect(
       pool.query(
         `INSERT INTO review_run_events (run_id, connector_id, axis, to_status)
          VALUES ($1, 'intruder', 'execution', 'pending')`,
         [runId]
       ),
-      /violates foreign key constraint/,
       'review_run_events must reject a connector its trunk does not own'
-    )
+    ).rejects.toThrow(/violates foreign key constraint/)
   } finally {
     await pool.end()
     await store.close()
@@ -114,7 +110,7 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     // A terminal preparation failure is what creates the notice row.
     await store.preparations.fail(runId, admission.preparation_token, {
       code: 'REVIEW_START_FAILED',
@@ -125,20 +121,19 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       [runId]
     )
     const sourceEventId = source.rows[0]?.source_event_id
-    assert.ok(sourceEventId)
+    expect.assert(sourceEventId)
     // Clear the real notice so the insert below cannot fail on the primary key; the connector is
     // then the only thing left that can reject it.
     await pool.query('DELETE FROM run_notices WHERE run_id=$1', [runId])
-    await assert.rejects(
+    await expect(
       pool.query(
         `INSERT INTO run_notices
            (run_id, connector_id, source_event_id, status, kind, axis)
          VALUES ($1, 'intruder', $2, 'pending', 'failure', 'preparation')`,
         [runId, sourceEventId]
       ),
-      /violates foreign key constraint/,
       'a notice must not name a connector its run does not belong to'
-    )
+    ).rejects.toThrow(/violates foreign key constraint/)
 
     // The reason this matters: the notice is joined on connector_id, so a row under another
     // connector is simply not found and the notice reads as absent — a notice that
@@ -157,16 +152,13 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       'SELECT connector_id FROM run_notices WHERE run_id=$1',
       [runId]
     )
-    assert.strictEqual(
-      stored.rowCount,
-      0,
-      'the wrong-connector notice was never stored'
+    expect(stored.rowCount, 'the wrong-connector notice was never stored').toBe(
+      0
     )
-    assert.deepStrictEqual(
+    expect(
       (await store.queries.getRun(runId))?.notices,
-      [],
       'and so the run reports no notice rather than a phantom one'
-    )
+    ).toStrictEqual([])
   } finally {
     await pool.end()
     await store.close()
@@ -193,11 +185,11 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'SELECT status, started_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
       [runId]
     )
-    assert.strictEqual(executions.rowCount, 1)
-    assert.strictEqual(executions.rows[0].status, 'pending')
-    assert.strictEqual(executions.rows[0].started_at, null)
-    assert.strictEqual(executions.rows[0].claim_token, null)
-    assert.strictEqual(executions.rows[0].claimed_at, null)
+    expect(executions.rowCount).toBe(1)
+    expect(executions.rows[0].status).toBe('pending')
+    expect(executions.rows[0].started_at).toBe(null)
+    expect(executions.rows[0].claim_token).toBe(null)
+    expect(executions.rows[0].claimed_at).toBe(null)
 
     // Publication input belongs to the publication axis, like the preparation and execution
     // inputs belong to theirs.
@@ -205,7 +197,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'SELECT input FROM publications WHERE run_id=$1',
       [runId]
     )
-    assert.deepStrictEqual(publication.rows[0].input, { repo: 'octo/example' })
+    expect(publication.rows[0].input).toStrictEqual({ repo: 'octo/example' })
 
     // The trunk keeps only identity and cross-axis fields; execution columns must not be there.
     const trunk = await pool.query(
@@ -225,7 +217,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'started_at',
       'publish_context'
     ]) {
-      assert.ok(
+      expect.assert(
         !trunkColumns.includes(moved),
         `review_runs must not keep execution column ${moved}`
       )
@@ -263,11 +255,11 @@ for (const axis of ['executions', 'preparations'] as const) {
       await pool.query(`DELETE FROM ${axis} WHERE run_id=$1`, [runId])
 
       const page = await store.queries.listRunsPage({ limit: 10 })
-      assert.ok(
+      expect.assert(
         page.dropped.some((entry) => entry.run_id === runId),
         'the corrupt run is reported in dropped'
       )
-      assert.ok(
+      expect.assert(
         !page.runs.some((run) => run.run_id === runId),
         'the corrupt run is not returned as a valid record'
       )
@@ -278,7 +270,7 @@ for (const axis of ['executions', 'preparations'] as const) {
         preparation_status: 'preparing',
         limit: 10
       })
-      assert.ok(
+      expect.assert(
         !matching.runs.some((run) => run.run_id === runId) &&
           matching.dropped.some((entry) => entry.run_id === runId),
         'a status filter reports the corrupt row instead of hiding it'
@@ -286,16 +278,15 @@ for (const axis of ['executions', 'preparations'] as const) {
       // The single-run read answers `null`, the same as an unknown id, so it reports the fault
       // through the callback rather than leaving corruption to look like a missing run.
       // An unknown id must NOT report corruption; only a stored row that fails to project does.
-      assert.strictEqual(
-        await store.queries.getRun(`run-unknown-${randomUUID()}`),
+      expect(await store.queries.getRun(`run-unknown-${randomUUID()}`)).toBe(
         null
       )
-      assert.ok(
+      expect.assert(
         !dropped.some((entry) => entry.run_id.startsWith('run-unknown-')),
         'an unknown run id is not reported as corruption'
       )
-      assert.strictEqual(await store.queries.getRun(runId), null)
-      assert.ok(
+      expect(await store.queries.getRun(runId)).toBe(null)
+      expect.assert(
         dropped.some((entry) => entry.run_id === runId),
         'the single-run read reports the corrupt row'
       )
@@ -329,9 +320,9 @@ test('Review Runs store initializes its schema and deduplicates ingress', async 
       ingress_key: ingressKey
     })
 
-    assert.strictEqual(first.created, true)
-    assert.strictEqual(replay.created, false)
-    assert.strictEqual(replay.record.run_id, first.record.run_id)
+    expect(first.created).toBe(true)
+    expect(replay.created).toBe(false)
+    expect(replay.record.run_id).toBe(first.record.run_id)
   } finally {
     await store.close()
   }
@@ -360,27 +351,27 @@ test('Review Runs readiness route rejects a schema ledger from a newer applicati
     })
     await app.ready()
     const ready = await app.inject({ method: 'GET', url: '/readyz' })
-    assert.strictEqual(ready.statusCode, 200)
-    assert.deepStrictEqual(ready.json(), { status: 'ok' })
+    expect(ready.statusCode).toBe(200)
+    expect(ready.json()).toStrictEqual({ status: 'ok' })
     await pool.query(
       `INSERT INTO schema_versions (version,name,checksum)
        VALUES (999999, 'newer_application', '0000000000000000000000000000000000000000000000000000000000000000')`
     )
     const unavailable = await app.inject({ method: 'GET', url: '/readyz' })
-    assert.strictEqual(unavailable.statusCode, 503)
-    assert.deepStrictEqual(unavailable.json(), { status: 'unavailable' })
+    expect(unavailable.statusCode).toBe(503)
+    expect(unavailable.json()).toStrictEqual({ status: 'unavailable' })
 
     await pool.query('DELETE FROM schema_versions WHERE version=999999')
     await pool.query('DELETE FROM schema_versions WHERE version=1')
     const missingSchema = await app.inject({ method: 'GET', url: '/readyz' })
-    assert.strictEqual(missingSchema.statusCode, 503)
-    assert.deepStrictEqual(missingSchema.json(), { status: 'unavailable' })
+    expect(missingSchema.statusCode).toBe(503)
+    expect(missingSchema.json()).toStrictEqual({ status: 'unavailable' })
 
     await pool.end()
     poolClosed = true
     const unavailablePool = await app.inject({ method: 'GET', url: '/readyz' })
-    assert.strictEqual(unavailablePool.statusCode, 503)
-    assert.deepStrictEqual(unavailablePool.json(), { status: 'unavailable' })
+    expect(unavailablePool.statusCode).toBe(503)
+    expect(unavailablePool.json()).toStrictEqual({ status: 'unavailable' })
   } finally {
     await app.close()
     if (!poolClosed) await store.close()
@@ -406,7 +397,7 @@ test('Review Runs store fences reads by connector', async () => {
       workflow: 'repository-review',
       publish_context: {}
     })
-    assert.strictEqual(await second.queries.getRun(runId), null)
+    expect(await second.queries.getRun(runId)).toBe(null)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -441,8 +432,8 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   try {
     const { runs: firstPage, next_cursor: cursor } =
       await restarted.queries.listRunsPage({ limit: 1 })
-    assert.strictEqual(firstPage.length, 1)
-    assert.ok(
+    expect(firstPage.length).toBe(1)
+    expect.assert(
       cursor,
       'a second run remains, so the first page must carry a cursor'
     )
@@ -451,14 +442,12 @@ test('run queries survive a fresh store connection and preserve stable paginatio
         limit: 1,
         cursor
       })
-    assert.strictEqual(secondPage.length, 1)
-    assert.notStrictEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
-    assert.strictEqual(finalCursor, null)
-    assert.strictEqual(
-      (await restarted.queries.getRun(runIds[0] ?? ''))?.execution_input
-        ?.secret,
-      true
-    )
+    expect(secondPage.length).toBe(1)
+    expect(secondPage[0]?.run_id).not.toBe(firstPage[0]?.run_id)
+    expect(finalCursor).toBe(null)
+    expect(
+      (await restarted.queries.getRun(runIds[0] ?? ''))?.execution_input?.secret
+    ).toBe(true)
   } finally {
     await restarted.close()
   }
@@ -477,7 +466,7 @@ test('run queries apply status filters before pagination limits', async () => {
       workflow: 'issue-review',
       publish_context: {}
     })
-    assert.ok(failed.preparation_token)
+    expect.assert(failed.preparation_token)
     await store.preparations.fail(failedRunId, failed.preparation_token, {
       code: 'PREPARATION_FAILED',
       message: 'failed before newer runs were admitted'
@@ -497,10 +486,7 @@ test('run queries apply status filters before pagination limits', async () => {
       execution_status: 'skipped',
       limit: 1
     })
-    assert.deepStrictEqual(
-      skippedRuns.map((run) => run.run_id),
-      [failedRunId]
-    )
+    expect(skippedRuns.map((run) => run.run_id)).toStrictEqual([failedRunId])
 
     // `preparation_status` filters on the redacted preparation summary's state, which the
     // run record exposes alongside the two status axes. The two waiting runs are still
@@ -509,17 +495,16 @@ test('run queries apply status filters before pagination limits', async () => {
       preparation_status: 'failed',
       limit: 10
     })
-    assert.deepStrictEqual(
-      failedPreparations.map((run) => run.run_id),
-      [failedRunId]
-    )
-    assert.strictEqual(failedPreparations[0]?.preparation?.status, 'failed')
+    expect(failedPreparations.map((run) => run.run_id)).toStrictEqual([
+      failedRunId
+    ])
+    expect(failedPreparations[0]?.preparation?.status).toBe('failed')
     const { runs: preparingPreparations } = await store.queries.listRunsPage({
       preparation_status: 'preparing',
       limit: 10
     })
-    assert.strictEqual(preparingPreparations.length, 2)
-    assert.ok(
+    expect(preparingPreparations.length).toBe(2)
+    expect.assert(
       preparingPreparations.every(
         (run) => run.preparation?.status === 'preparing'
       )
@@ -528,8 +513,8 @@ test('run queries apply status filters before pagination limits', async () => {
       source_platform: 'github',
       limit: 10
     })
-    assert.strictEqual(githubRuns.length, 3)
-    assert.ok(githubRuns.every((run) => run.source_platform === 'github'))
+    expect(githubRuns.length).toBe(3)
+    expect.assert(githubRuns.every((run) => run.source_platform === 'github'))
   } finally {
     await store.close()
   }
@@ -568,15 +553,14 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       await store.queries.listRunsPage({
         limit: 1
       })
-    assert.strictEqual(firstPage.length, 1)
-    assert.ok(cursor)
+    expect(firstPage.length).toBe(1)
+    expect.assert(cursor)
     const { runs: secondPage } = await store.queries.listRunsPage({
       limit: 1,
       cursor
     })
-    assert.strictEqual(secondPage.length, 1)
-    assert.deepStrictEqual(
-      [firstPage[0]?.run_id, secondPage[0]?.run_id].sort(),
+    expect(secondPage.length).toBe(1)
+    expect([firstPage[0]?.run_id, secondPage[0]?.run_id].sort()).toStrictEqual(
       [...runIds].sort()
     )
   } finally {
@@ -606,7 +590,7 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
         run_id: runId,
         publish_context: {}
       })
-      assert.ok(admission.preparation_token)
+      expect.assert(admission.preparation_token)
       await store.submissionTransitions.markQueued(
         runId,
         admission.preparation_token,
@@ -621,28 +605,24 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
     )
     try {
       const page = await store.queries.listRunsPage({ limit: 10 })
-      assert.deepStrictEqual(
+      expect(
         page.dropped.map((entry) => entry.run_id),
-        [poisonedId],
         'the unrepresentable row is reported'
-      )
-      assert.deepStrictEqual(
+      ).toStrictEqual([poisonedId])
+      expect(
         page.runs.map((entry) => entry.run_id),
-        [healthyId],
         'the healthy row is still listed'
-      )
+      ).toStrictEqual([healthyId])
 
       const active = await store.queries.listActiveRuns()
-      assert.deepStrictEqual(
+      expect(
         active.dropped.map((entry) => entry.run_id),
-        [poisonedId],
         'the poisoned active run is reported, not thrown'
-      )
-      assert.deepStrictEqual(
+      ).toStrictEqual([poisonedId])
+      expect(
         active.runs.map((entry) => entry.run_id),
-        [healthyId],
         'the pass still receives the healthy active run'
-      )
+      ).toStrictEqual([healthyId])
     } finally {
       await pool.end()
     }
@@ -661,12 +641,13 @@ test('a submission for an unknown run is a 404, not a server fault', async () =>
   })
   await store.initialize()
   try {
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.markQueued(
         `missing-${randomUUID()}`,
         randomUUID(),
         {}
-      ),
+      )
+    ).rejects.toSatisfy(
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
@@ -697,15 +678,14 @@ test('an execution may hold a recovery claim only while uncertain', async () => 
       publish_context: {}
     })
     // A token on `pending` is rejected.
-    await assert.rejects(
+    await expect(
       pool.query(
         `UPDATE executions SET claim_token=$2, claimed_at=clock_timestamp()
          WHERE run_id=$1`,
         [runId, randomUUID()]
       ),
-      /violates check constraint/,
       'a pending execution must not carry a recovery claim'
-    )
+    ).rejects.toThrow(/violates check constraint/)
     // A token on `uncertain` is accepted: that is the state a recovery claims.
     await pool.query(
       `UPDATE executions SET status='uncertain' WHERE run_id=$1`,
@@ -717,14 +697,13 @@ test('an execution may hold a recovery claim only while uncertain', async () => 
       [runId, randomUUID()]
     )
     // Moving out of `uncertain` without clearing the token is rejected.
-    await assert.rejects(
+    await expect(
       pool.query(
         `UPDATE executions SET status='queued', started_at=clock_timestamp() WHERE run_id=$1`,
         [runId]
       ),
-      /violates check constraint/,
       'leaving uncertain must clear the recovery claim'
-    )
+    ).rejects.toThrow(/violates check constraint/)
   } finally {
     await pool.end()
     await store.close()

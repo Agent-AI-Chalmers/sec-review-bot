@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { extractIssueContext } from '../../src/github/issue-service.js'
 import { extractPullRequestContext } from '../../src/github/pull-request-service.js'
 import {
@@ -57,15 +56,14 @@ function prInput(): PullRequestPreparationInput {
 test('extracted issue input survives persistence with unknown logins and empty metadata', () => {
   const input = issueInput()
   const json: unknown = JSON.parse(JSON.stringify(input))
-  assert.deepStrictEqual(parseIssuePreparationInput(json), input)
+  expect(parseIssuePreparationInput(json)).toStrictEqual(input)
 })
 
 test('extracted PR snapshot survives persistence without changing its push window', () => {
   const input = prInput()
-  assert.deepStrictEqual(
-    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input))),
-    input
-  )
+  expect(
+    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))
+  ).toStrictEqual(input)
 })
 
 test('issue recovery rejects invalid event and policy values', () => {
@@ -79,10 +77,9 @@ test('issue recovery rejects invalid event and policy values', () => {
     ['open_pr', 'true'],
     ['open_pr', undefined]
   ]) {
-    assert.throws(
-      () => parseIssuePreparationInput({ ...issueInput(), [field!]: value }),
-      InvalidPreparationInputError
-    )
+    expect(() =>
+      parseIssuePreparationInput({ ...issueInput(), [field!]: value })
+    ).toThrow(InvalidPreparationInputError)
   }
 })
 
@@ -92,25 +89,22 @@ test('PR recovery validates references and policies before performing GitHub wor
     pr: undefined,
     pr_reference: { owner_login: 'octo', repo_name: 'example', pr_number: 7 }
   }
-  assert.deepStrictEqual(
-    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input))),
-    {
-      kind: input.kind,
-      pr_reference: input.pr_reference,
-      trusted_default_branch,
-      event_type: 'synchronize',
-      test_changes: null
-    }
-  )
+  expect(
+    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))
+  ).toStrictEqual({
+    kind: input.kind,
+    pr_reference: input.pr_reference,
+    trusted_default_branch,
+    event_type: 'synchronize',
+    test_changes: null
+  })
   for (const pr_number of ['7', null, 0, -1, 1.5]) {
-    assert.throws(
-      () =>
-        parsePullRequestPreparationInput({
-          ...input,
-          pr_reference: { ...input.pr_reference, pr_number }
-        }),
-      InvalidPreparationInputError
-    )
+    expect(() =>
+      parsePullRequestPreparationInput({
+        ...input,
+        pr_reference: { ...input.pr_reference, pr_number }
+      })
+    ).toThrow(InvalidPreparationInputError)
   }
   for (const changes of [
     { event_type: 'typo' },
@@ -118,20 +112,18 @@ test('PR recovery validates references and policies before performing GitHub wor
     { pr: null },
     { pr_reference: null }
   ]) {
-    assert.throws(
-      () => parsePullRequestPreparationInput({ ...input, ...changes }),
-      InvalidPreparationInputError
-    )
+    expect(() =>
+      parsePullRequestPreparationInput({ ...input, ...changes })
+    ).toThrow(InvalidPreparationInputError)
   }
 })
 
 test('old reference checkpoints recover their captured snapshot rather than the reference', () => {
   const input = prInput()
-  assert.deepStrictEqual(
+  expect(
     parsePullRequestPreparationInput({
       ...input,
       pr_reference: { owner_login: 'octo', repo_name: 'example', pr_number: 7 }
-    }),
-    input
-  )
+    })
+  ).toStrictEqual(input)
 })

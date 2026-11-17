@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Run, RunEvent } from '../browser/features/runs/api.js'
 import { parkedSince } from '../browser/features/runs/format.js'
@@ -24,7 +23,7 @@ const run = {
 test('a step parking after its axis does not move the axis park time', () => {
   // Step events share the publication axis. Taking a later step's park as the axis' would make
   // the run look as if it had waited for an operator for less time than it has.
-  assert.strictEqual(
+  expect(
     parkedSince(run, 'publication', [
       event({ event_id: 1, occurred_at: '2026-10-28T10:00:00.000Z' }),
       event({
@@ -39,19 +38,17 @@ test('a step parking after its axis does not move the axis park time', () => {
         from_status: 'uncertain',
         occurred_at: '2026-10-28T10:30:00.000Z'
       })
-    ]),
-    '2026-10-28T10:00:00.000Z'
-  )
+    ])
+  ).toBe('2026-10-28T10:00:00.000Z')
 })
 
 test('without an axis park event, the park time is the axis last write', () => {
-  assert.strictEqual(
+  expect(
     parkedSince(run, 'publication', [
       event({
         step_key: 'issue:first',
         occurred_at: '2026-10-28T10:30:00.000Z'
       })
-    ]),
-    '2026-10-28T11:00:00.000Z'
-  )
+    ])
+  ).toBe('2026-10-28T11:00:00.000Z')
 })

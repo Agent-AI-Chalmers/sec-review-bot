@@ -3,9 +3,8 @@
 // the difference on the wire, so a row type that claims `string` for such a column type-checks
 // and passes HTTP tests while the in-process value is still a Date. This file reads each surface
 // through the store itself and checks the runtime value, which is where that drift shows up.
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool } from 'pg'
 
@@ -31,15 +30,14 @@ function artifact(name: string, digestCharacter: string): ArtifactReference {
 }
 
 function assertIsoTimestamp(value: unknown, field: string): void {
-  assert.equal(typeof value, 'string', `${field} must be a string`)
-  assert.equal(
+  expect(typeof value, `${field} must be a string`).toBe('string')
+  expect(
     new Date(value as string).toISOString(),
-    value,
     `${field} must be a canonical ISO date-time`,
-  )
+  ).toBe(value)
 }
 
-await test('store reads return contract timestamps as ISO strings, not Dates', async () => {
+test('store reads return contract timestamps as ISO strings, not Dates', async () => {
   const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
   const administrator = new Pool({ connectionString: databaseUrl })
   await administrator.query(`create schema ${schema}`)

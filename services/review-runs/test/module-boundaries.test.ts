@@ -6,10 +6,9 @@
 //
 // This is a dependency check, not a source-text check: it reads each module's own import
 // statements to prove which files it depends on.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 const SRC = path.resolve(import.meta.dirname, '../src')
 const AXIS_STORES = [
@@ -37,13 +36,13 @@ test('single-axis stores do not depend on each other', () => {
     for (const other of AXIS_STORES) {
       if (other === store) continue
       const otherName = path.basename(other)
-      assert.ok(
+      expect.assert(
         !dependencies.includes(otherName),
         `${store} imports ${otherName}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
       )
     }
     // `review-run-store.ts` constructs the stores, so it must not be imported back.
-    assert.ok(
+    expect.assert(
       !dependencies.includes('review-run-store.ts'),
       `${store} imports review-run-store.ts, which constructs it`
     )
@@ -55,11 +54,11 @@ test('the process entry, HTTP surface, and runtime composition stay acyclic', ()
   const surface = importedModules('http/server-surface.ts')
   const runtime = importedModules('runtime/server-runtime.ts')
 
-  assert.ok(entry.includes('server-runtime.ts'))
-  assert.ok(runtime.includes('server-surface.ts'))
-  assert.ok(!runtime.includes('server.ts'))
-  assert.ok(!surface.includes('server.ts'))
-  assert.ok(!surface.includes('server-runtime.ts'))
+  expect.assert(entry.includes('server-runtime.ts'))
+  expect.assert(runtime.includes('server-surface.ts'))
+  expect.assert(!runtime.includes('server.ts'))
+  expect.assert(!surface.includes('server.ts'))
+  expect.assert(!surface.includes('server-runtime.ts'))
 
   for (const handler of [
     'http/read-route-handlers.ts',
@@ -67,21 +66,21 @@ test('the process entry, HTTP surface, and runtime composition stay acyclic', ()
     'http/admin-route-handlers.ts'
   ]) {
     const dependencies = importedModules(handler)
-    assert.ok(!dependencies.includes('server.ts'))
-    assert.ok(!dependencies.includes('server-surface.ts'))
-    assert.ok(!dependencies.includes('server-runtime.ts'))
+    expect.assert(!dependencies.includes('server.ts'))
+    expect.assert(!dependencies.includes('server-surface.ts'))
+    expect.assert(!dependencies.includes('server-runtime.ts'))
   }
 })
 
 test('operator decisions compose axis stores without creating a dependency cycle', () => {
   const dependencies = importedModules('persistence/operator-decision-store.ts')
-  assert.ok(dependencies.includes('preparation-store.ts') === false)
-  assert.ok(dependencies.includes('publication-store.ts'))
-  assert.ok(dependencies.includes('execution-store.ts'))
-  assert.ok(!dependencies.includes('review-run-store.ts'))
+  expect.assert(dependencies.includes('preparation-store.ts') === false)
+  expect.assert(dependencies.includes('publication-store.ts'))
+  expect.assert(dependencies.includes('execution-store.ts'))
+  expect.assert(!dependencies.includes('review-run-store.ts'))
 
   for (const store of AXIS_STORES) {
-    assert.ok(
+    expect.assert(
       !importedModules(store).includes('operator-decision-store.ts'),
       `${store} imports the cross-axis operator decision store`
     )
@@ -90,11 +89,11 @@ test('operator decisions compose axis stores without creating a dependency cycle
 
 test('the read model does not depend on write stores', () => {
   const dependencies = importedModules('persistence/review-run-queries.ts')
-  assert.ok(dependencies.includes('run-record-projection.ts'))
-  assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(!dependencies.includes('review-run-store.ts'))
+  expect.assert(dependencies.includes('run-record-projection.ts'))
+  expect.assert(dependencies.includes('review-run-events.ts'))
+  expect.assert(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
-    assert.ok(
+    expect.assert(
       !dependencies.includes(path.basename(store)),
       `review-run-queries.ts imports write store ${store}`
     )
@@ -105,12 +104,12 @@ test('submission transitions compose axes without depending on axis stores', () 
   const dependencies = importedModules(
     'persistence/submission-transition-store.ts'
   )
-  assert.ok(dependencies.includes('publication-abandon.ts'))
-  assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(dependencies.includes('run-notices.ts'))
-  assert.ok(!dependencies.includes('review-run-store.ts'))
+  expect.assert(dependencies.includes('publication-abandon.ts'))
+  expect.assert(dependencies.includes('review-run-events.ts'))
+  expect.assert(dependencies.includes('run-notices.ts'))
+  expect.assert(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
-    assert.ok(
+    expect.assert(
       !dependencies.includes(path.basename(store)),
       `submission-transition-store.ts imports axis store ${store}`
     )
@@ -119,21 +118,21 @@ test('submission transitions compose axes without depending on axis stores', () 
 
 test('publication claims stay separate from single-axis publication writes', () => {
   const dependencies = importedModules('persistence/publication-claim-store.ts')
-  assert.ok(dependencies.includes('run-record-projection.ts'))
-  assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(!dependencies.includes('publication-store.ts'))
-  assert.ok(!dependencies.includes('review-run-store.ts'))
+  expect.assert(dependencies.includes('run-record-projection.ts'))
+  expect.assert(dependencies.includes('review-run-events.ts'))
+  expect.assert(!dependencies.includes('publication-store.ts'))
+  expect.assert(!dependencies.includes('review-run-store.ts'))
 })
 
 test('run admission owns aggregate creation without importing axis stores', () => {
   const dependencies = importedModules(
     'persistence/review-run-admission-store.ts'
   )
-  assert.ok(dependencies.includes('run-record-projection.ts'))
-  assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(!dependencies.includes('review-run-store.ts'))
+  expect.assert(dependencies.includes('run-record-projection.ts'))
+  expect.assert(dependencies.includes('review-run-events.ts'))
+  expect.assert(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
-    assert.ok(
+    expect.assert(
       !dependencies.includes(path.basename(store)),
       `review-run-admission-store.ts imports axis store ${store}`
     )

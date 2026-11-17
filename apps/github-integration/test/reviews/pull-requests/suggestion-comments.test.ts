@@ -3,8 +3,7 @@
 // The subtle rule is the multi-line one: GitHub wants `start_line`/`start_side` only for a span
 // that covers more than one line, and rejects a review that repeats the single-line value. Getting
 // this wrong turns every single-line suggestion into a failed review.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { publishPullRequestSuggestionReview } from '../../../src/reviews/pull-requests/suggestion-comments.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
@@ -31,7 +30,7 @@ function postedReview(
       request.method === 'POST' &&
       new URL(request.url).pathname.endsWith('/pulls/7/reviews')
   )
-  assert.ok(posted, 'a review must be posted')
+  expect.assert(posted, 'a review must be posted')
   return posted.body as { comments: Array<Record<string, unknown>> }
 }
 
@@ -41,7 +40,7 @@ function clients() {
     if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
     if (pathname.endsWith('/reviews') && method === 'POST') {
       const payload = (body ?? {}) as { comments?: unknown }
-      assert.ok(Array.isArray(payload.comments))
+      expect.assert(Array.isArray(payload.comments))
       return githubJson({
         id: 11,
         html_url: 'https://example.test/review/11',
@@ -72,7 +71,7 @@ test('a single-line suggestion omits start_line and start_side', async () => {
   })
 
   const review = postedReview(requests)
-  assert.deepStrictEqual(review.comments, [
+  expect(review.comments).toStrictEqual([
     { path: 'src/app.ts', body: 'suggestion', line: 10, side: 'RIGHT' }
   ])
 })
@@ -97,7 +96,7 @@ test('a multi-line suggestion sends start_line and a matching start_side', async
   })
 
   const review = postedReview(requests)
-  assert.deepStrictEqual(review.comments, [
+  expect(review.comments).toStrictEqual([
     {
       path: 'src/app.ts',
       body: 'suggestion',
@@ -135,12 +134,12 @@ test('reports the review and one entry per candidate', async () => {
     assert_publication_claim: async () => {}
   })
 
-  assert.strictEqual(result.review_id, 11)
-  assert.strictEqual(result.html_url, 'https://example.test/review/11')
-  assert.strictEqual(result.state, 'COMMENTED')
-  assert.strictEqual(result.reused, false)
-  assert.strictEqual(result.count, 2)
-  assert.deepStrictEqual(result.comments, [
+  expect(result.review_id).toBe(11)
+  expect(result.html_url).toBe('https://example.test/review/11')
+  expect(result.state).toBe('COMMENTED')
+  expect(result.reused).toBe(false)
+  expect(result.count).toBe(2)
+  expect(result.comments).toStrictEqual([
     { path: 'a.ts', line: 1, start_line: 1 },
     { path: 'b.ts', line: 5, start_line: 3 }
   ])
@@ -174,7 +173,7 @@ test('reuses an existing marked review instead of posting another', async () => 
     assert_publication_claim: async () => {}
   })
 
-  assert.strictEqual(result.reused, true)
-  assert.strictEqual(result.review_id, 99)
-  assert.ok(requests.every((request) => request.url.includes('/reviews')))
+  expect(result.reused).toBe(true)
+  expect(result.review_id).toBe(99)
+  expect.assert(requests.every((request) => request.url.includes('/reviews')))
 })

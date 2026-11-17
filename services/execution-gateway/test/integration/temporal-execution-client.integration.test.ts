@@ -1,9 +1,8 @@
 import { REPOSITORY_ROOT as repositoryDirectory } from '../project-paths.js'
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   ExecutionRunConflictError,
@@ -32,7 +31,7 @@ async function issueReviewInput(): Promise<IssueReviewInput> {
   ) as IssueReviewInput
 }
 
-await test('Temporal client submits and identifies execution requests', async () => {
+test('Temporal client submits and identifies execution requests', async () => {
   process.env.TEMPORAL_ADDRESS = temporalAddress
   const client = await TemporalExecutionClient.connect()
   const runId = `gateway-integration-${crypto.randomUUID()}`
@@ -45,21 +44,20 @@ await test('Temporal client submits and identifies execution requests', async ()
 
   try {
     const created = await client.start(request)
-    assert.equal(created.run_id, runId)
-    assert.equal(created.workflow, request.workflow)
-    assert.equal(created.status, 'running')
+    expect(created.run_id).toBe(runId)
+    expect(created.workflow).toBe(request.workflow)
+    expect(created.status).toBe('running')
 
-    assert.deepEqual(await client.start(request), created)
-    assert.deepEqual(await client.get(runId), created)
-    assert.equal(await client.get(`missing-${crypto.randomUUID()}`), undefined)
+    expect(await client.start(request)).toStrictEqual(created)
+    expect(await client.get(runId)).toStrictEqual(created)
+    expect(await client.get(`missing-${crypto.randomUUID()}`)).toBe(undefined)
 
-    assert.deepEqual(
+    expect(
       await client.start({ ...request, timeout_seconds: 120 }),
-      created,
       'Gateway timeout policy is not part of the caller request identity',
-    )
+    ).toStrictEqual(created)
 
-    await assert.rejects(
+    await expect(
       client.start({
         ...request,
         input: {
@@ -67,8 +65,7 @@ await test('Temporal client submits and identifies execution requests', async ()
           setup_declaration: 'steps:\n  - run: echo changed\n',
         },
       }),
-      ExecutionRunConflictError,
-    )
+    ).rejects.toThrow(ExecutionRunConflictError)
   } finally {
     await client.close()
   }

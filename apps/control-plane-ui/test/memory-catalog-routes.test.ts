@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import test, { type TestContext } from 'node:test'
+import { expect, test, type TestContext } from 'vitest'
 
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
 import { loginCookie } from './server-support.js'
@@ -11,7 +10,7 @@ test('memory writes require configured catalog access', async () => {
     reviewRuns.listen(0, '127.0.0.1', resolve)
   )
   const reviewAddress = reviewRuns.address()
-  assert(reviewAddress && typeof reviewAddress === 'object')
+  expect.assert(reviewAddress && typeof reviewAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${reviewAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -19,7 +18,7 @@ test('memory writes require configured catalog access', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -40,10 +39,10 @@ test('memory writes require configured catalog access', async () => {
         method,
         headers: { cookie, origin: base }
       })
-      assert.equal(obsolete.status, 404)
+      expect(obsolete.status).toBe(404)
     }
-    assert.strictEqual(response.status, 503)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(503)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_catalog_unavailable'
     })
   } finally {
@@ -63,7 +62,7 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -73,7 +72,7 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -83,11 +82,10 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
       '/api/memory/versions?limit=50',
       '/api/memory/versions/2'
     ])
-      assert.strictEqual(
-        (await fetch(`${base}${path}`, { headers: { cookie } })).status,
-        200
-      )
-    assert.deepStrictEqual(paths, [
+      expect(
+        (await fetch(`${base}${path}`, { headers: { cookie } })).status
+      ).toBe(200)
+    expect(paths).toStrictEqual([
       '/v1/memory-tree',
       '/v1/overview?range=90d',
       '/v1/memory-tree/versions?limit=50',
@@ -118,13 +116,13 @@ test('memory edit creates a version while restore only moves the pointer', async
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const reviewRuns = createServer((_request, response) => response.end('{}'))
   await new Promise<void>((resolve) =>
     reviewRuns.listen(0, '127.0.0.1', resolve)
   )
   const reviewAddress = reviewRuns.address()
-  assert(reviewAddress && typeof reviewAddress === 'object')
+  expect.assert(reviewAddress && typeof reviewAddress === 'object')
   let uploads = 0
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${reviewAddress.port}`,
@@ -141,12 +139,12 @@ test('memory edit creates a version while restore only moves the pointer', async
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const headers = { cookie, origin: base, 'content-type': 'application/json' }
-    assert.strictEqual(
+    expect(
       (
         await fetch(`${base}/api/memory/edit`, {
           method: 'POST',
@@ -157,25 +155,21 @@ test('memory edit creates a version while restore only moves the pointer', async
             files: { 'MEMORY.md': '# Memory\n' }
           })
         })
-      ).status,
-      201
-    )
-    assert.strictEqual(uploads, 1)
-    assert.deepStrictEqual(
-      requests.map(({ path }) => path),
-      [
-        '/v1/memory-tree/versions/publications/reserve',
-        '/v1/memory-tree/versions/publications/confirm',
-        '/v1/memory-tree/versions'
-      ]
-    )
-    assert.deepStrictEqual(requests[0]!.body, requests[1]!.body)
-    assert.deepStrictEqual(requests[0]!.body, requests[2]!.body)
+      ).status
+    ).toBe(201)
+    expect(uploads).toBe(1)
+    expect(requests.map(({ path }) => path)).toStrictEqual([
+      '/v1/memory-tree/versions/publications/reserve',
+      '/v1/memory-tree/versions/publications/confirm',
+      '/v1/memory-tree/versions'
+    ])
+    expect(requests[0]!.body).toStrictEqual(requests[1]!.body)
+    expect(requests[0]!.body).toStrictEqual(requests[2]!.body)
     const editSource = requests[0]!.body.source as Record<string, unknown>
-    assert.strictEqual(editSource.actor, undefined)
-    assert.strictEqual(editSource.operation_id, 'edit-1')
+    expect(editSource.actor).toBe(undefined)
+    expect(editSource.operation_id).toBe('edit-1')
 
-    assert.strictEqual(
+    expect(
       (
         await fetch(`${base}/api/memory/restore`, {
           method: 'POST',
@@ -186,12 +180,11 @@ test('memory edit creates a version while restore only moves the pointer', async
             restored_version: 1
           })
         })
-      ).status,
-      201
-    )
-    assert.strictEqual(uploads, 1, 'restore must not publish another object')
-    assert.strictEqual(requests[3]!.path, '/v1/memory-tree/restore')
-    assert.deepStrictEqual(requests[3]!.body, {
+      ).status
+    ).toBe(201)
+    expect(uploads, 'restore must not publish another object').toBe(1)
+    expect(requests[3]!.path).toBe('/v1/memory-tree/restore')
+    expect(requests[3]!.body).toStrictEqual({
       operation_id: 'restore-1',
       expected_active_version: 3,
       restored_version: 1
@@ -215,7 +208,7 @@ test('memory writes classify an unreachable catalog as an upstream failure', asy
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -224,8 +217,8 @@ test('memory writes classify an unreachable catalog as an upstream failure', asy
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ operation_id: 'op-1', expected_version: 1 })
     })
-    assert.strictEqual(response.status, 502)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_catalog_unavailable'
     })
   } finally {
@@ -237,7 +230,7 @@ test('memory writes classify a catalog timeout separately', async () => {
   const catalog = createServer(() => undefined)
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -248,7 +241,7 @@ test('memory writes classify a catalog timeout separately', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -257,8 +250,8 @@ test('memory writes classify a catalog timeout separately', async () => {
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ operation_id: 'op-1', expected_version: 1 })
     })
-    assert.strictEqual(response.status, 504)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(504)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_catalog_timeout'
     })
   } finally {
@@ -278,7 +271,7 @@ test('memory reads use their own timeout instead of the Review Runs timeout', as
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -290,15 +283,15 @@ test('memory reads use their own timeout instead of the Review Runs timeout', as
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/memory/tree`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 200)
-    assert.deepStrictEqual(await response.json(), {})
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual({})
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -345,9 +338,11 @@ async function memoryWriteFixture(
     )
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise<void>((resolve) => catalog.close(() => resolve())))
+  t.onTestFinished(
+    () => new Promise<void>((resolve) => catalog.close(() => resolve()))
+  )
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -359,10 +354,9 @@ async function memoryWriteFixture(
       : {
           artifactStore: {
             getObject: async (): Promise<never> =>
-              assert.fail('writes must not read stored objects'),
+              expect.unreachable('writes must not read stored objects'),
             putMemoryArtifact: async (): Promise<void> => {
-              assert.equal(
-                writes.at(-1)?.path,
+              expect(writes.at(-1)?.path).toBe(
                 '/v1/memory-tree/versions/publications/reserve'
               )
               uploads += 1
@@ -372,9 +366,11 @@ async function memoryWriteFixture(
         })
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise<void>((resolve) => ui.close(() => resolve())))
+  t.onTestFinished(
+    () => new Promise<void>((resolve) => ui.close(() => resolve()))
+  )
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   const cookie = await loginCookie(base)
   return {
@@ -422,12 +418,12 @@ test('memory writes reject malformed JSON and non-object JSON without side effec
       'false'
     ]) {
       const response = await fixture.post(action, body)
-      assert.equal(response.status, 400, `${action}: ${body}`)
-      assert.deepEqual(await response.json(), { error: 'invalid_request' })
+      expect(response.status, `${action}: ${body}`).toBe(400)
+      expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
     }
   }
-  assert.deepEqual(fixture.writes, [])
-  assert.equal(fixture.uploads(), 0)
+  expect(fixture.writes).toStrictEqual([])
+  expect(fixture.uploads()).toBe(0)
 })
 
 test('memory writes require valid operation IDs before any Catalog or storage mutation', async (t) => {
@@ -448,16 +444,15 @@ test('memory writes require valid operation IDs before any Catalog or storage mu
         action,
         JSON.stringify({ ...valid, operation_id })
       )
-      assert.equal(
+      expect(
         response.status,
-        400,
         `${action}: ${JSON.stringify(operation_id)}`
-      )
-      assert.deepEqual(await response.json(), { error: 'invalid_request' })
+      ).toBe(400)
+      expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
     }
   }
-  assert.deepEqual(fixture.writes, [])
-  assert.equal(fixture.uploads(), 0)
+  expect(fixture.writes).toStrictEqual([])
+  expect(fixture.uploads()).toBe(0)
 })
 
 test('memory writes reject missing, coerced, fractional, negative, and unsafe counters', async (t) => {
@@ -484,16 +479,15 @@ test('memory writes reject missing, coerced, fractional, negative, and unsafe co
         action,
         JSON.stringify({ ...validMemoryWrites[action], [field]: value })
       )
-      assert.equal(
+      expect(
         response.status,
-        400,
         `${action}.${field}: ${JSON.stringify(value)}`
-      )
-      assert.deepEqual(await response.json(), { error: 'invalid_request' })
+      ).toBe(400)
+      expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
     }
   }
-  assert.deepEqual(fixture.writes, [])
-  assert.equal(fixture.uploads(), 0)
+  expect(fixture.writes).toStrictEqual([])
+  expect(fixture.uploads()).toBe(0)
 })
 
 test('memory edits validate files before reserving or uploading artifacts', async (t) => {
@@ -511,8 +505,10 @@ test('memory edits validate files before reserving or uploading artifacts', asyn
       'edit',
       JSON.stringify({ ...validMemoryWrites.edit, files })
     )
-    assert.equal(response.status, 400)
-    assert.deepEqual(await response.json(), { error: 'invalid_memory_files' })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toStrictEqual({
+      error: 'invalid_memory_files'
+    })
   }
   const badPath = await fixture.post(
     'edit',
@@ -521,12 +517,12 @@ test('memory edits validate files before reserving or uploading artifacts', asyn
       files: { 'MEMORY.md': '# Memory\n', '../MEMORY.md': '# Bad path\n' }
     })
   )
-  assert.equal(badPath.status, 400)
-  assert.deepEqual(await badPath.json(), {
+  expect(badPath.status).toBe(400)
+  expect(await badPath.json()).toStrictEqual({
     error: 'Invalid memory tree content path: ../MEMORY.md'
   })
-  assert.deepEqual(fixture.writes, [])
-  assert.equal(fixture.uploads(), 0)
+  expect(fixture.writes).toStrictEqual([])
+  expect(fixture.uploads()).toBe(0)
 })
 
 test('valid control writes preserve zero versions and ignore client-supplied actor identity', async (t) => {
@@ -537,13 +533,13 @@ test('valid control writes preserve zero versions and ignore client-supplied act
       action,
       JSON.stringify({ ...body, actor: { kind: 'manual', id: 'forged' } })
     )
-    assert.equal(response.status, 201)
-    assert.deepEqual(fixture.writes.at(-1), {
+    expect(response.status).toBe(201)
+    expect(fixture.writes.at(-1)).toStrictEqual({
       path: `/v1/memory-tree/automation/${action}`,
       body
     })
   }
-  assert.equal(fixture.uploads(), 0)
+  expect(fixture.uploads()).toBe(0)
 })
 
 test('an initial memory edit accepts version zero and reserves before uploading', async (t) => {
@@ -552,35 +548,34 @@ test('an initial memory edit accepts version zero and reserves before uploading'
     'edit',
     JSON.stringify(validMemoryWrites.edit)
   )
-  assert.equal(response.status, 201)
-  assert.equal(fixture.uploads(), 1)
-  assert.deepEqual(
-    fixture.writes.map(({ path }) => path),
-    [
-      '/v1/memory-tree/versions/publications/reserve',
-      '/v1/memory-tree/versions/publications/confirm',
-      '/v1/memory-tree/versions'
-    ]
-  )
+  expect(response.status).toBe(201)
+  expect(fixture.uploads()).toBe(1)
+  expect(fixture.writes.map(({ path }) => path)).toStrictEqual([
+    '/v1/memory-tree/versions/publications/reserve',
+    '/v1/memory-tree/versions/publications/confirm',
+    '/v1/memory-tree/versions'
+  ])
   const body = fixture.writes[0]?.body
-  assert(body && typeof body === 'object' && 'expected_active_version' in body)
-  assert.equal(body.expected_active_version, 0)
+  expect.assert(
+    body && typeof body === 'object' && 'expected_active_version' in body
+  )
+  expect(body.expected_active_version).toBe(0)
 })
 
 test('valid edits keep upload capability errors separate from malformed input', async (t) => {
   const fixture = await memoryWriteFixture(t, { upload: 'missing' })
   const invalid = await fixture.post('edit', 'null')
-  assert.equal(invalid.status, 400)
-  assert.deepEqual(await invalid.json(), { error: 'invalid_request' })
+  expect(invalid.status).toBe(400)
+  expect(await invalid.json()).toStrictEqual({ error: 'invalid_request' })
   const response = await fixture.post(
     'edit',
     JSON.stringify(validMemoryWrites.edit)
   )
-  assert.equal(response.status, 503)
-  assert.deepEqual(await response.json(), {
+  expect(response.status).toBe(503)
+  expect(await response.json()).toStrictEqual({
     error: 'memory_artifact_upload_unavailable'
   })
-  assert.deepEqual(fixture.writes, [])
+  expect(fixture.writes).toStrictEqual([])
 })
 
 test('memory edits report upload failures as 502 and do not confirm or commit', async (t) => {
@@ -589,15 +584,14 @@ test('memory edits report upload failures as 502 and do not confirm or commit', 
     'edit',
     JSON.stringify(validMemoryWrites.edit)
   )
-  assert.equal(response.status, 502)
-  assert.deepEqual(await response.json(), {
+  expect(response.status).toBe(502)
+  expect(await response.json()).toStrictEqual({
     error: 'memory_artifact_upload_failed'
   })
-  assert.equal(fixture.uploads(), 1)
-  assert.deepEqual(
-    fixture.writes.map(({ path }) => path),
-    ['/v1/memory-tree/versions/publications/reserve']
-  )
+  expect(fixture.uploads()).toBe(1)
+  expect(fixture.writes.map(({ path }) => path)).toStrictEqual([
+    '/v1/memory-tree/versions/publications/reserve'
+  ])
 })
 
 test('valid memory edits relay Catalog conflicts before uploading', async (t) => {
@@ -606,10 +600,10 @@ test('valid memory edits relay Catalog conflicts before uploading', async (t) =>
     'edit',
     JSON.stringify(validMemoryWrites.edit)
   )
-  assert.equal(response.status, 409)
-  assert.deepEqual(await response.json(), { error: 'version_conflict' })
-  assert.equal(fixture.uploads(), 0)
-  assert.equal(fixture.writes.length, 1)
+  expect(response.status).toBe(409)
+  expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
+  expect(fixture.uploads()).toBe(0)
+  expect(fixture.writes.length).toBe(1)
 })
 
 for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
@@ -628,14 +622,13 @@ for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
       'edit',
       JSON.stringify(validMemoryWrites.edit)
     )
-    assert.equal(response.status, 409)
-    assert.deepEqual(await response.json(), { error: 'version_conflict' })
-    assert.equal(fixture.uploads(), failedPhase === 'reserve' ? 0 : 1)
-    assert.deepEqual(
-      fixture.writes.map(({ path }) => path),
+    expect(response.status).toBe(409)
+    expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
+    expect(fixture.uploads()).toBe(failedPhase === 'reserve' ? 0 : 1)
+    expect(fixture.writes.map(({ path }) => path)).toStrictEqual(
       paths.slice(0, failedIndex + 1)
     )
     for (const { body } of fixture.writes)
-      assert.deepEqual(body, fixture.writes[0]?.body)
+      expect(body).toStrictEqual(fixture.writes[0]?.body)
   })
 }

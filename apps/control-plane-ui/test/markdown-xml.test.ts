@@ -1,6 +1,5 @@
 import { trajectoryCorpus } from './contract-fixtures.js'
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { markdownWithoutXmlTags } from '../browser/features/trajectory/markdown-xml.js'
 
 for (const [name, source, expected] of [
@@ -46,7 +45,7 @@ for (const [name, source, expected] of [
   ]
 ] as const) {
   test(`preview removes XML wrappers and preserves ${name}`, () => {
-    assert.equal(markdownWithoutXmlTags(source), expected)
+    expect(markdownWithoutXmlTags(source)).toBe(expected)
   })
 }
 
@@ -63,9 +62,9 @@ test('the recorded summarization prompt keeps its instructions and Markdown sect
       event.message.role === 'user'
   ).message.content as string
   const preview = markdownWithoutXmlTags(prompt)
-  assert.ok(preview.includes('Context Extraction Assistant'))
-  assert.ok(preview.includes('## SESSION INTENT'))
-  assert.ok(preview.includes('src/download.py'))
-  assert.ok(!preview.includes('<primary_objective>'))
-  assert.ok(prompt.startsWith('<role>'))
+  expect.assert(preview.includes('Context Extraction Assistant'))
+  expect.assert(preview.includes('## SESSION INTENT'))
+  expect.assert(preview.includes('src/download.py'))
+  expect.assert(!preview.includes('<primary_objective>'))
+  expect.assert(prompt.startsWith('<role>'))
 })

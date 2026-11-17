@@ -5,9 +5,8 @@
 // The overlap is forced, not hoped for: a second session holds the singleton row the operation
 // locks, both attempts start and block behind it, and only then is the lock released. That is the
 // window in which both attempts have already looked for a replay and found none.
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool, type PoolClient } from 'pg'
 
@@ -64,7 +63,7 @@ async function overlapBehindLock<T>(
     const pid = (
       await holder.query<{ pid: number }>('select pg_backend_pid() as pid')
     ).rows[0]?.pid
-    assert.ok(pid !== undefined)
+    expect.assert(pid !== undefined)
     started.push(...attempts.map((attempt) => attempt()))
     await waitUntilBlocked(pid, attempts.length)
   } finally {
@@ -106,7 +105,7 @@ async function waitUntilBlocked(pid: number, count: number): Promise<void> {
   }
 }
 
-await test('an overlapping retry of an automation change replays instead of conflicting', async () => {
+test('an overlapping retry of an automation change replays instead of conflicting', async () => {
   await withStore(async (store, pool) => {
     const pause = { operation_id: 'pause-1', expected_version: 0, actor }
     const results = await overlapBehindLock(
@@ -117,20 +116,19 @@ await test('an overlapping retry of an automation change replays instead of conf
         () => store.changeMemoryTreeAutomation('paused', pause),
       ],
     )
-    assert.deepEqual(
+    expect(
       results.map((result) => result.status),
-      ['fulfilled', 'fulfilled'],
       'neither attempt may fail',
-    )
+    ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
       (result) =>
         (result as PromiseFulfilledResult<{ created: boolean }>).value.created,
     )
-    assert.deepEqual(created.toSorted(), [false, true])
+    expect(created.toSorted()).toStrictEqual([false, true])
   })
 })
 
-await test('an overlapping retry of a restore replays instead of conflicting', async () => {
+test('an overlapping retry of a restore replays instead of conflicting', async () => {
   await withStore(async (store, pool) => {
     // Version 1 must exist to be restored to; it is inserted directly so the test depends only on
     // the restore path.
@@ -165,15 +163,14 @@ await test('an overlapping retry of a restore replays instead of conflicting', a
         () => store.restoreMemoryTree(restore),
       ],
     )
-    assert.deepEqual(
+    expect(
       results.map((result) => result.status),
-      ['fulfilled', 'fulfilled'],
       'neither attempt may fail',
-    )
+    ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
       (result) =>
         (result as PromiseFulfilledResult<{ created: boolean }>).value.created,
     )
-    assert.deepEqual(created.toSorted(), [false, true])
+    expect(created.toSorted()).toStrictEqual([false, true])
   })
 })

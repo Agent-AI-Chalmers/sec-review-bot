@@ -6,8 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Covers issue and pull-request trigger behavior at the durable admission,
 // preparation-claim, and execution-submission boundaries.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, afterAll, test } from 'vitest'
 
 import {
   parseIssuePreparationInput,
@@ -35,7 +34,7 @@ import { unusedGitHub } from '../github-client.js'
 const bundleRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'trigger-input-'))
 const bundlePath = path.join(bundleRoot, 'bundle.tar.zst')
 await fs.writeFile(bundlePath, 'x')
-test.after(() => fs.rm(bundleRoot, { recursive: true, force: true }))
+afterAll(() => fs.rm(bundleRoot, { recursive: true, force: true }))
 const localBundle = {
   uri: pathToFileURL(bundlePath).href,
   digest: `sha256:${createHash('sha256').update('x').digest('hex')}`,
@@ -96,7 +95,7 @@ const TRUSTED_DEFAULT_BRANCH = {
 
 const preparationClaim = {
   checkpointPreparationInput: async () =>
-    assert.fail('snapshot input must not need checkpointing'),
+    expect.unreachable('snapshot input must not need checkpointing'),
   ...inputBundlePublicationStore(),
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
@@ -225,10 +224,10 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         review_objective,
         test_changes
       }) => {
-        assert.strictEqual(run_id, 'run-issue-1')
-        assert.strictEqual(event_type, 'opened')
-        assert.strictEqual(review_objective, 'audit')
-        assert.strictEqual(test_changes, null)
+        expect(run_id).toBe('run-issue-1')
+        expect(event_type).toBe('opened')
+        expect(review_objective).toBe('audit')
+        expect(test_changes).toBe(null)
         const prepared = {
           issue: submittedIssue,
           run_id: 'run-issue-1',
@@ -271,13 +270,13 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           transitions.push(['queued', run_id, publish_context])
         },
         failPreparation: () =>
-          assert.fail('successful review must not be marked failed')
+          expect.unreachable('successful review must not be marked failed')
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-issue-1')
-  assert.deepStrictEqual(phases, [
+  expect(submitted.run_id).toBe('run-issue-1')
+  expect(phases).toStrictEqual([
     'renew',
     'prepared',
     'renew',
@@ -285,7 +284,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     'present',
     'submit'
   ])
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     [
       'pending',
       {
@@ -333,9 +332,9 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         event_type,
         test_changes
       }) => {
-        assert.strictEqual(run_id, 'run-pr-1')
-        assert.strictEqual(event_type, 'manual_review')
-        assert.strictEqual(test_changes, 'deny')
+        expect(run_id).toBe('run-pr-1')
+        expect(event_type).toBe('manual_review')
+        expect(test_changes).toBe('deny')
         const prepared = {
           pr: submittedPr,
           run_id: 'run-pr-1',
@@ -358,13 +357,13 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
         failPreparation: () =>
-          assert.fail('successful review must not be marked failed')
+          expect.unreachable('successful review must not be marked failed')
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-pr-1')
-  assert.deepStrictEqual(transitions, [
+  expect(submitted.run_id).toBe('run-pr-1')
+  expect(transitions).toStrictEqual([
     [
       'pending',
       {
@@ -398,7 +397,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
   // be able to find the failed attempt and its delivery identity afterwards.
   const transitions: unknown[] = []
 
-  await assert.rejects(
+  await expect(
     startPullRequestReviewCommand({
       octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
@@ -407,7 +406,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       delivery_id: 'delivery-pr-failed',
       deps: {
         prepare_review: async ({ run_id }) => {
-          assert.strictEqual(run_id, 'run-pr-failed')
+          expect(run_id).toBe('run-pr-failed')
           throw new Error('workspace clone failed')
         },
         store: {
@@ -421,16 +420,15 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
             }
           },
           submitPreparedRun: () =>
-            assert.fail('failed review must not be queued'),
+            expect.unreachable('failed review must not be queued'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
-    /workspace clone failed/
-  )
+    })
+  ).rejects.toThrow(/workspace clone failed/)
 
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     [
       'pending',
       {
@@ -455,7 +453,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
     'SUBMISSION_STATE_UNCERTAIN'
   )
 
-  await assert.rejects(
+  await expect(
     startIssueReviewCommand({
       octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
@@ -492,12 +490,15 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
             transitions.push([run_id, failure])
         }
       }
-    }),
-    error
-  )
+    })
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
 
-  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
-  assert.strictEqual(transitions.length, 1)
+  expect((transitions[0] as unknown[])[0]).toBe('prepared')
+  expect(transitions.length).toBe(1)
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Execution submission for replay', async () => {
@@ -507,7 +508,7 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
     'SUBMISSION_STATE_UNCERTAIN'
   )
 
-  await assert.rejects(
+  await expect(
     startPullRequestReviewCommand({
       octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
@@ -543,18 +544,21 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
             transitions.push([run_id, failure])
         }
       }
-    }),
-    error
-  )
+    })
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
 
-  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
-  assert.strictEqual(transitions.length, 1)
+  expect((transitions[0] as unknown[])[0]).toBe('prepared')
+  expect(transitions.length).toBe(1)
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
   const transitions: unknown[] = []
 
-  await assert.rejects(
+  await expect(
     startPullRequestReviewCommand({
       octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
@@ -571,7 +575,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
           throw new Error('GitHub PR lookup failed')
         },
         prepare_review: async () =>
-          assert.fail('review must not start without PR context'),
+          expect.unreachable('review must not start without PR context'),
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
@@ -583,16 +587,15 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
             } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
-            assert.fail('failed context lookup must not queue'),
+            expect.unreachable('failed context lookup must not queue'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
-    /GitHub PR lookup failed/
-  )
+    })
+  ).rejects.toThrow(/GitHub PR lookup failed/)
 
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     ['pending', 'run-context-failure'],
     ['context'],
     [
@@ -623,8 +626,8 @@ for (const recovering of [false, true]) {
       deps: {
         get_pull_request_context: async () => pr,
         prepare_review: async ({ pr: preparedPr }) => {
-          assert.strictEqual(preparedPr, pr)
-          assert.strictEqual(checkpoints.length, 1)
+          expect(preparedPr).toBe(pr)
+          expect(checkpoints.length).toBe(1)
           const review = {
             pr: preparedPr,
             run_id: 'run-checkpoint',
@@ -637,7 +640,7 @@ for (const recovering of [false, true]) {
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            assert.equal(recovering, false, 'recovery must reuse its claim')
+            expect(recovering, 'recovery must reuse its claim').toBe(false)
             return {
               record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
               created: true,
@@ -648,16 +651,16 @@ for (const recovering of [false, true]) {
             const recovered = parsePullRequestPreparationInput(
               JSON.parse(JSON.stringify(args[2]))
             )
-            assert.deepEqual(recovered.pr, pr)
+            expect(recovered.pr).toStrictEqual(pr)
             checkpoints.push(args)
           },
           submitPreparedRun: () => {},
           failPreparation: () =>
-            assert.fail('checkpointed review must not fail')
+            expect.unreachable('checkpointed review must not fail')
         }
       }
     })
-    assert.deepStrictEqual(checkpoints, [
+    expect(checkpoints).toStrictEqual([
       [
         'run-checkpoint',
         'claim',
@@ -702,15 +705,17 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
           })
         }),
         submitPreparedRun: () =>
-          assert.fail('replayed delivery must not queue again'),
+          expect.unreachable('replayed delivery must not queue again'),
         failPreparation: () =>
-          assert.fail('replayed delivery must not change the original run')
+          expect.unreachable(
+            'replayed delivery must not change the original run'
+          )
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-original')
-  assert.strictEqual(starts, 0)
+  expect(submitted.run_id).toBe('run-original')
+  expect(starts).toBe(0)
 })
 
 test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
@@ -742,21 +747,23 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
           })
         }),
         submitPreparedRun: () =>
-          assert.fail('replayed delivery must not queue again'),
+          expect.unreachable('replayed delivery must not queue again'),
         failPreparation: () =>
-          assert.fail('replayed delivery must not change the original run')
+          expect.unreachable(
+            'replayed delivery must not change the original run'
+          )
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-original')
-  assert.strictEqual(starts, 0)
+  expect(submitted.run_id).toBe('run-original')
+  expect(starts).toBe(0)
 })
 
 test('startPullRequestReviewCommand reports an invalid setup declaration distinctly', async () => {
   const transitions: unknown[] = []
 
-  await assert.rejects(
+  await expect(
     startPullRequestReviewCommand({
       octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
@@ -784,16 +791,15 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
-            assert.fail('invalid setup must not be queued'),
+            expect.unreachable('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
-    SetupDeclarationError
-  )
+    })
+  ).rejects.toThrow(SetupDeclarationError)
 
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     [
       'failed',
       'run-pr-setup-invalid',
@@ -808,7 +814,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
 test('startIssueReviewCommand reports an invalid setup declaration distinctly', async () => {
   const transitions: unknown[] = []
 
-  await assert.rejects(
+  await expect(
     startIssueReviewCommand({
       octokit: unusedGitHub().octokit,
       issue: issueContext(),
@@ -836,16 +842,15 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
-            assert.fail('invalid setup must not be queued'),
+            expect.unreachable('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
-    SetupDeclarationError
-  )
+    })
+  ).rejects.toThrow(SetupDeclarationError)
 
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     [
       'failed',
       'run-issue-setup-invalid',
@@ -894,10 +899,10 @@ test('admission output roundtrips through recovery using the actual issue produc
           const recovered = parseIssuePreparationInput(
             JSON.parse(JSON.stringify(run.preparation_input))
           )
-          assert.deepEqual(recovered.issue, issue)
-          assert.equal(recovered.review_objective, 'repair')
-          assert.equal(recovered.test_changes, 'deny')
-          assert.equal(recovered.open_pr, true)
+          expect(recovered.issue).toStrictEqual(issue)
+          expect(recovered.review_objective).toBe('repair')
+          expect(recovered.test_changes).toBe('deny')
+          expect(recovered.open_pr).toBe(true)
           parsed = true
           return {
             record: admittedRecord({ ...run, run_id: 'roundtrip' }),
@@ -905,18 +910,18 @@ test('admission output roundtrips through recovery using the actual issue produc
             preparation_token: null
           }
         },
-        submitPreparedRun: () => assert.fail('a replay must not submit'),
-        failPreparation: () => assert.fail('a replay must not fail')
+        submitPreparedRun: () => expect.unreachable('a replay must not submit'),
+        failPreparation: () => expect.unreachable('a replay must not fail')
       }
     }
   })
-  assert.equal(parsed, true)
+  expect(parsed).toBe(true)
 })
 
 test('a failed PR checkpoint prevents preparation and submission', async () => {
   const error = new Error('checkpoint transport failed')
   const failures: unknown[][] = []
-  await assert.rejects(
+  await expect(
     startPullRequestReviewCommand({
       octokit: unusedGitHub().octokit,
       pr_reference: {
@@ -931,25 +936,29 @@ test('a failed PR checkpoint prevents preparation and submission', async () => {
       deps: {
         get_pull_request_context: async () => pullRequestContext(),
         prepare_review: async () =>
-          assert.fail('an uncheckpointed snapshot must not prepare'),
+          expect.unreachable('an uncheckpointed snapshot must not prepare'),
         store: {
           ...preparationClaim,
-          admitReviewRun: () => assert.fail('a retry must not admit again'),
+          admitReviewRun: () =>
+            expect.unreachable('a retry must not admit again'),
           checkpointPreparationInput: async () => {
             throw error
           },
           submitPreparedRun: () =>
-            assert.fail('an uncheckpointed snapshot must not submit'),
+            expect.unreachable('an uncheckpointed snapshot must not submit'),
           failPreparation: (...args) => {
             failures.push(args)
           }
         }
       }
-    }),
-    error
-  )
-  assert.equal(failures.length, 1)
-  assert.deepEqual(failures[0]?.slice(0, 3), [
+    })
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
+  expect(failures.length).toBe(1)
+  expect(failures[0]?.slice(0, 3)).toStrictEqual([
     'existing-run',
     'claim',
     { code: 'REVIEW_START_FAILED', message: error.message }

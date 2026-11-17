@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { contractFixture } from '../contract-fixtures.js'
 import { parseRepositoryWorkflowResult } from '../../src/reviews/repositories/result.js'
@@ -31,8 +30,7 @@ test('repository result rejects malformed delivery file changes before draft PR 
     status: 'deleted'
   })
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /duplicate file change entries/
   )
 })
@@ -42,9 +40,9 @@ test('repository result parser accepts the shared v1 repository result fixture',
     contractFixture('repository-review-result.json')
   )
 
-  assert.strictEqual(result.api_version, 'v1')
-  assert.strictEqual(result.case_results.at(0)?.case_id, 'case-1')
-  assert.strictEqual(result.deliveries.at(0)?.delivery_id, 'delivery-1')
+  expect(result.api_version).toBe('v1')
+  expect(result.case_results.at(0)?.case_id).toBe('case-1')
+  expect(result.deliveries.at(0)?.delivery_id).toBe('delivery-1')
 })
 
 test('repository result parser accepts the shared v1 blocked result fixture', () => {
@@ -52,39 +50,35 @@ test('repository result parser accepts the shared v1 blocked result fixture', ()
     contractFixture('repository-review-result-blocked.json')
   )
 
-  assert.strictEqual(result.api_version, 'v1')
-  assert.strictEqual(result.case_results.at(0)?.deliverable, false)
-  assert.deepStrictEqual(result.deliveries, [])
+  expect(result.api_version).toBe('v1')
+  expect(result.case_results.at(0)?.deliverable).toBe(false)
+  expect(result.deliveries).toStrictEqual([])
 })
 
 test('repository result rejects duplicate delivery identities', () => {
   const result = validRepositoryResult()
   result.deliveries.push(structuredClone(result.deliveries[0]))
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /duplicate delivery_id/
   )
 })
 
 test('repository result rejects malformed v1 result before draft PR publishing', () => {
-  assert.throws(
-    () =>
-      parseRepositoryWorkflowResult({
-        scan_summary: {},
-        case_results: [],
-        deliveries: []
-      }),
-    /repository-review result does not match API v1/
-  )
+  expect(() =>
+    parseRepositoryWorkflowResult({
+      scan_summary: {},
+      case_results: [],
+      deliveries: []
+    })
+  ).toThrow(/repository-review result does not match API v1/)
 })
 
 test('repository result rejects additional top-level fields at the production boundary', () => {
   const result = validRepositoryResult()
   result.unpublished_internal_state = true
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /repository-review result does not match API v1/
   )
 })
@@ -93,8 +87,7 @@ test('repository result rejects incomplete scan_summary at the production bounda
   const result = validRepositoryResult()
   delete result.scan_summary.scanned_file_count
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /repository-review result does not match API v1/
   )
 })
@@ -103,8 +96,7 @@ test('repository result rejects upsert changes without content_encoding', () => 
   const result = validRepositoryResult()
   delete result.deliveries[0].file_changes[0].content_encoding
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /repository-review result does not match API v1/
   )
 })
@@ -113,8 +105,7 @@ test('repository result rejects unsupported file modes', () => {
   const result = validRepositoryResult()
   result.deliveries[0].file_changes[0].mode = '100600'
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
     /repository-review result does not match API v1/
   )
 })
@@ -133,6 +124,6 @@ for (const [path, message] of [
     const result = validRepositoryResult()
     result.deliveries[0].file_changes[0].path = path
 
-    assert.throws(() => parseRepositoryWorkflowResult(result), message)
+    expect(() => parseRepositoryWorkflowResult(result)).toThrow(message)
   })
 }

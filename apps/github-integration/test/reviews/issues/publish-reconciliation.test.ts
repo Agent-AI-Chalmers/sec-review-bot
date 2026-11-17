@@ -5,8 +5,7 @@
 // the step's attempts and reports "no attempts left". Before reconciliation existed, that report
 // was itself the conclusion, so the run failed and the requester was told nothing was published
 // while the comment or PR was already on GitHub.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import { settleExhaustedStep } from '../../../src/reviews/shared/settle-exhausted-step.js'
@@ -164,24 +163,23 @@ test('an exhausted comment step that already posted is settled as succeeded', as
   const harness = buildHarness({ existingComment: postedComment() })
   await runPublish(harness)
 
-  assert.deepStrictEqual(harness.settles, [
+  expect(harness.settles).toStrictEqual([
     {
       stepKey: 'issue:summary-comment',
       found: { remote: { id: 4242, url: 'https://example.test/c/4242' } }
     }
   ])
-  assert.deepStrictEqual(
+  expect(
     harness.postedComments,
-    [],
     'a reconciliation discovers the side effect; it must never take a new one'
-  )
+  ).toStrictEqual([])
 })
 
 test('an exhausted comment step with no comment on GitHub stays a failure', async () => {
   // The connector looked and found nothing, which is the only evidence that makes the step a
   // real failure. The exhaustion error is then what the caller reports.
   const harness = buildHarness({ existingComment: null })
-  await assert.rejects(runPublish(harness), (error: unknown) => {
+  await expect(runPublish(harness)).rejects.toSatisfy((error: unknown) => {
     return (
       error instanceof Error &&
       'code' in error &&
@@ -189,11 +187,10 @@ test('an exhausted comment step with no comment on GitHub stays a failure', asyn
         EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
     )
   })
-  assert.deepStrictEqual(
+  expect(
     harness.settles,
-    [{ stepKey: 'issue:summary-comment', found: null }],
     'the reconciliation looked and found nothing, which is the evidence that makes it terminal'
-  )
+  ).toStrictEqual([{ stepKey: 'issue:summary-comment', found: null }])
 })
 
 test('a reconciliation that loses the step reports the failure rather than claiming success', async () => {
@@ -203,7 +200,7 @@ test('a reconciliation that loses the step reports the failure rather than claim
     existingComment: postedComment(),
     settleResult: false
   })
-  await assert.rejects(runPublish(harness))
+  await expect(runPublish(harness)).rejects.toSatisfy(() => true)
 })
 
 test('a recorded absence and a refused write are not conflated', async () => {
@@ -231,11 +228,11 @@ test('a recorded absence and a refused write are not conflated', async () => {
     stepKey: 'issue:summary-comment',
     find: async () => null
   })
-  assert.deepStrictEqual(absent, {
+  expect(absent).toStrictEqual({
     outcome: 'recorded',
     step: 'terminal_failed'
   })
-  assert.deepStrictEqual(lost, { outcome: 'not_owned' })
+  expect(lost).toStrictEqual({ outcome: 'not_owned' })
 })
 
 test('every outcome names whether the step was written, so a caller need not infer it', async () => {
@@ -264,19 +261,19 @@ test('every outcome names whether the step was written, so a caller need not inf
   const absent = await settledWith(true, null)
   const notOwned = await settledWith(false, null)
 
-  assert.deepStrictEqual(succeeded, {
+  expect(succeeded).toStrictEqual({
     outcome: 'recorded',
     step: 'succeeded',
     remote: { id: 4242, url: 'https://example.test/c/4242' }
   })
   // Only `recorded` outcomes claim a write; `not_owned` must never be read as one, which is why
   // it is not called `absent` or `failed`.
-  assert.deepStrictEqual(absent, {
+  expect(absent).toStrictEqual({
     outcome: 'recorded',
     step: 'terminal_failed'
   })
-  assert.deepStrictEqual(notOwned, { outcome: 'not_owned' })
-  assert.ok(
+  expect(notOwned).toStrictEqual({ outcome: 'not_owned' })
+  expect.assert(
     !('remote' in absent) && !('remote' in notOwned),
     'only a recorded success carries the remote reference'
   )
@@ -316,12 +313,12 @@ test('a reconciliation that cannot reach GitHub records the failure but settles 
       throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
     }
   })
-  assert.equal(result.outcome, 'lookup_failed')
-  assert.ok(result.outcome === 'lookup_failed')
-  assert.match(String(result.error), /502/)
-  assert.equal(result.recording, 'accepted')
-  assert.strictEqual(settled, false)
-  assert.deepStrictEqual(failures, [{ code: null, retry: true }])
+  expect(result.outcome).toBe('lookup_failed')
+  expect.assert(result.outcome === 'lookup_failed')
+  expect(String(result.error)).toMatch(/502/)
+  expect(result.recording).toBe('accepted')
+  expect(settled).toBe(false)
+  expect(failures).toStrictEqual([{ code: null, retry: true }])
 })
 
 test('a lookup can return a primitive error without mutation or wrapping', async () => {
@@ -339,9 +336,9 @@ test('a lookup can return a primitive error without mutation or wrapping', async
       throw 'lookup exploded'
     }
   })
-  assert.ok(result.outcome === 'lookup_failed')
-  assert.equal(result.recording, 'accepted')
-  assert.match(String(result.error), /lookup exploded/)
+  expect.assert(result.outcome === 'lookup_failed')
+  expect(result.recording).toBe('accepted')
+  expect(String(result.error)).toMatch(/lookup exploded/)
 })
 
 test('a lookup failure whose first report is lost is recorded by the retry', async () => {
@@ -368,9 +365,9 @@ test('a lookup failure whose first report is lost is recorded by the retry', asy
       throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
     }
   })
-  assert.ok(result.outcome === 'lookup_failed')
-  assert.strictEqual(calls, 2)
-  assert.equal(result.recording, 'accepted')
+  expect.assert(result.outcome === 'lookup_failed')
+  expect(calls).toBe(2)
+  expect(result.recording).toBe('accepted')
 })
 
 test('a lookup failure whose recording did not complete is reported again against the same count', async () => {
@@ -415,15 +412,14 @@ test('a lookup failure whose recording did not complete is reported again agains
       throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
     }
   })
-  assert.ok(result.outcome === 'lookup_failed')
-  assert.deepStrictEqual(
+  expect.assert(result.outcome === 'lookup_failed')
+  expect(
     reported,
-    [1, 1],
     'retried once, against the same count both times'
-  )
-  assert.match(String(result.error), /502/)
-  assert.equal(result.recording, 'unknown')
-  assert.strictEqual(result.expectedUnresolvedRecoveryCount, 1)
+  ).toStrictEqual([1, 1])
+  expect(String(result.error)).toMatch(/502/)
+  expect(result.recording).toBe('unknown')
+  expect(result.expectedUnresolvedRecoveryCount).toBe(1)
 })
 
 test('a frozen lookup error is returned unchanged with explicit recording state', async () => {
@@ -443,8 +439,8 @@ test('a frozen lookup error is returned unchanged with explicit recording state'
         throw error
       }
     })
-    assert.ok(result.outcome === 'lookup_failed')
-    assert.equal(result.error, error)
-    assert.equal(result.recording, accepted ? 'accepted' : 'not_owned')
+    expect.assert(result.outcome === 'lookup_failed')
+    expect(result.error).toBe(error)
+    expect(result.recording).toBe(accepted ? 'accepted' : 'not_owned')
   }
 })

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { publishedArtifact } from '../server/artifacts/published-artifact.js'
 import { ARTIFACT_BUCKET } from '../server/artifacts/store.js'
@@ -39,34 +38,31 @@ test('a execution archive resolves to the object it names', () => {
     'run-1',
     BUCKET
   )
-  assert.strictEqual(published.kind, 'available')
-  assert.deepStrictEqual(
-    published.kind === 'available' ? published.artifact : null,
-    {
-      digest: DIGEST,
-      key: 'runs/run-1/artifacts/execution-archive.v1.tar.zst',
-      maximumSize: 128 * 1024 * 1024,
-      sizeBytes: 1024
-    }
-  )
+  expect(published.kind).toBe('available')
+  expect(
+    published.kind === 'available' ? published.artifact : null
+  ).toStrictEqual({
+    digest: DIGEST,
+    key: 'runs/run-1/artifacts/execution-archive.v1.tar.zst',
+    maximumSize: 128 * 1024 * 1024,
+    sizeBytes: 1024
+  })
 })
 
 test('a run body for another run never resolves an artifact', () => {
-  assert.deepStrictEqual(
-    publishedExecutionArchive(runBody(bundleArtifact), 'run-2', BUCKET),
-    { kind: 'invalid' }
-  )
+  expect(
+    publishedExecutionArchive(runBody(bundleArtifact), 'run-2', BUCKET)
+  ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('a run that has not published an artifact resolves nothing', () => {
-  assert.deepStrictEqual(
+  expect(
     publishedExecutionArchive(
       { run_id: 'run-1', artifact_storage: { status: 'pending' } },
       'run-1',
       BUCKET
-    ),
-    { kind: 'invalid' }
-  )
+    )
+  ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('a reference naming a different object is invalid', () => {
@@ -74,18 +70,16 @@ test('a reference naming a different object is invalid', () => {
     ...bundleArtifact,
     uri: `s3://${BUCKET}/runs/run-1/artifacts/other.v1.tar.zst`
   }
-  assert.deepStrictEqual(
-    publishedExecutionArchive(runBody(elsewhere), 'run-1', BUCKET),
-    { kind: 'invalid' }
-  )
+  expect(
+    publishedExecutionArchive(runBody(elsewhere), 'run-1', BUCKET)
+  ).toStrictEqual({ kind: 'invalid' })
   const wrongBucket = {
     ...bundleArtifact,
     uri: 's3://other-bucket/runs/run-1/artifacts/execution-archive.v1.tar.zst'
   }
-  assert.deepStrictEqual(
-    publishedExecutionArchive(runBody(wrongBucket), 'run-1', BUCKET),
-    { kind: 'invalid' }
-  )
+  expect(
+    publishedExecutionArchive(runBody(wrongBucket), 'run-1', BUCKET)
+  ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('malformed fields are invalid rather than unavailable', () => {
@@ -97,19 +91,17 @@ test('malformed fields are invalid rather than unavailable', () => {
     { ...bundleArtifact, size_bytes: 1.5 },
     { ...bundleArtifact, uri: 42 }
   ])
-    assert.deepStrictEqual(
+    expect(
       publishedExecutionArchive(runBody(broken), 'run-1', BUCKET),
-      { kind: 'invalid' },
       JSON.stringify(broken)
-    )
+    ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('an object over the serving budget is reported as too large', () => {
   const oversized = { ...bundleArtifact, size_bytes: 128 * 1024 * 1024 + 1 }
-  assert.deepStrictEqual(
-    publishedExecutionArchive(runBody(oversized), 'run-1', BUCKET),
-    { kind: 'too_large' }
-  )
+  expect(
+    publishedExecutionArchive(runBody(oversized), 'run-1', BUCKET)
+  ).toStrictEqual({ kind: 'too_large' })
 })
 
 test('a memory tree must name the key its digest derives', () => {
@@ -120,18 +112,16 @@ test('a memory tree must name the key its digest derives', () => {
     size_bytes: 2048
   }
   const published = catalogArtifactReference(artifact, 'tree')
-  assert.strictEqual(published.kind, 'available')
-  assert.strictEqual(
-    published.kind === 'available' ? published.artifact.key : '',
+  expect(published.kind).toBe('available')
+  expect(published.kind === 'available' ? published.artifact.key : '').toBe(
     memoryTreeObjectKey(DIGEST)
   )
-  assert.deepStrictEqual(
+  expect(
     catalogArtifactReference(
       { ...artifact, uri: `s3://${BUCKET}/memory/trees/other/file.tar.zst` },
       'tree'
-    ),
-    { kind: 'invalid' }
-  )
+    )
+  ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('a trajectory reference stays inside its published prefix', () => {
@@ -141,31 +131,28 @@ test('a trajectory reference stays inside its published prefix', () => {
     media_type: 'application/zstd',
     size_bytes: 64
   }
-  assert.strictEqual(
-    catalogArtifactReference(artifact, 'trajectory').kind,
+  expect(catalogArtifactReference(artifact, 'trajectory').kind).toBe(
     'available'
   )
-  assert.deepStrictEqual(
+  expect(
     catalogArtifactReference(
       {
         ...artifact,
         uri: `s3://${BUCKET}/memory/trees/run-1.jsonl.zst`
       },
       'trajectory'
-    ),
-    { kind: 'invalid' }
-  )
+    )
+  ).toStrictEqual({ kind: 'invalid' })
 })
 
 test('a non-object reference is invalid', () => {
   for (const value of [null, undefined, 'artifact', 7, []])
-    assert.deepStrictEqual(
+    expect(
       publishedArtifact(value, {
         bucket: BUCKET,
         mediaType: 'application/zstd',
         maximumSize: 1,
         acceptsKey: () => true
-      }),
-      { kind: 'invalid' }
-    )
+      })
+    ).toStrictEqual({ kind: 'invalid' })
 })

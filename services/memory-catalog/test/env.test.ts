@@ -1,34 +1,38 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { integerEnv } from '../src/env.js'
 
-await test('integerEnv defaults only when the variable is unset', () => {
+test('integerEnv defaults only when the variable is unset', () => {
   delete process.env.TEST_INTEGER_ENV
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7), 7)
+  expect(integerEnv('TEST_INTEGER_ENV', 7)).toBe(7)
 })
 
-await test('integerEnv accepts values at explicit range boundaries', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
+test('integerEnv accepts values at explicit range boundaries', (t) => {
+  t.onTestFinished(() => {
+    delete process.env.TEST_INTEGER_ENV
+  })
   process.env.TEST_INTEGER_ENV = '0'
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7, 0, 12), 0)
+  expect(integerEnv('TEST_INTEGER_ENV', 7, 0, 12)).toBe(0)
   process.env.TEST_INTEGER_ENV = '12'
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7, 0, 12), 12)
+  expect(integerEnv('TEST_INTEGER_ENV', 7, 0, 12)).toBe(12)
 })
 
-await test('integerEnv rejects malformed, unsafe, and out-of-range values', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
+test('integerEnv rejects malformed, unsafe, and out-of-range values', (t) => {
+  t.onTestFinished(() => {
+    delete process.env.TEST_INTEGER_ENV
+  })
   for (const value of ['', '10ms', '1.5', '9007199254740992', '0']) {
     process.env.TEST_INTEGER_ENV = value
-    assert.throws(() => integerEnv('TEST_INTEGER_ENV', 7), /TEST_INTEGER_ENV/)
+    expect(() => integerEnv('TEST_INTEGER_ENV', 7)).toThrow(/TEST_INTEGER_ENV/)
   }
 })
 
-await test('integerEnv rejects values above an explicit maximum', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
+test('integerEnv rejects values above an explicit maximum', (t) => {
+  t.onTestFinished(() => {
+    delete process.env.TEST_INTEGER_ENV
+  })
   process.env.TEST_INTEGER_ENV = '13'
-  assert.throws(
-    () => integerEnv('TEST_INTEGER_ENV', 7, 1, 12),
+  expect(() => integerEnv('TEST_INTEGER_ENV', 7, 1, 12)).toThrow(
     /TEST_INTEGER_ENV must be at most 12/,
   )
 })

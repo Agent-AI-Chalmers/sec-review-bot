@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { MemoryCatalogStore } from '../src/catalog-store.js'
 import {
@@ -80,7 +79,7 @@ const emptyOverview = {
   workflows: [],
 }
 
-await test('the contract authenticates and validates extraction registration', async () => {
+test('the contract authenticates and validates extraction registration', async () => {
   const extractions: unknown[] = []
   const store: MemoryCatalogStore = {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
@@ -130,7 +129,7 @@ await test('the contract authenticates and validates extraction registration', a
     ['POST', '/v1/maintenance-control/resume'],
   ] as const) {
     const obsolete = await app.inject({ method, url, headers: operatorHeaders })
-    assert.equal(obsolete.statusCode, 404)
+    expect(obsolete.statusCode).toBe(404)
   }
 
   const unauthorized = await app.inject({
@@ -153,7 +152,7 @@ await test('the contract authenticates and validates extraction registration', a
       observations: [extraction.observations[0], extraction.observations[0]],
     },
   })
-  assert.equal(duplicate.statusCode, 400)
+  expect(duplicate.statusCode).toBe(400)
   const registered = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
@@ -161,14 +160,14 @@ await test('the contract authenticates and validates extraction registration', a
     payload: extraction,
   })
 
-  assert.equal(unauthorized.statusCode, 401)
-  assert.equal(invalid.statusCode, 400)
-  assert.deepEqual(registered.json(), { ok: true, created: true })
-  assert.deepEqual(extractions, [extraction])
+  expect(unauthorized.statusCode).toBe(401)
+  expect(invalid.statusCode).toBe(400)
+  expect(registered.json()).toStrictEqual({ ok: true, created: true })
+  expect(extractions).toStrictEqual([extraction])
   await app.close()
 })
 
-await test('worker and operator credentials are restricted to their write roles', async () => {
+test('worker and operator credentials are restricted to their write roles', async () => {
   const store = storeWithVersionFailure(new Error('not used'))
   const app = await createApp({ store, ...auth })
   const operatorRegistration = await app.inject({
@@ -219,15 +218,15 @@ await test('worker and operator credentials are restricted to their write roles'
     },
   })
 
-  assert.equal(operatorRegistration.statusCode, 401)
-  assert.equal(workerPause.statusCode, 401)
-  assert.equal(workerManualVersion.statusCode, 401)
-  assert.equal(operatorLearningVersion.statusCode, 401)
-  assert.equal(operatorReorganizationVersion.statusCode, 401)
+  expect(operatorRegistration.statusCode).toBe(401)
+  expect(workerPause.statusCode).toBe(401)
+  expect(workerManualVersion.statusCode).toBe(401)
+  expect(operatorLearningVersion.statusCode).toBe(401)
+  expect(operatorReorganizationVersion.statusCode).toBe(401)
   await app.close()
 })
 
-await test('an extraction identity conflict is a declared 409', async () => {
+test('an extraction identity conflict is a declared 409', async () => {
   const store: MemoryCatalogStore = {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
@@ -275,18 +274,17 @@ await test('an extraction identity conflict is a declared 409', async () => {
     payload: extraction,
   })
 
-  assert.equal(response.statusCode, 409)
+  expect(response.statusCode).toBe(409)
   const payload: unknown = response.json()
-  assert.equal(
+  expect(
     typeof payload === 'object' && payload !== null && 'code' in payload
       ? payload.code
       : null,
-    'CONFLICT',
-  )
+  ).toBe('CONFLICT')
   await app.close()
 })
 
-await test('completed extractions are queryable with or without an observation', async () => {
+test('completed extractions are queryable with or without an observation', async () => {
   const records = new Map([
     ['extraction-1', { ...extraction, created_at: '2026-10-23T00:00:00.000Z' }],
     [
@@ -357,17 +355,17 @@ await test('completed extractions are queryable with or without an observation',
     headers,
   })
 
-  assert.deepEqual(produced.json(), records.get('extraction-1'))
-  assert.deepEqual(empty.json(), records.get('extraction-2'))
-  assert.equal(missing.statusCode, 404)
-  assert.deepEqual(missing.json(), {
+  expect(produced.json()).toStrictEqual(records.get('extraction-1'))
+  expect(empty.json()).toStrictEqual(records.get('extraction-2'))
+  expect(missing.statusCode).toBe(404)
+  expect(missing.json()).toStrictEqual({
     error: 'Memory extraction not found: missing',
     code: 'NOT_FOUND',
   })
   await app.close()
 })
 
-await test('UI catalog reads expose paginated records and durable control state', async () => {
+test('UI catalog reads expose paginated records and durable control state', async () => {
   const calls: unknown[] = []
   const overviewRanges: string[] = []
   const automationChanges: unknown[] = []
@@ -490,11 +488,11 @@ await test('UI catalog reads expose paginated records and durable control state'
     headers,
   })
 
-  assert.equal(extractions.statusCode, 200)
-  assert.equal(observations.statusCode, 200)
-  assert.equal(overview.statusCode, 200)
+  expect(extractions.statusCode).toBe(200)
+  expect(observations.statusCode).toBe(200)
+  expect(overview.statusCode).toBe(200)
   const overviewPayload: unknown = overview.json()
-  assert.deepEqual(overviewPayload, {
+  expect(overviewPayload).toStrictEqual({
     totals: {
       completed_extraction_count: 4,
       extracted_unit_count: 3,
@@ -521,9 +519,9 @@ await test('UI catalog reads expose paginated records and durable control state'
       },
     ],
   })
-  assert.deepEqual(memoryTreeAutomation.json(), control)
-  assert.deepEqual(overviewRanges, ['90d'])
-  assert.deepEqual(calls, [
+  expect(memoryTreeAutomation.json()).toStrictEqual(control)
+  expect(overviewRanges).toStrictEqual(['90d'])
+  expect(calls).toStrictEqual([
     [
       'extractions',
       'cursor-1',
@@ -555,12 +553,12 @@ await test('UI catalog reads expose paginated records and durable control state'
       headers: operatorHeaders,
       payload,
     })
-    assert.equal(response.statusCode, 201)
-    assert.deepEqual(response.json(), {
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toStrictEqual({
       created: true,
       automation: { ...control, state },
     })
-    assert.deepEqual(automationChanges.at(-1), [
+    expect(automationChanges.at(-1)).toStrictEqual([
       state,
       { ...payload, actor: { kind: 'service', id: 'memory-catalog-operator' } },
     ])
@@ -568,7 +566,7 @@ await test('UI catalog reads expose paginated records and durable control state'
   await app.close()
 })
 
-await test('learning input is read and a version is created with resource semantics', async () => {
+test('learning input is read and a version is created with resource semantics', async () => {
   const learningInput = {
     expected_active_version: 0,
     active_memory_tree_reference: null,
@@ -654,14 +652,14 @@ await test('learning input is read and a version is created with resource semant
     },
   })
 
-  assert.deepEqual(backlog.json(), {
+  expect(backlog.json()).toStrictEqual({
     pending_count: 1,
     oldest_pending_created_at: null,
   })
-  assert.deepEqual(input.json(), { input: learningInput })
-  assert.equal(created.statusCode, 201)
-  assert.equal(created.headers.location, '/v1/memory-tree/versions/1')
-  assert.deepEqual(created.json(), {
+  expect(input.json()).toStrictEqual({ input: learningInput })
+  expect(created.statusCode).toBe(201)
+  expect(created.headers.location).toBe('/v1/memory-tree/versions/1')
+  expect(created.json()).toStrictEqual({
     created: true,
     version: 1,
     source: { kind: 'learning', operation_id: 'maintenance-1' },
@@ -735,18 +733,18 @@ function responseCode(response: { json: () => unknown }): unknown {
     : null
 }
 
-await test('version conflicts are declared as 409', async () => {
+test('version conflicts are declared as 409', async () => {
   const response = await postVersion(
     storeWithVersionFailure(
       new MemoryTreeVersionConflictError('stale expected active version'),
     ),
   )
 
-  assert.equal(response.statusCode, 409)
-  assert.equal(responseCode(response), 'CONFLICT')
+  expect(response.statusCode).toBe(409)
+  expect(responseCode(response)).toBe('CONFLICT')
 })
 
-await test('maintenance reports must match consumed extractions before reaching the store', async () => {
+test('maintenance reports must match consumed extractions before reaching the store', async () => {
   const store = storeWithVersionFailure(new Error('store must not be called'))
   const reached: string[] = []
   store.reserveVersionPublication = () => {
@@ -805,20 +803,19 @@ await test('maintenance reports must match consumed extractions before reaching 
             source,
           },
         })
-        assert.equal(
+        expect(
           response.statusCode,
-          400,
           `${url} ${source.maintenance_report.summary}`,
-        )
-        assert.equal(responseCode(response), 'INVALID_BODY')
+        ).toBe(400)
+        expect(responseCode(response)).toBe('INVALID_BODY')
       }
   } finally {
     await app.close()
   }
-  assert.deepEqual(reached, [])
+  expect(reached).toStrictEqual([])
 })
 
-await test('a paused automatic version commit has its own 409 code', async () => {
+test('a paused automatic version commit has its own 409 code', async () => {
   const response = await postVersion(
     storeWithVersionFailure(
       new AutomationPausedError(
@@ -827,11 +824,11 @@ await test('a paused automatic version commit has its own 409 code', async () =>
     ),
   )
 
-  assert.equal(response.statusCode, 409)
-  assert.equal(responseCode(response), 'AUTOMATION_PAUSED')
+  expect(response.statusCode).toBe(409)
+  expect(responseCode(response)).toBe('AUTOMATION_PAUSED')
 })
 
-await test('restore moves the active pointer through its own operation', async () => {
+test('restore moves the active pointer through its own operation', async () => {
   const restores: unknown[] = []
   const store: MemoryCatalogStore = {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
@@ -891,13 +888,13 @@ await test('restore moves the active pointer through its own operation', async (
     payload,
   })
 
-  assert.equal(response.statusCode, 201)
-  assert.deepEqual(response.json(), {
+  expect(response.statusCode).toBe(201)
+  expect(response.json()).toStrictEqual({
     created: true,
     active_version: 1,
     operation_id: 'restore-1',
   })
-  assert.deepEqual(restores, [
+  expect(restores).toStrictEqual([
     {
       ...payload,
       actor: { kind: 'service', id: 'memory-catalog-operator' },
@@ -906,7 +903,7 @@ await test('restore moves the active pointer through its own operation', async (
   await app.close()
 })
 
-await test('memory tree version history is queryable through the public contract', async () => {
+test('memory tree version history is queryable through the public contract', async () => {
   const calls: unknown[] = []
   const store: MemoryCatalogStore = {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
@@ -984,30 +981,30 @@ await test('memory tree version history is queryable through the public contract
     headers,
   })
 
-  assert.equal(one.statusCode, 200)
-  assert.deepEqual(active.json(), {
+  expect(one.statusCode).toBe(200)
+  expect(active.json()).toStrictEqual({
     version: version.version,
     memory_tree_reference: version.memory_tree_reference,
   })
-  assert.deepEqual(one.json(), version)
-  assert.equal(missing.statusCode, 404)
-  assert.deepEqual(missing.json(), {
+  expect(one.json()).toStrictEqual(version)
+  expect(missing.statusCode).toBe(404)
+  expect(missing.json()).toStrictEqual({
     error: 'Memory tree version not found: 2',
     code: 'NOT_FOUND',
   })
-  assert.deepEqual(page.json(), {
+  expect(page.json()).toStrictEqual({
     versions: [version],
     next_before_version: null,
   })
   // The bound lives in the contract, so the page is refused by the same query
   // validation that guards every other declared parameter, before the store is read.
-  assert.equal(excessivePage.statusCode, 400)
-  assert.equal(excessivePage.json<{ code?: string }>().code, 'INVALID_BODY')
-  assert.deepEqual(calls, [{ beforeVersion: 3, limit: 10 }])
+  expect(excessivePage.statusCode).toBe(400)
+  expect(excessivePage.json<{ code?: string }>().code).toBe('INVALID_BODY')
+  expect(calls).toStrictEqual([{ beforeVersion: 3, limit: 10 }])
   await app.close()
 })
 
-await test('publication endpoints enforce producer roles and return complete recovery intents', async () => {
+test('publication endpoints enforce producer roles and return complete recovery intents', async () => {
   const store = storeWithVersionFailure(new Error('unused'))
   const intent = {
     expected_active_version: 0,
@@ -1034,22 +1031,22 @@ await test('publication endpoints enforce producer roles and return complete rec
         headers: operatorHeaders,
         payload: intent,
       })
-      assert.equal(denied.statusCode, 401)
+      expect(denied.statusCode).toBe(401)
       const accepted = await app.inject({
         method: 'POST',
         url: `/v1/memory-tree/versions/publications/${action}`,
         headers: workerHeaders,
         payload: intent,
       })
-      assert.equal(accepted.statusCode, 200)
-      assert.deepEqual(accepted.json<{ intent: unknown }>().intent, intent)
+      expect(accepted.statusCode).toBe(200)
+      expect(accepted.json<{ intent: unknown }>().intent).toStrictEqual(intent)
     }
     const listed = await app.inject({
       method: 'GET',
       url: '/v1/memory-tree/versions/publications/learning/maintenance-1',
       headers: workerHeaders,
     })
-    assert.deepEqual(listed.json(), {
+    expect(listed.json()).toStrictEqual({
       publications: [{ intent, status: 'reserved' }],
     })
     const forbidden = await app.inject({
@@ -1057,12 +1054,12 @@ await test('publication endpoints enforce producer roles and return complete rec
       url: '/v1/memory-tree/versions/publications/manual/edit-1',
       headers: workerHeaders,
     })
-    assert.equal(forbidden.statusCode, 401)
+    expect(forbidden.statusCode).toBe(401)
     const extractionIntent = {
       registration: extraction,
       summary: 'Original summary.',
     }
-    assert.equal(
+    expect(
       (
         await app.inject({
           method: 'POST',
@@ -1071,25 +1068,24 @@ await test('publication endpoints enforce producer roles and return complete rec
           payload: extractionIntent,
         })
       ).statusCode,
-      401,
-    )
+    ).toBe(401)
     const reserved = await app.inject({
       method: 'POST',
       url: '/v1/extractions/publications/reserve',
       headers: workerHeaders,
       payload: extractionIntent,
     })
-    assert.deepEqual(reserved.json(), {
+    expect(reserved.json()).toStrictEqual({
       intent: extractionIntent,
       status: 'reserved',
     })
-    assert.equal(calls.length, 1)
+    expect(calls.length).toBe(1)
   } finally {
     await app.close()
   }
 })
 
-await test('only workers can abandon automatic publications and abandoned commits have a distinct error code', async () => {
+test('only workers can abandon automatic publications and abandoned commits have a distinct error code', async () => {
   const store = storeWithVersionFailure(
     new PublicationAbandonedError('Version operation has been abandoned.'),
   )
@@ -1108,23 +1104,23 @@ await test('only workers can abandon automatic publications and abandoned commit
       headers: operatorHeaders,
       payload,
     })
-    assert.equal(denied.statusCode, 401)
+    expect(denied.statusCode).toBe(401)
     const invalid = await app.inject({
       method: 'POST',
       url,
       headers: workerHeaders,
       payload: { ...payload, kind: 'manual' },
     })
-    assert.equal(invalid.statusCode, 400)
+    expect(invalid.statusCode).toBe(400)
     const accepted = await app.inject({
       method: 'POST',
       url,
       headers: workerHeaders,
       payload,
     })
-    assert.equal(accepted.statusCode, 200)
-    assert.deepEqual(accepted.json(), { publications: [] })
-    assert.deepEqual(calls, [payload])
+    expect(accepted.statusCode).toBe(200)
+    expect(accepted.json()).toStrictEqual({ publications: [] })
+    expect(calls).toStrictEqual([payload])
     const committed = await app.inject({
       method: 'POST',
       url: '/v1/memory-tree/versions',
@@ -1135,9 +1131,8 @@ await test('only workers can abandon automatic publications and abandoned commit
         source: version.source,
       },
     })
-    assert.equal(committed.statusCode, 409)
-    assert.equal(
-      committed.json<{ code: string }>().code,
+    expect(committed.statusCode).toBe(409)
+    expect(committed.json<{ code: string }>().code).toBe(
       'PUBLICATION_ABANDONED',
     )
   } finally {

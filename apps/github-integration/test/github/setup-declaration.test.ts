@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   SetupDeclarationError,
@@ -36,50 +35,49 @@ function corpusFiles(): string[] {
 test('every corpus file is classified by the manifest', () => {
   const manifest = corpusManifest()
   const files = corpusFiles()
-  assert.ok(files.length > 0, 'expected shared setup-declaration corpus')
-  assert.deepStrictEqual(
+  expect.assert(files.length > 0, 'expected shared setup-declaration corpus')
+  expect(
     [...manifest.valid, ...manifest.invalid].sort(),
-    files,
     'manifest must classify every corpus file and nothing else'
-  )
-  assert.strictEqual(
+  ).toStrictEqual(files)
+  expect(
     manifest.valid.some((name) => manifest.invalid.includes(name)),
-    false,
     'a case cannot be both valid and invalid'
-  )
+  ).toBe(false)
 })
 
 test('shared setup-declaration corpus classifies consistently', () => {
   const manifest = corpusManifest()
   for (const name of manifest.valid) {
     const content = readFileSync(path.join(corpusDir, name), 'utf8')
-    assert.notStrictEqual(
+    expect(
       parseSetupDeclaration(content),
-      null,
       `${name} should parse to a declaration`
-    )
+    ).not.toBe(null)
   }
   for (const name of manifest.invalid) {
     const content = readFileSync(path.join(corpusDir, name), 'utf8')
-    assert.throws(
+    expect(
       () => parseSetupDeclaration(content),
-      SetupDeclarationError,
       `${name} should be rejected`
-    )
+    ).toThrow(SetupDeclarationError)
   }
 })
 
 test('blank content means no declaration', () => {
-  assert.strictEqual(parseSetupDeclaration(''), null)
-  assert.strictEqual(parseSetupDeclaration('   \n\n'), null)
+  expect(parseSetupDeclaration('')).toBe(null)
+  expect(parseSetupDeclaration('   \n\n')).toBe(null)
 })
 
 test('rejects an invalid declaration with a reason', () => {
-  assert.throws(
-    () => parseSetupDeclaration('setup:\n  - uses: actions/checkout@v4\n'),
-    (error: unknown) =>
-      error instanceof SetupDeclarationError &&
-      error.reason === 'unsupported-step-key'
+  expect(() =>
+    parseSetupDeclaration('setup:\n  - uses: actions/checkout@v4\n')
+  ).toThrow(
+    expect.toSatisfy(
+      (error: unknown) =>
+        error instanceof SetupDeclarationError &&
+        error.reason === 'unsupported-step-key'
+    )
   )
 })
 
@@ -91,9 +89,9 @@ test('accepts YAML 1.1 boolean words as plain strings under the Core schema', ()
     const declaration = parseSetupDeclaration(
       `setup:\n  - run: ${word}\n    working-directory: ${word}\n    env:\n      ${word}: ${word}\n`
     )
-    assert.strictEqual(declaration?.steps[0]?.run, word)
-    assert.strictEqual(declaration?.steps[0]?.working_directory, word)
-    assert.strictEqual(declaration?.steps[0]?.env[word], word)
+    expect(declaration?.steps[0]?.run).toBe(word)
+    expect(declaration?.steps[0]?.working_directory).toBe(word)
+    expect(declaration?.steps[0]?.env[word]).toBe(word)
   }
 })
 
@@ -101,40 +99,36 @@ test('rejects unquoted booleans and numbers in string positions', () => {
   // The words above are strings, but real booleans/numbers are not strings in
   // either dialect, so a string-valued position still rejects them.
   for (const raw of ['true', 'false', '123']) {
-    assert.throws(
+    expect(
       () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
-      SetupDeclarationError,
       `run: ${raw} should be rejected`
-    )
-    assert.throws(
+    ).toThrow(SetupDeclarationError)
+    expect(
       () =>
         parseSetupDeclaration(
           `setup:\n  - run: x\n    working-directory: ${raw}\n`
         ),
-      SetupDeclarationError,
       `working-directory: ${raw} should be rejected`
-    )
-    assert.throws(
+    ).toThrow(SetupDeclarationError)
+    expect(
       () =>
         parseSetupDeclaration(
           `setup:\n  - run: x\n    env:\n      FLAG: ${raw}\n`
         ),
-      SetupDeclarationError,
       `env value ${raw} should be rejected`
-    )
+    ).toThrow(SetupDeclarationError)
   }
 })
 
 test('rejects non-string env keys', () => {
   for (const raw of ['true', '123', '1.5', 'null', '~']) {
-    assert.throws(
+    expect(
       () =>
         parseSetupDeclaration(
           `setup:\n  - run: x\n    env:\n      ${raw}: ok\n`
         ),
-      SetupDeclarationError,
       `env key ${raw} should be rejected`
-    )
+    ).toThrow(SetupDeclarationError)
   }
 })
 
@@ -149,11 +143,10 @@ test('rejects explicit YAML tags', () => {
     '!!set {a}',
     '!!int 5'
   ]) {
-    assert.throws(
+    expect(
       () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
-      SetupDeclarationError,
       `explicit tag ${raw} should be rejected`
-    )
+    ).toThrow(SetupDeclarationError)
   }
 })
 
@@ -161,14 +154,13 @@ test('rejects a float-syntax timeout', () => {
   // `1.0`/`1e3` resolve to an integer-valued JS number, but the Execution Worker resolves
   // them to a Python float and rejects them; both sides reject by source text.
   for (const raw of ['1.0', '1e3', '1.0e2', '10.']) {
-    assert.throws(
+    expect(
       () =>
         parseSetupDeclaration(
           `setup:\n  - run: x\n    timeout_seconds: ${raw}\n`
         ),
-      SetupDeclarationError,
       `timeout ${raw} should be rejected`
-    )
+    ).toThrow(SetupDeclarationError)
   }
   for (const [raw, expected] of [
     ['100', 100],
@@ -178,19 +170,17 @@ test('rejects a float-syntax timeout', () => {
     ['0o10', 8],
     ['+5', 5]
   ] as const) {
-    assert.strictEqual(
+    expect(
       parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`)
         ?.steps[0]?.timeout_seconds,
-      expected,
       `timeout ${raw} should preserve its integer value`
-    )
+    ).toBe(expected)
   }
 })
 
 test('rejects an oversized declaration', () => {
   const filler = 'x'.repeat(65536 + 1)
-  assert.throws(
-    () => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`),
+  expect(() => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`)).toThrow(
     SetupDeclarationError
   )
 })
@@ -203,9 +193,11 @@ test('rejects an alias-expansion bomb as an invalid declaration', () => {
     const refs = Array.from({ length: 9 }, () => `*${prev}`).join(',')
     bomb += `${next}: &${next} [${refs}]\n`
   }
-  assert.throws(
-    () => parseSetupDeclaration(`setup:\n  - run: x\n${bomb}`),
-    (error: unknown) =>
-      error instanceof SetupDeclarationError && error.reason === 'invalid-yaml'
+  expect(() => parseSetupDeclaration(`setup:\n  - run: x\n${bomb}`)).toThrow(
+    expect.toSatisfy(
+      (error: unknown) =>
+        error instanceof SetupDeclarationError &&
+        error.reason === 'invalid-yaml'
+    )
   )
 })

@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { Pool } from 'pg'
 import {
   AutomationPausedError,
@@ -24,9 +23,9 @@ function artifact(character: string): ArtifactReference {
   }
 }
 
-await test('publication recovery preserves intents and attachment transactions select one complete result', async () => {
+test('publication recovery preserves intents and attachment transactions select one complete result', async () => {
   const databaseUrl = process.env.TEST_DATABASE_URL
-  assert(databaseUrl)
+  expect.assert(databaseUrl)
   const schema = `memory_publications_${crypto.randomUUID().replaceAll('-', '_')}`
   const admin = new Pool({ connectionString: databaseUrl })
   await admin.query(`create schema ${schema}`)
@@ -51,32 +50,28 @@ await test('publication recovery preserves intents and attachment transactions s
   }
   try {
     await store.initialize()
-    assert.equal(
-      (await store.reserveExtractionPublication(intent)).status,
+    expect((await store.reserveExtractionPublication(intent)).status).toBe(
       'reserved',
     )
-    await assert.rejects(
-      store.registerExtraction(intent.registration),
+    await expect(store.registerExtraction(intent.registration)).rejects.toThrow(
       ExtractionConflictError,
     )
-    await assert.rejects(
+    await expect(
       store.reserveExtractionPublication({
         ...intent,
         summary: 'Changed summary.',
       }),
-      ExtractionConflictError,
-    )
-    assert.deepEqual(await store.listExtractionPublications('extract-1'), [
+    ).rejects.toThrow(ExtractionConflictError)
+    expect(await store.listExtractionPublications('extract-1')).toStrictEqual([
       { intent, status: 'reserved' },
     ])
     await store.confirmExtractionPublication(intent)
-    assert.equal(await store.registerExtraction(intent.registration), true)
+    expect(await store.registerExtraction(intent.registration)).toBe(true)
     // A response-lost replay sees both the full intent and the authoritative attachment.
-    assert.equal(
+    expect(
       (await store.listExtractionPublications('extract-1'))[0]?.status,
-      'selected',
-    )
-    assert.equal(await store.registerExtraction(intent.registration), false)
+    ).toBe('selected')
+    expect(await store.registerExtraction(intent.registration)).toBe(false)
     const alternative = {
       ...intent,
       registration: {
@@ -86,14 +81,12 @@ await test('publication recovery preserves intents and attachment transactions s
     }
     await store.reserveExtractionPublication(alternative)
     await store.confirmExtractionPublication(alternative)
-    await assert.rejects(
+    await expect(
       store.registerExtraction(alternative.registration),
-      ExtractionConflictError,
-    )
-    assert.equal(
+    ).rejects.toThrow(ExtractionConflictError)
+    expect(
       (await store.listExtractionPublications('extract-1'))[1]?.status,
-      'present',
-    )
+    ).toBe('present')
 
     const version = {
       expected_active_version: 0,
@@ -107,8 +100,7 @@ await test('publication recovery preserves intents and attachment transactions s
       },
     }
     await store.reserveVersionPublication(version)
-    await assert.rejects(
-      store.createMemoryTreeVersion(version),
+    await expect(store.createMemoryTreeVersion(version)).rejects.toThrow(
       MemoryTreeVersionConflictError,
     )
     await store.confirmVersionPublication(version)
@@ -119,34 +111,34 @@ await test('publication recovery preserves intents and attachment transactions s
       store.createMemoryTreeVersion(version),
       store.createMemoryTreeVersion(competing),
     ])
-    assert.equal(
+    expect(
       outcomes.filter((outcome) => outcome.status === 'fulfilled').length,
-      1,
-    )
+    ).toBe(1)
     const failed = outcomes.find((outcome) => outcome.status === 'rejected')
-    assert(
+    expect.assert(
       failed?.status === 'rejected' &&
         failed.reason instanceof MemoryTreeVersionConflictError,
     )
-    assert.equal((await store.queries.getMemoryTree()).version, 1)
-    assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
+    expect((await store.queries.getMemoryTree()).version).toBe(1)
+    expect((await store.queries.getObservationBacklog()).pending_count).toBe(0)
     const publications = await store.listVersionPublications(
       'learning',
       'maintain-1',
     )
-    assert.equal(publications[0]?.status, 'selected')
-    assert.equal(publications[1]?.status, 'present')
-    const selected = publications[0].intent
-    assert(selected.source.kind === 'learning')
-    assert.equal(
+    expect(publications[0]?.status).toBe('selected')
+    expect(publications[1]?.status).toBe('present')
+    const selectedPublication = publications[0]
+    expect.assert(selectedPublication)
+    const selected = selectedPublication.intent
+    expect.assert(selected.source.kind === 'learning')
+    expect(
       (
         await store.createMemoryTreeVersion({
           ...selected,
           source: selected.source,
         })
       ).created,
-      false,
-    )
+    ).toBe(false)
 
     const operator = {
       expected_active_version: 0,
@@ -159,16 +151,14 @@ await test('publication recovery preserves intents and attachment transactions s
     }
     await store.reserveVersionPublication(operator)
     await store.confirmVersionPublication(operator)
-    await assert.rejects(
-      store.createMemoryTreeVersion(operator),
+    await expect(store.createMemoryTreeVersion(operator)).rejects.toThrow(
       MemoryTreeVersionConflictError,
     )
-    assert.equal(
+    expect(
       (await store.listVersionPublications('manual', 'edit-1'))[0]?.status,
-      'present',
       'CAS failure rolls back candidate selection',
-    )
-    assert.equal((await store.queries.getMemoryTree()).version, 1)
+    ).toBe('present')
+    expect((await store.queries.getMemoryTree()).version).toBe(1)
 
     // Different kinds must serialize on the same globally unique operation ID.
     const candidates = [
@@ -195,12 +185,11 @@ await test('publication recovery preserves intents and attachment transactions s
     const concurrent = await Promise.allSettled(
       candidates.map((candidate) => store.createMemoryTreeVersion(candidate)),
     )
-    assert.equal(
+    expect(
       concurrent.filter((result) => result.status === 'fulfilled').length,
-      1,
-    )
+    ).toBe(1)
     const rejected = concurrent.find((result) => result.status === 'rejected')
-    assert(
+    expect.assert(
       rejected?.status === 'rejected' &&
         rejected.reason instanceof MemoryTreeVersionConflictError,
     )
@@ -212,32 +201,29 @@ await test('publication recovery preserves intents and attachment transactions s
         ),
       ),
     )
-    assert.equal(
+    expect(
       recorded.flat().filter((publication) => publication.status === 'selected')
         .length,
-      1,
-    )
-    assert.equal((await store.queries.getMemoryTree()).version, 2)
+    ).toBe(1)
+    expect((await store.queries.getMemoryTree()).version).toBe(2)
 
     // Preparation cleanup is idempotent and never changes selected publications.
     await store.abandonVersionPublications({
       kind: 'learning',
       operation_id: 'maintain-1',
     })
-    assert.equal(
+    expect(
       (await store.listVersionPublications('learning', 'maintain-1'))[0]
         ?.status,
-      'selected',
-    )
-    assert.equal(
+    ).toBe('selected')
+    expect(
       (
         await store.createMemoryTreeVersion({
           ...selected,
           source: selected.source,
         })
       ).created,
-      false,
-    )
+    ).toBe(false)
     const prepared = {
       expected_active_version: 2,
       memory_tree_reference: artifact('c'),
@@ -252,32 +238,27 @@ await test('publication recovery preserves intents and attachment transactions s
     const other = { ...prepared, memory_tree_reference: artifact('f') }
     await store.reserveVersionPublication(other)
     await store.confirmVersionPublication(other)
-    assert.equal(
+    expect(
       (
         await store.abandonVersionPublications({
           kind: 'reorganization',
           operation_id: 'prepared',
         })
       ).length,
-      2,
-    )
-    assert.deepEqual(
+    ).toBe(2)
+    expect(
       await store.abandonVersionPublications({
         kind: 'reorganization',
         operation_id: 'prepared',
       }),
-      [],
-    )
-    assert.equal(
-      (await store.confirmVersionPublication(prepared)).status,
+    ).toStrictEqual([])
+    expect((await store.confirmVersionPublication(prepared)).status).toBe(
       'abandoned',
     )
-    assert.equal(
-      (await store.reserveVersionPublication(prepared)).status,
+    expect((await store.reserveVersionPublication(prepared)).status).toBe(
       'abandoned',
     )
-    await assert.rejects(
-      store.createMemoryTreeVersion(prepared),
+    await expect(store.createMemoryTreeVersion(prepared)).rejects.toThrow(
       PublicationAbandonedError,
     )
 
@@ -289,20 +270,18 @@ await test('publication recovery preserves intents and attachment transactions s
     await store.reserveVersionPublication(pausedCandidate)
     await store.confirmVersionPublication(pausedCandidate)
     await pool.query("update memory_tree_automation set state='paused'")
-    await assert.rejects(
+    await expect(
       store.createMemoryTreeVersion(pausedCandidate),
-      AutomationPausedError,
-    )
-    assert.equal(
+    ).rejects.toThrow(AutomationPausedError)
+    expect(
       (
         await store.listVersionPublications(
           'reorganization',
           'paused-candidate',
         )
       )[0]?.status,
-      'abandoned',
-    )
-    assert.equal((await store.queries.getMemoryTree()).version, 2)
+    ).toBe('abandoned')
+    expect((await store.queries.getMemoryTree()).version).toBe(2)
     // The two ways a candidate is abandoned are recorded apart, so an operator can tell a paused
     // commit from a worker's cleanup without reconstructing it from logs.
     const reasons = await pool.query<{
@@ -314,16 +293,15 @@ await test('publication recovery preserves intents and attachment transactions s
        where operation_id in ('prepared','paused-candidate')
        group by operation_id order by operation_id`,
     )
-    assert.deepEqual(reasons.rows, [
+    expect(reasons.rows).toStrictEqual([
       { operation_id: 'paused-candidate', reasons: ['automation_paused'] },
       { operation_id: 'prepared', reasons: ['worker_cleanup'] },
     ])
     await pool.query("update memory_tree_automation set state='enabled'")
     // A response-lost retry after resume must not submit the abandoned candidate.
-    await assert.rejects(
+    await expect(
       store.createMemoryTreeVersion(pausedCandidate),
-      PublicationAbandonedError,
-    )
+    ).rejects.toThrow(PublicationAbandonedError)
 
     // Commit and cleanup serialize: either a selected version survives or its candidate is abandoned.
     const racing = {
@@ -340,18 +318,20 @@ await test('publication recovery preserves intents and attachment transactions s
       }),
     ])
     const cleanup = race[1]
-    assert(cleanup?.status === 'fulfilled' && Array.isArray(cleanup.value))
+    expect.assert(
+      cleanup?.status === 'fulfilled' && Array.isArray(cleanup.value),
+    )
     const status = (
       await store.listVersionPublications('reorganization', 'racing')
     )[0]?.status
     if (cleanup.value.length) {
-      assert.equal(status, 'abandoned')
-      assert.equal((await store.queries.getMemoryTree()).version, 2)
-      assert.equal(race[0]?.status, 'rejected')
+      expect(status).toBe('abandoned')
+      expect((await store.queries.getMemoryTree()).version).toBe(2)
+      expect(race[0]?.status).toBe('rejected')
     } else {
-      assert.equal(status, 'selected')
-      assert.equal((await store.queries.getMemoryTree()).version, 3)
-      assert.equal(race[0]?.status, 'fulfilled')
+      expect(status).toBe('selected')
+      expect((await store.queries.getMemoryTree()).version).toBe(3)
+      expect(race[0]?.status).toBe('fulfilled')
     }
     // Abandonment is publication-scoped, not an operation-level ban. A late
     // attempt may reserve a new candidate after an abandon; only explicit
@@ -360,7 +340,7 @@ await test('publication recovery preserves intents and attachment transactions s
       kind: 'reorganization' as const,
       operation_id: 'late-publication',
     }
-    assert.deepEqual(await store.abandonVersionPublications(lateOwner), [])
+    expect(await store.abandonVersionPublications(lateOwner)).toStrictEqual([])
     const latePublication = {
       expected_active_version: (await store.queries.getMemoryTree()).version,
       memory_tree_reference: artifact('a'),
@@ -371,57 +351,50 @@ await test('publication recovery preserves intents and attachment transactions s
         maintenance_report: reorganizationReport,
       },
     }
-    assert.equal(
+    expect(
       (await store.reserveVersionPublication(latePublication)).status,
-      'reserved',
-    )
-    assert.equal(
+    ).toBe('reserved')
+    expect(
       (await store.confirmVersionPublication(latePublication)).status,
-      'present',
-    )
-    assert.equal(
+    ).toBe('present')
+    expect(
       (
         await store.listVersionPublications(
           'reorganization',
           'late-publication',
         )
       )[0]?.status,
-      'present',
-    )
+    ).toBe('present')
     await store.abandonVersionPublications(lateOwner)
     const laterPublication = {
       ...latePublication,
       memory_tree_reference: artifact('c'),
     }
-    assert.equal(
+    expect(
       (await store.reserveVersionPublication(laterPublication)).status,
-      'reserved',
-    )
-    assert.equal(
+    ).toBe('reserved')
+    expect(
       (await store.confirmVersionPublication(laterPublication)).status,
-      'present',
-    )
+    ).toBe('present')
     const latePublications = await store.listVersionPublications(
       lateOwner.kind,
       lateOwner.operation_id,
     )
-    assert.equal(latePublications.length, 2)
-    assert.equal(
+    expect(latePublications.length).toBe(2)
+    expect(
       latePublications.find(
         ({ intent }) =>
           intent.memory_tree_reference.digest ===
           latePublication.memory_tree_reference.digest,
       )?.status,
-      'abandoned',
-    )
-    assert.equal(
+    ).toBe('abandoned')
+    expect(
       latePublications.find(
         ({ intent }) =>
           intent.memory_tree_reference.digest ===
           laterPublication.memory_tree_reference.digest,
       )?.status,
-      'present',
-    )
+    ).toBe('present')
   } finally {
     await store.close()
     await admin.query(`drop schema ${schema} cascade`)

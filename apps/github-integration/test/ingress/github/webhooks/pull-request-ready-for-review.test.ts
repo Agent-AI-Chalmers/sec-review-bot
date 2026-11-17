@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handlePullRequestReadyForReviewWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-ready-for-review.js'
 import { unusedGitHub } from '../../../github-client.js'
@@ -82,12 +81,11 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
     }
   )
 
-  assert.strictEqual(
+  expect(
     reviewStarted,
-    false,
     'fork PR must not auto-review on ready_for_review'
-  )
-  assert.strictEqual(configFetched, false)
+  ).toBe(false)
+  expect(configFetched).toBe(false)
 })
 
 test('does not start a review when automatic mode is disabled', async () => {
@@ -108,5 +106,5 @@ test('does not start a review when automatic mode is disabled', async () => {
     }
   )
 
-  assert.strictEqual(reviewStarted, false)
+  expect(reviewStarted).toBe(false)
 })

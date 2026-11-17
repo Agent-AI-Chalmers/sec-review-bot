@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handleIssueOpenedWithDeps } from '../../../../src/ingress/github/webhooks/issue-opened.js'
 import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata-service.js'
@@ -82,7 +81,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
     }
   )
 
-  assert.strictEqual(reviewCalled, false)
+  expect(reviewCalled).toBe(false)
 })
 
 test('issue-opened skips self-originated payload before issue extraction', async () => {
@@ -109,7 +108,7 @@ test('issue-opened skips self-originated payload before issue extraction', async
       }
     )
 
-    assert.strictEqual(configFetched, false)
+    expect(configFetched).toBe(false)
   } finally {
     setGitHubAppMetadata()
   }
@@ -136,9 +135,9 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
     }
   )
 
-  assert.strictEqual(reviewCalled, true)
+  expect(reviewCalled).toBe(true)
   // The resolved trusted branch is forwarded to the command (wiring pinned).
-  assert.deepStrictEqual(forwarded, {
+  expect(forwarded).toStrictEqual({
     default_branch: 'main',
     head_sha: 'main-sha'
   })
@@ -153,7 +152,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
     reason: 'invalid-yaml'
   })
 
-  await assert.rejects(
+  await expect(
     handleIssueOpenedWithDeps(
       {
         id: 'delivery-test',
@@ -168,7 +167,10 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
           error
         ): error is RepositoryTriggerConfigError => Boolean(error)
       }
-    ),
-    configError
-  )
+    )
+  ).rejects.toMatchObject({
+    ...configError,
+    name: configError.name,
+    message: configError.message
+  })
 })

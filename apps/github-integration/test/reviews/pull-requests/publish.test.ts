@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 // These tests exercise the publication side effects, not attribution: the app must be able to
 // recognize its own bot so the shared check can answer. The one test that needs missing metadata
@@ -167,8 +166,8 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.strictEqual(issueComments.length, 0)
-  assert.strictEqual(pullReviews.length, 1)
+  expect(issueComments.length).toBe(0)
+  expect(pullReviews.length).toBe(1)
   const reviewArgs = pullReviews[0] as {
     body: string
     comments: unknown[]
@@ -178,27 +177,23 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     pull_number: number
     repo: string
   }
-  assert.deepStrictEqual(
-    {
-      ...reviewArgs,
-      body: '<body>'
-    },
-    {
-      owner: 'octo',
-      repo: 'example',
-      pull_number: 7,
-      commit_id: 'head-sha',
-      body: '<body>',
-      event: 'COMMENT',
-      comments: []
-    }
-  )
-  assert.match(
-    reviewArgs.body,
+  expect({
+    ...reviewArgs,
+    body: '<body>'
+  }).toStrictEqual({
+    owner: 'octo',
+    repo: 'example',
+    pull_number: 7,
+    commit_id: 'head-sha',
+    body: '<body>',
+    event: 'COMMENT',
+    comments: []
+  })
+  expect(reviewArgs.body).toMatch(
     /<!-- sec-review-bot:pull-request-review-run:run-1 -->/
   )
-  assert.match(reviewArgs.body, /## PR Security Review/)
-  assert.deepStrictEqual(completed, [
+  expect(reviewArgs.body).toMatch(/## PR Security Review/)
+  expect(completed).toStrictEqual([
     [
       'run-1',
       'test-claim',
@@ -261,8 +256,8 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.strictEqual(pullReviews.length, 1)
-  assert.strictEqual((pullReviews[0] as { event: string }).event, 'COMMENT')
+  expect(pullReviews.length).toBe(1)
+  expect((pullReviews[0] as { event: string }).event).toBe('COMMENT')
 })
 
 test('pull request publish approves when analysis is not confirmed', async () => {
@@ -328,9 +323,9 @@ test('pull request publish approves when analysis is not confirmed', async () =>
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.strictEqual(issueComments.length, 0)
-  assert.strictEqual(pullReviews.length, 1)
-  assert.strictEqual((pullReviews[0] as { event: string }).event, 'APPROVE')
+  expect(issueComments.length).toBe(0)
+  expect(pullReviews.length).toBe(1)
+  expect((pullReviews[0] as { event: string }).event).toBe('APPROVE')
 })
 
 test('pull request publish comments instead of approving a PR authored by the app bot', async () => {
@@ -382,10 +377,9 @@ test('pull request publish comments instead of approving a PR authored by the ap
     setGitHubAppMetadata({ slug: 'web-sec-bot' })
   }
 
-  assert.deepStrictEqual(
-    pullReviews.map((item) => (item as { event: string }).event),
-    ['COMMENT']
-  )
+  expect(
+    pullReviews.map((item) => (item as { event: string }).event)
+  ).toStrictEqual(['COMMENT'])
 })
 
 test('pull request publish falls back to comment when GitHub rejects own PR approval', async () => {
@@ -439,10 +433,9 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.deepStrictEqual(
-    pullReviews.map((item) => (item as { event: string }).event),
-    ['APPROVE', 'COMMENT']
-  )
+  expect(
+    pullReviews.map((item) => (item as { event: string }).event)
+  ).toStrictEqual(['APPROVE', 'COMMENT'])
 })
 
 test('pull request publish falls back to comment when own PR approval error is in response message', async () => {
@@ -496,10 +489,9 @@ test('pull request publish falls back to comment when own PR approval error is i
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.deepStrictEqual(
-    pullReviews.map((item) => (item as { event: string }).event),
-    ['APPROVE', 'COMMENT']
-  )
+  expect(
+    pullReviews.map((item) => (item as { event: string }).event)
+  ).toStrictEqual(['APPROVE', 'COMMENT'])
 })
 
 test('pull request publish leaves confirmed risks as non-blocking comments with inline suggestions', async () => {
@@ -568,12 +560,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.strictEqual(pullReviews.length, 1)
-  assert.strictEqual((pullReviews[0] as { event: string }).event, 'COMMENT')
-  assert.strictEqual(
-    (pullReviews[0] as { comments: unknown[] }).comments.length,
-    1
-  )
+  expect(pullReviews.length).toBe(1)
+  expect((pullReviews[0] as { event: string }).event).toBe('COMMENT')
+  expect((pullReviews[0] as { comments: unknown[] }).comments.length).toBe(1)
 })
 
 test('pull request publish does not create a fallback review after an uncertain suggestion submission', async () => {
@@ -589,7 +578,7 @@ test('pull request publish does not create a fallback review after an uncertain 
     return githubJson({})
   })
 
-  await assert.rejects(
+  await expect(
     handlePullRequestReviewRun({
       run: {
         run_id: 'run-uncertain',
@@ -621,11 +610,10 @@ test('pull request publish does not create a fallback review after an uncertain 
       claim_token: 'test-claim',
       assert_publication_claim: async () => {},
       installation_octokit_for_repo: async () => octokit
-    }),
-    /connection reset/
-  )
+    })
+  ).rejects.toThrow(/connection reset/)
 
-  assert.strictEqual(createCalls, 1)
+  expect(createCalls).toBe(1)
 })
 
 test('an unattributable PR author is never approved', async () => {
@@ -651,7 +639,7 @@ test('an unattributable PR author is never approved', async () => {
   })
 
   try {
-    await assert.rejects(
+    await expect(
       handlePullRequestReviewRun({
         run: {
           run_id: 'run-1',
@@ -675,19 +663,17 @@ test('an unattributable PR author is never approved', async () => {
         claim_token: 'test-claim',
         assert_publication_claim: async () => {},
         installation_octokit_for_repo: async () => octokit
-      }),
-      /metadata is not loaded/
-    )
+      })
+    ).rejects.toThrow(/metadata is not loaded/)
   } finally {
     // Restore the suite-wide metadata so later tests are not left in the fail-closed state.
     setGitHubAppMetadata({ slug: 'web-sec-bot' })
   }
 
-  assert.deepStrictEqual(
+  expect(
     pullReviews.map((item) => (item as { event: string }).event),
-    [],
     'no review may be created while attribution is unknown'
-  )
+  ).toStrictEqual([])
 })
 
 test('an exhausted PR review step is concluded from the review already on the pull request', async () => {
@@ -757,15 +743,14 @@ test('an exhausted PR review step is concluded from the review already on the pu
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.deepStrictEqual(settles, [
+  expect(settles).toStrictEqual([
     {
       stepKey: 'pull-request:review',
       found: { remote: { id: 31, url: 'https://example.test/review/31' } }
     }
   ])
-  assert.deepStrictEqual(
+  expect(
     pullReviews,
-    [],
     'a settled step must never submit another review'
-  )
+  ).toStrictEqual([])
 })

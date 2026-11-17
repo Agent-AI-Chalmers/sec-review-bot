@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parseExecutionArchiveArtifact } from '../src/temporal-execution-client.js'
 
@@ -14,37 +13,35 @@ const artifact = {
   },
 } as const
 
-await test('accepts the workflow-owned execution archive reference', () => {
-  assert.deepEqual(parseExecutionArchiveArtifact(artifact, 'run-1'), artifact)
+test('accepts the workflow-owned execution archive reference', () => {
+  expect(parseExecutionArchiveArtifact(artifact, 'run-1')).toStrictEqual(
+    artifact,
+  )
 })
 
-await test('rejects the deleted standalone trajectory object', () => {
-  assert.throws(
-    () =>
-      parseExecutionArchiveArtifact(
-        {
-          ...artifact,
-          artifact: {
-            ...artifact.artifact,
-            uri: 's3://sec-review/runs/run-1/trajectories/review-trajectories.v1.tar.zst',
-          },
+test('rejects the deleted standalone trajectory object', () => {
+  expect(() =>
+    parseExecutionArchiveArtifact(
+      {
+        ...artifact,
+        artifact: {
+          ...artifact.artifact,
+          uri: 's3://sec-review/runs/run-1/trajectories/review-trajectories.v1.tar.zst',
         },
-        'run-1',
-      ),
+      },
+      'run-1',
+    ),
+  ).toThrow(/invalid execution archive URI/)
+})
+
+test('binds the diagnostic reference to the requested run', () => {
+  expect(() => parseExecutionArchiveArtifact(artifact, 'run-2')).toThrow(
     /invalid execution archive URI/,
   )
 })
 
-await test('binds the diagnostic reference to the requested run', () => {
-  assert.throws(
-    () => parseExecutionArchiveArtifact(artifact, 'run-2'),
-    /invalid execution archive URI/,
-  )
-})
-
-await test('requires a successful diagnostic publication', () => {
-  assert.throws(
-    () => parseExecutionArchiveArtifact(undefined, 'run-1'),
+test('requires a successful diagnostic publication', () => {
+  expect(() => parseExecutionArchiveArtifact(undefined, 'run-1')).toThrow(
     /missing artifact_storage/,
   )
 })
@@ -113,7 +110,7 @@ for (const [name, value] of Object.entries({
     artifact: { ...artifact.artifact, uri: `${artifact.artifact.uri}#archive` },
   },
 })) {
-  await test(`rejects ${name}`, () => {
-    assert.throws(() => parseExecutionArchiveArtifact(value, 'run-1'))
+  test(`rejects ${name}`, () => {
+    expect(() => parseExecutionArchiveArtifact(value, 'run-1')).toThrow()
   })
 }

@@ -1,10 +1,9 @@
-import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import test from 'node:test'
+import { expect, afterAll, beforeAll, test } from 'vitest'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
@@ -34,7 +33,7 @@ let suiteTempRoot: string
 let suiteInputBundleRoot: string
 const previousInputBundleRoot = process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
 
-test.before(async () => {
+beforeAll(async () => {
   suiteTempRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), 'prepare-input-suite-')
   )
@@ -42,7 +41,7 @@ test.before(async () => {
   process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = suiteInputBundleRoot
 })
 
-test.after(async () => {
+afterAll(async () => {
   if (previousInputBundleRoot === undefined)
     delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
   else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousInputBundleRoot
@@ -118,10 +117,10 @@ function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
 
 function assertPathIsWithin(parent: string, candidate: string): void {
   const relative = path.relative(parent, candidate)
-  assert.notStrictEqual(relative, '')
-  assert.notStrictEqual(relative, '..')
-  assert.strictEqual(path.isAbsolute(relative), false)
-  assert.strictEqual(relative.startsWith(`..${path.sep}`), false)
+  expect(relative).not.toBe('')
+  expect(relative).not.toBe('..')
+  expect(path.isAbsolute(relative)).toBe(false)
+  expect(relative.startsWith(`..${path.sep}`)).toBe(false)
 }
 
 /** Assert the archive behind a prepared input.
@@ -143,13 +142,12 @@ async function assertRunnerInputArtifact<
   runId: string
 }): Promise<void> {
   const inputBundle = input['input_bundle'] as Record<string, unknown>
-  assert.strictEqual(inputBundle['media_type'], 'application/tar+zstd')
+  expect(inputBundle['media_type']).toBe('application/tar+zstd')
   const archivePath = fileURLToPath(String(inputBundle['uri']))
-  assert.strictEqual(archivePath, `${inputBundleRoot}.tar.zst`)
+  expect(archivePath).toBe(`${inputBundleRoot}.tar.zst`)
   const archive = await fs.readFile(archivePath)
-  assert.strictEqual(inputBundle['size_bytes'], archive.byteLength)
-  assert.strictEqual(
-    inputBundle['digest'],
+  expect(inputBundle['size_bytes']).toBe(archive.byteLength)
+  expect(inputBundle['digest']).toBe(
     `sha256:${crypto.createHash('sha256').update(archive).digest('hex')}`
   )
   const { stdout: archiveListing } = await execFileAsync('tar', [
@@ -157,28 +155,20 @@ async function assertRunnerInputArtifact<
     '-tf',
     archivePath
   ])
-  assert.match(archiveListing, /^manifest\.json$/m)
-  assert.match(
-    archiveListing,
+  expect(archiveListing).toMatch(/^manifest\.json$/m)
+  expect(archiveListing).toMatch(
     new RegExp(`^${WORKSPACE_SNAPSHOT_TAR_NAME}$`, 'm')
   )
-  assert.doesNotMatch(archiveListing, /^workspace\//m)
-  assert.doesNotMatch(archiveListing, /review-input\.json$/m)
-  assert.strictEqual(path.basename(path.dirname(inputBundleRoot)), runId)
+  expect(archiveListing).not.toMatch(/^workspace\//m)
+  expect(archiveListing).not.toMatch(/review-input\.json$/m)
+  expect(path.basename(path.dirname(inputBundleRoot))).toBe(runId)
   assertPathIsWithin(suiteInputBundleRoot, inputBundleRoot)
   assertPathIsWithin(inputBundleRoot, inputPath)
   const keys = collectKeys(input)
   for (const key of PRIVATE_EXECUTION_INPUT_KEYS) {
-    assert.strictEqual(
-      keys.has(key),
-      false,
-      `execution input must not expose ${key}`
-    )
+    expect(keys.has(key), `execution input must not expose ${key}`).toBe(false)
   }
-  assert.deepStrictEqual(
-    JSON.parse(await fs.readFile(inputPath, 'utf8')),
-    input
-  )
+  expect(JSON.parse(await fs.readFile(inputPath, 'utf8'))).toStrictEqual(input)
 }
 
 function repositoryOctokit(refs: {
@@ -242,7 +232,7 @@ function repositoryOctokit(refs: {
 
 test(
   'issue input preparer keeps materialized git workspace files in snapshot',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     const tempRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), 'issue-input-workspace-')
@@ -330,11 +320,11 @@ test(
         issue,
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.strictEqual(prepared.input.api_version, 'v1')
-      assert.deepStrictEqual(prepared.input.review_intent, {
+      expect(prepared.input.api_version).toBe('v1')
+      expect(prepared.input.review_intent).toStrictEqual({
         objective: 'audit'
       })
-      assert.strictEqual(prepared.input.issue.repo_full_name, 'octo/demo')
+      expect(prepared.input.issue.repo_full_name).toBe('octo/demo')
       await assertRunnerInputArtifact({
         input: prepared.input,
         inputBundleRoot: prepared.input_bundle_root,
@@ -347,7 +337,7 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.deepStrictEqual(manifest, {
+      expect(manifest).toStrictEqual({
         api_version: EXECUTION_API_VERSION,
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }
@@ -361,13 +351,12 @@ test(
         extractedSnapshot
       ])
 
-      assert.strictEqual(
+      expect(
         await fs.readFile(
           path.join(extractedSnapshot, 'workspace', 'src', 'app.ts'),
           'utf8'
-        ),
-        'export const value = 1\n'
-      )
+        )
+      ).toBe('export const value = 1\n')
     } finally {
       if (previousGitHubServerUrl === undefined) {
         delete process.env['GITHUB_SERVER_URL']
@@ -381,7 +370,7 @@ test(
 
 test(
   'pull request input preparer writes a canonical execution bundle',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pr-input-'))
     const previousServer = process.env['GITHUB_SERVER_URL']
@@ -466,9 +455,9 @@ test(
         inputPath: prepared.input_path,
         runId: prepared.run_id
       })
-      assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
-      assert.strictEqual('pullRequest' in prepared.input, false)
-      assert.strictEqual('repository' in prepared.input, false)
+      expect(prepared.input.pr.repo_full_name).toBe('octo/demo')
+      expect('pullRequest' in prepared.input).toBe(false)
+      expect('repository' in prepared.input).toBe(false)
       // The file handed to the agent carries only what a review can act on.
       // Identity fields stay in the execution input; putting them in this file
       // spends agent context and offers extra ranges that can be mistaken for
@@ -479,20 +468,19 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.deepStrictEqual(Object.keys(agent_metadata).sort(), [
+      expect(Object.keys(agent_metadata).sort()).toStrictEqual([
         'commit_shas',
         'review_window'
       ])
-      assert.strictEqual(
-        (agent_metadata['review_window'] as Record<string, unknown>)['kind'],
-        'full'
-      )
+      expect(
+        (agent_metadata['review_window'] as Record<string, unknown>)['kind']
+      ).toBe('full')
 
       // The execution input carries the review subject, not the raw webhook
       // payload: no endpoint URLs, commit counts, or sender identity.
-      assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
-      assert.strictEqual(prepared.input.pr.base_sha, refs.base_sha)
-      assert.deepStrictEqual(Object.keys(prepared.input.pr).sort(), [
+      expect(prepared.input.pr.repo_full_name).toBe('octo/demo')
+      expect(prepared.input.pr.base_sha).toBe(refs.base_sha)
+      expect(Object.keys(prepared.input.pr).sort()).toStrictEqual([
         'base_ref',
         'base_sha',
         'body',
@@ -513,8 +501,8 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.strictEqual('incremental_window' in manifest, true)
-      assert.strictEqual(
+      expect('incremental_window' in manifest).toBe(true)
+      expect(
         await fs
           .readFile(
             path.join(
@@ -524,9 +512,8 @@ test(
             ),
             'utf8'
           )
-          .then(Boolean),
-        true
-      )
+          .then(Boolean)
+      ).toBe(true)
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
@@ -537,7 +524,7 @@ test(
 
 test(
   'repository input preparer writes full and incremental execution bundles',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-input-'))
     const previousServer = process.env['GITHUB_SERVER_URL']
@@ -563,17 +550,17 @@ test(
         inputPath: full.input_path,
         runId: full.run_id
       })
-      assert.strictEqual(full.input.scan_target.scan_mode, 'full')
-      assert.strictEqual('max_file_bytes' in full.input.scan_scope, false)
-      assert.strictEqual('repo_full_name' in full.input.scan_target, false)
-      assert.strictEqual('repository' in full.input, false)
+      expect(full.input.scan_target.scan_mode).toBe('full')
+      expect('max_file_bytes' in full.input.scan_scope).toBe(false)
+      expect('repo_full_name' in full.input.scan_target).toBe(false)
+      expect('repository' in full.input).toBe(false)
       const fullManifest = JSON.parse(
         await fs.readFile(
           path.join(full.input_bundle_root, 'manifest.json'),
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.strictEqual('incremental_window' in fullManifest, false)
+      expect('incremental_window' in fullManifest).toBe(false)
 
       await fs.writeFile(
         path.join(full.input_bundle_root, 'stale-from-failed-attempt.txt'),
@@ -589,15 +576,14 @@ test(
         },
         scan_mode: 'full'
       })
-      await assert.rejects(
+      await expect(
         fs.access(
           path.join(
             retriedFull.input_bundle_root,
             'stale-from-failed-attempt.txt'
           )
-        ),
-        { code: 'ENOENT' }
-      )
+        )
+      ).rejects.toMatchObject({ code: 'ENOENT' })
 
       const incremental = await prepareRepositoryReviewInput({
         run_id: 'run-repo-incremental',
@@ -617,17 +603,17 @@ test(
         inputPath: incremental.input_path,
         runId: incremental.run_id
       })
-      assert.strictEqual(incremental.input.scan_target.scan_mode, 'incremental')
-      assert.strictEqual(incremental.input.scan_target.base_sha, refs.base_sha)
+      expect(incremental.input.scan_target.scan_mode).toBe('incremental')
+      expect(incremental.input.scan_target.base_sha).toBe(refs.base_sha)
       const changed_paths =
         incremental.input.scan_scope.incremental_changed_files.map(
           (file) => file.path
         )
-      assert.ok(
+      expect.assert(
         changed_paths.includes('src/app.ts'),
         `the workspace change is missing from the scan scope: ${changed_paths.join(', ')}`
       )
-      assert.ok(
+      expect.assert(
         !changed_paths.includes('from-api.ts'),
         'the scan scope was read from the compare response instead of the workspace'
       )
@@ -639,8 +625,8 @@ test(
         ),
         'utf8'
       )
-      assert.match(incremental_patch, /src\/app\.ts/)
-      assert.doesNotMatch(incremental_patch, /from-api\.ts/)
+      expect(incremental_patch).toMatch(/src\/app\.ts/)
+      expect(incremental_patch).not.toMatch(/from-api\.ts/)
 
       // The bundle is what the agent reads, so the file has to be there. The manifest and the
       // prompts both name this path; asserting only that they mention it let the file itself
@@ -659,23 +645,22 @@ test(
         head_sha: string
         files: { path: string; status: string; previous_path: string | null }[]
       }
-      assert.strictEqual(incremental_changed_files.base_sha, refs.base_sha)
-      assert.strictEqual(incremental_changed_files.head_sha, refs.head_sha)
-      assert.deepStrictEqual(
+      expect(incremental_changed_files.base_sha).toBe(refs.base_sha)
+      expect(incremental_changed_files.head_sha).toBe(refs.head_sha)
+      expect(
         incremental_changed_files.files.map((file) => [
           file.path,
           file.status,
           file.previous_path
-        ]),
-        [['src/app.ts', 'modified', null]]
-      )
+        ])
+      ).toStrictEqual([['src/app.ts', 'modified', null]])
       const incrementalManifest = JSON.parse(
         await fs.readFile(
           path.join(incremental.input_bundle_root, 'manifest.json'),
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.strictEqual('incremental_window' in incrementalManifest, true)
+      expect('incremental_window' in incrementalManifest).toBe(true)
 
       // One writer produces the window record for both modes, so a field cannot exist in one
       // and be missing from the other.
@@ -689,10 +674,10 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.strictEqual(scan_window['scan_mode'], 'incremental')
-      assert.strictEqual(scan_window['base_sha'], refs.base_sha)
-      assert.strictEqual(scan_window['head_sha'], refs.head_sha)
-      assert.strictEqual(typeof scan_window['changed_file_count'], 'number')
+      expect(scan_window['scan_mode']).toBe('incremental')
+      expect(scan_window['base_sha']).toBe(refs.base_sha)
+      expect(scan_window['head_sha']).toBe(refs.head_sha)
+      expect(typeof scan_window['changed_file_count']).toBe('number')
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
@@ -703,7 +688,7 @@ test(
 
 test(
   'a push window keeps the patch and changed files on the same range',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     // The regression this prevents: `changed-files.json` describing only the
     // pushed commits while `incremental.patch` covered the whole pull request.
@@ -814,28 +799,25 @@ test(
         'utf8'
       )
 
-      assert.deepStrictEqual(
-        changed_files.files.map((item) => item.path),
-        ['src/app.ts']
-      )
+      expect(changed_files.files.map((item) => item.path)).toStrictEqual([
+        'src/app.ts'
+      ])
       // The patch must be exactly the push window, not the whole pull request.
       // The fixture is base=1, mid=2, head=3, so a push window over mid..head
       // shows 2 -> 3 and a full-window patch would show 1 -> 3 instead.
-      assert.match(patch, /^-export const value = 2$/m)
-      assert.match(patch, /^\+export const value = 3$/m)
-      assert.doesNotMatch(patch, /value = 1/)
+      expect(patch).toMatch(/^-export const value = 2$/m)
+      expect(patch).toMatch(/^\+export const value = 3$/m)
+      expect(patch).not.toMatch(/value = 1/)
       const hunk_count = (patch.match(/^@@/gm) ?? []).length
-      assert.strictEqual(hunk_count, 1)
+      expect(hunk_count).toBe(1)
 
       // The third artifact -- the file set suggestion anchoring uses -- must agree with the
       // other two. When it came from the API's per-file list, a large run could anchor against a
       // narrower set than the patch covered, and the three would describe different changes.
-      assert.deepStrictEqual(
-        prepared.files.map((item: { filename: string }) => item.filename),
-        changed_files.files.map((item) => item.path)
-      )
-      assert.match(
-        prepared.files[0]?.patch ?? '',
+      expect(
+        prepared.files.map((item: { filename: string }) => item.filename)
+      ).toStrictEqual(changed_files.files.map((item) => item.path))
+      expect(prepared.files[0]?.patch ?? '').toMatch(
         /^\+export const value = 3$/m
       )
     } finally {

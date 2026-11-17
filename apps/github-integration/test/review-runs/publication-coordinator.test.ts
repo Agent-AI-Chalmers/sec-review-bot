@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   publishReviewRunsOnce,
@@ -172,14 +171,14 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
 
   // The pass asks Review Runs to hold the claim, so a run that becomes publishable
   // mid-interval is picked up then instead of at the next poll.
-  assert.ok(
+  expect.assert(
     (claimWaits[0] ?? 0) > 0,
     'a publication pass must ask for a bounded wait'
   )
-  assert.strictEqual(installationLookups, 0)
-  assert.strictEqual(completionAttempts, 0)
+  expect(installationLookups).toBe(0)
+  expect(completionAttempts).toBe(0)
   // Nothing was asked of GitHub at all: a failed lease renewal stops the pass before any lookup.
-  assert.deepStrictEqual(requests, [])
+  expect(requests).toStrictEqual([])
 })
 
 test('explicit ownership checks share a failing in-flight heartbeat', async () => {
@@ -236,16 +235,15 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
     publicationHeartbeatIntervalMs: async () => 1
   } satisfies PublicationHeartbeatStore
 
-  await assert.rejects(
+  await expect(
     withPublicationHeartbeat(store, work, async (assertOwned) => {
       await heartbeatStarted
       const ownership = assertOwned()
       resolveHeartbeat?.(false)
       await ownership
-    }),
-    PublicationClaimLostError
-  )
-  assert.strictEqual(renewals, 2)
+    })
+  ).rejects.toThrow(PublicationClaimLostError)
+  expect(renewals).toBe(2)
 })
 
 test('a reconciliation that loses the step ends the publication instead of holding its lease', async () => {
@@ -266,7 +264,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
     stepKey: 'repository:summary-issue',
     find: async () => null
   })
-  assert.deepStrictEqual(lost, { outcome: 'not_owned' })
+  expect(lost).toStrictEqual({ outcome: 'not_owned' })
 
   const failures: Array<{
     code: string | null | undefined
@@ -366,17 +364,16 @@ test('a reconciliation that loses the step ends the publication instead of holdi
 
   await publishReviewRunsOnce({ app, store })
 
-  assert.strictEqual(settlementAttempts, 1, 'the step was reconciled once')
-  assert.deepStrictEqual(
+  expect(settlementAttempts, 'the step was reconciled once').toBe(1)
+  expect(
     failures,
-    [
-      {
-        code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
-        retry: false
-      }
-    ],
     'a lost reconciliation is recorded as a terminal failure, which releases the claim'
-  )
+  ).toStrictEqual([
+    {
+      code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+      retry: false
+    }
+  ])
 })
 
 test('a publication that cannot complete names the steps that kept it from completing', async () => {
@@ -477,13 +474,12 @@ test('a publication that cannot complete names the steps that kept it from compl
     console.error = restore
   }
 
-  assert.strictEqual(messages.length, 1)
-  assert.match(messages[0] ?? '', /^PUBLICATION_STEPS_INCOMPLETE: /)
-  assert.match(
-    messages[0] ?? '',
+  expect(messages.length).toBe(1)
+  expect(messages[0] ?? '').toMatch(/^PUBLICATION_STEPS_INCOMPLETE: /)
+  expect(messages[0] ?? '').toMatch(
     /repository:delivery:gone \(uncertain, GITHUB_TIMEOUT\)/
   )
-  assert.doesNotMatch(messages[0] ?? '', /repository:summary-issue/)
+  expect(messages[0] ?? '').not.toMatch(/repository:summary-issue/)
 })
 
 test('a refused conclusion is logged as left for the operator when a step is parked', async () => {
@@ -579,27 +575,29 @@ test('a refused conclusion is logged as left for the operator when a step is par
   }
 
   const parked = await run('disconnected')
-  assert.ok(
+  expect.assert(
     parked.some(
       (line) =>
         line.includes('review_publication_left_for_operator') &&
         line.includes('repository:delivery:gone')
     )
   )
-  assert.ok(
+  expect.assert(
     !parked.some((line) => line.includes('review_publication_claim_lost'))
   )
 
   const lost = await run('pending')
-  assert.ok(lost.some((line) => line.includes('review_publication_claim_lost')))
-  assert.ok(
+  expect.assert(
+    lost.some((line) => line.includes('review_publication_claim_lost'))
+  )
+  expect.assert(
     !lost.some((line) => line.includes('review_publication_left_for_operator'))
   )
 
   // A publish error is the diagnosis; a refused conclusion only explains why the run did not
   // change, so it must not replace the error in the log.
   const thrown = await run('disconnected', true)
-  assert.ok(
+  expect.assert(
     thrown.some(
       (line) =>
         line.includes('review_publication_failed') &&
@@ -607,21 +605,21 @@ test('a refused conclusion is logged as left for the operator when a step is par
     ),
     'the publish error is logged even though its conclusion was refused'
   )
-  assert.ok(
+  expect.assert(
     thrown.some((line) => line.includes('review_publication_left_for_operator'))
   )
 
   // When the steps cannot be read the lost-claim warning stays, and the read failure says why
   // the refusal could not be explained.
   const unreadable = await run('unreadable')
-  assert.ok(
+  expect.assert(
     unreadable.some(
       (line) =>
         line.includes('review_publication_refusal_unexplained') &&
         line.includes('Review Runs unreachable')
     )
   )
-  assert.ok(
+  expect.assert(
     unreadable.some((line) => line.includes('review_publication_claim_lost'))
   )
 })

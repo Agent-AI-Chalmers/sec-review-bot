@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { Readable } from 'node:stream'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { App } from 'octokit'
 
@@ -99,8 +98,8 @@ test('repository dispatch forwards test_changes to repository review submission'
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 202)
-  assert.deepStrictEqual(calls, [{ test_changes: 'deny' }])
+  expect(response.statusCodeValue).toBe(202)
+  expect(calls).toStrictEqual([{ test_changes: 'deny' }])
 })
 
 test('repository dispatch returns preparing as soon as durable admission completes', async () => {
@@ -131,8 +130,8 @@ test('repository dispatch returns preparing as soon as durable admission complet
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 202)
-  assert.deepStrictEqual(JSON.parse(response.body ?? '{}'), {
+  expect(response.statusCodeValue).toBe(202)
+  expect(JSON.parse(response.body ?? '{}')).toStrictEqual({
     ok: true,
     accepted: true,
     status: 'pending',
@@ -158,11 +157,11 @@ test('repository dispatch requires a correlation id before starting a review', a
     response,
     oidcVerifier: oidcVerifier(),
     dispatchReview: async () =>
-      assert.fail('invalid dispatch must not start a review')
+      expect.unreachable('invalid dispatch must not start a review')
   })
 
-  assert.strictEqual(response.statusCodeValue, 400)
-  assert.match(String(response.body), /correlation_id is required/)
+  expect(response.statusCodeValue).toBe(400)
+  expect(String(response.body)).toMatch(/correlation_id is required/)
 })
 
 test('repository dispatch rejects manual incremental without base_sha as a bad request', async () => {
@@ -188,9 +187,8 @@ test('repository dispatch rejects manual incremental without base_sha as a bad r
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 400)
-  assert.match(
-    String(response.body),
+  expect(response.statusCodeValue).toBe(400)
+  expect(String(response.body)).toMatch(
     /manual incremental scan requires base_sha/
   )
 })
@@ -216,10 +214,9 @@ test('repository dispatch does not echo internal submission errors', async () =>
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 500)
-  assert.match(String(response.body), /Repository review dispatch failed/)
-  assert.doesNotMatch(
-    String(response.body),
+  expect(response.statusCodeValue).toBe(500)
+  expect(String(response.body)).toMatch(/Repository review dispatch failed/)
+  expect(String(response.body)).not.toMatch(
     /sensitive execution failure detail/
   )
 })
@@ -245,8 +242,8 @@ test('repository dispatch rejects oversized request bodies before authentication
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 413)
-  assert.match(String(response.body), /too large/)
+  expect(response.statusCodeValue).toBe(413)
+  expect(String(response.body)).toMatch(/too large/)
 })
 
 test('repository dispatch rejects missing OIDC token', async () => {
@@ -272,8 +269,8 @@ test('repository dispatch rejects missing OIDC token', async () => {
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 401)
-  assert.match(String(response.body), /Missing GitHub Actions OIDC token/)
+  expect(response.statusCodeValue).toBe(401)
+  expect(String(response.body)).toMatch(/Missing GitHub Actions OIDC token/)
 })
 
 test('repository dispatch rejects OIDC repository mismatch', async () => {
@@ -299,8 +296,8 @@ test('repository dispatch rejects OIDC repository mismatch', async () => {
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /repository does not match/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/repository does not match/)
 })
 
 test('repository dispatch passes the canonical OIDC repository to admission', async () => {
@@ -328,8 +325,8 @@ test('repository dispatch passes the canonical OIDC repository to admission', as
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 202)
-  assert.strictEqual(verifiedRepository, 'octo/example')
+  expect(response.statusCodeValue).toBe(202)
+  expect(verifiedRepository).toBe('octo/example')
 })
 
 test('repository dispatch rejects disallowed OIDC event', async () => {
@@ -355,8 +352,8 @@ test('repository dispatch rejects disallowed OIDC event', async () => {
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /event is not allowed/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/event is not allowed/)
 })
 
 test('repository dispatch rejects OIDC ref mismatch', async () => {
@@ -382,8 +379,8 @@ test('repository dispatch rejects OIDC ref mismatch', async () => {
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /ref does not match/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/ref does not match/)
 })
 
 test('repository dispatch rejects disallowed OIDC workflow', async () => {
@@ -409,8 +406,8 @@ test('repository dispatch rejects disallowed OIDC workflow', async () => {
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /workflow is not allowed/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/workflow is not allowed/)
 })
 
 test('repository dispatch does not accept job_workflow_ref as the dispatch workflow', async () => {
@@ -438,8 +435,8 @@ test('repository dispatch does not accept job_workflow_ref as the dispatch workf
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /workflow is not allowed/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/workflow is not allowed/)
 })
 
 test('repository dispatch rejects OIDC workflow from a different branch', async () => {
@@ -466,6 +463,6 @@ test('repository dispatch rejects OIDC workflow from a different branch', async 
     }
   })
 
-  assert.strictEqual(response.statusCodeValue, 403)
-  assert.match(String(response.body), /workflow is not allowed/)
+  expect(response.statusCodeValue).toBe(403)
+  expect(String(response.body)).toMatch(/workflow is not allowed/)
 })

@@ -4,9 +4,8 @@
 // keeps semantic keys and pins values to the contract at compile time (the `satisfies`), but
 // the reverse direction — that every contract code has a key here, and none is missing or
 // extra — has to be asserted at runtime, since the keys are not the code strings.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse as parseYaml } from 'yaml'
 
@@ -21,11 +20,10 @@ test('the keyed error-code map covers exactly the contract enum', () => {
   const fromKeys = Object.values(PUBLICATION_STEP_ERROR_CODES).sort()
   const fromContract = [...PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT].sort()
 
-  assert.deepStrictEqual(
+  expect(
     fromKeys,
-    fromContract,
     'PUBLICATION_STEP_ERROR_CODES and the contract enum have drifted'
-  )
+  ).toStrictEqual(fromContract)
 })
 
 test('the closed error-code set is exactly the contract enum', () => {
@@ -44,9 +42,8 @@ test('the closed error-code set is exactly the contract enum', () => {
   const enumValues =
     spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
 
-  assert.deepStrictEqual(
+  expect(
     [...ERROR_RESPONSE_CODES_FROM_CONTRACT].sort(),
-    [...(enumValues as string[])].sort(),
     'ERROR_RESPONSE_CODES_FROM_CONTRACT must list every contract code and nothing else'
-  )
+  ).toStrictEqual([...(enumValues as string[])].sort())
 })

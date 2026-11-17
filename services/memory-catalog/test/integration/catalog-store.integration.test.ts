@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool } from 'pg'
 
@@ -31,7 +30,7 @@ function artifact(name: string, digestCharacter: string): ArtifactReference {
   }
 }
 
-await test('PostgreSQL store preserves extraction and version invariants', async () => {
+test('PostgreSQL store preserves extraction and version invariants', async () => {
   const observationBody = 'Preserve this repository-specific fact.'
   const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
   const administrator = new Pool({ connectionString: databaseUrl })
@@ -66,9 +65,9 @@ await test('PostgreSQL store preserves extraction and version invariants', async
     }
     await store.reserveExtractionPublication(publication)
     await store.confirmExtractionPublication(publication)
-    assert.equal(await store.registerExtraction(extraction), true)
-    assert.equal(await store.registerExtraction(extraction), false)
-    await assert.rejects(
+    expect(await store.registerExtraction(extraction)).toBe(true)
+    expect(await store.registerExtraction(extraction)).toBe(false)
+    await expect(
       store.registerExtraction({
         ...extraction,
         observations: [
@@ -78,16 +77,13 @@ await test('PostgreSQL store preserves extraction and version invariants', async
           },
         ],
       }),
-      ExtractionConflictError,
-    )
+    ).rejects.toThrow(ExtractionConflictError)
 
     const stored = await store.queries.getExtraction(extraction.extraction_id)
-    assert.equal(
-      stored?.observations[0]?.body_markdown,
+    expect(stored?.observations[0]?.body_markdown).toBe(
       extraction.observations[0]?.body_markdown,
     )
-    assert.deepEqual(
-      stored?.trajectory_reference,
+    expect(stored?.trajectory_reference).toStrictEqual(
       extraction.trajectory_reference,
     )
 
@@ -95,20 +91,19 @@ await test('PostgreSQL store preserves extraction and version invariants', async
       sourceRunId: extraction.source_run_id,
       hasObservation: true,
     })
-    assert.deepEqual(extractionPage.extractions, [stored])
-    assert.equal(extractionPage.next_cursor, null)
-    assert.equal(
+    expect(extractionPage.extractions).toStrictEqual([stored])
+    expect(extractionPage.next_cursor).toBe(null)
+    expect(
       (
         await store.queries.listObservations(undefined, 10, {
           status: 'pending',
         })
       ).observations[0]?.extraction_id,
-      extraction.extraction_id,
-    )
+    ).toBe(extraction.extraction_id)
 
     const learningInput = await store.getLearningInput(10)
-    assert.equal(learningInput?.expected_active_version, 0)
-    assert.deepEqual(learningInput?.observations, [
+    expect(learningInput?.expected_active_version).toBe(0)
+    expect(learningInput?.observations).toStrictEqual([
       {
         observation_id: extraction.extraction_id,
         body_markdown: observationBody,
@@ -131,44 +126,42 @@ await test('PostgreSQL store preserves extraction and version invariants', async
     }
     await store.reserveVersionPublication(versionInput)
     await store.confirmVersionPublication(versionInput)
-    assert.deepEqual(await store.createMemoryTreeVersion(versionInput), {
+    expect(await store.createMemoryTreeVersion(versionInput)).toStrictEqual({
       created: true,
       version: 1,
       source: { kind: 'learning', operation_id: 'maintenance-1' },
     })
-    assert.deepEqual(await store.createMemoryTreeVersion(versionInput), {
+    expect(await store.createMemoryTreeVersion(versionInput)).toStrictEqual({
       created: false,
       version: 1,
       source: { kind: 'learning', operation_id: 'maintenance-1' },
     })
 
-    assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
-    assert.equal((await store.queries.getMemoryTree()).version, 1)
-    assert.equal(
+    expect((await store.queries.getObservationBacklog()).pending_count).toBe(0)
+    expect((await store.queries.getMemoryTree()).version).toBe(1)
+    expect(
       (await store.queries.getMemoryTreeVersion(1))?.predecessor_version,
-      null,
-    )
+    ).toBe(null)
 
     const history = await store.queries.listMemoryTreeVersions(undefined, 10)
-    assert.deepEqual(history.versions, [
+    expect(history.versions).toStrictEqual([
       await store.queries.getMemoryTreeVersion(1),
     ])
-    assert.equal(history.next_before_version, null)
+    expect(history.next_before_version).toBe(null)
     const consumed = await store.queries.listObservations(undefined, 10, {
       status: 'consumed',
       consumedVersion: 1,
     })
-    assert.equal(consumed.observations[0]?.consumed_version, 1)
-    assert.deepEqual(
+    expect(consumed.observations[0]?.consumed_version).toBe(1)
+    expect(
       (
         await store.queries.listObservations(undefined, 10, {
           status: 'pending',
         })
       ).observations,
-      [],
-    )
+    ).toStrictEqual([])
 
-    await assert.rejects(
+    await expect(
       store.createMemoryTreeVersion({
         expected_active_version: 0,
         memory_tree_reference: artifact(
@@ -181,8 +174,7 @@ await test('PostgreSQL store preserves extraction and version invariants', async
           actor: { kind: 'user', id: 'reviewer@example.com' },
         },
       }),
-      MemoryTreeVersionConflictError,
-    )
+    ).rejects.toThrow(MemoryTreeVersionConflictError)
 
     const reorganizationInput = {
       expected_active_version: 1,
@@ -214,33 +206,36 @@ await test('PostgreSQL store preserves extraction and version invariants', async
       const conflictingInput = { ...reorganizationInput, source }
       await store.reserveVersionPublication(conflictingInput)
       await store.confirmVersionPublication(conflictingInput)
-      await assert.rejects(
+      await expect(
         store.createMemoryTreeVersion(conflictingInput),
-        MemoryTreeVersionConflictError,
-      )
+      ).rejects.toThrow(MemoryTreeVersionConflictError)
     }
-    assert.equal((await store.queries.getMemoryTree()).version, 1)
+    expect((await store.queries.getMemoryTree()).version).toBe(1)
 
     await store.reserveVersionPublication(reorganizationInput)
     await store.confirmVersionPublication(reorganizationInput)
-    assert.deepEqual(await store.createMemoryTreeVersion(reorganizationInput), {
+    expect(
+      await store.createMemoryTreeVersion(reorganizationInput),
+    ).toStrictEqual({
       created: true,
       version: 2,
       source: { kind: 'reorganization', operation_id: 'reorganization-1' },
     })
-    assert.deepEqual(await store.createMemoryTreeVersion(reorganizationInput), {
+    expect(
+      await store.createMemoryTreeVersion(reorganizationInput),
+    ).toStrictEqual({
       created: false,
       version: 2,
       source: { kind: 'reorganization', operation_id: 'reorganization-1' },
     })
     const queries = new PostgresMemoryCatalogQueries(pool)
     const version = await queries.getMemoryTreeVersion(2)
-    assert.deepEqual(version?.source, reorganizationInput.source)
+    expect(version?.source).toStrictEqual(reorganizationInput.source)
     const reorganizationHistory = await queries.listMemoryTreeVersions(
       undefined,
       10,
     )
-    assert.deepEqual(reorganizationHistory.versions[0], version)
+    expect(reorganizationHistory.versions[0]).toStrictEqual(version)
 
     const actor = { kind: 'user' as const, id: 'reviewer@example.com' }
     const pause = {
@@ -249,15 +244,13 @@ await test('PostgreSQL store preserves extraction and version invariants', async
       actor,
     }
     const paused = await store.changeMemoryTreeAutomation('paused', pause)
-    assert.equal(paused.automation.state, 'paused')
-    assert.equal(
-      (await store.createMemoryTreeVersion(versionInput)).created,
+    expect(paused.automation.state).toBe('paused')
+    expect((await store.createMemoryTreeVersion(versionInput)).created).toBe(
       false,
     )
-    assert.equal(
+    expect(
       (await store.createMemoryTreeVersion(reorganizationInput)).created,
-      false,
-    )
+    ).toBe(false)
 
     const pendingExtraction = {
       ...extraction,
@@ -275,7 +268,7 @@ await test('PostgreSQL store preserves extraction and version invariants', async
     }
     await store.reserveExtractionPublication(pendingPublication)
     await store.confirmExtractionPublication(pendingPublication)
-    assert.equal(await store.registerExtraction(pendingExtraction), true)
+    expect(await store.registerExtraction(pendingExtraction)).toBe(true)
     for (const source of [
       {
         ...versionInput.source,
@@ -291,16 +284,14 @@ await test('PostgreSQL store preserves extraction and version invariants', async
       }
       await store.reserveVersionPublication(candidate)
       await store.confirmVersionPublication(candidate)
-      await assert.rejects(
-        store.createMemoryTreeVersion(candidate),
+      await expect(store.createMemoryTreeVersion(candidate)).rejects.toThrow(
         AutomationPausedError,
       )
-      assert.equal(
+      expect(
         (
           await store.listVersionPublications(source.kind, source.operation_id)
         )[0]?.status,
-        'abandoned',
-      )
+      ).toBe('abandoned')
     }
     const manual = {
       expected_active_version: 2,
@@ -313,9 +304,9 @@ await test('PostgreSQL store preserves extraction and version invariants', async
     }
     await store.reserveVersionPublication(manual)
     await store.confirmVersionPublication(manual)
-    assert.equal((await store.createMemoryTreeVersion(manual)).version, 3)
-    assert.equal((await store.queries.getObservationBacklog()).pending_count, 1)
-    assert.equal(
+    expect((await store.createMemoryTreeVersion(manual)).version).toBe(3)
+    expect((await store.queries.getObservationBacklog()).pending_count).toBe(1)
+    expect(
       (
         await store.restoreMemoryTree({
           operation_id: 'restore-while-paused',
@@ -324,20 +315,20 @@ await test('PostgreSQL store preserves extraction and version invariants', async
           actor,
         })
       ).active_version,
-      1,
-    )
+    ).toBe(1)
     const resumed = await store.changeMemoryTreeAutomation('enabled', {
       operation_id: 'resume-automation',
       expected_version: 1,
       actor,
     })
-    assert.equal(resumed.automation.state, 'enabled')
-    assert.deepEqual(await store.changeMemoryTreeAutomation('paused', pause), {
+    expect(resumed.automation.state).toBe('enabled')
+    expect(
+      await store.changeMemoryTreeAutomation('paused', pause),
+    ).toStrictEqual({
       ...paused,
       created: false,
     })
-    assert.deepEqual(
-      await store.queries.getMemoryTreeAutomation(),
+    expect(await store.queries.getMemoryTreeAutomation()).toStrictEqual(
       resumed.automation,
     )
   } finally {
@@ -347,7 +338,7 @@ await test('PostgreSQL store preserves extraction and version invariants', async
   }
 })
 
-await test('one extraction publishes multiple observations that paginate and consume independently', async () => {
+test('one extraction publishes multiple observations that paginate and consume independently', async () => {
   const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
   const administrator = new Pool({ connectionString: databaseUrl })
   await administrator.query(`create schema ${schema}`)
@@ -382,8 +373,8 @@ await test('one extraction publishes multiple observations that paginate and con
     }
     await store.reserveExtractionPublication(intent)
     await store.confirmExtractionPublication(intent)
-    assert.equal(await store.registerExtraction(extraction), true)
-    assert.equal(await store.registerExtraction(extraction), false)
+    expect(await store.registerExtraction(extraction)).toBe(true)
+    expect(await store.registerExtraction(extraction)).toBe(false)
     const collision = { ...extraction, extraction_id: 'another-run' }
     const collisionIntent = {
       registration: collision,
@@ -391,48 +382,40 @@ await test('one extraction publishes multiple observations that paginate and con
     }
     await store.reserveExtractionPublication(collisionIntent)
     await store.confirmExtractionPublication(collisionIntent)
-    await assert.rejects(
-      store.registerExtraction(collision),
+    await expect(store.registerExtraction(collision)).rejects.toThrow(
       ExtractionConflictError,
     )
-    assert.equal(await store.queries.getExtraction('another-run'), undefined)
-    assert.equal(
+    expect(await store.queries.getExtraction('another-run')).toBe(undefined)
+    expect(
       (await store.listExtractionPublications('another-run'))[0]?.status,
-      'present',
-    )
-    assert.deepEqual(
+    ).toBe('present')
+    expect(
       (await store.queries.getExtraction('one-run'))?.observations,
-      extraction.observations,
-    )
-    assert.equal(
+    ).toStrictEqual(extraction.observations)
+    expect(
       (await store.queries.listExtractions(undefined, 1, {})).extractions
         .length,
-      1,
-    )
+    ).toBe(1)
     // Equal timestamps force the observation ID to act as the pagination tie-breaker.
     await pool.query('update observations set created_at=$1', [
       '2026-01-01T00:00:00Z',
     ])
     const first = await store.queries.listObservations(undefined, 1, {})
-    assert(first.next_cursor)
+    expect.assert(first.next_cursor)
     const second = await store.queries.listObservations(
       first.next_cursor,
       1,
       {},
     )
-    assert.deepEqual(
-      [
-        first.observations[0]?.observation_id,
-        second.observations[0]?.observation_id,
-      ],
-      ['lesson-b', 'lesson-a'],
-    )
-    assert.equal(second.next_cursor, null)
+    expect([
+      first.observations[0]?.observation_id,
+      second.observations[0]?.observation_id,
+    ]).toStrictEqual(['lesson-b', 'lesson-a'])
+    expect(second.next_cursor).toBe(null)
     const input = await store.getLearningInput(1)
-    assert.deepEqual(
+    expect(
       input?.observations.map((item) => item.observation_id),
-      ['lesson-a'],
-    )
+    ).toStrictEqual(['lesson-a'])
     const version = {
       expected_active_version: 0,
       memory_tree_reference: artifact('tree', 'e'),
@@ -446,19 +429,18 @@ await test('one extraction publishes multiple observations that paginate and con
     }
     await store.reserveVersionPublication(version)
     await store.confirmVersionPublication(version)
-    assert.equal((await store.createMemoryTreeVersion(version)).created, true)
-    assert.equal((await store.createMemoryTreeVersion(version)).created, false)
-    assert.deepEqual(
+    expect((await store.createMemoryTreeVersion(version)).created).toBe(true)
+    expect((await store.createMemoryTreeVersion(version)).created).toBe(false)
+    expect(
       (await store.getLearningInput(10))?.observations.map(
         (item) => item.observation_id,
       ),
-      ['lesson-b'],
-    )
-    assert.equal((await store.queries.getObservationBacklog()).pending_count, 1)
+    ).toStrictEqual(['lesson-b'])
+    expect((await store.queries.getObservationBacklog()).pending_count).toBe(1)
     const overview = await store.queries.getCatalogOverview('all')
-    assert.equal(overview.totals.completed_extraction_count, 1)
-    assert.equal(overview.totals.extracted_unit_count, 1)
-    assert.equal(overview.totals.observation_count, 2)
+    expect(overview.totals.completed_extraction_count).toBe(1)
+    expect(overview.totals.extracted_unit_count).toBe(1)
+    expect(overview.totals.observation_count).toBe(2)
   } finally {
     await store.close()
     await administrator.query(`drop schema if exists ${schema} cascade`)

@@ -1,8 +1,7 @@
 // Verifies the integration's typed Review Runs client at its HTTP and
 // contract boundary, without involving connector workflow behavior.
-import assert from 'node:assert/strict'
 import { ReadableStream } from 'node:stream/web'
-import test from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import {
   reviewRunsClient,
@@ -57,7 +56,7 @@ test('repository preparation can replace the admitted empty publish context', as
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -65,9 +64,7 @@ test('repository preparation can replace the admitted empty publish context', as
     else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/v1/runs') && init?.method === 'POST') {
@@ -84,7 +81,7 @@ test('repository preparation can replace the admitted empty publish context', as
         url.endsWith('/v1/runs/run-1/submission') &&
         init?.method === 'POST'
       ) {
-        assert.deepStrictEqual(sentBody(init).publish_context, {
+        expect(sentBody(init).publish_context).toStrictEqual({
           repo: {
             owner_login: 'octo',
             repo_name: 'example',
@@ -118,7 +115,7 @@ test('repository preparation can replace the admitted empty publish context', as
     preparation_input_version: 'v1',
     preparation_input: { kind: 'test' }
   })
-  assert.strictEqual(admission.record.execution.status, 'pending')
+  expect(admission.record.execution.status).toBe('pending')
 
   await reviewRunsClient.submitPreparedRun(
     'run-1',
@@ -150,7 +147,7 @@ test('Review Runs calls have a bounded request timeout', async (t) => {
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS = '10'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -160,9 +157,7 @@ test('Review Runs calls have a bounded request timeout', async (t) => {
       delete process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS
     else process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS = previousTimeout
   })
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (
       _input: string | URL | Request,
       init?: RequestInit
@@ -178,8 +173,9 @@ test('Review Runs calls have a bounded request timeout', async (t) => {
       })
   )
 
-  await assert.rejects(
-    reviewRunsClient.renewPublicationClaim('run-1', 'claim-1'),
+  await expect(
+    reviewRunsClient.renewPublicationClaim('run-1', 'claim-1')
+  ).rejects.toSatisfy(
     (error: unknown) =>
       error instanceof Error &&
       'code' in error &&
@@ -192,7 +188,7 @@ test('Review Runs success responses have a bounded body', async (t) => {
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -200,9 +196,7 @@ test('Review Runs success responses have a bounded body', async (t) => {
     else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
   })
   let bodyCancelled = false
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async () =>
       new Response(
         new ReadableStream({
@@ -217,14 +211,15 @@ test('Review Runs success responses have a bounded body', async (t) => {
       )
   )
 
-  await assert.rejects(
-    reviewRunsClient.renewPublicationClaim('run-1', 'claim-1'),
+  await expect(
+    reviewRunsClient.renewPublicationClaim('run-1', 'claim-1')
+  ).rejects.toSatisfy(
     (error: unknown) =>
       error instanceof Error &&
       'code' in error &&
       error.code === 'REVIEW_RUNS_RESPONSE_TOO_LARGE'
   )
-  assert.strictEqual(bodyCancelled, true)
+  expect(bodyCancelled).toBe(true)
 })
 
 test('run notice lease operations use the notice claim routes', async (t) => {
@@ -232,7 +227,7 @@ test('run notice lease operations use the notice claim routes', async (t) => {
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -241,9 +236,7 @@ test('run notice lease operations use the notice claim routes', async (t) => {
   })
 
   const requests: Array<{ url: string; method: string; body?: unknown }> = []
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
       requests.push({
@@ -259,15 +252,11 @@ test('run notice lease operations use the notice claim routes', async (t) => {
     }
   )
 
-  assert.strictEqual(
-    await reviewRunsClient.renewRunNoticeClaim('notice-1', 'claim-1'),
-    true
-  )
-  assert.strictEqual(
-    await reviewRunsClient.runNoticeHeartbeatIntervalMs(),
-    20_000
-  )
-  assert.deepStrictEqual(requests, [
+  expect(
+    await reviewRunsClient.renewRunNoticeClaim('notice-1', 'claim-1')
+  ).toBe(true)
+  expect(await reviewRunsClient.runNoticeHeartbeatIntervalMs()).toBe(20_000)
+  expect(requests).toStrictEqual([
     {
       url: 'http://review-runs.test/v1/run-notices/notice-1/claim',
       method: 'POST',
@@ -285,7 +274,7 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -297,9 +286,7 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     method: string
     body: Record<string, unknown>
   }> = []
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
       requests.push({
@@ -328,20 +315,18 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     }
   )
 
-  await assert.rejects(
-    reviewRunsClient.claimNextPublication(),
+  await expect(reviewRunsClient.claimNextPublication()).rejects.toThrow(
     /Persisted publish context is invalid/
   )
-  assert.deepStrictEqual(requests[0]?.body, { wait_ms: 0 })
+  expect(requests[0]?.body).toStrictEqual({ wait_ms: 0 })
   // `run_id` rides the URL path now, not the body: the fail call targets
   // /v1/runs/run-1/publication/fail with token + failure + retry in the body.
-  assert.strictEqual(
-    requests[1]?.url.endsWith('/v1/runs/run-1/publication/fail'),
+  expect(requests[1]?.url.endsWith('/v1/runs/run-1/publication/fail')).toBe(
     true
   )
-  assert.strictEqual('run_id' in requests[1]!.body, false)
-  assert.strictEqual(requests[1]?.body.token, 'claim-1')
-  assert.deepStrictEqual(requests[1]?.body.retry, false)
+  expect('run_id' in requests[1]!.body).toBe(false)
+  expect(requests[1]?.body.token).toBe('claim-1')
+  expect(requests[1]?.body.retry).toStrictEqual(false)
 })
 
 test('void operations accept the empty 200 body the real server sends', async (t) => {
@@ -356,7 +341,7 @@ test('void operations accept the empty 200 body the real server sends', async (t
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -364,34 +349,26 @@ test('void operations accept the empty 200 body the real server sends', async (t
     else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async () => new Response('', { status: 200 })
   )
 
-  assert.strictEqual(
-    await reviewRunsClient.initializePublicationSteps('run-1', 'claim-1', [
-      'a'
-    ]),
-    undefined
-  )
-  assert.strictEqual(
-    await reviewRunsClient.requirePublicationStepClaim('run-1', 'claim-1', 'a'),
-    undefined
-  )
-  assert.strictEqual(
+  expect(
+    await reviewRunsClient.initializePublicationSteps('run-1', 'claim-1', ['a'])
+  ).toBe(undefined)
+  expect(
+    await reviewRunsClient.requirePublicationStepClaim('run-1', 'claim-1', 'a')
+  ).toBe(undefined)
+  expect(
     await reviewRunsClient.checkpointPreparationInput('run-1', 'prep-1', {
       resolved: true
-    }),
-    undefined
-  )
-  assert.strictEqual(
+    })
+  ).toBe(undefined)
+  expect(
     await reviewRunsClient.failPreparation('run-1', 'prep-1', {
       message: 'x'
-    }),
-    undefined
-  )
+    })
+  ).toBe(undefined)
 })
 
 test('a Review Runs refusal carries the HTTP status that tells it apart from a fault', async (t) => {
@@ -404,7 +381,7 @@ test('a Review Runs refusal carries the HTTP status that tells it apart from a f
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
     else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
     if (previousToken === undefined)
@@ -412,7 +389,7 @@ test('a Review Runs refusal carries the HTTP status that tells it apart from a f
     else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
   })
 
-  t.mock.method(globalThis, 'fetch', async () =>
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
     Response.json(
       {
         error: 'Publication step has no attempts left; reconcile first.',
@@ -425,13 +402,12 @@ test('a Review Runs refusal carries the HTTP status that tells it apart from a f
   const error = await reviewRunsClient
     .requirePublicationStepClaim('run-1', 'claim-1', 'issue:draft-pr')
     .then(
-      () => assert.fail('the refusal must be raised'),
+      () => expect.unreachable('the refusal must be raised'),
       (raised: unknown) => raised
     )
-  assert.strictEqual(errorCode(error), 'PUBLICATION_STEP_RETRY_EXHAUSTED')
-  assert.strictEqual(
+  expect(errorCode(error)).toBe('PUBLICATION_STEP_RETRY_EXHAUSTED')
+  expect(
     asErrorWithResponse(error).status,
-    409,
     'the client reports the status Review Runs answered with'
-  )
+  ).toBe(409)
 })

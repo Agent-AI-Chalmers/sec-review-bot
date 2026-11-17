@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { Pool } from 'pg'
 
 function databaseUrl(): string {
@@ -37,10 +36,10 @@ test('authenticated run queries are redacted, paginated, and survive a server re
   let server = await startReviewRunsServer()
   try {
     const unauthorized = await fetch(`${base}/v1/runs?limit=1`)
-    assert.strictEqual(unauthorized.status, 401)
+    expect(unauthorized.status).toBe(401)
     const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
-    assert.strictEqual(unfiltered.status, 200)
-    assert.deepStrictEqual(await unfiltered.json(), {
+    expect(unfiltered.status).toBe(200)
+    expect(await unfiltered.json()).toStrictEqual({
       runs: [],
       next_cursor: null
     })
@@ -53,62 +52,56 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         headers: readAuth
       }
     )
-    assert.strictEqual(invalidExecutionStatus.status, 400)
-    assert.strictEqual(
-      ((await invalidExecutionStatus.json()) as { code?: string }).code,
-      'INVALID_QUERY'
-    )
+    expect(invalidExecutionStatus.status).toBe(400)
+    expect(
+      ((await invalidExecutionStatus.json()) as { code?: string }).code
+    ).toBe('INVALID_QUERY')
     const invalidPublicationStatus = await fetch(
       `${base}/v1/runs?publication_status=typo`,
       {
         headers: readAuth
       }
     )
-    assert.strictEqual(invalidPublicationStatus.status, 400)
-    assert.strictEqual(
-      ((await invalidPublicationStatus.json()) as { code?: string }).code,
-      'INVALID_QUERY'
-    )
+    expect(invalidPublicationStatus.status).toBe(400)
+    expect(
+      ((await invalidPublicationStatus.json()) as { code?: string }).code
+    ).toBe('INVALID_QUERY')
     const invalidPreparationStatus = await fetch(
       `${base}/v1/runs?preparation_status=typo`,
       {
         headers: readAuth
       }
     )
-    assert.strictEqual(invalidPreparationStatus.status, 400)
-    assert.strictEqual(
-      ((await invalidPreparationStatus.json()) as { code?: string }).code,
-      'INVALID_QUERY'
-    )
+    expect(invalidPreparationStatus.status).toBe(400)
+    expect(
+      ((await invalidPreparationStatus.json()) as { code?: string }).code
+    ).toBe('INVALID_QUERY')
     const invalidSourcePlatform = await fetch(
       `${base}/v1/runs?source_platform=gitlab`,
       { headers: readAuth }
     )
-    assert.strictEqual(invalidSourcePlatform.status, 400)
-    assert.strictEqual(
-      ((await invalidSourcePlatform.json()) as { code?: string }).code,
-      'INVALID_QUERY'
-    )
+    expect(invalidSourcePlatform.status).toBe(400)
+    expect(
+      ((await invalidSourcePlatform.json()) as { code?: string }).code
+    ).toBe('INVALID_QUERY')
     const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, {
       headers: readAuth
     })
-    assert.strictEqual(invalidWorkflow.status, 400)
-    assert.strictEqual(
-      ((await invalidWorkflow.json()) as { code?: string }).code,
+    expect(invalidWorkflow.status).toBe(400)
+    expect(((await invalidWorkflow.json()) as { code?: string }).code).toBe(
       'INVALID_QUERY'
     )
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, {
       headers: readAuth
     })
-    assert.strictEqual(invalidLimit.status, 400)
+    expect(invalidLimit.status).toBe(400)
     // An undeclared query parameter is rejected, matching the request bodies' refusal of
     // undeclared fields: the query is one `additionalProperties: false` object.
     const unknownParameter = await fetch(`${base}/v1/runs?bogus=1`, {
       headers: readAuth
     })
-    assert.strictEqual(unknownParameter.status, 400)
-    assert.strictEqual(
-      ((await unknownParameter.json()) as { code?: string }).code,
+    expect(unknownParameter.status).toBe(400)
+    expect(((await unknownParameter.json()) as { code?: string }).code).toBe(
       'INVALID_QUERY'
     )
 
@@ -124,7 +117,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         ingress_key: 'delivery:missing-workflow'
       })
     })
-    assert.strictEqual(missingWorkflow.status, 400)
+    expect(missingWorkflow.status).toBe(400)
 
     const runIds: string[] = []
     for (const ingressKey of [
@@ -143,7 +136,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
           preparation_input: { kind: 'test' }
         })
       })
-      assert.strictEqual(admitted.status, 200)
+      expect(admitted.status).toBe(200)
       const body = (await admitted.json()) as { record: { run_id: string } }
       runIds.push(body.record.run_id)
     }
@@ -152,9 +145,9 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       headers: readAuth
     })
     const detailText = await detail.text()
-    assert.strictEqual(detail.status, 200)
-    assert.strictEqual(detailText.includes('must-not-leak'), false)
-    assert.strictEqual(detailText.includes('publish_context'), false)
+    expect(detail.status).toBe(200)
+    expect(detailText.includes('must-not-leak')).toBe(false)
+    expect(detailText.includes('publish_context')).toBe(false)
 
     const firstPage = await fetch(`${base}/v1/runs?limit=1`, {
       headers: readAuth
@@ -163,8 +156,8 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       runs: Array<{ run_id: string }>
       next_cursor: string | null
     }
-    assert.strictEqual(firstBody.runs.length, 1)
-    assert.notStrictEqual(firstBody.next_cursor, null)
+    expect(firstBody.runs.length).toBe(1)
+    expect(firstBody.next_cursor).not.toBe(null)
     const secondPage = await fetch(
       `${base}/v1/runs?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor ?? '')}`,
       { headers: readAuth }
@@ -172,8 +165,8 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const secondBody = (await secondPage.json()) as {
       runs: Array<{ run_id: string }>
     }
-    assert.strictEqual(secondBody.runs.length, 1)
-    assert.notStrictEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
+    expect(secondBody.runs.length).toBe(1)
+    expect(secondBody.runs[0]?.run_id).not.toBe(firstBody.runs[0]?.run_id)
 
     // The coordination event log is the operator timeline the console renders. Its read path
     // is new, so pin the whole HTTP surface: authentication, the admission events, oldest-first
@@ -181,11 +174,11 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const unauthorizedEvents = await fetch(
       `${base}/v1/runs/${runIds[0]}/events`
     )
-    assert.strictEqual(unauthorizedEvents.status, 401)
+    expect(unauthorizedEvents.status).toBe(401)
     const events = await fetch(`${base}/v1/runs/${runIds[0]}/events`, {
       headers: readAuth
     })
-    assert.strictEqual(events.status, 200)
+    expect(events.status).toBe(200)
     const eventsBody = (await events.json()) as {
       run_id: string
       events: Array<{
@@ -196,26 +189,27 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         occurred_at: string
       }>
     }
-    assert.strictEqual(eventsBody.run_id, runIds[0])
+    expect(eventsBody.run_id).toBe(runIds[0])
     // Admission writes one event per axis inside the admitting transaction.
-    assert.deepStrictEqual(
-      eventsBody.events.map((event) => `${event.axis}:${event.to_status}`),
-      ['execution:pending', 'preparation:preparing', 'publication:pending']
-    )
+    expect(
+      eventsBody.events.map((event) => `${event.axis}:${event.to_status}`)
+    ).toStrictEqual([
+      'execution:pending',
+      'preparation:preparing',
+      'publication:pending'
+    ])
     const occurredAt = eventsBody.events.map((event) =>
       Date.parse(event.occurred_at)
     )
-    assert.deepStrictEqual(
-      occurredAt,
-      [...occurredAt].sort((left, right) => left - right),
-      'events are returned oldest first'
+    expect(occurredAt, 'events are returned oldest first').toStrictEqual(
+      [...occurredAt].sort((left, right) => left - right)
     )
     const unknownRunEvents = await fetch(
       `${base}/v1/runs/${randomUUID()}/events`,
       { headers: readAuth }
     )
-    assert.strictEqual(unknownRunEvents.status, 404)
-    assert.deepStrictEqual(await unknownRunEvents.json(), {
+    expect(unknownRunEvents.status).toBe(404)
+    expect(await unknownRunEvents.json()).toStrictEqual({
       error: 'run_not_found'
     })
     // The path parameter is contract-validated like every other run id.
@@ -225,7 +219,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         headers: readAuth
       }
     )
-    assert.strictEqual(malformedRunEvents.status, 400)
+    expect(malformedRunEvents.status).toBe(400)
 
     // The created-at range was accepted by the API but never covered, so a broken
     // bound would have filtered silently.
@@ -234,27 +228,25 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, {
       headers: readAuth
     })
-    assert.strictEqual(
-      ((await boundedAbove.json()) as { runs: unknown[] }).runs.length,
-      2
-    )
+    expect(
+      ((await boundedAbove.json()) as { runs: unknown[] }).runs.length
+    ).toBe(2)
     const notYet = await fetch(`${base}/v1/runs?from=${future}`, {
       headers: readAuth
     })
-    assert.deepStrictEqual(await notYet.json(), { runs: [], next_cursor: null })
+    expect(await notYet.json()).toStrictEqual({ runs: [], next_cursor: null })
     const beforeEverything = await fetch(`${base}/v1/runs?to=${past}`, {
       headers: readAuth
     })
-    assert.deepStrictEqual(await beforeEverything.json(), {
+    expect(await beforeEverything.json()).toStrictEqual({
       runs: [],
       next_cursor: null
     })
     const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, {
       headers: readAuth
     })
-    assert.strictEqual(invalidFrom.status, 400)
-    assert.strictEqual(
-      ((await invalidFrom.json()) as { code?: string }).code,
+    expect(invalidFrom.status).toBe(400)
+    expect(((await invalidFrom.json()) as { code?: string }).code).toBe(
       'INVALID_QUERY'
     )
 
@@ -270,26 +262,24 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       const corruptDetail = await fetch(`${base}/v1/runs/${corruptRunId}`, {
         headers: readAuth
       })
-      assert.strictEqual(
+      expect(
         corruptDetail.status,
-        404,
         'the record read still treats the corrupt run as unrepresentable'
-      )
+      ).toBe(404)
       const corruptEvents = await fetch(
         `${base}/v1/runs/${corruptRunId}/events`,
         { headers: readAuth }
       )
-      assert.strictEqual(
+      expect(
         corruptEvents.status,
-        200,
         'the event log stays readable for a corrupt run'
-      )
+      ).toBe(200)
       const corruptBody = (await corruptEvents.json()) as {
         run_id: string
         events: unknown[]
       }
-      assert.strictEqual(corruptBody.run_id, corruptRunId)
-      assert.ok(corruptBody.events.length > 0)
+      expect(corruptBody.run_id).toBe(corruptRunId)
+      expect.assert(corruptBody.events.length > 0)
     } finally {
       await writePool.end()
     }
@@ -299,7 +289,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const afterRestart = await fetch(`${base}/v1/runs/${runIds[0]}`, {
       headers: readAuth
     })
-    assert.strictEqual(afterRestart.status, 200)
+    expect(afterRestart.status).toBe(200)
   } finally {
     await server.close()
   }

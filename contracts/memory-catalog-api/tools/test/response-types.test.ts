@@ -1,6 +1,5 @@
 import { SPEC_PATH } from '../src/paths.js'
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import ts from 'typescript'
 import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 
@@ -22,16 +21,13 @@ test('every emitted operation response alias indexes its status map', async () =
   for (const [name, alias] of aliases) {
     if (!name.endsWith('ResponseBody') || !aliases.has(`${name}ByStatus`))
       continue
-    assert.ok(
+    expect.assert(
       ts.isIndexedAccessTypeNode(alias.type),
       `${name} must index its status map`
     )
-    assert.ok(ts.isTypeReferenceNode(alias.type.objectType))
-    assert.equal(
-      alias.type.objectType.typeName.getText(file),
-      `${name}ByStatus`
-    )
+    expect.assert(ts.isTypeReferenceNode(alias.type.objectType))
+    expect(alias.type.objectType.typeName.getText(file)).toBe(`${name}ByStatus`)
     checked++
   }
-  assert.ok(checked > 0)
+  expect.assert(checked > 0)
 })

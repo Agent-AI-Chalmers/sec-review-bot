@@ -7,8 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Covers repository-dispatch admission, preparation, and submission boundaries
 // with controlled connector and Review Runs dependencies.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, afterAll, test } from 'vitest'
 import type { App } from 'octokit'
 
 import { fakeApp as fakeGitHubApp } from '../github-app-stubs.js'
@@ -42,7 +41,7 @@ const bundleRoot = await fs.mkdtemp(
 )
 const bundlePath = path.join(bundleRoot, 'bundle.tar.zst')
 await fs.writeFile(bundlePath, 'x')
-test.after(() => fs.rm(bundleRoot, { recursive: true, force: true }))
+afterAll(() => fs.rm(bundleRoot, { recursive: true, force: true }))
 
 /** A complete `RepositoryReviewInput`, returned by preparation. */
 function repositoryReviewInput(): RepositoryReviewInput &
@@ -173,17 +172,11 @@ test('repository dispatch request resolves scheduled incremental window in the a
     }
   })
 
-  assert.strictEqual(resolved.scan_mode, 'incremental')
-  assert.strictEqual(resolved.event_type, 'scheduled')
-  assert.strictEqual(resolved.target_branch, 'main')
-  assert.strictEqual(
-    resolved.head_sha,
-    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-  )
-  assert.strictEqual(
-    resolved.base_sha,
-    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-  )
+  expect(resolved.scan_mode).toBe('incremental')
+  expect(resolved.event_type).toBe('scheduled')
+  expect(resolved.target_branch).toBe('main')
+  expect(resolved.head_sha).toBe('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+  expect(resolved.base_sha).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
 })
 
 test('repository dispatch request resolves manual incremental refs from raw payload', async () => {
@@ -201,17 +194,11 @@ test('repository dispatch request resolves manual incremental refs from raw payl
     }
   })
 
-  assert.strictEqual(resolved.scan_mode, 'incremental')
-  assert.strictEqual(resolved.event_type, 'manual')
-  assert.strictEqual(
-    resolved.base_sha,
-    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-  )
-  assert.strictEqual(
-    resolved.head_sha,
-    'cccccccccccccccccccccccccccccccccccccccc'
-  )
-  assert.strictEqual(resolved.test_changes, 'deny')
+  expect(resolved.scan_mode).toBe('incremental')
+  expect(resolved.event_type).toBe('manual')
+  expect(resolved.base_sha).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  expect(resolved.head_sha).toBe('cccccccccccccccccccccccccccccccccccccccc')
+  expect(resolved.test_changes).toBe('deny')
 })
 
 test('dispatchRepositoryReview resolves, submits, and persists a queued repository review run', async () => {
@@ -244,12 +231,12 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
     },
     deps: {
       getInstallationOctokit: async (repo_full_name) => {
-        assert.strictEqual(repo_full_name, 'octo/example')
+        expect(repo_full_name).toBe('octo/example')
         return octokit
       },
       resolve_dispatch: async (args) => {
-        assert.strictEqual(args.octokit, octokit)
-        assert.strictEqual(args.payload.test_changes, 'deny')
+        expect(args.octokit).toBe(octokit)
+        expect(args.payload.test_changes).toBe('deny')
         return resolved
       },
       prepare_review: async (args) => {
@@ -290,40 +277,37 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         submitPreparedRun: (run_id, _token, context, input) =>
           saved_runs.push({ run_id, context, input }),
         failPreparation: () =>
-          assert.fail('successful review must not be marked failed')
+          expect.unreachable('successful review must not be marked failed')
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-1')
-  assert.strictEqual(submit_calls.length, 1)
+  expect(submitted.run_id).toBe('run-1')
+  expect(submit_calls.length).toBe(1)
   const submitCall = submit_calls[0] as Record<string, unknown>
-  assert.deepStrictEqual(
-    {
-      octokit: submitCall.octokit,
-      run_id: submitCall.run_id,
-      repo_full_name: submitCall.repo_full_name,
-      target_branch: submitCall.target_branch,
-      scan_mode: submitCall.scan_mode,
-      base_sha: submitCall.base_sha,
-      head_sha: submitCall.head_sha,
-      event_type: submitCall.event_type,
-      test_changes: submitCall.test_changes,
-      correlation_id: submitCall.correlation_id
-    },
-    {
-      octokit,
-      run_id: 'run-1',
-      ...resolved
-    }
-  )
-  assert.deepStrictEqual(saved_runs[0], {
+  expect({
+    octokit: submitCall.octokit,
+    run_id: submitCall.run_id,
+    repo_full_name: submitCall.repo_full_name,
+    target_branch: submitCall.target_branch,
+    scan_mode: submitCall.scan_mode,
+    base_sha: submitCall.base_sha,
+    head_sha: submitCall.head_sha,
+    event_type: submitCall.event_type,
+    test_changes: submitCall.test_changes,
+    correlation_id: submitCall.correlation_id
+  }).toStrictEqual({
+    octokit,
+    run_id: 'run-1',
+    ...resolved
+  })
+  expect(saved_runs[0]).toStrictEqual({
     workflow: 'repository-review',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:actions-run-1'
   })
-  assert.deepStrictEqual(saved_runs[1], {
+  expect(saved_runs[1]).toStrictEqual({
     run_id: 'run-1',
     input: {
       ...repositoryReviewInput(),
@@ -396,24 +380,26 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
           })
         }),
         submitPreparedRun: () =>
-          assert.fail('replayed dispatch must not queue again'),
+          expect.unreachable('replayed dispatch must not queue again'),
         failPreparation: () =>
-          assert.fail('replayed dispatch must not change the original run')
+          expect.unreachable(
+            'replayed dispatch must not change the original run'
+          )
       }
     }
   })
 
-  assert.strictEqual(submitted.run_id, 'run-original')
-  assert.strictEqual(submitted.replayed, true)
-  assert.strictEqual(submissions, 0)
-  assert.deepStrictEqual(admissions, [
+  expect(submitted.run_id).toBe('run-original')
+  expect(submitted.replayed).toBe(true)
+  expect(submissions).toBe(0)
+  expect(admissions).toStrictEqual([
     { run_id: 'run-original', status: 'running', replayed: true }
   ])
 })
 
 test('dispatchRepositoryReview maps resolver errors to validation errors', async () => {
   const transitions: unknown[] = []
-  await assert.rejects(
+  await expect(
     dispatchRepositoryReview({
       app: fakeApp(),
       verified_repository: 'octo/example',
@@ -441,17 +427,18 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
             } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
-            assert.fail('invalid dispatch must not queue a run'),
+            expect.unreachable('invalid dispatch must not queue a run'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
+    })
+  ).rejects.toSatisfy(
     (error: unknown) =>
       error instanceof RepositoryReviewDispatchValidationError &&
       error.message === 'manual incremental scan requires base_sha.'
   )
-  assert.deepStrictEqual(transitions.at(-1), [
+  expect(transitions.at(-1)).toStrictEqual([
     'failed',
     'run-invalid-window',
     {
@@ -462,7 +449,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
 })
 
 test('dispatchRepositoryReview rejects invalid pure contract fields before admission', async () => {
-  await assert.rejects(
+  await expect(
     dispatchRepositoryReview({
       app: fakeApp(),
       verified_repository: 'octo/example',
@@ -474,22 +461,23 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
       },
       deps: {
         getInstallationOctokit: async () =>
-          assert.fail('invalid contract must not call GitHub'),
+          expect.unreachable('invalid contract must not call GitHub'),
         resolve_dispatch: async () =>
-          assert.fail('invalid contract must not resolve refs'),
+          expect.unreachable('invalid contract must not resolve refs'),
         prepare_review: async () =>
-          assert.fail('invalid contract must not submit'),
+          expect.unreachable('invalid contract must not submit'),
         store: {
           ...preparationClaim,
           admitReviewRun: () =>
-            assert.fail('invalid contract must not create a run'),
+            expect.unreachable('invalid contract must not create a run'),
           submitPreparedRun: () =>
-            assert.fail('invalid contract must not queue'),
+            expect.unreachable('invalid contract must not queue'),
           failPreparation: () =>
-            assert.fail('invalid contract has no run to fail')
+            expect.unreachable('invalid contract has no run to fail')
         }
       }
-    }),
+    })
+  ).rejects.toSatisfy(
     (error: unknown) =>
       error instanceof RepositoryReviewDispatchValidationError &&
       /Unsupported repository scan_mode/.test(error.message)
@@ -499,7 +487,7 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
 test('dispatchRepositoryReview records an accepted run when preparation or submission fails', async () => {
   const transitions: unknown[] = []
 
-  await assert.rejects(
+  await expect(
     dispatchRepositoryReview({
       app: fakeApp(),
       verified_repository: 'octo/example',
@@ -521,7 +509,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           correlation_id: 'actions-run-failed'
         }),
         prepare_review: async ({ run_id }) => {
-          assert.strictEqual(run_id, 'run-repo-failed')
+          expect(run_id).toBe('run-repo-failed')
           throw new Error('bundle preparation failed')
         },
         store: {
@@ -535,16 +523,15 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
             } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
-            assert.fail('failed review must not be queued'),
+            expect.unreachable('failed review must not be queued'),
           failPreparation: (run_id, _token, error) =>
             transitions.push(['failed', run_id, error])
         }
       }
-    }),
-    /bundle preparation failed/
-  )
+    })
+  ).rejects.toThrow(/bundle preparation failed/)
 
-  assert.deepStrictEqual(transitions, [
+  expect(transitions).toStrictEqual([
     [
       'pending',
       {
@@ -569,7 +556,7 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
     'SUBMISSION_STATE_UNCERTAIN'
   )
 
-  await assert.rejects(
+  await expect(
     dispatchRepositoryReview({
       app: fakeApp(),
       verified_repository: 'octo/example',
@@ -632,12 +619,15 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
             transitions.push([run_id, failure])
         }
       }
-    }),
-    error
-  )
+    })
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
 
-  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
-  assert.strictEqual(transitions.length, 1)
+  expect((transitions[0] as unknown[])[0]).toBe('prepared')
+  expect(transitions.length).toBe(1)
 })
 
 function withoutPreparationInput<
@@ -652,7 +642,7 @@ function withoutPreparationInput<
 test('recovery transport failure retries preparation without rebuilding GitHub input', async () => {
   const error = new Error('storage unavailable')
   const failures: unknown[] = []
-  await assert.rejects(
+  await expect(
     dispatchRepositoryReview({
       app: fakeApp(),
       payload: {
@@ -666,24 +656,25 @@ test('recovery transport failure retries preparation without rebuilding GitHub i
       claimed_preparation: { run_id: 'recover-run', token: 'current' },
       deps: {
         getInstallationOctokit: async () =>
-          assert.fail('must reconcile before fetching GitHub'),
+          expect.unreachable('must reconcile before fetching GitHub'),
         store: {
           ...preparationClaim,
-          admitReviewRun: () => assert.fail('already admitted'),
+          admitReviewRun: () => expect.unreachable('already admitted'),
           async listInputBundleCandidates() {
             throw error
           },
           submitPreparedRun: () =>
-            assert.fail('unconfirmed input must not submit'),
+            expect.unreachable('unconfirmed input must not submit'),
           failPreparation: (_run, _token, _failure, options) => {
             failures.push(options)
           }
         }
       }
-    }),
+    })
+  ).rejects.toSatisfy(
     (caught) =>
       caught instanceof RepositoryReviewDispatchValidationError &&
       caught.message === error.message
   )
-  assert.equal((failures[0] as { retry: boolean }).retry, true)
+  expect((failures[0] as { retry: boolean }).retry).toBe(true)
 })

@@ -27,4 +27,8 @@ pnpm test
 pnpm run test:integration
 ```
 
-`pnpm test` 运行隔离的校验与 HTTP 测试。`pnpm run test:integration` 使用显式提供的 `TEST_TEMPORAL_ADDRESS` 测试 workflow 提交和请求身份；未设置时，launcher 会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker Temporal 服务。Launcher 会有意忽略服务常规使用的 `TEMPORAL_ADDRESS`，避免测试意外在共享部署中创建 workflow。
+<!-- doc-default: execution-gateway.test-projects; source=services/execution-gateway/vitest.config.ts -->
+
+`pnpm test` 构建服务并运行隔离测试。开发时可用 `pnpm test test/env.test.ts` 只运行一个文件。集成测试通过 `pnpm run test:integration` 单独运行，也可以追加测试路径或测试运行选项。
+
+`pnpm run test:integration` 使用显式提供的 `TEST_TEMPORAL_ADDRESS` 测试 workflow 提交和请求身份；未设置时，launcher 会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker Temporal 服务。Launcher 会有意忽略服务常规使用的 `TEMPORAL_ADDRESS`，避免测试意外在共享部署中创建 workflow。

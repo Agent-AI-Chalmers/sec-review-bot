@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
 import { executionArchive, loginCookie } from './server-support.js'
@@ -32,7 +31,7 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   let requestedKey = ''
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
@@ -47,45 +46,33 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
-    assert.strictEqual(
-      (await fetch(`${base}/api/runs/${runId}/artifact`)).status,
-      401
-    )
+    expect((await fetch(`${base}/api/runs/${runId}/artifact`)).status).toBe(401)
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
       headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 200)
-    assert.strictEqual(await download.text(), 'artifact')
-    assert.strictEqual(
-      requestedKey,
+    expect(download.status).toBe(200)
+    expect(await download.text()).toBe('artifact')
+    expect(requestedKey).toBe(
       `runs/${runId}/artifacts/execution-archive.v1.tar.zst`
     )
-    assert.strictEqual(
-      download.headers.get('content-type'),
+    expect(download.headers.get('content-type')).toBe(
       'application/octet-stream'
     )
-    assert.strictEqual(
-      download.headers.get('content-disposition'),
+    expect(download.headers.get('content-disposition')).toBe(
       'attachment; filename="execution-archive.v1.tar.zst"'
     )
-    assert.strictEqual(
-      download.headers.get('cache-control'),
-      'private, no-store'
-    )
-    assert.strictEqual(
-      download.headers.get('x-content-type-options'),
-      'nosniff'
-    )
+    expect(download.headers.get('cache-control')).toBe('private, no-store')
+    expect(download.headers.get('x-content-type-options')).toBe('nosniff')
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -119,7 +106,7 @@ test('BFF verifies and reads a execution archive for the run files viewer', asyn
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -135,16 +122,16 @@ test('BFF verifies and reads a execution archive for the run files viewer', asyn
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/runs/${runId}/artifact/content`, {
       headers: { cookie }
     })
-    assert.equal(response.status, 200)
-    assert.equal(response.headers.get('cache-control'), 'private, no-store')
-    assert.deepEqual(await response.json(), {
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(await response.json()).toStrictEqual({
       files: {
         'manifest.json': JSON.stringify({
           version: 1,
@@ -193,7 +180,7 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   let storageCalled = false
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
@@ -208,7 +195,7 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -217,12 +204,12 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/run-1/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 409)
-    assert.strictEqual(storageCalled, false)
+    expect(download.status).toBe(409)
+    expect(storageCalled).toBe(false)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -255,7 +242,7 @@ test('BFF rejects an object whose size does not match the available artifact', a
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -268,7 +255,7 @@ test('BFF rejects an object whose size does not match the available artifact', a
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -277,12 +264,12 @@ test('BFF rejects an object whose size does not match the available artifact', a
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 502)
-    assert.deepStrictEqual(await download.json(), {
+    expect(download.status).toBe(502)
+    expect(await download.json()).toStrictEqual({
       error: 'artifact_identity_mismatch'
     })
   } finally {
@@ -317,7 +304,7 @@ test('BFF rejects same-size artifact content that does not match the stored dige
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -330,7 +317,7 @@ test('BFF rejects same-size artifact content that does not match the stored dige
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -339,12 +326,12 @@ test('BFF rejects same-size artifact content that does not match the stored dige
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 502)
-    assert.deepStrictEqual(await download.json(), {
+    expect(download.status).toBe(502)
+    expect(await download.json()).toStrictEqual({
       error: 'artifact_identity_mismatch'
     })
   } finally {
@@ -379,7 +366,7 @@ test('BFF times out a stalled artifact download', async () => {
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -397,7 +384,7 @@ test('BFF times out a stalled artifact download', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -406,12 +393,12 @@ test('BFF times out a stalled artifact download', async () => {
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 504)
-    assert.deepStrictEqual(await download.json(), {
+    expect(download.status).toBe(504)
+    expect(await download.json()).toStrictEqual({
       error: 'artifact_download_timeout'
     })
   } finally {
@@ -429,7 +416,7 @@ test('BFF reports a Review Runs metadata timeout separately', async () => {
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -443,7 +430,7 @@ test('BFF reports a Review Runs metadata timeout separately', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -452,12 +439,12 @@ test('BFF reports a Review Runs metadata timeout separately', async () => {
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie)
+    expect.assert(cookie)
     const download = await fetch(`${base}/api/runs/run-1/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(download.status, 504)
-    assert.deepStrictEqual(await download.json(), {
+    expect(download.status).toBe(504)
+    expect(await download.json()).toStrictEqual({
       error: 'review_runs_timeout'
     })
   } finally {
@@ -495,7 +482,7 @@ test('BFF lets a progressing artifact preview outlive the metadata timeout', asy
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
 
   let started = false
   const body = new Readable({
@@ -523,18 +510,18 @@ test('BFF lets a progressing artifact preview outlive the metadata timeout', asy
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/runs/${runId}/artifact/content`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 200)
+    expect(response.status).toBe(200)
     const view = (await response.json()) as {
       files: Record<string, string>
     }
-    assert.strictEqual(view.files['manifest.json']?.includes('unit-1'), true)
+    expect(view.files['manifest.json']?.includes('unit-1')).toBe(true)
   } finally {
     upstream.closeAllConnections()
     await Promise.all([

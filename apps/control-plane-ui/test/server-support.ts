@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict'
+import { expect } from 'vitest'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
@@ -50,6 +50,6 @@ export async function loginCookie(base: string): Promise<string> {
     body: '{"token":"login-secret"}'
   })
   const cookie = login.headers.get('set-cookie')
-  assert(cookie !== null)
+  expect.assert(cookie !== null)
   return cookie
 }

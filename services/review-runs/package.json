@@ -13,7 +13,7 @@
     "copy:spec": "node --import tsx scripts/copy-contract.ts",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
-    "test": "pnpm run build && node --import tsx --test test/*.test.ts",
+    "test": "pnpm run build && vitest run --project unit",
     "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
@@ -39,6 +39,7 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
+    "vitest": "5.1.0",
     "yaml": "^2.9.1"
   }
 }

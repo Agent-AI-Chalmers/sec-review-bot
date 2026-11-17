@@ -4,8 +4,7 @@
 // `deps.getInstallationOctokit`, and `fakeApp({ installationOctokit })` replaces the App's own
 // token-exchange, so nothing asserted that the *installation id* from the lookup is the one handed
 // to `getInstallationOctokit`, nor that a missing installation propagates as a 404.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { App } from 'octokit'
 
@@ -48,8 +47,8 @@ test('the installation id from the lookup is the one used to mint the client', a
 
   const resolved = await installationOctokitForRepo(app, 'octo/example')
 
-  assert.strictEqual(resolved, client)
-  assert.deepStrictEqual(seen, [4242])
+  expect(resolved).toBe(client)
+  expect(seen).toStrictEqual([4242])
 })
 
 test('the repository is split into owner and repo for the installation lookup', async () => {
@@ -63,9 +62,8 @@ test('the repository is split into owner and repo for the installation lookup', 
 
   await installationOctokitForRepo(app, 'octo/example')
 
-  assert.strictEqual(requests.length, 1)
-  assert.strictEqual(
-    new URL(requests[0]!.url).pathname,
+  expect(requests.length).toBe(1)
+  expect(new URL(requests[0]!.url).pathname).toBe(
     '/repos/octo/example/installation'
   )
 })
@@ -76,10 +74,9 @@ test('a repository with no installation propagates the 404', async () => {
   const client = fakeGitHub(() => githubJson({})).octokit
   const app = appDouble({ lookupStatus: 404, installationOctokit: client })
 
-  await assert.rejects(
-    () => installationOctokitForRepo(app, 'attacker/repo'),
-    (error: { status?: number }) => error.status === 404
-  )
+  await expect(
+    installationOctokitForRepo(app, 'attacker/repo')
+  ).rejects.toSatisfy((error: { status?: number }) => error.status === 404)
 })
 
 test('an invalid repository name is rejected before any request', async () => {
@@ -91,9 +88,11 @@ test('an invalid repository name is rejected before any request', async () => {
     getInstallationOctokit: async (_id: number) => octokit
   }
 
-  await assert.rejects(() => installationOctokitForRepo(app, 'octo'))
-  assert.deepStrictEqual(requests, [])
-  assert.throws(() => splitRepoFullName('octo'))
+  await expect(installationOctokitForRepo(app, 'octo')).rejects.toSatisfy(
+    () => true
+  )
+  expect(requests).toStrictEqual([])
+  expect(() => splitRepoFullName('octo')).toThrow()
 })
 
 test('a real App answers the lookup through the installed client factory', async () => {
@@ -112,6 +111,6 @@ test('a real App answers the lookup through the installed client factory', async
 
   const resolved = await installationOctokitForRepo(app, 'octo/example')
 
-  assert.strictEqual(resolved, client)
-  assert.strictEqual(requestedId, 99)
+  expect(resolved).toBe(client)
+  expect(requestedId).toBe(99)
 })

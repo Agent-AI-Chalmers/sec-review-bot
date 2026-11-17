@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   fetchRepositoryTriggerConfig,
@@ -45,14 +44,14 @@ test('fetchRepositoryTriggerConfig falls back to manual_only when config file is
     ref: 'main'
   })
 
-  assert.deepStrictEqual(config, {
+  expect(config).toStrictEqual({
     trigger_mode: 'manual_only',
     paths_ignore: [],
     path: null,
     ref: 'main',
     source: 'default'
   })
-  assert.strictEqual(isAutomaticTriggerModeEnabled(config), false)
+  expect(isAutomaticTriggerModeEnabled(config)).toBe(false)
 })
 
 test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository config', async () => {
@@ -72,14 +71,14 @@ test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository
     ref: 'main'
   })
 
-  assert.deepStrictEqual(config, {
+  expect(config).toStrictEqual({
     trigger_mode: 'automatic',
     paths_ignore: ['frontend/src/assets', '**/*.min.js'],
     path: CONFIG_PATH,
     ref: 'main',
     source: 'repository-config'
   })
-  assert.strictEqual(isAutomaticTriggerModeEnabled(config), true)
+  expect(isAutomaticTriggerModeEnabled(config)).toBe(true)
 })
 
 test('fetchRepositoryTriggerConfig parses manual_only trigger mode from repository config', async () => {
@@ -93,14 +92,14 @@ test('fetchRepositoryTriggerConfig parses manual_only trigger mode from reposito
     ref: 'main'
   })
 
-  assert.deepStrictEqual(config, {
+  expect(config).toStrictEqual({
     trigger_mode: 'manual_only',
     paths_ignore: [],
     path: CONFIG_PATH,
     ref: 'main',
     source: 'repository-config'
   })
-  assert.strictEqual(isAutomaticTriggerModeEnabled(config), false)
+  expect(isAutomaticTriggerModeEnabled(config)).toBe(false)
 })
 
 test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for invalid YAML', async () => {
@@ -108,26 +107,25 @@ test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for inval
     [CONFIG_PATH]: 'sec_review_bot: [broken'
   })
 
-  await assert.rejects(
+  await expect(
     fetchRepositoryTriggerConfig(octokit, {
       owner_login: 'octo',
       repo_name: 'repo',
       ref: 'main'
-    }),
-    (error: unknown) => {
-      if (!(error instanceof RepositoryTriggerConfigError)) {
-        return false
-      }
-      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
-      assert.strictEqual(error instanceof RepositoryTriggerConfigError, true)
-      assert.strictEqual(error.reason, 'invalid-yaml')
-      assert.strictEqual(error.owner_login, 'octo')
-      assert.strictEqual(error.repo_name, 'repo')
-      assert.strictEqual(error.ref, 'main')
-      assert.strictEqual(error.path, CONFIG_PATH)
-      return true
+    })
+  ).rejects.toSatisfy((error: unknown) => {
+    if (!(error instanceof RepositoryTriggerConfigError)) {
+      return false
     }
-  )
+    expect(isRepositoryTriggerConfigError(error)).toBe(true)
+    expect(error instanceof RepositoryTriggerConfigError).toBe(true)
+    expect(error.reason).toBe('invalid-yaml')
+    expect(error.owner_login).toBe('octo')
+    expect(error.repo_name).toBe('repo')
+    expect(error.ref).toBe('main')
+    expect(error.path).toBe(CONFIG_PATH)
+    return true
+  })
 })
 
 test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mode', async () => {
@@ -135,21 +133,20 @@ test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mod
     [CONFIG_PATH]: 'sec_review_bot: {}'
   })
 
-  await assert.rejects(
+  await expect(
     fetchRepositoryTriggerConfig(octokit, {
       owner_login: 'octo',
       repo_name: 'repo',
       ref: 'main'
-    }),
-    (error: unknown) => {
-      if (!(error instanceof RepositoryTriggerConfigError)) {
-        return false
-      }
-      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
-      assert.strictEqual(error.reason, 'missing-trigger-mode')
-      return true
+    })
+  ).rejects.toSatisfy((error: unknown) => {
+    if (!(error instanceof RepositoryTriggerConfigError)) {
+      return false
     }
-  )
+    expect(isRepositoryTriggerConfigError(error)).toBe(true)
+    expect(error.reason).toBe('missing-trigger-mode')
+    return true
+  })
 })
 
 test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', async () => {
@@ -157,21 +154,20 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
     [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: always_on'].join('\n')
   })
 
-  await assert.rejects(
+  await expect(
     fetchRepositoryTriggerConfig(octokit, {
       owner_login: 'octo',
       repo_name: 'repo',
       ref: 'main'
-    }),
-    (error: unknown) => {
-      if (!(error instanceof RepositoryTriggerConfigError)) {
-        return false
-      }
-      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
-      assert.strictEqual(error.reason, 'invalid-trigger-mode')
-      return true
+    })
+  ).rejects.toSatisfy((error: unknown) => {
+    if (!(error instanceof RepositoryTriggerConfigError)) {
+      return false
     }
-  )
+    expect(isRepositoryTriggerConfigError(error)).toBe(true)
+    expect(error.reason).toBe('invalid-trigger-mode')
+    return true
+  })
 })
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
@@ -183,21 +179,20 @@ test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async
     ].join('\n')
   })
 
-  await assert.rejects(
+  await expect(
     fetchRepositoryTriggerConfig(octokit, {
       owner_login: 'octo',
       repo_name: 'repo',
       ref: 'main'
-    }),
-    (error: unknown) => {
-      if (!(error instanceof RepositoryTriggerConfigError)) {
-        return false
-      }
-      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
-      assert.strictEqual(error.reason, 'invalid-paths-ignore')
-      return true
+    })
+  ).rejects.toSatisfy((error: unknown) => {
+    if (!(error instanceof RepositoryTriggerConfigError)) {
+      return false
     }
-  )
+    expect(isRepositoryTriggerConfigError(error)).toBe(true)
+    expect(error.reason).toBe('invalid-paths-ignore')
+    return true
+  })
 })
 
 test('reads the .sec-review/config.yml path', async () => {
@@ -211,12 +206,12 @@ test('reads the .sec-review/config.yml path', async () => {
     ref: 'main'
   })
 
-  assert.strictEqual(config.trigger_mode, 'automatic')
-  assert.strictEqual(config.path, CONFIG_PATH)
+  expect(config.trigger_mode).toBe('automatic')
+  expect(config.path).toBe(CONFIG_PATH)
   // The Contents API path is part of the request URL, so the recorded request proves which file
   // was read without replacing the client's method.
-  assert.strictEqual(requests.length, 1)
-  assert.ok(
+  expect(requests.length).toBe(1)
+  expect.assert(
     decodeURIComponent(new URL(requests[0]!.url).pathname).endsWith(
       `/contents/${CONFIG_PATH}`
     ),
@@ -229,13 +224,13 @@ test('invalid YAML in the config path is rejected', async () => {
     [CONFIG_PATH]: 'sec_review_bot: [broken'
   })
 
-  await assert.rejects(
-    () =>
-      fetchRepositoryTriggerConfig(octokit, {
-        owner_login: 'octo',
-        repo_name: 'repo',
-        ref: 'main'
-      }),
+  await expect(
+    fetchRepositoryTriggerConfig(octokit, {
+      owner_login: 'octo',
+      repo_name: 'repo',
+      ref: 'main'
+    })
+  ).rejects.toSatisfy(
     (error: unknown) =>
       isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
   )
@@ -255,13 +250,13 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
     })
   ).octokit
 
-  await assert.rejects(
-    () =>
-      fetchRepositoryTriggerConfig(octokit, {
-        owner_login: 'octo',
-        repo_name: 'repo',
-        ref: 'main'
-      }),
+  await expect(
+    fetchRepositoryTriggerConfig(octokit, {
+      owner_login: 'octo',
+      repo_name: 'repo',
+      ref: 'main'
+    })
+  ).rejects.toSatisfy(
     (error: unknown) =>
       isRepositoryTriggerConfigError(error) &&
       error.reason === 'invalid-content'

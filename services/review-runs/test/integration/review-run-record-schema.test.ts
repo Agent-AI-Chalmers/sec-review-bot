@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   Ajv2020,
@@ -74,14 +73,13 @@ test('the record getRun returns validates against the shared schema', async () =
       ingress_kind: 'github_webhook',
       ingress_key: `delivery:${randomUUID()}`
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
 
     const preparing = await store.queries.getRun(runId)
-    assert.strictEqual(
+    expect(
       validate(preparing),
-      true,
       `a preparing record must be accepted: ${JSON.stringify(validate.errors)}`
-    )
+    ).toBe(true)
 
     await store.submissionTransitions.markQueued(
       runId,
@@ -97,11 +95,10 @@ test('the record getRun returns validates against the shared schema', async () =
     )
 
     const succeeded = await store.queries.getRun(runId)
-    assert.strictEqual(
+    expect(
       validate(succeeded),
-      true,
       `a succeeded record must be accepted: ${JSON.stringify(validate.errors)}`
-    )
+    ).toBe(true)
   } finally {
     await store.close()
   }

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parseViewerInput } from '../browser/features/viewer/Viewer.js'
 
@@ -18,15 +17,14 @@ test('viewer parses repository trajectory JSONL', () => {
       })
     ].join('\n')
   )
-  assert.deepStrictEqual(
+  expect(
     events
       .filter((event) => event.event === 'message')
-      .map((event) => [event.seq, event.message.role]),
-    [
-      [1, 'system'],
-      [2, 'assistant']
-    ]
-  )
+      .map((event) => [event.seq, event.message.role])
+  ).toStrictEqual([
+    [1, 'system'],
+    [2, 'assistant']
+  ])
 })
 
 test('viewer rejects arrays, wrappers and malformed records', () => {
@@ -41,7 +39,7 @@ test('viewer rejects arrays, wrappers and malformed records', () => {
       message: { role: 'user', content: 'missing ID' }
     }
   ]) {
-    assert.throws(() => parseViewerInput(JSON.stringify(value)))
+    expect(() => parseViewerInput(JSON.stringify(value))).toThrow()
   }
 })
 
@@ -75,13 +73,12 @@ test('viewer projects execution events and retains model provenance', () => {
   const events = parseViewerInput(
     records.map((record) => JSON.stringify(record)).join('\n')
   )
-  assert.equal(events.length, 5)
-  assert.equal(events[2]?.call_id, 'call')
-  assert.deepEqual(events[2]?.parent_ids, ['root', 'child'])
-  assert.throws(
-    () => parseViewerInput(JSON.stringify([{ seq: 1, event: 'unrecognized' }])),
-    /invalid_trajectory_artifact/
-  )
+  expect(events.length).toBe(5)
+  expect(events[2]?.call_id).toBe('call')
+  expect(events[2]?.parent_ids).toStrictEqual(['root', 'child'])
+  expect(() =>
+    parseViewerInput(JSON.stringify([{ seq: 1, event: 'unrecognized' }]))
+  ).toThrow(/invalid_trajectory_artifact/)
 })
 
 test('viewer rejects duplicate identities, unordered records, and inconsistent call references', () => {
@@ -106,5 +103,5 @@ test('viewer rejects duplicate identities, unordered records, and inconsistent c
       { ...message, seq: 3 }
     ]
   ])
-    assert.throws(() => parseViewerInput(encode(records)))
+    expect(() => parseViewerInput(encode(records))).toThrow()
 })

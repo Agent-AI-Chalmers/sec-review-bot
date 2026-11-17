@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { pathToFileURL } from 'node:url'
 
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3'
@@ -39,21 +38,19 @@ test('S3 input upload is immutable and idempotent', async (t) => {
 
   const key = `runs/${runId}/input/${reference.digest.slice(7)}/input-bundle.v1.tar.zst`
   try {
-    assert.equal(
-      await inputBundleExists(publishedInputBundleReference(reference, runId)),
-      false
-    )
+    expect(
+      await inputBundleExists(publishedInputBundleReference(reference, runId))
+    ).toBe(false)
     const first = await publishInputBundle(reference, runId)
-    assert.equal(await inputBundleExists(first), true)
+    expect(await inputBundleExists(first)).toBe(true)
     const retry = await publishInputBundle(reference, runId)
-    assert.strictEqual(first.uri, retry.uri)
-    assert.strictEqual(first.uri, `s3://${bucket}/${key}`)
+    expect(first.uri).toBe(retry.uri)
+    expect(first.uri).toBe(`s3://${bucket}/${key}`)
 
     await fs.writeFile(source, 'different')
-    await assert.rejects(
-      publishInputBundle({ ...reference, size_bytes: 9 }, runId),
-      /conflicts with existing content/
-    )
+    await expect(
+      publishInputBundle({ ...reference, size_bytes: 9 }, runId)
+    ).rejects.toThrow(/conflicts with existing content/)
   } finally {
     const cleanupAccessKeyId =
       process.env['SEC_REVIEW_TEST_S3_CLEANUP_ACCESS_KEY_ID']

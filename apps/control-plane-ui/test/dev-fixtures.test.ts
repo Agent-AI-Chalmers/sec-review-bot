@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { expect, test } from 'vitest'
 import {
   createServer,
   type IncomingMessage,
@@ -21,7 +20,7 @@ function captureMiddleware(): (
 ) => void {
   const plugin: Plugin = devFixtures()
   const configureServer = plugin.configureServer
-  assert(typeof configureServer === 'function')
+  expect.assert(typeof configureServer === 'function')
   let middleware:
     | ((
         request: IncomingMessage,
@@ -48,7 +47,7 @@ function captureMiddleware(): (
     server: typeof fakeServer
   ) => void
   runConfigureServer(fakeServer)
-  assert(middleware !== undefined)
+  expect.assert(middleware !== undefined)
   return middleware
 }
 
@@ -66,7 +65,7 @@ async function startFixtureServer(): Promise<{
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   return {
     base: `http://127.0.0.1:${address.port}`,
     close: () => new Promise<void>((resolve) => server.close(() => resolve()))
@@ -79,9 +78,7 @@ test('dev fixtures only describe reachable run states', async () => {
   // whose publication is still `pending`). Importing it is therefore the assertion:
   // this test exists so an unreachable fixture fails CI instead of silently
   // showing operators a state that cannot happen.
-  await assert.doesNotReject(
-    () => import('../scripts/dev-fixtures/runs/generate.js')
-  )
+  await import('../scripts/dev-fixtures/runs/generate.js')
 })
 
 test('dev fixtures distinguish a statistics snapshot from no snapshot', async () => {
@@ -93,22 +90,22 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
     workflow: (typeof completed)[number]['workflow']
   ): string[] => {
     const run = completed.find((candidate) => candidate.workflow === workflow)
-    assert(run !== undefined)
+    expect.assert(run !== undefined)
     const statistics = run.execution_statistics
-    assert(statistics !== null)
+    expect.assert(statistics !== null)
     return [...new Set(statistics.groups.map((group) => group.agent_name))]
   }
-  assert.deepStrictEqual(agentsFor('issue-review'), [
+  expect(agentsFor('issue-review')).toStrictEqual([
     'issue-analyzer',
     'issue-mitigator',
     'issue-verifier'
   ])
-  assert.deepStrictEqual(agentsFor('pull-request-review'), [
+  expect(agentsFor('pull-request-review')).toStrictEqual([
     'pull-request-analyzer',
     'pull-request-mitigator',
     'pull-request-verifier'
   ])
-  assert.deepStrictEqual(agentsFor('repository-review'), [
+  expect(agentsFor('repository-review')).toStrictEqual([
     'repository-discovery',
     'repository-triager',
     'repository-analyzer',
@@ -121,19 +118,19 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
   const repositoryRun = completed.find(
     (run) => run.workflow === 'repository-review'
   )
-  assert(repositoryRun !== undefined)
+  expect.assert(repositoryRun !== undefined)
   const patchDeliveryIds = repositoryRun.execution_statistics?.groups
     .filter((group) => group.agent_name === 'patch-synthesizer')
     .map((group) => group.delivery_id)
-  assert(patchDeliveryIds !== undefined)
-  assert(patchDeliveryIds.length >= 2)
+  expect.assert(patchDeliveryIds !== undefined)
+  expect.assert(patchDeliveryIds.length >= 2)
   const publicationDeliveryIds = (stepsByRun.get(repositoryRun.run_id) ?? [])
     .map((step) => step.step_key.match(/^repository:delivery:(.+)$/)?.[1])
     .filter((deliveryId): deliveryId is string => deliveryId !== undefined)
-  assert.deepStrictEqual(patchDeliveryIds, publicationDeliveryIds)
+  expect(patchDeliveryIds).toStrictEqual(publicationDeliveryIds)
   for (const run of completed) {
     const statistics = run.execution_statistics
-    assert(statistics !== null)
+    expect.assert(statistics !== null)
     const usages = [
       statistics.token_usage,
       ...statistics.groups.map((group) => group.token_usage)
@@ -144,17 +141,16 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
         usage.output_tokens !== null &&
         usage.total_tokens !== null
       ) {
-        assert.strictEqual(
+        expect(
           usage.total_tokens,
-          usage.input_tokens + usage.output_tokens,
           'fixture total_tokens must equal inclusive input_tokens + output_tokens'
-        )
+        ).toBe(usage.input_tokens + usage.output_tokens)
       }
       if (
         usage.input_tokens !== null &&
         usage.cache_read_input_tokens !== null
       ) {
-        assert(
+        expect.assert(
           usage.cache_read_input_tokens <= usage.input_tokens,
           'fixture cache_read_input_tokens must be a subset of input_tokens'
         )
@@ -163,13 +159,13 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
         usage.input_tokens !== null &&
         usage.cache_creation_input_tokens !== null
       ) {
-        assert(
+        expect.assert(
           usage.cache_creation_input_tokens <= usage.input_tokens,
           'fixture cache_creation_input_tokens must be a subset of input_tokens'
         )
       }
       if (usage.output_tokens !== null && usage.reasoning_tokens !== null) {
-        assert(
+        expect.assert(
           usage.reasoning_tokens <= usage.output_tokens,
           'fixture reasoning_tokens must be a subset of output_tokens'
         )
@@ -178,7 +174,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
   }
   for (const workflow of ['issue-review', 'pull-request-review'] as const) {
     const workflowRuns = completed.filter((run) => run.workflow === workflow)
-    assert(
+    expect.assert(
       workflowRuns.some((run) =>
         run.execution_statistics?.groups.some(
           (group) => group.agent_phase === 'feedback'
@@ -186,7 +182,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
       ),
       `${workflow} fixtures must include a feedback loop`
     )
-    assert(
+    expect.assert(
       workflowRuns.some(
         (run) =>
           !run.execution_statistics?.groups.some(
@@ -196,7 +192,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
       `${workflow} fixtures must include a run without feedback`
     )
   }
-  assert.strictEqual(active?.execution_statistics, null)
+  expect(active?.execution_statistics).toBe(null)
 })
 
 test('dev fixtures track sign-out so the console reaches the sign-in form', async () => {
@@ -205,27 +201,27 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
   const fixture = await startFixtureServer()
   try {
     const signedIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.strictEqual(signedIn.status, 200)
+    expect(signedIn.status).toBe(200)
 
     // Signing out mirrors the BFF: 204, and every later API call is unauthorized so
     // the console switches to its sign-in form rather than reloading the run list.
     const signOut = await fetch(`${fixture.base}/api/session`, {
       method: 'DELETE'
     })
-    assert.strictEqual(signOut.status, 204)
+    expect(signOut.status).toBe(204)
 
     const afterSignOut = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.strictEqual(afterSignOut.status, 401)
-    assert.deepStrictEqual(await afterSignOut.json(), { error: 'unauthorized' })
+    expect(afterSignOut.status).toBe(401)
+    expect(await afterSignOut.json()).toStrictEqual({ error: 'unauthorized' })
 
     // Signing back in restores the run list: POST is the only way to become signed in.
     const signIn = await fetch(`${fixture.base}/api/session`, {
       method: 'POST'
     })
-    assert.strictEqual(signIn.status, 204)
+    expect(signIn.status).toBe(204)
 
     const afterSignIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.strictEqual(afterSignIn.status, 200)
+    expect(afterSignIn.status).toBe(200)
   } finally {
     await fixture.close()
   }
@@ -244,53 +240,48 @@ test('dev fixtures answer the give-up decision the queue offers', async () => {
       await fetch(`${fixture.base}/api/runs/parked`)
     ).json()) as { blocks: { run_id: string }[] }
     const runId = parked.blocks[0]?.run_id
-    assert(runId !== undefined)
+    expect.assert(runId !== undefined)
     const endpoint = `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/give-up`
     const headers = {
       'content-type': 'application/json',
       'x-review-runs-admin-token': 'fixture-admin-token'
     }
 
-    assert.strictEqual(
+    expect(
       (
         await fetch(endpoint, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ reason: 'not waiting' })
         })
-      ).status,
-      401
-    )
-    assert.strictEqual(
+      ).status
+    ).toBe(401)
+    expect(
       (
         await fetch(endpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify({})
         })
-      ).status,
-      400
-    )
+      ).status
+    ).toBe(400)
 
     const givenUp = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({ reason: 'the outcome cannot be established' })
     })
-    assert.strictEqual(givenUp.status, 200)
+    expect(givenUp.status).toBe(200)
     const record = (await givenUp.json()) as {
       run: { notices: { kind: string; reason_code: string | null }[] }
     }
-    assert.strictEqual(record.run.notices[0]?.kind, 'failure')
-    assert.match(record.run.notices[0]?.reason_code ?? '', /BY_OPERATOR$/)
+    expect(record.run.notices[0]?.kind).toBe('failure')
+    expect(record.run.notices[0]?.reason_code ?? '').toMatch(/BY_OPERATOR$/)
 
     const after = (await (
       await fetch(`${fixture.base}/api/runs/parked`)
     ).json()) as { blocks: { run_id: string }[] }
-    assert.equal(
-      after.blocks.some((block) => block.run_id === runId),
-      false
-    )
+    expect(after.blocks.some((block) => block.run_id === runId)).toBe(false)
   } finally {
     await fixture.close()
   }
@@ -302,7 +293,7 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
   const fixture = await startFixtureServer()
   try {
     const asset = await fetch(`${fixture.base}/index.html`)
-    assert.strictEqual(asset.status, 404)
+    expect(asset.status).toBe(404)
   } finally {
     await fixture.close()
   }
@@ -326,13 +317,12 @@ test('dev fixtures serve memory actions as downloads', async () => {
       ]
     ] as const) {
       const response = await fetch(`${fixture.base}${path}`)
-      assert.strictEqual(response.status, 200)
-      assert.strictEqual(
-        response.headers.get('content-type'),
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe(
         'application/octet-stream'
       )
-      assert.strictEqual(response.headers.get('content-disposition'), filename)
-      assert.ok((await response.arrayBuffer()).byteLength > 0)
+      expect(response.headers.get('content-disposition')).toBe(filename)
+      expect.assert((await response.arrayBuffer()).byteLength > 0)
     }
   } finally {
     await fixture.close()
@@ -356,16 +346,15 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
       ]
     ] as const) {
       const response = await fetch(`${fixture.base}${path}`)
-      assert.strictEqual(response.status, status)
-      assert.deepStrictEqual(await response.json(), { error })
+      expect(response.status).toBe(status)
+      expect(await response.json()).toStrictEqual({ error })
     }
 
     const download = await fetch(
       `${fixture.base}/api/memory/versions/404/artifact`
     )
-    assert.strictEqual(download.status, 200)
-    assert.strictEqual(
-      download.headers.get('content-disposition'),
+    expect(download.status).toBe(200)
+    expect(download.headers.get('content-disposition')).toBe(
       'attachment; filename="memory-tree.v1.tar.zst"'
     )
   } finally {
@@ -387,12 +376,11 @@ test('dev fixtures page the run list in the order their cursor describes', async
     const stamps = first.runs.map(
       (run: { created_at: string }) => run.created_at
     )
-    assert.deepStrictEqual(
+    expect(
       stamps,
-      [...stamps].sort().reverse(),
       'the list is newest-first, which is what the cursor walks'
-    )
-    assert.ok(
+    ).toStrictEqual([...stamps].sort().reverse())
+    expect.assert(
       first.next_cursor,
       'sixty-two fixtures must not fit one page of fifty'
     )
@@ -405,9 +393,12 @@ test('dev fixtures page the run list in the order their cursor describes', async
     const firstIds = new Set(
       first.runs.map((run: { run_id: string }) => run.run_id)
     )
-    assert.ok(second.runs.length > 0, 'the cursor must return a second page')
+    expect.assert(
+      second.runs.length > 0,
+      'the cursor must return a second page'
+    )
     for (const run of second.runs as { run_id: string }[]) {
-      assert.ok(
+      expect.assert(
         !firstIds.has(run.run_id),
         `${run.run_id} appears on both pages`
       )
@@ -433,8 +424,8 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
       await fetch(`${fixture.base}/api/runs?limit=1`)
     ).json()
     const newest = unfiltered.runs[0]
-    assert.ok(newest, 'the fixtures must serve at least one run')
-    assert.ok(
+    expect.assert(newest, 'the fixtures must serve at least one run')
+    expect.assert(
       !(
         newest.workflow === 'repository-review' &&
         newest.publication.status === 'published'
@@ -452,17 +443,17 @@ test('run fixtures filter by source platform', async () => {
     const github = await (
       await fetch(`${fixture.base}/api/runs?source_platform=github&limit=1`)
     ).json()
-    assert.strictEqual(github.runs[0]?.source_platform, 'github')
+    expect(github.runs[0]?.source_platform).toBe('github')
 
     const gitlab = await (
       await fetch(`${fixture.base}/api/runs?source_platform=gitlab&limit=1`)
     ).json()
-    assert.strictEqual(gitlab.runs[0]?.source_platform, 'gitlab')
+    expect(gitlab.runs[0]?.source_platform).toBe('gitlab')
 
     const unknown = await (
       await fetch(`${fixture.base}/api/runs?source_platform=unknown&limit=1`)
     ).json()
-    assert.strictEqual(unknown.runs[0]?.source_platform, 'unknown')
+    expect(unknown.runs[0]?.source_platform).toBe('unknown')
   } finally {
     await fixture.close()
   }
@@ -499,61 +490,55 @@ test('memory fixtures form one coherent provenance graph', async () => {
       )
     )
 
-    assert.strictEqual(extractions.next_cursor, null)
-    assert.strictEqual(extractions.extractions.length, 48)
-    assert.strictEqual(observations.next_cursor, null)
-    assert.strictEqual(observations.observations.length, 46)
-    assert.strictEqual(
-      overview.totals.completed_extraction_count,
+    expect(extractions.next_cursor).toBe(null)
+    expect(extractions.extractions.length).toBe(48)
+    expect(observations.next_cursor).toBe(null)
+    expect(observations.observations.length).toBe(46)
+    expect(overview.totals.completed_extraction_count).toBe(
       extractions.extractions.length
     )
-    assert.strictEqual(
-      overview.totals.observation_count,
+    expect(overview.totals.observation_count).toBe(
       observations.observations.length
     )
-    assert.strictEqual(
+    expect(
       overview.totals.pending_observation_count +
-        overview.totals.consumed_observation_count,
-      observations.observations.length
-    )
-    assert.strictEqual(
+        overview.totals.consumed_observation_count
+    ).toBe(observations.observations.length)
+    expect(
       overview.totals.units_with_observation_count +
-        overview.totals.units_without_observation_count,
-      overview.totals.extracted_unit_count
-    )
-    assert.strictEqual(
+        overview.totals.units_without_observation_count
+    ).toBe(overview.totals.extracted_unit_count)
+    expect(
       overview.workflows.reduce(
         (total: number, workflow: { extracted_unit_count: number }) =>
           total + workflow.extracted_unit_count,
         0
-      ),
-      overview.totals.extracted_unit_count
-    )
+      )
+    ).toBe(overview.totals.extracted_unit_count)
 
     const siblings = observations.observations.filter(
       (item: { extraction_id: string }) =>
         item.extraction_id === 'fixture-extraction-2'
     )
-    assert.strictEqual(siblings.length, 2)
-    assert.strictEqual(
+    expect(siblings.length).toBe(2)
+    expect(
       new Set(
         siblings.map((item: { observation_id: string }) => item.observation_id)
-      ).size,
-      2
-    )
-    assert(
+      ).size
+    ).toBe(2)
+    expect.assert(
       siblings.some(
         (item: { consumed_version: number | null }) =>
           item.consumed_version === null
       )
     )
-    assert(
+    expect.assert(
       siblings.some(
         (item: { consumed_version: number | null }) =>
           item.consumed_version === 2
       )
     )
-    assert(
+    expect.assert(
       observations.observations.every(
         (item: { observation_id: string; extraction_id: string }) =>
           item.observation_id !== item.extraction_id
@@ -569,34 +554,36 @@ test('memory fixtures form one coherent provenance graph', async () => {
       consumed_version: number | null
     }>) {
       const extraction = extractionById.get(observation.extraction_id)
-      assert(extraction, `${observation.extraction_id} must exist`)
-      assert.strictEqual(extraction.source_run_id, observation.source_run_id)
-      assert.strictEqual(extraction.source_unit_id, observation.source_unit_id)
-      assert.strictEqual(
+      expect.assert(extraction, `${observation.extraction_id} must exist`)
+      expect(extraction.source_run_id).toBe(observation.source_run_id)
+      expect(extraction.source_unit_id).toBe(observation.source_unit_id)
+      expect(
         extraction.observations.find(
           (item) => item.observation_id === observation.observation_id
-        )?.body_markdown,
-        observation.body_markdown
-      )
+        )?.body_markdown
+      ).toBe(observation.body_markdown)
 
       const runResponse = await fetch(
         `${fixture.base}/api/runs/${encodeURIComponent(observation.source_run_id)}`
       )
-      assert.strictEqual(runResponse.status, 200)
+      expect(runResponse.status).toBe(200)
       const { run } = await runResponse.json()
-      assert.strictEqual(run.source_platform, 'github')
-      assert.strictEqual(run.execution.status, 'succeeded')
-      assert.strictEqual(run.publication.status, 'published')
-      assert.strictEqual(run.artifact_storage?.status, 'available')
+      expect(run.source_platform).toBe('github')
+      expect(run.execution.status).toBe('succeeded')
+      expect(run.publication.status).toBe('published')
+      expect(run.artifact_storage?.status).toBe('available')
 
       if (observation.consumed_version !== null) {
         const version = versions.versions.find(
           (candidate: { version: number }) =>
             candidate.version === observation.consumed_version
         )
-        assert(version, 'a consumed observation must name an existing version')
-        assert.strictEqual(version.source.kind, 'learning')
-        assert.ok(
+        expect.assert(
+          version,
+          'a consumed observation must name an existing version'
+        )
+        expect(version.source.kind).toBe('learning')
+        expect.assert(
           version.source.observation_ids.includes(observation.observation_id)
         )
       }
@@ -615,26 +602,25 @@ test('memory fixtures form one coherent provenance graph', async () => {
         | { kind: 'reorganization'; operation_id: string }
     }>) {
       if (version.source.kind === 'learning') {
-        assert.deepStrictEqual(
+        expect(
           version.source.maintenance_report.observation_decisions
             .map((decision) => decision.observation_id)
             .sort(),
-          version.source.observation_ids.toSorted(),
           'maintenance decisions must identify every consumed observation'
-        )
+        ).toStrictEqual(version.source.observation_ids.toSorted())
         for (const observationId of version.source.observation_ids) {
           const observation = observations.observations.find(
             (candidate: { observation_id: string }) =>
               candidate.observation_id === observationId
           )
-          assert(
+          expect.assert(
             observation,
             `${observationId} consumed by a version must have an observation`
           )
         }
       } else if (version.source.kind === 'manual') {
-        assert.ok(version.source.operation_id)
-        assert.ok(version.source.actor)
+        expect.assert(version.source.operation_id)
+        expect.assert(version.source.actor)
       }
     }
   } finally {
@@ -654,14 +640,14 @@ test('fixture event responses preserve the contract reason for a failed transiti
     const response = await fetch(
       `${fixture.base}/api/runs/${run.run_id}/events`
     )
-    assert.equal(response.status, 200)
+    expect(response.status).toBe(200)
     const body = await response.json()
     const transition = body.events.find(
       (event: { axis: string; to_status: string }) =>
         event.axis === 'preparation' && event.to_status === 'failed'
     )
-    assert.ok(transition)
-    assert.equal(transition.reason_code, run.preparation.failure_code)
+    expect.assert(transition)
+    expect(transition.reason_code).toBe(run.preparation.failure_code)
   } finally {
     await fixture.close()
   }
@@ -678,8 +664,8 @@ test('fixture events show a step that failed and was retried inside a publicatio
       (step) => step.status === 'succeeded' && step.attempt_count > 1
     )
   )
-  assert.ok(run, 'one fixture run retries a step')
-  assert.equal(run.publication.status, 'published')
+  expect.assert(run, 'one fixture run retries a step')
+  expect(run.publication.status).toBe('published')
   const fixture = await startFixtureServer()
   try {
     const response = await fetch(
@@ -706,15 +692,14 @@ test('fixture events show a step that failed and was retried inside a publicatio
           other.step_key === event.step_key && other.to_status === 'failed'
       )
     )
-    assert.deepEqual(
-      retried.map((event) => `${event.from_status}->${event.to_status}`),
-      [
-        'pending->running',
-        'running->failed',
-        'failed->running',
-        'running->succeeded'
-      ]
-    )
+    expect(
+      retried.map((event) => `${event.from_status}->${event.to_status}`)
+    ).toStrictEqual([
+      'pending->running',
+      'running->failed',
+      'failed->running',
+      'running->succeeded'
+    ])
     // The publication brackets its steps: it starts before the first and concludes after the last.
     const started = publication.find(
       (event) => event.to_status === 'publishing'
@@ -722,10 +707,12 @@ test('fixture events show a step that failed and was retried inside a publicatio
     const concluded = publication.find(
       (event) => event.to_status === 'published'
     )
-    assert.ok(started && concluded)
+    expect.assert(started && concluded)
     for (const step of steps) {
-      assert.ok(Date.parse(step.occurred_at) > Date.parse(started.occurred_at))
-      assert.ok(
+      expect.assert(
+        Date.parse(step.occurred_at) > Date.parse(started.occurred_at)
+      )
+      expect.assert(
         Date.parse(step.occurred_at) < Date.parse(concluded.occurred_at)
       )
     }
@@ -743,7 +730,7 @@ test('abandoning a contradictory preparation uses the current production reason'
     const runId = parked.blocks.find(
       (block) => block.axis === 'preparation'
     )?.run_id
-    assert.ok(runId)
+    expect.assert(runId)
     const response = await fetch(
       `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/abandon`,
       {
@@ -757,20 +744,18 @@ test('abandoning a contradictory preparation uses the current production reason'
         })
       }
     )
-    assert.equal(response.status, 200)
+    expect(response.status).toBe(200)
     const { run } = (await response.json()) as {
       run: {
         preparation: { status: string; failure_code: string }
         notices: { reason_code: string }[]
       }
     }
-    assert.equal(run.preparation.status, 'failed')
-    assert.equal(
-      run.preparation.failure_code,
+    expect(run.preparation.status).toBe('failed')
+    expect(run.preparation.failure_code).toBe(
       'PREPARATION_ABANDONED_BY_OPERATOR'
     )
-    assert.equal(
-      run.notices[0]?.reason_code,
+    expect(run.notices[0]?.reason_code).toBe(
       'PREPARATION_ABANDONED_BY_OPERATOR'
     )
   } finally {

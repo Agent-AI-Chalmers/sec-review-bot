@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import type { App } from 'octokit'
 
 import { createAppHttpHandler } from '../../../src/ingress/http/app-http-handler.js'
@@ -75,7 +74,7 @@ test('app HTTP handler routes repository dispatch requests before webhook middle
     captureResponse()
   )
 
-  assert.deepStrictEqual(calls, ['dispatch'])
+  expect(calls).toStrictEqual(['dispatch'])
 })
 
 test('app HTTP handler delegates non-dispatch requests to webhook middleware', async () => {
@@ -94,7 +93,7 @@ test('app HTTP handler delegates non-dispatch requests to webhook middleware', a
 
   await handler(requestFor('/api/github/webhooks'), captureResponse())
 
-  assert.deepStrictEqual(calls, ['webhook'])
+  expect(calls).toStrictEqual(['webhook'])
 })
 
 test('app HTTP handler rejects webhook content lengths above the configured limit', async () => {
@@ -118,8 +117,8 @@ test('app HTTP handler rejects webhook content lengths above the configured limi
     response
   )
 
-  assert.strictEqual(response.statusCodeValue, 413)
-  assert.match(String(response.body), /too large/i)
+  expect(response.statusCodeValue).toBe(413)
+  expect(String(response.body)).toMatch(/too large/i)
 })
 
 test('app HTTP handler aborts streamed webhook bodies above the configured limit', async () => {
@@ -146,10 +145,10 @@ test('app HTTP handler aborts streamed webhook bodies above the configured limit
   await handler(request, response)
   await new Promise<void>((resolve) => request.once('close', resolve))
 
-  assert.strictEqual(response.statusCodeValue, 413)
-  assert.match(String(response.body), /too large/i)
-  assert.strictEqual(request.destroyed, true)
-  assert.ok(middlewareBytes <= 5)
+  expect(response.statusCodeValue).toBe(413)
+  expect(String(response.body)).toMatch(/too large/i)
+  expect(request.destroyed).toBe(true)
+  expect.assert(middlewareBytes <= 5)
 })
 
 test('app HTTP handler rejects malformed request URLs', async () => {
@@ -168,12 +167,11 @@ test('app HTTP handler rejects malformed request URLs', async () => {
 
   await handler(requestFor('/', { host: 'bad host' }), response)
 
-  assert.strictEqual(response.statusCodeValue, 400)
-  assert.strictEqual(
-    response.headers['content-type'],
+  expect(response.statusCodeValue).toBe(400)
+  expect(response.headers['content-type']).toBe(
     'application/json; charset=utf-8'
   )
-  assert.match(String(response.body), /Invalid request URL/)
+  expect(String(response.body)).toMatch(/Invalid request URL/)
 })
 
 test('app HTTP handler contains rejected async dispatch handlers', async () => {
@@ -190,8 +188,8 @@ test('app HTTP handler contains rejected async dispatch handlers', async () => {
 
   await handler(requestFor('/repository-review-dispatch'), response)
 
-  assert.strictEqual(response.statusCodeValue, 500)
-  assert.deepStrictEqual(JSON.parse(String(response.body)), {
+  expect(response.statusCodeValue).toBe(500)
+  expect(JSON.parse(String(response.body))).toStrictEqual({
     error: 'Internal server error.'
   })
 })

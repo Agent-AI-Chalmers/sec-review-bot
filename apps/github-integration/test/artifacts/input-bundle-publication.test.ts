@@ -1,10 +1,9 @@
-import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import {
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -103,7 +102,7 @@ for (const crash of [
           : []
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
-        assert.ok(candidate)
+        expect.assert(candidate)
         if (crash === 'after-upload') failOnce()
         candidate.status = status
         if (crash === 'after-confirm') failOnce()
@@ -111,49 +110,45 @@ for (const crash of [
       },
       async submitPreparedRun(_run, _token, savedContext, input) {
         if (crash === 'before-commit') failOnce()
-        assert.ok(candidate)
+        expect.assert(candidate)
         candidate.status = 'selected'
         authoritative = structuredClone({ context: savedContext, input })
         if (crash === 'after-commit') failOnce()
       }
     }
     try {
-      await assert.rejects(
+      await expect(
         publishAndSubmitInputBundle(store, 'run', 'original', context, {
           input_bundle: reference,
           subject: 'original snapshot'
-        }),
-        /process died/
-      )
-      assert.ok(
+        })
+      ).rejects.toThrow(/process died/)
+      expect.assert(
         candidate,
         'intent must be durable before the first external write'
       )
       if (crash === 'before-upload') {
-        assert.equal(
-          await recoverInputBundlePublication(store, 'run', 'takeover'),
-          false
-        )
-        assert.equal(candidate.status, 'abandoned')
-        assert.equal(authoritative, undefined)
+        expect(
+          await recoverInputBundlePublication(store, 'run', 'takeover')
+        ).toBe(false)
+        expect(candidate.status).toBe('abandoned')
+        expect(authoritative).toBe(undefined)
       } else {
-        assert.equal(
-          await recoverInputBundlePublication(store, 'run', 'takeover'),
-          true
-        )
-        assert.deepStrictEqual(authoritative, {
+        expect(
+          await recoverInputBundlePublication(store, 'run', 'takeover')
+        ).toBe(true)
+        expect(authoritative).toStrictEqual({
           context,
           input: {
             input_bundle: candidate.reference,
             subject: 'original snapshot'
           }
         })
-        assert.equal(candidate.status, 'selected')
-        assert.equal(
+        expect(candidate.status).toBe('selected')
+        expect(
           s3.commandCalls(PutObjectCommand).length,
-          1,
           'recovery must not rebuild or upload again'
-        )
+        ).toBe(1)
       }
     } finally {
       await fs.rm(directory, { recursive: true, force: true })
@@ -183,17 +178,16 @@ test('an unavailable store is not evidence that the intent should be abandoned',
       return [candidate]
     },
     async reserveInputBundleCandidate() {
-      assert.fail('must not rebuild')
+      expect.unreachable('must not rebuild')
     },
     async settleInputBundleCandidate() {
-      assert.fail('must not abandon on an uncertain read')
+      expect.unreachable('must not abandon on an uncertain read')
     },
     async submitPreparedRun() {
-      assert.fail('must not submit unverified bytes')
+      expect.unreachable('must not submit unverified bytes')
     }
   }
-  await assert.rejects(
-    recoverInputBundlePublication(store, 'run', 'current'),
-    /storage unavailable/
-  )
+  await expect(
+    recoverInputBundlePublication(store, 'run', 'current')
+  ).rejects.toThrow(/storage unavailable/)
 })

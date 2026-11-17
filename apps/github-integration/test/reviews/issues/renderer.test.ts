@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { renderIssueReviewCommentFromReviewRecord } from '../../../src/reviews/issues/renderer.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
@@ -43,16 +42,15 @@ test('promoted issue comment uses the shared status vocabulary and keeps the ove
     draftPullRequest: { number: 97, html_url: 'https://example.test/pull/97' }
   })
 
-  assert.match(body, /^## Issue Security Review$/m)
-  assert.match(body, /- Analysis: `confirmed security defect`/)
-  assert.match(body, /- Mitigation: `patch proposed, 1 file changed`/)
-  assert.match(
-    body,
+  expect(body).toMatch(/^## Issue Security Review$/m)
+  expect(body).toMatch(/- Analysis: `confirmed security defect`/)
+  expect(body).toMatch(/- Mitigation: `patch proposed, 1 file changed`/)
+  expect(body).toMatch(
     /- Verification: `full coverage; logic simulation; checks not run`/
   )
-  assert.match(body, /Analyzer overview text\./)
-  assert.match(body, /PR: #97 \(https:\/\/example\.test\/pull\/97\)/)
-  assert.doesNotMatch(body, /\*\*Verification:\*\*/)
+  expect(body).toMatch(/Analyzer overview text\./)
+  expect(body).toMatch(/PR: #97 \(https:\/\/example\.test\/pull\/97\)/)
+  expect(body).not.toMatch(/\*\*Verification:\*\*/)
 })
 
 test('unpromoted issue comment shares the same status vocabulary and reports the plan', () => {
@@ -63,14 +61,13 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
     draftPullRequest: null
   })
 
-  assert.match(body, /^## Security Review$/m)
-  assert.match(body, /- Analysis: `confirmed security defect`/)
-  assert.match(body, /- Mitigation: `patch proposed, 1 file changed`/)
-  assert.match(
-    body,
+  expect(body).toMatch(/^## Security Review$/m)
+  expect(body).toMatch(/- Analysis: `confirmed security defect`/)
+  expect(body).toMatch(/- Mitigation: `patch proposed, 1 file changed`/)
+  expect(body).toMatch(
     /- Verification: `full coverage; logic simulation; checks not run`/
   )
-  assert.match(body, /- Patch ready: `yes`/)
-  assert.match(body, /- `src\/app\.ts`/)
-  assert.match(body, /Next step: `none`/)
+  expect(body).toMatch(/- Patch ready: `yes`/)
+  expect(body).toMatch(/- `src\/app\.ts`/)
+  expect(body).toMatch(/Next step: `none`/)
 })

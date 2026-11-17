@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { ReadableStream } from 'node:stream/web'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   ResponseTooLargeError,
@@ -16,8 +15,7 @@ test('a body within the budget is returned whole', async () => {
   const response = new Response('abcd', {
     headers: { 'content-length': '4' }
   })
-  assert.deepStrictEqual(
-    await readBoundedResponseBody(response, 4),
+  expect(await readBoundedResponseBody(response, 4)).toStrictEqual(
     new Uint8Array([97, 98, 99, 100])
   )
 })
@@ -35,11 +33,10 @@ test('a declared length over the budget is refused without reading the body', as
   const response = new Response(stream, {
     headers: { 'content-length': '8' }
   })
-  await assert.rejects(
-    () => readBoundedResponseBody(response, 4),
+  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(
     ResponseTooLargeError
   )
-  assert.strictEqual(cancelled, true)
+  expect(cancelled).toBe(true)
 })
 
 test('a body that grows past the budget mid-stream is refused', async () => {
@@ -53,16 +50,14 @@ test('a body that grows past the budget mid-stream is refused', async () => {
   })
   // No content-length: the declared-length check cannot help here.
   const response = new Response(stream)
-  await assert.rejects(
-    () => readBoundedResponseBody(response, 4),
+  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(
     ResponseTooLargeError
   )
 })
 
 test('an empty body reads as no bytes', async () => {
   const response = new Response(null)
-  assert.deepStrictEqual(
-    await readBoundedResponseBody(response, 4),
+  expect(await readBoundedResponseBody(response, 4)).toStrictEqual(
     new Uint8Array(0)
   )
 })

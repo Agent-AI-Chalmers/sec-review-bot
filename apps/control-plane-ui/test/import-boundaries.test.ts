@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import ts from 'typescript'
 
 const sourceRoot = path.resolve(import.meta.dirname, '../browser')
@@ -98,22 +97,20 @@ test('route modules do not create a dependency cycle through App', async () => {
     file.startsWith(path.join(sourceRoot, 'features', 'memory'))
   )
 
-  assert.ok(routeModules.length > 0)
-  assert.ok(memoryModules.length > 0)
-  assert.equal(reaches(graph, app, memoryPage), true)
+  expect.assert(routeModules.length > 0)
+  expect.assert(memoryModules.length > 0)
+  expect(reaches(graph, app, memoryPage)).toBe(true)
   for (const module of routeModules) {
-    assert.equal(
+    expect(
       reaches(graph, module, app),
-      false,
       `${path.basename(module)} must not depend on App.tsx`
-    )
+    ).toBe(false)
   }
   for (const module of memoryModules) {
-    assert.equal(
+    expect(
       reaches(graph, module, app),
-      false,
       `${path.basename(module)} must not depend on App.tsx`
-    )
+    ).toBe(false)
   }
 })
 
@@ -126,29 +123,26 @@ test('feature domains depend inward through explicit shared capabilities', async
   for (const [file, imports] of graph) {
     if (file.startsWith(sharedRoot)) {
       for (const imported of imports) {
-        assert.equal(
+        expect(
           imported.startsWith(runsRoot) || imported.startsWith(memoryRoot),
-          false,
           `${path.relative(sourceRoot, file)} must not depend on a feature domain`
-        )
+        ).toBe(false)
       }
     }
     if (file.startsWith(runsRoot)) {
       for (const imported of imports) {
-        assert.equal(
+        expect(
           imported.startsWith(memoryRoot),
-          false,
           `${path.relative(sourceRoot, file)} must not depend on memory`
-        )
+        ).toBe(false)
       }
     }
     if (file.startsWith(memoryRoot)) {
       for (const imported of imports) {
-        assert.equal(
+        expect(
           imported.startsWith(runsRoot),
-          false,
           `${path.relative(sourceRoot, file)} must not depend on runs`
-        )
+        ).toBe(false)
       }
     }
   }

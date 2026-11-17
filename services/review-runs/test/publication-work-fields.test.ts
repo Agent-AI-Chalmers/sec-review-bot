@@ -11,9 +11,8 @@
 // but it does not serialize through this fastify + openapi-glue path: a payload that satisfies
 // both branches still failed with the same "does not match schema definition" error. Keeping two
 // explicit schemas and holding them together with this test is what was verified to work.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse as parseYaml } from 'yaml'
 
@@ -71,20 +70,19 @@ test('PublicationWork carries every ReviewRunRecord field plus the claim', () =>
     (field) => !requiredOf(work).has(field)
   )
 
-  assert.deepEqual(
+  expect(
     {
       missingFields,
       unexpectedFields,
       missingRequired,
       unexpectedRequired
     },
-    {
-      missingFields: [],
-      unexpectedFields: [],
-      missingRequired: [],
-      unexpectedRequired: []
-    },
     'PublicationWork must stay the run record plus workflow_result and claim_token, ' +
       'with the same requiredness; the store builds it by spreading rowToRecord(row)'
-  )
+  ).toStrictEqual({
+    missingFields: [],
+    unexpectedFields: [],
+    missingRequired: [],
+    unexpectedRequired: []
+  })
 })

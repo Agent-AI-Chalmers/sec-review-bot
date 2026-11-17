@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { classifyPublicationFailure } from '../../src/review-runs/publication-failure.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
@@ -15,7 +14,7 @@ test('a publication step that exhausted its retry budget fails rather than retri
       status: 409
     }
   )
-  assert.deepStrictEqual(classifyPublicationFailure(error), {
+  expect(classifyPublicationFailure(error)).toStrictEqual({
     retry: false,
     scope: 'step',
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
@@ -33,7 +32,7 @@ test('the same exhaustion code carried by a proxy answer stays retryable', () =>
     code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
     status: 503
   })
-  assert.deepStrictEqual(classifyPublicationFailure(relayed), {
+  expect(classifyPublicationFailure(relayed)).toStrictEqual({
     retry: true,
     scope: 'publication',
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
@@ -46,7 +45,7 @@ test('a refused credential ends the publication instead of the next delivery', (
   // which belong to one delivery, but wrong for a rejected credential: every remaining delivery
   // would fail the same way. Scope is what lets the batch tell the two apart.
   const refused = Object.assign(new Error('Bad credentials'), { status: 401 })
-  assert.deepStrictEqual(classifyPublicationFailure(refused), {
+  expect(classifyPublicationFailure(refused)).toStrictEqual({
     retry: false,
     scope: 'publication',
     code: 'GITHUB_AUTH_REJECTED',
@@ -56,8 +55,8 @@ test('a refused credential ends the publication instead of the next delivery', (
 
 test('a delivery-scoped refusal keeps the rest of the publication running', () => {
   const missing = Object.assign(new Error('Not Found'), { status: 404 })
-  assert.strictEqual(classifyPublicationFailure(missing).scope, 'step')
-  assert.strictEqual(classifyPublicationFailure(missing).retry, false)
+  expect(classifyPublicationFailure(missing).scope).toBe('step')
+  expect(classifyPublicationFailure(missing).retry).toBe(false)
 })
 
 test('Review Runs publication faults that cannot be repaired fail rather than retry', () => {
@@ -79,7 +78,7 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
       new Error('Publication step set is not usable.'),
       { code }
     )
-    assert.deepStrictEqual(classifyPublicationFailure(error), {
+    expect(classifyPublicationFailure(error)).toStrictEqual({
       retry: false,
       scope: 'step',
       code,
@@ -87,13 +86,12 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
     })
   }
 
-  assert.deepStrictEqual(
-    classifyPublicationFailure(new Error('Publication step set changed.')),
-    {
-      retry: true,
-      scope: 'publication',
-      code: null,
-      reason: 'unknown-publish-error'
-    }
-  )
+  expect(
+    classifyPublicationFailure(new Error('Publication step set changed.'))
+  ).toStrictEqual({
+    retry: true,
+    scope: 'publication',
+    code: null,
+    reason: 'unknown-publish-error'
+  })
 })

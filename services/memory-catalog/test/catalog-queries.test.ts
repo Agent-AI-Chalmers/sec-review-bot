@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Pool } from 'pg'
 
@@ -30,7 +29,7 @@ const extractionTrajectory = {
   size_bytes: 18,
 }
 
-await test('memory tree version history pagination returns an exclusive descending cursor', async () => {
+test('memory tree version history pagination returns an exclusive descending cursor', async () => {
   const queried: unknown[][] = []
   const pool = {
     query: (_sql: string, parameters: unknown[]) => {
@@ -83,15 +82,12 @@ await test('memory tree version history pagination returns an exclusive descendi
 
   const page = await queries.listMemoryTreeVersions(5, 2)
 
-  assert.deepEqual(queried, [[5, 3]])
-  assert.deepEqual(
-    page.versions.map((entry) => entry.version),
-    [4, 3],
-  )
-  assert.equal(page.next_before_version, 3)
+  expect(queried).toStrictEqual([[5, 3]])
+  expect(page.versions.map((entry) => entry.version)).toStrictEqual([4, 3])
+  expect(page.next_before_version).toBe(3)
 })
 
-await test('extraction pagination uses a stable opaque exclusive cursor', async () => {
+test('extraction pagination uses a stable opaque exclusive cursor', async () => {
   const parametersSeen: unknown[][] = []
   const rows = [
     {
@@ -129,18 +125,17 @@ await test('extraction pagination uses a stable opaque exclusive cursor', async 
     hasObservation: true,
   })
 
-  assert.deepEqual(parametersSeen, [
+  expect(parametersSeen).toStrictEqual([
     [null, null, 'issue-review', null, true, 2],
   ])
-  assert.deepEqual(
-    page.extractions.map((entry) => entry.extraction_id),
-    ['extraction-3'],
-  )
-  assert.equal(typeof page.next_cursor, 'string')
-  assert.match(page.next_cursor ?? '', /^[A-Za-z0-9_-]+$/)
+  expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual([
+    'extraction-3',
+  ])
+  expect(typeof page.next_cursor).toBe('string')
+  expect(page.next_cursor ?? '').toMatch(/^[A-Za-z0-9_-]+$/)
 })
 
-await test('observation pagination rejects malformed cursors before querying', async () => {
+test('observation pagination rejects malformed cursors before querying', async () => {
   let queried = false
   const pool = {
     query: () => {
@@ -151,14 +146,13 @@ await test('observation pagination rejects malformed cursors before querying', a
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
-  await assert.rejects(
-    queries.listObservations('not-json', 10, {}),
+  await expect(queries.listObservations('not-json', 10, {})).rejects.toThrow(
     InvalidCatalogCursorError,
   )
-  assert.equal(queried, false)
+  expect(queried).toBe(false)
 })
 
-await test('observation records include their authoritative extraction source', async () => {
+test('observation records include their authoritative extraction source', async () => {
   const pool = {
     query: () =>
       Promise.resolve({
@@ -181,7 +175,7 @@ await test('observation records include their authoritative extraction source', 
 
   const page = await queries.listObservations(undefined, 10, {})
 
-  assert.deepEqual(page.observations, [
+  expect(page.observations).toStrictEqual([
     {
       extraction_id: 'extraction-1',
       observation_id: 'extraction-1',
@@ -194,7 +188,7 @@ await test('observation records include their authoritative extraction source', 
   ])
 })
 
-await test('catalog overview projects completed extraction outcomes by distinct unit', async () => {
+test('catalog overview projects completed extraction outcomes by distinct unit', async () => {
   let trendQuery: { sql: string; values: unknown[] | undefined } | undefined
   const pool = {
     query: (sql: string, values?: unknown[]) => {
@@ -242,7 +236,7 @@ await test('catalog overview projects completed extraction outcomes by distinct 
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
-  assert.deepEqual(await queries.getCatalogOverview('30d'), {
+  expect(await queries.getCatalogOverview('30d')).toStrictEqual({
     totals: {
       completed_extraction_count: 5,
       extracted_unit_count: 4,
@@ -269,12 +263,12 @@ await test('catalog overview projects completed extraction outcomes by distinct 
       },
     ],
   })
-  assert.deepEqual(trendQuery?.values, [29])
-  assert.match(trendQuery?.sql ?? '', /created_at at time zone 'UTC'/)
-  assert.match(trendQuery?.sql ?? '', /current_timestamp at time zone 'UTC'/)
+  expect(trendQuery?.values).toStrictEqual([29])
+  expect(trendQuery?.sql ?? '').toMatch(/created_at at time zone 'UTC'/)
+  expect(trendQuery?.sql ?? '').toMatch(/current_timestamp at time zone 'UTC'/)
 })
 
-await test('all-time catalog overview uses UTC month periods including an empty current month', async () => {
+test('all-time catalog overview uses UTC month periods including an empty current month', async () => {
   let trendQuery: { sql: string; values: unknown[] | undefined } | undefined
   const pool = {
     query: (sql: string, values?: unknown[]) => {
@@ -314,21 +308,21 @@ await test('all-time catalog overview uses UTC month periods including an empty 
 
   const overview = await queries.getCatalogOverview('all')
 
-  assert.equal(overview.trend_granularity, 'month')
-  assert.deepEqual(overview.trend_points, [
+  expect(overview.trend_granularity).toBe('month')
+  expect(overview.trend_points).toStrictEqual([
     {
       period_start: '2026-10-01',
       extracted_unit_count: 0,
       units_with_observation_count: 0,
     },
   ])
-  assert.deepEqual(trendQuery?.values, [])
-  assert.match(trendQuery?.sql ?? '', /date_trunc\('month'/)
-  assert.match(trendQuery?.sql ?? '', /at time zone 'UTC'/)
-  assert.match(trendQuery?.sql ?? '', /coalesce\(/)
+  expect(trendQuery?.values).toStrictEqual([])
+  expect(trendQuery?.sql ?? '').toMatch(/date_trunc\('month'/)
+  expect(trendQuery?.sql ?? '').toMatch(/at time zone 'UTC'/)
+  expect(trendQuery?.sql ?? '').toMatch(/coalesce\(/)
 })
 
-await test('memory-tree automation reads the durable singleton state', async () => {
+test('memory-tree automation reads the durable singleton state', async () => {
   const pool = {
     query: () =>
       Promise.resolve({
@@ -346,7 +340,7 @@ await test('memory-tree automation reads the durable singleton state', async () 
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
-  assert.deepEqual(await queries.getMemoryTreeAutomation(), {
+  expect(await queries.getMemoryTreeAutomation()).toStrictEqual({
     state: 'enabled',
     version: 0,
     changed_by: { kind: 'service', id: 'memory-catalog' },
@@ -354,7 +348,7 @@ await test('memory-tree automation reads the durable singleton state', async () 
   })
 })
 
-await test('reorganization versions retain their source and trajectory in detail and history', async () => {
+test('reorganization versions retain their source and trajectory in detail and history', async () => {
   const pool = {
     query: () =>
       Promise.resolve({
@@ -387,8 +381,8 @@ await test('reorganization versions retain their source and trajectory in detail
     memory_tree_reference: artifact,
     created_at: '2026-10-23T04:00:00.000Z',
   }
-  assert.deepEqual(await queries.getMemoryTreeVersion(2), expected)
-  assert.deepEqual(await queries.listMemoryTreeVersions(undefined, 10), {
+  expect(await queries.getMemoryTreeVersion(2)).toStrictEqual(expected)
+  expect(await queries.listMemoryTreeVersions(undefined, 10)).toStrictEqual({
     versions: [expected],
     next_before_version: null,
   })

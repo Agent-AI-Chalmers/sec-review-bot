@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { observeExecutionRun } from '../src/runtime/terminal-coordination.js'
 import type { ReviewRunRecord } from '../src/shapes.js'
@@ -70,7 +69,7 @@ function store(events: unknown[][]): ObservationStore {
 
 test('active execution advances without publishing', async () => {
   const events: unknown[][] = []
-  assert.strictEqual(
+  expect(
     await observeExecutionRun(
       store(events),
       run,
@@ -80,16 +79,15 @@ test('active execution advances without publishing', async () => {
         status: 'running'
       }),
       () => false
-    ),
-    'active'
-  )
-  assert.deepStrictEqual(events, [['running', 'run-1']])
+    )
+  ).toBe('active')
+  expect(events).toStrictEqual([['running', 'run-1']])
 })
 
 test('successful Execution result is durably recorded for later publication', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'unavailable' as const }
-  assert.strictEqual(
+  expect(
     await observeExecutionRun(
       store(events),
       run,
@@ -102,17 +100,16 @@ test('successful Execution result is durably recorded for later publication', as
         notices: []
       }),
       () => false
-    ),
-    'succeeded'
-  )
-  assert.deepStrictEqual(events, [
+    )
+  ).toBe('succeeded')
+  expect(events).toStrictEqual([
     ['succeeded', 'run-1', { answer: 42 }, artifact]
   ])
 })
 
 test('transient polling failure leaves the run active', async () => {
   const events: unknown[][] = []
-  assert.strictEqual(
+  expect(
     await observeExecutionRun(
       store(events),
       run,
@@ -120,10 +117,9 @@ test('transient polling failure leaves the run active', async () => {
         throw new Error('temporary')
       },
       () => false
-    ),
-    'poll_retry'
-  )
-  assert.deepStrictEqual(events, [])
+    )
+  ).toBe('poll_retry')
+  expect(events).toStrictEqual([])
 })
 
 test('terminal polling failure fails the run without publication', async () => {
@@ -131,7 +127,7 @@ test('terminal polling failure fails the run without publication', async () => {
   const error = Object.assign(new Error('missing'), {
     code: 'EXECUTION_RUN_NOT_FOUND'
   })
-  assert.strictEqual(
+  expect(
     await observeExecutionRun(
       store(events),
       run,
@@ -139,10 +135,9 @@ test('terminal polling failure fails the run without publication', async () => {
         throw error
       },
       () => true
-    ),
-    'failed'
-  )
-  assert.deepStrictEqual(events, [
+    )
+  ).toBe('failed')
+  expect(events).toStrictEqual([
     [
       'failed',
       'run-1',
@@ -155,7 +150,7 @@ test('terminal polling failure fails the run without publication', async () => {
 test('Execution failure records its artifact atomically with the terminal failure', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'failed' as const, error: 'upload failed' }
-  assert.strictEqual(
+  expect(
     await observeExecutionRun(
       store(events),
       run,
@@ -173,10 +168,9 @@ test('Execution failure records its artifact atomically with the terminal failur
         }
       }),
       () => false
-    ),
-    'failed'
-  )
-  assert.deepStrictEqual(events, [
+    )
+  ).toBe('failed')
+  expect(events).toStrictEqual([
     [
       'failed',
       'run-1',
@@ -202,8 +196,8 @@ test('a stale running observation does not emit a state-change event', async () 
     () => false,
     (event) => events.push(event)
   )
-  assert.strictEqual(result, 'active')
-  assert.deepStrictEqual(events, [])
+  expect(result).toBe('active')
+  expect(events).toStrictEqual([])
 })
 
 test('a stale successful observation does not emit a terminal event', async () => {
@@ -226,6 +220,6 @@ test('a stale successful observation does not emit a terminal event', async () =
     () => false,
     (event) => events.push(event)
   )
-  assert.strictEqual(result, 'succeeded')
-  assert.deepStrictEqual(events, [])
+  expect(result).toBe('succeeded')
+  expect(events).toStrictEqual([])
 })

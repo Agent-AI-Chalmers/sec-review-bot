@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   buildRepositoryDeliveryBranchName,
@@ -15,9 +14,8 @@ test('repository delivery branch identity includes both run and delivery', () =>
   const first = buildRepositoryDeliveryBranchName('run/one', delivery)
   const second = buildRepositoryDeliveryBranchName('run/two', delivery)
 
-  assert.notStrictEqual(first, second)
-  assert.match(
-    first,
+  expect(first).not.toBe(second)
+  expect(first).toMatch(
     /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/
   )
 })
@@ -206,10 +204,10 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
     delivery
   })
 
-  assert.strictEqual(result.reused, false)
-  assert.strictEqual(calls.blobs.length, 1)
-  assert.strictEqual(calls.trees.length, 1)
-  assert.deepStrictEqual(calls.trees[0], [
+  expect(result.reused).toBe(false)
+  expect(calls.blobs.length).toBe(1)
+  expect(calls.trees.length).toBe(1)
+  expect(calls.trees[0]).toStrictEqual([
     {
       path: 'src/app.txt',
       mode: '100755',
@@ -223,16 +221,16 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
       sha: null
     }
   ])
-  assert.strictEqual(calls.commits.length, 1)
-  assert.strictEqual(calls.refs.length, 1)
-  assert.strictEqual(calls.pulls.length, 1)
+  expect(calls.commits.length).toBe(1)
+  expect(calls.refs.length).toBe(1)
+  expect(calls.pulls.length).toBe(1)
 })
 
 test('delivery-draft-pr stops before the next GitHub write after claim loss', async () => {
   const { octokit, calls } = createOctokitMock()
   let ownershipChecks = 0
 
-  await assert.rejects(
+  await expect(
     createRepositoryDeliveryDraftPrWithClaim({
       octokit,
       repo: {
@@ -260,15 +258,14 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
         if (ownershipChecks === 2)
           throw new PublicationClaimLostError('run-claim-loss')
       }
-    }),
-    PublicationClaimLostError
-  )
+    })
+  ).rejects.toThrow(PublicationClaimLostError)
 
-  assert.strictEqual(calls.blobs.length, 1)
-  assert.strictEqual(calls.trees.length, 0)
-  assert.strictEqual(calls.commits.length, 0)
-  assert.strictEqual(calls.refs.length, 0)
-  assert.strictEqual(calls.pulls.length, 0)
+  expect(calls.blobs.length).toBe(1)
+  expect(calls.trees.length).toBe(0)
+  expect(calls.commits.length).toBe(0)
+  expect(calls.refs.length).toBe(0)
+  expect(calls.pulls.length).toBe(0)
 })
 
 test('delivery-draft-pr reuses a PR when the create response is lost', async () => {
@@ -299,11 +296,13 @@ test('delivery-draft-pr reuses a PR when the create response is lost', async () 
     } satisfies RepositoryDelivery
   }
 
-  await assert.rejects(createRepositoryDeliveryDraftPr(args))
+  await expect(createRepositoryDeliveryDraftPr(args)).rejects.toSatisfy(
+    () => true
+  )
   const retry = await createRepositoryDeliveryDraftPr(args)
-  assert.strictEqual(retry.reused, true)
-  assert.strictEqual(retry.number, 42)
-  assert.deepStrictEqual(calls.pulls, [], 'no second PR may be created')
+  expect(retry.reused).toBe(true)
+  expect(retry.number).toBe(42)
+  expect(calls.pulls, 'no second PR may be created').toStrictEqual([])
 })
 
 test('delivery-draft-pr uses scan target branch as PR base when provided', async () => {
@@ -341,8 +340,8 @@ test('delivery-draft-pr uses scan target branch as PR base when provided', async
     delivery
   })
 
-  assert.strictEqual(calls.pulls.length, 1)
-  assert.strictEqual(calls.pulls[0]?.base, 'release/2026-q2')
+  expect(calls.pulls.length).toBe(1)
+  expect(calls.pulls[0]?.base).toBe('release/2026-q2')
 })
 
 test('delivery-draft-pr rejects unsafe file paths before publishing git objects', async () => {
@@ -369,22 +368,21 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
     ]
   }
 
-  await assert.rejects(
+  await expect(
     createRepositoryDeliveryDraftPr({
       octokit,
       repo,
       run_id: 'run-unsafe-path',
       input,
       delivery
-    }),
-    /Sensitive repository file path/
-  )
+    })
+  ).rejects.toThrow(/Sensitive repository file path/)
 
-  assert.strictEqual(calls.blobs.length, 0)
-  assert.strictEqual(calls.trees.length, 0)
-  assert.strictEqual(calls.commits.length, 0)
-  assert.strictEqual(calls.refs.length, 0)
-  assert.strictEqual(calls.pulls.length, 0)
+  expect(calls.blobs.length).toBe(0)
+  expect(calls.trees.length).toBe(0)
+  expect(calls.commits.length).toBe(0)
+  expect(calls.refs.length).toBe(0)
+  expect(calls.pulls.length).toBe(0)
 })
 
 test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR', async () => {
@@ -420,22 +418,21 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
     ]
   }
 
-  await assert.rejects(
+  await expect(
     createRepositoryDeliveryDraftPr({
       octokit,
       repo,
       run_id: 'run-unsafe-existing-pr',
       input,
       delivery
-    }),
-    /Sensitive repository file path/
-  )
+    })
+  ).rejects.toThrow(/Sensitive repository file path/)
 
-  assert.strictEqual(calls.blobs.length, 0)
-  assert.strictEqual(calls.trees.length, 0)
-  assert.strictEqual(calls.commits.length, 0)
-  assert.strictEqual(calls.refs.length, 0)
-  assert.strictEqual(calls.pulls.length, 0)
+  expect(calls.blobs.length).toBe(0)
+  expect(calls.trees.length).toBe(0)
+  expect(calls.commits.length).toBe(0)
+  expect(calls.refs.length).toBe(0)
+  expect(calls.pulls.length).toBe(0)
 })
 
 function minimalDelivery(deliveryId: string): RepositoryDelivery {
@@ -471,8 +468,8 @@ test('delivery-draft-pr reads an existing ref without force-updating it', async 
     delivery: minimalDelivery('delivery-ref-exists')
   })
 
-  assert.strictEqual(readRefs.length, 1)
-  assert.deepStrictEqual(updatedRefs, [])
+  expect(readRefs.length).toBe(1)
+  expect(updatedRefs).toStrictEqual([])
 })
 
 test('delivery-draft-pr does not create a PR from an existing branch with a different tree', async () => {
@@ -481,7 +478,7 @@ test('delivery-draft-pr does not create a PR from an existing branch with a diff
     existingCommitTreeSha: 'different-tree-sha'
   })
 
-  await assert.rejects(
+  await expect(
     createRepositoryDeliveryDraftPr({
       octokit,
       repo: {
@@ -492,10 +489,9 @@ test('delivery-draft-pr does not create a PR from an existing branch with a diff
       run_id: 'run-ref-exists',
       input: { workspace_ref: 'base-sha' },
       delivery: minimalDelivery('delivery-ref-exists')
-    }),
-    /Existing delivery draft PR branch does not match/
-  )
-  assert.strictEqual(calls.pulls.length, 0)
+    })
+  ).rejects.toThrow(/Existing delivery draft PR branch does not match/)
+  expect(calls.pulls.length).toBe(0)
 })
 
 test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {
@@ -503,7 +499,7 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
     createRefMessage: 'Reference name is invalid'
   })
 
-  await assert.rejects(
+  await expect(
     createRepositoryDeliveryDraftPr({
       octokit,
       repo: {
@@ -514,11 +510,12 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
       run_id: 'run-invalid-ref',
       input: { workspace_ref: 'base-sha' },
       delivery: minimalDelivery('delivery-invalid-ref')
-    }),
+    })
+  ).rejects.toSatisfy(
     (error: unknown) => (error as { status?: unknown }).status === 422
   )
 
-  assert.deepStrictEqual(updatedRefs, [])
+  expect(updatedRefs).toStrictEqual([])
 })
 
 test('delivery-draft-pr publishes symbolic link targets and deletions without dereferencing', async () => {
@@ -558,12 +555,12 @@ test('delivery-draft-pr publishes symbolic link targets and deletions without de
     delivery
   })
 
-  assert.strictEqual(result.reused, false)
-  assert.deepStrictEqual(calls.blobs, [
+  expect(result.reused).toBe(false)
+  expect(calls.blobs).toStrictEqual([
     { content: 'dGFyZ2V0Lf8=', encoding: 'base64' }
   ])
-  assert.strictEqual(calls.trees.length, 1)
-  assert.deepStrictEqual(calls.trees[0], [
+  expect(calls.trees.length).toBe(1)
+  expect(calls.trees[0]).toStrictEqual([
     {
       path: 'src/app.txt',
       mode: '120000',
@@ -577,7 +574,7 @@ test('delivery-draft-pr publishes symbolic link targets and deletions without de
       sha: null
     }
   ])
-  assert.strictEqual(calls.commits.length, 1)
-  assert.strictEqual(calls.refs.length, 1)
-  assert.strictEqual(calls.pulls.length, 1)
+  expect(calls.commits.length).toBe(1)
+  expect(calls.refs.length).toBe(1)
+  expect(calls.pulls.length).toBe(1)
 })

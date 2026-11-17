@@ -3,10 +3,9 @@
 // `generated-artifacts.json` lists what is derived from this family's contract and where it
 // lands. If it drifts from the generators it guards nothing, so the manifest and the code
 // check each other rather than each being trusted alone.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import ts from 'typescript'
 import { parse } from 'yaml'
@@ -75,7 +74,10 @@ const WORKFLOW_INPUT_TYPES = [
 
 function assertHasWorkflowInputs(names: Set<string>): void {
   for (const name of WORKFLOW_INPUT_TYPES) {
-    assert.ok(names.has(name), `generated declarations do not export ${name}`)
+    expect.assert(
+      names.has(name),
+      `generated declarations do not export ${name}`
+    )
   }
 }
 
@@ -92,9 +94,9 @@ test('the HTTP contract is a hand-maintained YAML source, not a service projecti
     info?: { version?: unknown }
     'x-contract-source'?: unknown
   }
-  assert.equal(contract.openapi, '3.1.0')
-  assert.equal(contract.info?.version, EXECUTION_API_VERSION)
-  assert.equal(contract['x-contract-source'], 'hand-maintained')
+  expect(contract.openapi).toBe('3.1.0')
+  expect(contract.info?.version).toBe(EXECUTION_API_VERSION)
+  expect(contract['x-contract-source']).toBe('hand-maintained')
 })
 
 test('contract declaration projections expose only the types each consumer owns', async () => {
@@ -104,12 +106,12 @@ test('contract declaration projections expose only the types each consumer owns'
   const executionApi = exportedTypeNames(await renderExecutionApiDeclarations())
 
   assertHasWorkflowInputs(workflowInputs)
-  assert.equal(workflowInputs.has('ReviewRecord'), false)
-  assert.equal(workflowInputs.has('FileChange'), false)
+  expect(workflowInputs.has('ReviewRecord')).toBe(false)
+  expect(workflowInputs.has('FileChange')).toBe(false)
 
   assertHasWorkflowInputs(executionApi)
-  assert.equal(executionApi.has('ReviewRecord'), true)
-  assert.equal(executionApi.has('FileChange'), true)
+  expect(executionApi.has('ReviewRecord')).toBe(true)
+  expect(executionApi.has('FileChange')).toBe(true)
 })
 
 test('the Execution API projection remains limited to workflow inputs', async () => {
@@ -118,8 +120,8 @@ test('the Execution API projection remains limited to workflow inputs', async ()
   )
 
   assertHasWorkflowInputs(names)
-  assert.equal(names.has('ReviewRecord'), false)
-  assert.equal(names.has('FileChange'), false)
+  expect(names.has('ReviewRecord')).toBe(false)
+  expect(names.has('FileChange')).toBe(false)
 })
 
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
@@ -129,27 +131,24 @@ const ACTUAL_OUTPUTS: Record<string, string[]> = {
 
 test('every committed artifact matches a fresh render', async () => {
   const stale = await staleGeneratedArtifacts()
-  assert.deepStrictEqual(
+  expect(
     stale,
-    [],
     `these are stale:\n${stale.map((s) => `  ${s.output} -> ${s.command}`).join('\n')}`
-  )
+  ).toStrictEqual([])
 })
 
 test('the manifest lists exactly the artifacts the generators write', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   const byName = new Map(manifest.generators.map((g) => [g.name, g.outputs]))
-  assert.deepStrictEqual(
+  expect(
     [...byName.keys()].sort(),
-    Object.keys(ACTUAL_OUTPUTS).sort(),
     'the manifest lists a different set of generators than the code has'
-  )
+  ).toStrictEqual(Object.keys(ACTUAL_OUTPUTS).sort())
   for (const [name, outputs] of Object.entries(ACTUAL_OUTPUTS)) {
-    assert.deepStrictEqual(
+    expect(
       [...(byName.get(name) ?? [])].sort(),
-      [...outputs].sort(),
       `manifest outputs for ${name} do not match the generator`
-    )
+    ).toStrictEqual([...outputs].sort())
   }
 })
 
@@ -163,10 +162,10 @@ test('every file the manifest names exists', () => {
       ...generator.inputs,
       ...generator.outputs
     ]) {
-      assert.doesNotThrow(
+      expect(
         () => readFileSync(path.join(REPO_ROOT, file), 'utf8'),
         `${file} is listed in the manifest but cannot be read`
-      )
+      ).not.toThrow()
     }
   }
 })
@@ -196,8 +195,7 @@ test('the workflow byte limit is projected from common.schema.json', () => {
     ),
     'utf8'
   )
-  assert.match(
-    generated,
+  expect(generated).toMatch(
     new RegExp(
       `export const MAX_WORKFLOW_INPUT_BYTES = ${common.$defs.workflowInputBytes.const}(?:\\n|$)`
     )
@@ -223,11 +221,10 @@ test('the selected workflow schemas declare the generated contract version', () 
         'utf8'
       )
     ) as { properties?: { api_version?: { const?: unknown } } }
-    assert.equal(
+    expect(
       schema.properties?.api_version?.const,
-      EXECUTION_API_VERSION,
       `${schemaName} disagrees with the selected workflow contract version`
-    )
+    ).toBe(EXECUTION_API_VERSION)
   }
 })
 
@@ -261,13 +258,13 @@ test('the contract-tools CI filter triggers on every artifact of this family', (
     )
   ) as Record<string, string[]>
   const patterns = filters['contract-tools'] ?? []
-  assert.ok(patterns.length > 0, 'no patterns for the contract-tools area')
+  expect.assert(patterns.length > 0, 'no patterns for the contract-tools area')
 
   const required = (
     JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   ).generators.flatMap((generator) => generator.outputs)
   for (const output of required) {
-    assert.ok(
+    expect.assert(
       globCovers(patterns, output),
       `the contract-tools CI filter does not cover ${output}; a hand edit of it would run no ` +
         'job that detects the drift'

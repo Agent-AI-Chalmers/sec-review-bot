@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
-import test, { type TestContext } from 'node:test'
+import { expect, test, type TestContext } from 'vitest'
 import { zstdCompressSync } from 'node:zlib'
 
 import { buildMemoryTreeArtifact } from '../server/memory/memory-tree-artifact.js'
@@ -55,7 +54,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -68,7 +67,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -76,8 +75,8 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
       `${base}/api/memory/versions/2/trajectory/content`,
       { headers: { cookie } }
     )
-    assert.strictEqual(response.status, 200)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual({
       events: [
         {
           seq: 1,
@@ -130,7 +129,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   let objectReads = 0
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
@@ -147,18 +146,18 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 409)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(409)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_artifact_unavailable'
     })
-    assert.strictEqual(objectReads, 0)
+    expect(objectReads).toBe(0)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -194,7 +193,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   let objectReads = 0
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
@@ -211,18 +210,18 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 413)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(413)
+    expect(await response.json()).toStrictEqual({
       error: 'artifact_too_large'
     })
-    assert.strictEqual(objectReads, 0)
+    expect(objectReads).toBe(0)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -253,7 +252,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   let bodyRead = false
   const body = new Readable({
     read(): void {
@@ -276,18 +275,18 @@ test('BFF rejects oversized memory objects before buffering their body', async (
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 502)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'artifact_identity_mismatch'
     })
-    assert.strictEqual(bodyRead, false)
+    expect(bodyRead).toBe(false)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -318,7 +317,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   let sentChunk = false
   let bodyClosed = false
   const body = new Readable({
@@ -344,7 +343,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
@@ -359,11 +358,11 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
         )
       )
     ])
-    assert.strictEqual(response.status, 504)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(504)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_artifact_download_timeout'
     })
-    assert.strictEqual(bodyClosed, true)
+    expect(bodyClosed).toBe(true)
   } finally {
     body.destroy()
     await Promise.all([
@@ -395,7 +394,7 @@ test('BFF rejects same-size memory content that does not match the stored digest
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -410,15 +409,15 @@ test('BFF rejects same-size memory content that does not match the stored digest
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/memory/versions/2/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 502)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'artifact_identity_mismatch'
     })
   } finally {
@@ -499,9 +498,11 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
     response.end(catalogReply.body)
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise<void>((resolve) => catalog.close(() => resolve())))
+  t.onTestFinished(
+    () => new Promise<void>((resolve) => catalog.close(() => resolve()))
+  )
   const catalogAddress = catalog.address()
-  assert(catalogAddress && typeof catalogAddress === 'object')
+  expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
     reviewRunsToken: 'read-secret',
@@ -512,15 +513,17 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
       getObject: async (key) => {
         objectReads.push(key)
         const bytes = objects.get(key)
-        assert(bytes, `unexpected object ${key}`)
+        expect.assert(bytes, `unexpected object ${key}`)
         return { body: Readable.from([bytes]), contentLength: bytes.length }
       }
     }
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise<void>((resolve) => ui.close(() => resolve())))
+  t.onTestFinished(
+    () => new Promise<void>((resolve) => ui.close(() => resolve()))
+  )
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   const cookie = await loginCookie(base)
   return {
@@ -550,24 +553,25 @@ test('memory artifact routes select the declared source for downloads and conten
     ]
   ] as const) {
     const response = await fixture.get(path)
-    assert.equal(response.status, 200, path)
-    assert.equal(
-      response.headers.get('content-disposition'),
+    expect(response.status, path).toBe(200)
+    expect(response.headers.get('content-disposition')).toBe(
       `attachment; filename="${filename}"`
     )
-    assert.equal(response.headers.get('cache-control'), 'no-store')
-    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(Buffer.from(await response.arrayBuffer())).toStrictEqual(bytes)
   }
   const tree = await fixture.get('/versions/2/content')
-  assert.equal(tree.status, 200)
-  assert.deepEqual(await tree.json(), { files: { 'MEMORY.md': '# Memory\n' } })
+  expect(tree.status).toBe(200)
+  expect(await tree.json()).toStrictEqual({
+    files: { 'MEMORY.md': '# Memory\n' }
+  })
   for (const [path, content] of [
     ['/versions/2/trajectory/content', 'Maintenance trajectory'],
     ['/extractions/extract-1/trajectory/content', 'Extraction trajectory']
   ]) {
     const response = await fixture.get(path)
-    assert.equal(response.status, 200)
-    assert.deepEqual(await response.json(), {
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual({
       events: [
         {
           seq: 1,
@@ -582,8 +586,8 @@ test('memory artifact routes select the declared source for downloads and conten
       ]
     })
   }
-  assert.equal(fixture.objectReads.length, 6)
-  assert.deepEqual(fixture.catalogReads, [
+  expect(fixture.objectReads.length).toBe(6)
+  expect(fixture.catalogReads).toStrictEqual([
     '/v1/memory-tree/versions/2',
     '/v1/memory-tree/versions/2',
     '/v1/extractions/extract-1',
@@ -604,13 +608,13 @@ test('invalid artifact identities and extraction tree requests never reach Catal
     '/extractions/invalid%2Fid/trajectory'
   ]) {
     const response = await fixture.get(path)
-    assert.equal(response.status, 404, path)
-    assert.deepEqual(await response.json(), {
+    expect(response.status, path).toBe(404)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_artifact_not_found'
     })
   }
-  assert.deepEqual(fixture.catalogReads, [])
-  assert.deepEqual(fixture.objectReads, [])
+  expect(fixture.catalogReads).toStrictEqual([])
+  expect(fixture.objectReads).toStrictEqual([])
 })
 
 test('malformed Catalog records fail as upstream errors before reading object storage', async (t) => {
@@ -618,18 +622,18 @@ test('malformed Catalog records fail as upstream errors before reading object st
   for (const body of ['null', '[]', '"record"', '42', '{']) {
     fixture.catalogReply.body = body
     const response = await fixture.get('/versions/2/artifact')
-    assert.equal(response.status, 502, body)
-    assert.deepEqual(await response.json(), {
+    expect(response.status, body).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_artifact_download_failed'
     })
   }
-  assert.deepEqual(fixture.objectReads, [])
+  expect(fixture.objectReads).toStrictEqual([])
 })
 
 test('version trajectories reject non-maintainer sources while unavailable references remain 409', async (t) => {
   const fixture = await memoryArtifactFixture(t)
   const record: unknown = JSON.parse(fixture.catalogReply.body)
-  assert(
+  expect.assert(
     record && typeof record === 'object' && 'trajectory_reference' in record
   )
   for (const source of [
@@ -644,12 +648,12 @@ test('version trajectories reject non-maintainer sources while unavailable refer
       trajectory_reference: record.trajectory_reference
     })
     const response = await fixture.get('/versions/2/trajectory')
-    assert.equal(response.status, 409)
-    assert.deepEqual(await response.json(), {
+    expect(response.status).toBe(409)
+    expect(await response.json()).toStrictEqual({
       error: 'memory_artifact_unavailable'
     })
   }
-  assert.deepEqual(fixture.objectReads, [])
+  expect(fixture.objectReads).toStrictEqual([])
 })
 
 test('reorganization trajectories support verified download and content preview', async (t) => {
@@ -658,13 +662,12 @@ test('reorganization trajectories support verified download and content preview'
   record.source.kind = 'reorganization'
   fixture.catalogReply.body = JSON.stringify(record)
   const download = await fixture.get('/versions/2/trajectory')
-  assert.equal(download.status, 200)
-  assert.deepEqual(
-    Buffer.from(await download.arrayBuffer()),
+  expect(download.status).toBe(200)
+  expect(Buffer.from(await download.arrayBuffer())).toStrictEqual(
     fixture.maintenance
   )
   const preview = await fixture.get('/versions/2/trajectory/content')
-  assert.equal(preview.status, 200)
+  expect(preview.status).toBe(200)
   const content = await preview.json()
-  assert.equal(content.events[0].message.content, 'Maintenance trajectory')
+  expect(content.events[0].message.content).toBe('Maintenance trajectory')
 })

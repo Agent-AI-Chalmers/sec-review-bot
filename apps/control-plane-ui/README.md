@@ -122,7 +122,10 @@ Additional UI consistency checks:
 
 ### Test Coverage
 
-- `pnpm test`: runs Node tests and React component tests for component rendering and interaction.
+<!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/vitest.config.ts -->
+
+- `pnpm test`: runs logic, API, and UI component tests.
+- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
 - `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.

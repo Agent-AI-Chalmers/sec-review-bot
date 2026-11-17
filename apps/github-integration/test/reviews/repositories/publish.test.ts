@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { ensureSummaryIssueNumber } from '../../../src/reviews/repositories/publish.js'
 import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
@@ -107,12 +106,12 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
     })
   })
 
-  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepStrictEqual(completed, ['repository:delivery:delivery-b'])
-  assert.deepStrictEqual(
-    published.map((item) => item.html_url),
-    ['https://example.test/pull/11', 'https://example.test/pull/12']
-  )
+  expect(claimed).toStrictEqual(['repository:delivery:delivery-b'])
+  expect(completed).toStrictEqual(['repository:delivery:delivery-b'])
+  expect(published.map((item) => item.html_url)).toStrictEqual([
+    'https://example.test/pull/11',
+    'https://example.test/pull/12'
+  ])
 })
 
 test('repository delivery continues after a deterministic failure', async () => {
@@ -178,14 +177,13 @@ test('repository delivery continues after a deterministic failure', async () => 
     }
   })
 
-  assert.deepStrictEqual(attempted, ['delivery-a', 'delivery-b'])
-  assert.deepStrictEqual(failures, [
+  expect(attempted).toStrictEqual(['delivery-a', 'delivery-b'])
+  expect(failures).toStrictEqual([
     { stepKey: 'repository:delivery:delivery-a', retry: false }
   ])
-  assert.deepStrictEqual(
-    published.map((item) => item.html_url),
-    ['https://example.test/pull/12']
-  )
+  expect(published.map((item) => item.html_url)).toStrictEqual([
+    'https://example.test/pull/12'
+  ])
 })
 
 test('repository delivery stops the publication when the credential is refused', async () => {
@@ -215,7 +213,7 @@ test('repository delivery stops the publication when the credential is refused',
 
   // A 401 belongs to the credential, not to this delivery: every remaining delivery would fail
   // the same way, so the publication must stop rather than record the same failure again.
-  await assert.rejects(
+  await expect(
     publishDeliveryDraftPrs({
       octokit: unusedGitHub().octokit,
       repo: {
@@ -243,10 +241,10 @@ test('repository delivery stops the publication when the credential is refused',
         })
       }
     })
-  )
+  ).rejects.toSatisfy(() => true)
 
-  assert.deepStrictEqual(attempted, ['delivery-a'])
-  assert.deepStrictEqual(failures, [
+  expect(attempted).toStrictEqual(['delivery-a'])
+  expect(failures).toStrictEqual([
     { stepKey: 'repository:delivery:delivery-a', retry: false }
   ])
 })
@@ -301,11 +299,10 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     })
   })
 
-  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepStrictEqual(
-    published.map((item) => item.html_url),
-    ['https://example.test/pull/12']
-  )
+  expect(claimed).toStrictEqual(['repository:delivery:delivery-b'])
+  expect(published.map((item) => item.html_url)).toStrictEqual([
+    'https://example.test/pull/12'
+  ])
 })
 test('summary issue lookup reuses an issue when the create response is lost', async () => {
   let created = false
@@ -344,9 +341,9 @@ test('summary issue lookup reuses an issue when the create response is lost', as
       { ...repo, repo_full_name: `${repo.owner_login}/${repo.repo_name}` },
       async () => {}
     )
-  await assert.rejects(ensure(), /response lost/)
-  assert.strictEqual(await ensure(), 17)
-  assert.strictEqual(createAttempts, 1)
+  await expect(ensure()).rejects.toThrow(/response lost/)
+  expect(await ensure()).toBe(17)
+  expect(createAttempts).toBe(1)
 })
 
 test('an exhausted delivery step is concluded from the draft PR a previous owner opened', async () => {
@@ -407,16 +404,15 @@ test('an exhausted delivery step is concluded from the draft PR a previous owner
     }
   })
 
-  assert.deepStrictEqual(settles, [
+  expect(settles).toStrictEqual([
     {
       stepKey: 'repository:delivery:delivery-a',
       found: { remote: { id: 77, url: 'https://example.test/pull/77' } }
     }
   ])
-  assert.deepStrictEqual(
-    published.map((item) => item.html_url),
-    ['https://example.test/pull/77']
-  )
+  expect(published.map((item) => item.html_url)).toStrictEqual([
+    'https://example.test/pull/77'
+  ])
 })
 
 test('a delivery reconciliation that cannot reach GitHub is recorded once and settles nothing', async () => {
@@ -465,7 +461,7 @@ test('a delivery reconciliation that cannot reach GitHub is recorded once and se
     errors.push(String(line))
   }
   try {
-    await assert.rejects(
+    await expect(
       publishDeliveryDraftPrs({
         octokit,
         repo: {
@@ -485,14 +481,13 @@ test('a delivery reconciliation that cannot reach GitHub is recorded once and se
         create_delivery_draft_pr: async () => {
           throw new Error('an unreconciled step must not create a pull request')
         }
-      }),
-      /Bad Gateway/
-    )
+      })
+    ).rejects.toThrow(/Bad Gateway/)
   } finally {
     console.error = restore
   }
-  assert.deepStrictEqual(writes, ['fail retry=true'])
-  assert.ok(
+  expect(writes).toStrictEqual(['fail retry=true'])
+  expect.assert(
     errors.some(
       (line) =>
         line.includes('delivery_draft_pr_failed') && line.includes('delivery-a')
@@ -581,14 +576,13 @@ test('a deterministic reconciliation failure skips only its delivery', async () 
         reused: false
       })
     })
-    assert.deepStrictEqual(
-      published.map((item) => item.html_url),
-      ['https://example.test/pull/2']
-    )
+    expect(published.map((item) => item.html_url)).toStrictEqual([
+      'https://example.test/pull/2'
+    ])
   } finally {
     console.error = restore
   }
-  assert.deepStrictEqual(writes, [
+  expect(writes).toStrictEqual([
     'fail repository:delivery:delivery-a retry=false',
     'complete repository:delivery:delivery-b'
   ])
@@ -649,7 +643,7 @@ test('a transient reconciliation failure still lets later deliveries publish bef
   const restore = console.error
   console.error = () => {}
   try {
-    await assert.rejects(
+    await expect(
       publishDeliveryDraftPrs({
         octokit,
         repo: {
@@ -674,13 +668,12 @@ test('a transient reconciliation failure still lets later deliveries publish bef
           body: 'Delivery body',
           reused: false
         })
-      }),
-      /delivery-a.*Bad Gateway/
-    )
+      })
+    ).rejects.toThrow(/delivery-a.*Bad Gateway/)
   } finally {
     console.error = restore
   }
-  assert.deepStrictEqual(writes, [
+  expect(writes).toStrictEqual([
     'fail repository:delivery:delivery-a retry=true',
     'complete repository:delivery:delivery-b'
   ])
