@@ -1094,33 +1094,28 @@ x-state-machines:
     states:
       pending:
         label: Pending
-        description: Admitted, but no preparer has claimed the work yet.
+        description: "Admitted, but no preparer has claimed the work yet."
+        summary: "The run was accepted and is waiting for input preparation to start."
       preparing:
         label: Preparing
-        description: A coordinator currently owns the claim and is building the Execution input.
+        description: "A coordinator currently owns the claim and is building the Execution input."
+        summary: "Review input is being prepared."
       uncertain:
         label: Uncertain
-        description: >-
-          The claim lapsed before the preparer reported, so it is unknown whether the prepared
-          input reached Review Runs. This is not a failure: a claim may rebuild the input and
-          resubmit it under the same identity, which is idempotent.
+        description: "The claim lapsed before the preparer reported, so it is unknown whether the prepared input reached Review Runs. This is not a failure: a claim may rebuild the input and resubmit it under the same identity, which is idempotent."
+        summary: "Preparation claim expired; saved input is unconfirmed. Recovery can resubmit under the same run identity."
       disconnected:
         label: Disconnected
-        description: >-
-          Automatic work stopped without a conclusion, because the run's persisted state no
-          longer admits the only transition expiry could make. Nothing retries this row on its
-          own; an operator resumes it into `uncertain`, gives it up, or abandons it.
+        description: "Automatic work stopped without a conclusion, because the run's persisted state no longer admits the only transition expiry could make. Nothing retries this row on its own; an operator resumes it into `uncertain`, gives it up, or abandons it."
+        summary: "Conflicting preparation and execution records stopped recovery. Manual review is required."
       submitted:
         label: Submitted
-        description: The input was accepted and handed to the Execution API provider; preparation is done.
+        description: "The input was accepted and handed to the Execution API provider; preparation is done."
+        summary: "Input is ready and has been submitted for execution."
       failed:
         label: Failed
-        description: >-
-          Preparation ended without a usable result, in one of two ways: (1) it failed for good
-          (retry budget exhausted, or the input could not be built), so the Execution API provider
-          was never handed input and execution is skipped; (2) an operator gave up on or abandoned
-          a disconnected preparation. After an operator decision the input may already have been
-          submitted, and the task may still be running remotely.
+        description: "Preparation ended without a usable result, in one of two ways: (1) it failed for good (retry budget exhausted, or the input could not be built), so the Execution API provider was never handed input and execution is skipped; (2) an operator gave up on or abandoned a disconnected preparation. After an operator decision the input may already have been submitted, and the task may still be running remotely."
+        summary: "Preparation failed permanently or was stopped manually. Failure skips execution; manual closure may leave a remote task running."
     transitions:
       - { from: pending, to: preparing, label: claimed }
       - { from: preparing, to: submitted, label: input accepted }
@@ -1171,45 +1166,36 @@ x-state-machines:
     states:
       pending:
         label: Pending
-        description: Admitted, but its prepared input has not been submitted to the Execution API provider yet.
+        description: "Admitted, but its prepared input has not been submitted to the Execution API provider yet."
+        summary: "Waiting for prepared input to be submitted to the execution service."
       queued:
         label: Queued
-        description: The Execution API provider accepted the submission; polling has not yet seen it start.
+        description: "The Execution API provider accepted the submission; polling has not yet seen it start."
+        summary: "The execution service accepted the task. It has not yet been observed running."
       running:
         label: Running
-        description: >-
-          Polling observed that the Execution API provider is executing this run. A transient network blip while
-          polling does not change this state: the run keeps the last observed value and is polled
-          again, so this state may be slightly out of date.
+        description: "Polling observed that the Execution API provider is executing this run. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be slightly out of date."
+        summary: "Last reported running. Temporary polling errors keep that status, which may be out of date."
       succeeded:
         label: Succeeded
-        description: The Execution API provider returned a result; it now becomes eligible for publication.
+        description: "The Execution API provider returned a result; it now becomes eligible for publication."
+        summary: "The execution service returned a successful result. It is ready for publication."
       skipped:
         label: Skipped
-        description: >-
-          Execution never ran because preparation failed. This is not an execution failure; the
-          reason is on the preparation axis.
+        description: "Execution never ran because preparation failed. This is not an execution failure; the reason is on the preparation axis."
+        summary: "Preparation failed, so execution was skipped. See the preparation failure for the cause."
       uncertain:
         label: Uncertain
-        description: >-
-          The task was submitted, but no response arrived, so it is unknown whether the Execution API provider
-          accepted it. This is not a failure: the submission is replayed under the same run_id.
+        description: "The task was submitted, but no response arrived, so it is unknown whether the Execution API provider accepted it. This is not a failure: the submission is replayed under the same run_id."
+        summary: "Acceptance is unconfirmed. Recovery resubmits under the same run identity."
       disconnected:
         label: Disconnected
-        description: >-
-          Automatic recovery used its budget without a conclusive Execution API provider answer. The run is
-          visible for operator action and is not reported as failed.
+        description: "Automatic recovery used its budget without a conclusive Execution API provider answer. The run is visible for operator action and is not reported as failed."
+        summary: "Recovery retries ran out; acceptance remains unknown. Manual review is required, not a failure conclusion."
       failed:
         label: Failed
-        description: >-
-          This run no longer tracks the task, in one of two ways: (1) a definite failure, where
-          polling produced a conclusive answer that the task cannot succeed (the Execution API
-          provider reported it failed, or the run could not be found, returned no result, or the
-          response broke the protocol) or a retried submission failed conclusively; (2) an
-          operator gave up on a disconnected execution or abandoned the run's preparation. After
-          an operator decision no cancellation is sent, so the task may still be running or may
-          succeed remotely. A transient network error (a timeout, a 5xx, a dropped connection) is
-          not a definite failure.
+        description: "This run no longer tracks the task, in one of two ways: (1) a definite failure, where polling produced a conclusive answer that the task cannot succeed (the Execution API provider reported it failed, or the run could not be found, returned no result, or the response broke the protocol) or a retried submission failed conclusively; (2) an operator gave up on a disconnected execution or abandoned the run's preparation. After an operator decision no cancellation is sent, so the task may still be running or may succeed remotely. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure."
+        summary: "Tracking ended after failure, an unusable result, or an operator decision. Stopping the wait does not cancel remote work."
     transitions:
       # Submission (a write). `uncertain` only ever comes from a submission whose acceptance
       # could not be confirmed — never from a run that was already queued or running.
@@ -1271,29 +1257,32 @@ x-state-machines:
     states:
       pending:
         label: Pending
-        description: Waiting for a successful execution result before publishing.
+        description: "Waiting for a successful execution result before publishing."
+        summary: "Waiting for a successful execution result to publish."
       publishing:
         label: Publishing
-        description: A coordinator owns the publication claim and is performing the side effects.
+        description: "A coordinator owns the publication claim and is performing the side effects."
+        summary: "Review results are being published."
       uncertain:
         label: Uncertain
-        description: >-
-          A step may have completed its side effect remotely and is being reconciled. The axis
-          reflects its strongest step; this is not a failure, and other steps keep publishing.
+        description: "A step may have completed its side effect remotely and is being reconciled. The axis reflects its strongest step; this is not a failure, and other steps keep publishing."
+        summary: "A step may have taken effect and is being checked. Other steps can continue; failure is not established."
       disconnected:
         label: Disconnected
-        description: >-
-          Automatic reconciliation of a step stopped without an answer, so an operator has to
-          establish what is on the remote system. The axis reflects its strongest step.
+        description: "Automatic reconciliation of a step stopped without an answer, so an operator has to establish what is on the remote system. The axis reflects its strongest step."
+        summary: "Automatic checks stopped without confirming a step. Manual review of the remote result is required."
       published:
         label: Published
-        description: All publication steps succeeded; the result is visible.
+        description: "All publication steps succeeded; the result is visible."
+        summary: "All publication steps succeeded. The results are available."
       failed:
         label: Failed
-        description: Publishing ended in failure, either because its owner concluded it as failed (for example after a terminal failure or with steps that did not succeed) or because an operator gave up. A retryable failure returns to `pending` instead.
+        description: "Publishing ended in failure, either because its owner concluded it as failed (for example after a terminal failure or with steps that did not succeed) or because an operator gave up. A retryable failure returns to `pending` instead."
+        summary: "Publication failed or was stopped manually; some steps may have taken effect. Retryable failures requeue instead."
       skipped:
         label: Skipped
-        description: There was nothing to publish because execution did not succeed.
+        description: "There was nothing to publish because execution did not succeed."
+        summary: "No result will be published because execution did not succeed."
     transitions:
       - { from: pending, to: publishing, label: publishing started }
       # A retry can leave unresolved steps while the axis waits for a new owner.
@@ -1382,38 +1371,37 @@ x-state-machines:
       states:
         pending:
           label: Pending
-          description: Not attempted yet, or returned to the queue with fresh budgets by an operator.
+          description: "Not attempted yet, or returned to the queue with fresh budgets by an operator."
+          summary: "Not attempted, or manually requeued with retry and recovery limits reset."
         running:
           label: Running
-          description: >-
-            An attempt started. Its owner may still be performing the side effect, or may have died
-            after performing it, so a later claim cannot assume nothing happened.
+          description: "An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened."
+          summary: "An attempt started and may have taken effect, even if its process stopped."
         failed:
           label: Attempt failed
-          description: The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding.
+          description: "The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding."
+          summary: "The last attempt failed. Retry while attempts remain; otherwise check the remote result before concluding."
         uncertain:
           label: Uncertain
-          description: >-
-            The attempt budget is spent, but any started attempt may have taken effect remotely, so
-            the connector must reconcile against the remote system before the step can conclude.
+          description: "The attempt budget is spent, but any started attempt may have taken effect remotely, so the connector must reconcile against the remote system before the step can conclude."
+          summary: "No attempts remain; an earlier one may have taken effect. Check the remote result before concluding."
         disconnected:
           label: Disconnected
-          description: >-
-            Reconciliation used its budget without an answer. An operator has to establish what is
-            on the remote system.
+          description: "Reconciliation used its budget without an answer. An operator has to establish what is on the remote system."
+          summary: "Checks ran out; the remote result needs manual confirmation."
         succeeded:
           label: Succeeded
-          description: The side effect exists, either written by an attempt or found by reconciliation.
+          description: "The side effect exists, either written by an attempt or found by reconciliation."
+          summary: "The remote change was made successfully or confirmed by a later check."
         terminal_failed:
           label: Terminal failure
-          description: >-
-            The step will not be attempted again: an attempt failed terminally, or reconciliation
-            confirmed that the side effect is absent.
+          description: "The step will not be attempted again: an attempt failed terminally, or reconciliation confirmed that the side effect is absent."
+          summary: "No more retries: a permanent failure occurred, or the remote change was confirmed absent."
       transitions:
         - { from: pending, to: running, label: attempt started }
         # A running step whose owner died is taken over by a different claim token. The status
         # stays `running`; the attempt count records the new attempt.
-        - { from: running, to: running, label: taken over by a new owner }
+        - { from: running, to: running, label: taken over by another process }
         - { from: failed, to: running, label: retry started }
         - { from: running, to: succeeded, label: side effect written }
         - { from: running, to: failed, label: retryable failure }

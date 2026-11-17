@@ -120,7 +120,7 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
   SUBMISSION_STATE_UNCERTAIN: 'failureCodeSubmissionUncertain',
   SUBMISSION_RECOVERY_EXHAUSTED: 'failureCodeSubmissionRecoveryExhausted',
   SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR:
-    'failureCodeSubmissionRecoveryAbandoned',
+    'failureCodeSubmissionRecoveryGivenUp',
   PREPARATION_GIVEN_UP_BY_OPERATOR: 'failureCodePreparationGivenUp',
   PREPARATION_ABANDONED_BY_OPERATOR: 'failureCodePreparationAbandoned',
   PUBLICATION_GIVEN_UP_BY_OPERATOR: 'failureCodePublicationGivenUp',

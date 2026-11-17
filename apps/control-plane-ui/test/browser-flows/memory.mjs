@@ -312,7 +312,7 @@ export async function runMemoryChineseFlow({ page, base, name }) {
       name: '自动更新'
     })
     await automationSwitch.waitFor()
-    await page.getByRole('img', { name: '说明记忆自动更新控制行为' }).hover()
+    await page.getByRole('img', { name: '查看记忆自动更新说明' }).hover()
     const automationHelp = page.getByRole('tooltip')
     await automationHelp.waitFor()
     assert.ok(

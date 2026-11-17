@@ -214,7 +214,7 @@ test('operator conclusions retain their reason while absent and unknown reasons 
     // none of the operator decisions: the explanation describes the reached state instead of
     // guessing a decision.
     const reached = stateMachine('preparation', language).details.failed
-      ?.description
+      ?.summary
     assert.ok(reached)
     assert.ok(!explanations.has(reached))
     assert.equal(transitionExplanation(base, language), reached)

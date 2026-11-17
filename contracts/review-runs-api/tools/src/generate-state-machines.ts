@@ -1,7 +1,7 @@
 // Project the contract's `x-state-machines` block into the module the console and Review Runs
 // read, and into the Markdown page people read. The block is the single source of truth for the
 // coordination lifecycles. Its text is English; `v1/overlays/zh.yaml` is an OpenAPI Overlay that
-// supplies the Chinese title, label, and description for the same machines. Regenerate with
+// supplies the Chinese title, label, summary, and description for the same machines. Regenerate with
 // `pnpm --dir contracts/review-runs-api/tools run generate`.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -39,13 +39,10 @@ export interface StateTransition {
   label?: string
 }
 
-/** One state on a machine: its display labels and the sentence shown when it is hovered. This
- * text lives in the contract so a tooltip can never describe a state differently from the
- * diagram or the schema. */
+/** A state's short overview and complete lifecycle semantics, in the selected language. */
 export interface StateDetail {
-  /** English label; the console localizes it by state key. */
   label: string
-  /** English sentence shown on hover; the console localizes it by state key. */
+  summary: string
   description: string
 }
 
@@ -57,7 +54,7 @@ export interface MachineBody {
   terminal: string[]
   /** State keys in declaration order. */
   states: string[]
-  /** Per-state label and hover description, keyed by the same values as `states`. */
+  /** Per-state label, summary, and full description, keyed by the same values as `states`. */
   details: Record<string, StateDetail>
   transitions: StateTransition[]
 }
@@ -167,7 +164,7 @@ function asRecord(value: unknown, where: string): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-/** Read the `states` map: each key is a state value, each value its labels and hover
+/** Read the `states` map: each key is a state value, each value its label, summary, and full
  * description. Every field is required, so a state cannot be added without saying what it
  * means. */
 function readStates(
@@ -184,6 +181,7 @@ function readStates(
     const record = raw as Record<string, unknown>
     details[state] = {
       label: asString(record.label, `${where}.${state}.label`),
+      summary: asString(record.summary, `${where}.${state}.summary`),
       description: asString(record.description, `${where}.${state}.description`)
     }
     states.push(state)
@@ -213,7 +211,7 @@ function asString(value: unknown, where: string): string {
 
 /** The text fields an overlay may replace. Anything else (states, transitions, reasons, fields)
  * is the contract's structure and stays English-only. */
-const TEXT_FIELDS = new Set(['title', 'label', 'description'])
+const TEXT_FIELDS = new Set(['title', 'label', 'summary', 'description'])
 
 /** The JSONPath forms this tool evaluates: a machine, a state, or one transition picked by its
  * `from`, `to`, and `reason`. Overlay targets may be any RFC 9535 expression; restricting them
@@ -254,7 +252,7 @@ export function applyTextOverlay(
     for (const [field, value] of Object.entries(update)) {
       if (!TEXT_FIELDS.has(field) || !(field in node))
         throw new Error(
-          `${where}: ${target} may only replace the existing title, label, or description, not ${field}`
+          `${where}: ${target} may only replace the existing title, label, summary, or description, not ${field}`
         )
       if (typeof value !== 'string' || value.trim() === '')
         throw new Error(`${where}: ${target}.${field} must be non-empty text`)
@@ -363,7 +361,7 @@ ${sources(languages)
  * in each language, and Review Runs reads the structure, which is identical across languages. */
 async function renderStateMachinesModule(): Promise<string> {
   const machines = `/** The three axis machines, in lifecycle order, with their text in each console language. The
- * structure is identical across languages; only title, label, and description differ. A
+ * structure is identical across languages; only title, label, summary, and description differ. A
  * machine's steps, when it has them, are its \`step\` member. */
 export const STATE_MACHINES_BY_LANGUAGE: Readonly<
   Record<Language, readonly StateMachine[]>
@@ -414,6 +412,7 @@ export interface StateTransition {
 
 export interface StateDetail {
   label: string
+  summary: string
   description: string
 }
 
@@ -505,9 +504,9 @@ const PAGE_TEXT = {
     language: '语言：[English](STATE_MACHINES.md) | 中文',
     title: 'Review Runs 状态机',
     intro: (axes: string) =>
-      `Review Runs 全部生命周期状态和允许的转换，由 [openapi.yaml](openapi.yaml) 的 \`x-state-machines\` 和中文覆盖层 [overlays/zh.yaml](overlays/zh.yaml) 生成。每个 run 有三条轴（${axes}），一次发布由若干步骤组成，步骤有自己的状态机。同一个状态名在不同状态机上含义可能不同，读状态时要连同它所在的状态机一起看。例如，发布步骤的 \`failed\` 只是一次尝试失败，仍可重试或核对；轴的 \`failed\` 则是最终结论。`,
+      `Review Runs 的全部生命周期状态和允许的转换，定义于 [openapi.yaml](openapi.yaml) 的 \`x-state-machines\`，中文译文来自 [overlays/zh.yaml](overlays/zh.yaml)。每个运行有三条状态轴（${axes}）。发布包含多个步骤，每个步骤也有独立的状态机。同名状态在不同状态机中可能含义不同。例如，发布步骤的 \`failed\` 表示一次尝试失败，仍可重试或核对；状态轴的 \`failed\` 则表示该轴已最终失败。`,
     loops:
-      '保持同一状态的转换（例如接管或核对无结论）只记录审计事件，不改变状态。“记录的原因”是转换写入 run 事件日志的 `reason_code`（如有）。',
+      '有些转换会记录审计事件，但不改变状态，例如任务被接管，或核对后结果仍不确定。“记录的原因”列显示该转换写入运行事件日志的 `reason_code`；没有原因码时留空。',
     step: (title: string) => `${title}步骤`,
     field: '字段：',
     stateHeader: '| 状态 | 标签 | 角色 | 含义 |',

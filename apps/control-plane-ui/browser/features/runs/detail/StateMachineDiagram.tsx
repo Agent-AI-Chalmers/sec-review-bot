@@ -8,7 +8,7 @@ import type {
   StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
 import { NODE_H, NODE_W, diagramGeometry } from './state-machine-geometry.js'
-import { edgeLabel, stateDescription, stateLabel } from './transitions.js'
+import { edgeLabel, stateSummary, stateLabel } from './transitions.js'
 
 /** The current state of one drawn axis, read from the run. */
 function currentState(run: Run, axis: CoordinationAxis): string {
@@ -26,7 +26,7 @@ function currentState(run: Run, axis: CoordinationAxis): string {
  * A hand-laid state machine for one axis. States sit on fixed cells (normal path on top,
  * recovery beneath it, failures at the bottom), the current state is highlighted, edges the run
  * actually took are emphasised, and return edges (retry, replay, resume) are dashed. Every node
- * is a tooltip of the state's description and every edge a tooltip of its transitions.
+ * is a tooltip of the state's summary and every edge a tooltip of its transitions.
  */
 export function StateMachineDiagram({
   machine,
@@ -153,7 +153,7 @@ export function StateMachineDiagram({
           return (
             <g key={state} className={className}>
               <Tooltip
-                label={stateDescription(machine, state)}
+                label={stateSummary(machine, state)}
                 multiline
                 w={260}
                 withArrow

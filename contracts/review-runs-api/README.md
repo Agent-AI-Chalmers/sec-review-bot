@@ -15,7 +15,7 @@ Input publication operations reserve a complete immutable publication intent und
 
 ## Run States
 
-The `x-state-machines` block in [v1/openapi.yaml](v1/openapi.yaml) defines every lifecycle state and allowed transition. [v1/STATE_MACHINES.md](v1/STATE_MACHINES.md) is generated from it for reading, and [v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) from it plus the Chinese overlay [v1/overlays/zh.yaml](v1/overlays/zh.yaml), an [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) that replaces only titles, labels, and descriptions. Each page has one diagram per machine, what each state means, and every transition. The console shows the same text in both languages.
+The `x-state-machines` block in [v1/openapi.yaml](v1/openapi.yaml) defines every lifecycle state and allowed transition. [v1/STATE_MACHINES.md](v1/STATE_MACHINES.md) is generated from it for reading, and [v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) from it plus the Chinese overlay [v1/overlays/zh.yaml](v1/overlays/zh.yaml), an [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) that replaces only titles, labels, and descriptions. Each page has one diagram per machine, what each state means, and every transition. Each state requires a short `summary` and a complete `description`. The console uses `summary` for state hints; the generated documentation uses `description` for lifecycle semantics, edge cases, and recovery rules. The Chinese overlay translates both fields independently.
 
 ## Boundary
 
