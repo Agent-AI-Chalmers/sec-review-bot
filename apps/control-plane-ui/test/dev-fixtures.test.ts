@@ -287,6 +287,35 @@ test('dev fixtures answer the give-up decision the queue offers', async () => {
   }
 })
 
+test('mutating one fixture server does not change another server’s run state', async () => {
+  await using resources = new AsyncDisposableStack()
+  const first = await startFixtureServer()
+  resources.defer(first.close)
+  const second = await startFixtureServer()
+  resources.defer(second.close)
+  const parked = (await (
+    await fetch(`${first.base}/api/runs/parked`)
+  ).json()) as { blocks: { run_id: string; axis: string }[] }
+  const runId = parked.blocks.find(
+    (block) => block.axis === 'preparation'
+  )?.run_id
+  expect.assert(runId)
+  const response = await fetch(
+    `${first.base}/api/admin/runs/${encodeURIComponent(runId)}/resume`,
+    {
+      method: 'POST',
+      headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
+    }
+  )
+  expect(response.status).toBe(200)
+  const remaining = (await (
+    await fetch(`${second.base}/api/runs/parked`)
+  ).json()) as { blocks: { run_id: string; axis: string }[] }
+  expect(remaining.blocks).toContainEqual(
+    expect.objectContaining({ run_id: runId, axis: 'preparation' })
+  )
+})
+
 test('dev fixtures leave non-API requests to the next middleware', async () => {
   // The middleware must not claim routes outside `/api/`; the fixture server's `next`
   // handler answers 404, which stands in for Vite's own asset middleware.

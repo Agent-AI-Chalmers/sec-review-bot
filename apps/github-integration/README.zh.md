@@ -24,11 +24,13 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
-pnpm run test:types
+pnpm run typecheck
 pnpm test
 ```
 
-<!-- doc-default: github-integration.test-projects; source=apps/github-integration/vitest.config.ts -->
+<!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
+
+`pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。
 
 `pnpm run test:types` 单独报告客户端请求和响应的编译期契约检查，不发送请求。
 

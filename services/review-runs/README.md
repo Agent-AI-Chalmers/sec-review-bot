@@ -233,12 +233,13 @@ Checks:
 pnpm run format:check
 pnpm run lint
 pnpm run typecheck
-pnpm run test:types
 pnpm test
 pnpm run test:integration
 ```
 
-<!-- doc-default: review-runs.test-projects; source=services/review-runs/vitest.config.ts -->
+<!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
+
+`pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.
 
 `pnpm run test:types` reports compile-time contract checks for handler requests, results, and registry completeness. These tests do not start the server.
 

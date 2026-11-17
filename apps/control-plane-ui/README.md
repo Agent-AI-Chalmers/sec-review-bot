@@ -106,7 +106,6 @@ The console supports continuously updated modern browsers. Keep your browser up 
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run test:types
 pnpm run colors:check
 pnpm run icons:check
 pnpm run styles:report
@@ -123,12 +122,13 @@ Additional UI consistency checks:
 
 ### Test Coverage
 
-<!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/vitest.config.ts -->
+<!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
 - `pnpm test`: runs logic, API, and UI component tests.
 - `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
-- `pnpm run test:types`: reports compile-time checks for archive availability and required references. These tests do not run application code.
+- `pnpm run typecheck`: checks browser and server source types and reports type-test results. CI uses this command. Use `pnpm run test:types` to view the type-test results separately.
 - `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
+- `pnpm run test:browser-component`: checks editor wrapping in real Chrome without starting the application BFF or fixture API. Use jsdom component tests for ordinary rendering and interaction; reserve this command for behavior that needs browser layout. It uses installed Chrome, with `CONTROL_PLANE_UI_CHROME_PATH` available for a custom executable. CI runs it in the desktop browser job.
 - `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.

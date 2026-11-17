@@ -22,11 +22,13 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
-pnpm run test:types
+pnpm run typecheck
 pnpm test
 ```
 
-<!-- doc-default: github-integration.test-projects; source=apps/github-integration/vitest.config.ts -->
+<!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
+
+`pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.
 
 `pnpm run test:types` reports compile-time contract checks for client requests and responses. These tests do not execute requests.
 

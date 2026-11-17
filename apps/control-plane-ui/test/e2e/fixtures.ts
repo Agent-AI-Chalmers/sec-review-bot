@@ -1,5 +1,6 @@
 import { expect, test as base, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
+import createViteConfig from '../../vite.config.js'
 
 interface FixtureRuntime {
   baseURL: string
@@ -41,8 +42,13 @@ export const test = base.extend<TestFixtures>({
       process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME = '2026-11-12T12:00:00Z'
       let server: ViteDevServer | undefined
       try {
+        const config = createViteConfig()
         server = await createServer({
+          ...config,
+          // Import configuration once, but create fresh plugins and fixture data per test.
+          configFile: false,
           server: {
+            ...config.server,
             host: '127.0.0.1',
             port: fixturePort(),
             strictPort: true,

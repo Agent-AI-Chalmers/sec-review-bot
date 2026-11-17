@@ -235,12 +235,13 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run typecheck
-pnpm run test:types
 pnpm test
 pnpm run test:integration
 ```
 
-<!-- doc-default: review-runs.test-projects; source=services/review-runs/vitest.config.ts -->
+<!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
+
+`pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。
 
 `pnpm run test:types` 单独报告处理函数的请求、返回值及注册表完整性的编译期契约检查，不启动服务。
 

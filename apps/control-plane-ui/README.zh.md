@@ -108,7 +108,6 @@ Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默�
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run test:types
 pnpm run colors:check
 pnpm run icons:check
 pnpm run styles:report
@@ -125,12 +124,13 @@ pnpm run build
 
 ### 测试范围
 
-<!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/vitest.config.ts -->
+<!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
 - `pnpm test`：运行逻辑、接口和界面组件测试。
 - `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：只运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/api-error.test.ts`。
-- `pnpm run test:types`：单独报告归档可用状态和必需引用字段的编译期检查，不执行应用代码。
+- `pnpm run typecheck`：检查浏览器与服务端源码的类型，并报告类型测试结果。CI 使用此命令。需要单独查看类型测试结果时，可运行 `pnpm run test:types`。
 - `pnpm run test:affected`：开发时只重跑上次运行后受源码改动影响的测试。首次运行会为所有选中的测试建立记录；可追加文件路径缩小范围，例如 `pnpm run test:affected test/api-error.test.ts`。此命令使用实验性的依赖跟踪。修改契约、fixture、生成文件、环境或配置后，应显式运行相关测试；完成前仍需运行 `pnpm test` 和其他必要检查。
+- `pnpm run test:browser-component`：在真实 Chrome 中检查编辑器换行，无需启动应用 BFF 或模拟 API。普通渲染和交互继续使用 jsdom 组件测试，需要真实浏览器布局的行为使用此命令。它使用已安装的 Chrome，也可通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定可执行文件。CI 在桌面浏览器任务中运行此检查。
 - `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、滚动、下载等浏览器行为，以及无障碍和视觉效果。
 
 本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。

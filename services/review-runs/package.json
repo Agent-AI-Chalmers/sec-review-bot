@@ -15,7 +15,7 @@
     "server": "pnpm run build && node dist/server.js",
     "test": "pnpm run build && vitest run --project unit",
     "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm run test:types",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

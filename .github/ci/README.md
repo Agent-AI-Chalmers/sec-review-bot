@@ -66,6 +66,14 @@ The Agents job runs directly in the main CI workflow. After checkout, it calls [
 
 Review Runs and Memory Catalog each own a complete job in the main workflow: change conditions, PostgreSQL service configuration, package checks, and integration tests. They reuse Node environment setup, while their check sequences remain explicit and independently editable.
 
+<!-- doc-default: ci.typecheck-commands; source=.github/workflows/ci.yml -->
+
+The UI, GitHub Integration, and Review Runs `typecheck` commands include named compiler-only tests. CI uses those package commands instead of adding a second `test:types` step that would compile the same configuration again. The UI also checks its separate browser TypeScript configuration.
+
+<!-- doc-default: ci.browser-component; source=.github/workflows/ci-browser.yml -->
+
+The desktop browser job also runs UI browser component regressions. These exercise browser layout directly without the full application fixtures.
+
 ## Automation Validators
 
 Run these checks from the repository root:
