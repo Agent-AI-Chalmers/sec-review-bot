@@ -79,7 +79,7 @@ pnpm run test:integration
 
 <!-- doc-default: memory-catalog.test-projects; source=services/memory-catalog/vitest.config.ts -->
 
-`pnpm test` 构建服务并运行隔离测试。开发时可用 `pnpm test test/env.test.ts` 只运行一个文件。集成测试通过 `pnpm run test:integration` 单独运行，也可以追加测试路径或测试运行选项。
+`pnpm test` 构建服务并运行隔离测试。开发时可用 `pnpm run test:dev test/env.test.ts` 直接从源码运行指定测试，无需构建；省略路径会运行全部隔离测试。完成前仍需运行 `pnpm test`，保留构建验证。集成测试通过 `pnpm run test:integration` 单独运行，也可以追加测试路径或测试运行选项。
 
 `pnpm run test:integration` 使用显式提供的 `TEST_DATABASE_URL` 对 PostgreSQL 存储实现进行测试；未设置时，启动脚本会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker PostgreSQL 实例。启动脚本会有意忽略服务常规使用的 `MEMORY_CATALOG_DATABASE_URL`，避免测试意外修改共享数据库。
 

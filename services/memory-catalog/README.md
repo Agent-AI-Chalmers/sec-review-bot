@@ -77,7 +77,7 @@ pnpm run test:integration
 
 <!-- doc-default: memory-catalog.test-projects; source=services/memory-catalog/vitest.config.ts -->
 
-`pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
+`pnpm test` builds the service and runs isolated tests. During development, `pnpm run test:dev test/env.test.ts` runs a selected test file directly from source without building; omit the path to run all isolated tests. Before finishing, run `pnpm test` to retain build validation. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
 
 `pnpm run test:integration` exercises the PostgreSQL store against an explicitly supplied `TEST_DATABASE_URL`; when it is unset, the launcher creates and removes a temporary local Docker PostgreSQL instance using the image configured in the repository `compose.yaml`. The launcher deliberately ignores the service's ordinary `MEMORY_CATALOG_DATABASE_URL` so a test cannot modify a shared database by accident.
 

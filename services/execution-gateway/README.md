@@ -27,6 +27,6 @@ pnpm run test:integration
 
 <!-- doc-default: execution-gateway.test-projects; source=services/execution-gateway/vitest.config.ts -->
 
-`pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
+`pnpm test` builds the service and runs isolated tests. During development, `pnpm run test:dev test/env.test.ts` runs a selected test file directly from source without building; omit the path to run all isolated tests. Before finishing, run `pnpm test` to retain build validation. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
 
 `pnpm run test:integration` exercises workflow submission and request identity against an explicitly supplied `TEST_TEMPORAL_ADDRESS`; when it is unset, the launcher creates and removes a temporary local Docker Temporal service using the image configured in the repository `compose.yaml`. The launcher deliberately ignores the service's ordinary `TEMPORAL_ADDRESS` so a test cannot create workflows in a shared deployment by accident.

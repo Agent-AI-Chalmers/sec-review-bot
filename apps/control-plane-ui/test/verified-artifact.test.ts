@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { expect, test, vi } from 'vitest'
@@ -8,9 +10,14 @@ import { withVerifiedArtifactFile } from '../server/artifacts/verified-artifact.
 for (const failure of ['metadata', 'storage'] as const) {
   test(`artifact ${failure} rejection closes a pending file before removing its directory`, async () => {
     // A busy filesystem can finish opening the sink after metadata rejects the download.
-    // Delay the real open to make that ordering deterministic instead of relying on CI load.
+    // Hold the real open until failure cleanup destroys the sink, then let it finish.
     const open = fs.open
     const close = fs.close
+    const rm = fsPromises.rm
+    const destroy = fs.WriteStream.prototype.destroy
+    const pendingOpen = Promise.withResolvers<void>()
+    const releaseOpen = Promise.withResolvers<void>()
+    const sinkDestroyed = Promise.withResolvers<void>()
     let filename = ''
     const observedClose = vi
       .spyOn(fs, 'close')
@@ -25,10 +32,30 @@ for (const failure of ['metadata', 'storage'] as const) {
       .spyOn(fs, 'open')
       .mockImplementation((...args: Parameters<typeof fs.open>) => {
         filename = String(args[0])
-        setTimeout(() => open(...args), 25)
+        pendingOpen.resolve()
+        void releaseOpen.promise.then(() => open(...args))
       })
+    const observedDestroy = vi
+      .spyOn(fs.WriteStream.prototype, 'destroy')
+      .mockImplementation(function (this: fs.WriteStream, error) {
+        sinkDestroyed.resolve()
+        return destroy.call(this, error)
+      })
+    const observedRemoval = vi
+      .spyOn(fsPromises, 'rm')
+      .mockImplementation(async (...args: Parameters<typeof fsPromises.rm>) => {
+        const closed = observedClose.mock.calls.length
+        await rm(...args)
+        expect(
+          closed,
+          'directory removal must start after the file closes'
+        ).toBe(1)
+      })
+    // The implementation uses the named fs/promises export; keep it bound to the spy.
+    syncBuiltinESMExports()
+    let completion: Promise<void> | undefined
     try {
-      await expect(
+      completion = expect(
         withVerifiedArtifactFile(
           {
             getObject: async () => {
@@ -51,14 +78,28 @@ for (const failure of ['metadata', 'storage'] as const) {
           ? /artifact_identity_mismatch/
           : /storage unavailable/
       )
+      await pendingOpen.promise
+      await sinkDestroyed.promise
+      expect(observedClose).not.toHaveBeenCalled()
+      expect(fs.existsSync(path.dirname(filename))).toBe(true)
+      releaseOpen.resolve()
+      await completion
       expect(
         observedClose.mock.calls.length,
         'rejection must wait for the sink to close'
       ).toBe(1)
       expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
-      delayedOpen.mockRestore()
-      observedClose.mockRestore()
+      releaseOpen.resolve()
+      try {
+        await completion
+      } finally {
+        observedRemoval.mockRestore()
+        observedDestroy.mockRestore()
+        delayedOpen.mockRestore()
+        observedClose.mockRestore()
+        syncBuiltinESMExports()
+      }
     }
   })
 }
