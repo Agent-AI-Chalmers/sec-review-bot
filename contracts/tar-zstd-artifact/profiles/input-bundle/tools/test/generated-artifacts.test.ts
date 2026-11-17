@@ -2,14 +2,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-const toolRoot = import.meta.dirname
+const toolRoot = path.resolve(import.meta.dirname, '..')
 const corpusRoot = path.resolve(toolRoot, '../v1/corpus')
 
 test('input-bundle corpus manifest covers every archive', () => {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(corpusRoot, 'manifest.json'), 'utf8')
   )
-  expect(manifest.corpus.map((item) => item.file).sort()).toStrictEqual(
+  expect(
+    manifest.corpus.map((item: { file: string }) => item.file).sort()
+  ).toStrictEqual(
     fs
       .readdirSync(corpusRoot)
       .filter((name) => name.endsWith('.tar.zst'))

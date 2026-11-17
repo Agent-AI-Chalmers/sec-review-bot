@@ -4,10 +4,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
-const root = path.resolve(import.meta.dirname, '..')
+const root = path.resolve(import.meta.dirname, '../..')
 const corpus = path.join(root, 'v1', 'corpus')
 
-function octal(header, offset, length, value) {
+function octal(header: Buffer, offset: number, length: number, value: number) {
   header.write(
     `${value.toString(8).padStart(length - 1, '0')}\0`,
     offset,
@@ -16,7 +16,21 @@ function octal(header, offset, length, value) {
   )
 }
 
-function entry(name, type, body = Buffer.alloc(0), metadata = {}) {
+type EntryMetadata = {
+  mode?: number
+  uid?: number
+  gid?: number
+  mtime?: number
+  uname?: string
+  gname?: string
+}
+
+function entry(
+  name: string,
+  type: string,
+  body: Buffer = Buffer.alloc(0),
+  metadata: EntryMetadata = {}
+): Buffer {
   const header = Buffer.alloc(512)
   header.write(name, 0, 100, 'utf8')
   octal(header, 100, 8, metadata.mode ?? (type === '5' ? 0o755 : 0o644))
@@ -39,7 +53,7 @@ function entry(name, type, body = Buffer.alloc(0), metadata = {}) {
   ])
 }
 
-function record(key, value) {
+function record(key: string, value: string): Buffer {
   const payload = `${key}=${value}\n`
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
@@ -49,12 +63,12 @@ function record(key, value) {
   }
 }
 
-function archive(parts) {
+function archive(parts: Buffer[]): Buffer {
   return zstdCompressSync(Buffer.concat([...parts, Buffer.alloc(1024)]))
 }
 
 const longPath = `tree/${'a'.repeat(110)}.txt`
-const definitions = [
+const definitions: [file: string, expected: string, bytes: Buffer][] = [
   [
     'valid-ustar.tar.zst',
     'valid',

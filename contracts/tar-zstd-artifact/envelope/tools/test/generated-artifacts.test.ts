@@ -3,11 +3,13 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 
 test('shared corpus manifest covers every encoded archive', () => {
-  const corpus = path.resolve(import.meta.dirname, '../v1/corpus')
+  const corpus = path.resolve(import.meta.dirname, '../../v1/corpus')
   const manifest = JSON.parse(
     fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')
   )
-  expect(manifest.corpus.map((item) => item.file).sort()).toStrictEqual(
+  expect(
+    manifest.corpus.map((item: { file: string }) => item.file).sort()
+  ).toStrictEqual(
     fs
       .readdirSync(corpus)
       .filter((name) => name.endsWith('.tar.zst'))
@@ -16,7 +18,7 @@ test('shared corpus manifest covers every encoded archive', () => {
 })
 
 test('generated artifact manifest covers the envelope corpus', () => {
-  const toolRoot = import.meta.dirname
+  const toolRoot = path.resolve(import.meta.dirname, '..')
   const generated = JSON.parse(
     fs.readFileSync(path.join(toolRoot, 'generated-artifacts.json'), 'utf8')
   )

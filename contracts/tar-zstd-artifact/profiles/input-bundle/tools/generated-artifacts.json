@@ -3,7 +3,7 @@
   "family": "tar-zstd-artifact/profiles/input-bundle",
   "generators": [
     {
-      "script": "contracts/tar-zstd-artifact/profiles/input-bundle/tools/generate.mjs",
+      "script": "contracts/tar-zstd-artifact/profiles/input-bundle/tools/src/generate.ts",
       "inputs": [],
       "command": "pnpm --dir contracts/tar-zstd-artifact/profiles/input-bundle/tools run generate",
       "outputs": [

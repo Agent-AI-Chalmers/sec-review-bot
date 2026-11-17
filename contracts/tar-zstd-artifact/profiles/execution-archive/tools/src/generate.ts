@@ -4,10 +4,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
-const profileRoot = path.resolve(import.meta.dirname, '..')
+const profileRoot = path.resolve(import.meta.dirname, '../..')
 const corpusRoot = path.join(profileRoot, 'v1', 'corpus')
 
-function writeOctal(header, offset, length, value) {
+function writeOctal(
+  header: Buffer,
+  offset: number,
+  length: number,
+  value: number
+) {
   header.write(
     `${value.toString(8).padStart(length - 1, '0')}\0`,
     offset,
@@ -16,7 +21,11 @@ function writeOctal(header, offset, length, value) {
   )
 }
 
-function rawEntry(name, type, body = Buffer.alloc(0)) {
+function rawEntry(
+  name: string,
+  type: string,
+  body: Buffer = Buffer.alloc(0)
+): Buffer {
   const header = Buffer.alloc(512)
   header.write(name, 0, 100, 'utf8')
   writeOctal(header, 100, 8, type === '5' ? 0o755 : 0o644)
@@ -37,7 +46,7 @@ function rawEntry(name, type, body = Buffer.alloc(0)) {
   ])
 }
 
-function paxRecord(value) {
+function paxRecord(value: string): Buffer {
   const payload = `path=${value}\n`
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
@@ -47,7 +56,13 @@ function paxRecord(value) {
   }
 }
 
-function entry(name, type, body = Buffer.alloc(0)) {
+type EntrySpec = [name: string, type: string, body?: Buffer]
+
+function entry(
+  name: string,
+  type: string,
+  body: Buffer = Buffer.alloc(0)
+): Buffer[] {
   if (Buffer.byteLength(name) <= 100) return [rawEntry(name, type, body)]
   const marker = crypto
     .createHash('sha256')
@@ -60,11 +75,14 @@ function entry(name, type, body = Buffer.alloc(0)) {
   ]
 }
 
-function json(value) {
+function json(value: unknown): Buffer {
   return Buffer.from(`${JSON.stringify(value)}\n`)
 }
 
-function manifest(trajectories, overrides = {}) {
+function manifest(
+  trajectories: string[],
+  overrides: Record<string, unknown> = {}
+) {
   return {
     version: 1,
     run_id: 'run-1',
@@ -74,7 +92,7 @@ function manifest(trajectories, overrides = {}) {
   }
 }
 
-function archive(entries) {
+function archive(entries: EntrySpec[]): Buffer {
   return zstdCompressSync(
     Buffer.concat([
       ...entries.flatMap((item) => entry(...item)),

@@ -4,7 +4,7 @@
   "generators": [
     {
       "name": "corpus",
-      "script": "contracts/tar-zstd-artifact/envelope/tools/generate.mjs",
+      "script": "contracts/tar-zstd-artifact/envelope/tools/src/generate.ts",
       "code_inputs": [],
       "command": "pnpm --dir contracts/tar-zstd-artifact/envelope/tools run generate",
       "inputs": [],

@@ -1,8 +1,8 @@
 import { defineConfig } from 'eslint/config'
 import js from '@eslint/js'
+import tseslint from 'typescript-eslint'
 import stylistic from '@stylistic/eslint-plugin'
 import eslintConfigPrettier from 'eslint-config-prettier/flat'
-import globals from 'globals'
 
 // Match declarations directly and through export wrappers.
 const declaration = (type) => ({
@@ -17,11 +17,37 @@ const declarations = [
 ].map(declaration)
 
 export default defineConfig(
-  { ignores: ['node_modules/**'] },
   {
-    files: ['**/*.js', '**/*.mjs'],
-    extends: [js.configs.recommended],
-    languageOptions: { globals: globals.node }
+    ignores: ['dist/**', 'node_modules/**', '.agent-input-bundles/**']
+  },
+  js.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    extends: [tseslint.configs.recommended],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+        Request: 'readonly',
+        RequestInit: 'readonly',
+        Response: 'readonly',
+        AbortController: 'readonly',
+        fetch: 'readonly',
+        structuredClone: 'readonly',
+        clearTimeout: 'readonly',
+        setImmediate: 'readonly',
+        setInterval: 'readonly',
+        setTimeout: 'readonly'
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' }
+      ]
+    }
   },
   eslintConfigPrettier,
   {
@@ -45,6 +71,21 @@ export default defineConfig(
             declaration('TSDeclareFunction'),
             declaration('FunctionDeclaration')
           ]
+        }
+      ]
+    }
+  },
+  {
+    // A misplaced import still works because ES modules hoist it, so nothing else
+    // notices it. This rule is the only thing that keeps imports where readers look.
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program > :not(ImportDeclaration) ~ ImportDeclaration',
+          message:
+            'Imports must come first in a module: move this import above the code.'
         }
       ]
     }
