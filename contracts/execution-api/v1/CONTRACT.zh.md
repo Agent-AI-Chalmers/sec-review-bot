@@ -167,6 +167,14 @@ Repository review 由 `scan -> case review -> delivery` 组成：
 
 调用方发布仓库交付单元 draft PR 时应使用 `RepositoryDelivery`。每个交付单元必须携带生成的 `patch_diff` 和最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`file_changes` 是应用文件内容的权威表示；`patch_diff` 是可从交付单元基线与 `file_changes` 重新生成的缓存审查/定位视图，不得用于重建可发布的文件内容。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
 
+### 运行状态
+
+<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
+
+OpenAPI `RunResponse` 中运行的 `status` 取值为 `queued`、`running`、`succeeded` 或 `failed`。Execution Gateway 不另存运行状态表，每次读取时投影 Temporal workflow 的状态。`running` 表示 workflow 仍在运行。已完成的 workflow 只有在成功信封、结果、workflow 标识和 artifact 引用都通过验证后，才是 `succeeded`。已完成但无效或不成功的结果，以及其他终态 Temporal 状态，都是 `failed`。提交后、尚无执行记录时，可以立即返回 `queued`。
+
+Review Runs 在自己的 execution 轴上记录对这一状态的观测。那条轴有自己的状态，例如提交是否被接受始终未得到确认时的 `uncertain`；参见 [Review Runs 状态机参考](../../review-runs-api/v1/STATE_MACHINES.zh.md#执行)。
+
 ### 校验责任
 
 JSON Schema 负责传输结构，包括必填字段、JSON 类型、枚举、带类型标签的不同结构和额外字段策略。消费方必须先校验完整的 v1 结果，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。

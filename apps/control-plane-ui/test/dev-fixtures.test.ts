@@ -765,8 +765,14 @@ test('abandoning a contradictory preparation uses the current production reason'
       }
     }
     assert.equal(run.preparation.status, 'failed')
-    assert.equal(run.preparation.failure_code, 'EXECUTION_ALREADY_ADVANCED')
-    assert.equal(run.notices[0]?.reason_code, 'EXECUTION_ALREADY_ADVANCED')
+    assert.equal(
+      run.preparation.failure_code,
+      'PREPARATION_ABANDONED_BY_OPERATOR'
+    )
+    assert.equal(
+      run.notices[0]?.reason_code,
+      'PREPARATION_ABANDONED_BY_OPERATOR'
+    )
   } finally {
     await fixture.close()
   }

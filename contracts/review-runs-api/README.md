@@ -13,6 +13,10 @@ Use these documents:
 
 Input publication operations reserve a complete immutable publication intent under a preparation claim, list publication intents for recovery, and settle publication presence or abandonment. A prepared submission must match a present or already selected publication intent in full. Identical submission replay is accepted while preparation still owns the run; changing the reference, input, or publish context is rejected. Candidate records contain storage locators and prepared input, so they belong to the authenticated service coordination surface and are not part of the console's observed-run projection.
 
+## Run States
+
+The `x-state-machines` block in [v1/openapi.yaml](v1/openapi.yaml) defines every lifecycle state and allowed transition. [v1/STATE_MACHINES.md](v1/STATE_MACHINES.md) is generated from it for reading, and [v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) from it plus the Chinese overlay [v1/overlays/zh.yaml](v1/overlays/zh.yaml), an [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) that replaces only titles, labels, and descriptions. Each page has one diagram per machine, what each state means, and every transition. The console shows the same text in both languages.
+
 ## Boundary
 
 Review Runs exposes redacted observed runs to read-token callers and full coordination records to service-token callers. Only the full record includes `failure_message`.

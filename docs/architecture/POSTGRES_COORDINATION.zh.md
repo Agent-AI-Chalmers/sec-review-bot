@@ -34,20 +34,11 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 
 对于 publication，租约到期允许其他进程接管，但不会单独使当前 token 失效。在接管替换 token 或释放操作清空 token 之前，当前 owner 仍可续租或写入。`uncertain` 和 `disconnected` 保留 owner，让它执行允许的 step 核对。处于 disconnected 的 publication 不能被自动认领，也不能由 owner 整体收尾；运维人员可以恢复或放弃，两种决定都会清空 token 和租约时间戳。
 
-## 各轴的恢复含义
+## 运维决策
 
-<!-- doc-default: review-runs.recovery-meaning; source=contracts/review-runs-api/v1/openapi.yaml -->
-
-| 范围             | `uncertain`                                                                 | `disconnected`                                             |
-| ---------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Preparation      | 准备者回报前认领已过期；可以重新认领，确认或重新构造输入。                  | 运行自身的记录不允许自动收尾，例如准备过期时执行已经推进。 |
-| Execution        | 提交可能已到达 Execution Gateway，但响应未确认；恢复时重放同一个 `run_id`。 | 提交恢复预算用尽，仍未得到确定答复。                       |
-| Publication step | 尝试次数用尽，远端写入可能已生效；connector 先核对再下结论。                | 核对预算用尽，仍未得到确定答复。                           |
-| Publication 轴   | 某步骤的远端结果不确定。                                                    | 某步骤的核对已停止，需要操作员决定。                       |
+`uncertain` 和 `disconnected` 在各状态机上的含义，见[状态机参考](../../contracts/review-runs-api/v1/STATE_MACHINES.zh.md)。
 
 `disconnected` 会停止对应范围的自动恢复。恢复操作将符合条件的范围交回自动处理；准备阶段只有在 execution 仍为 `pending` 时才能恢复。放弃等待记录操作员不再等待的决定，并不能证明远端副作用没有发生。Abandon 则是准备阶段针对矛盾记录的独立操作。允许的操作和后果见 [Review Runs 指南](../../services/review-runs/README.zh.md)及契约。
-
-发布步骤的 `failed` 表示上一次尝试失败：剩余次数允许重试，次数用尽后转为核对。`terminal_failed` 才是步骤的最终失败。轴的 `failed` 则是终态结论。不能脱离所属范围，仅凭 `failed` 判断是否还会重试。
 
 ## 其他状态边界
 
@@ -61,9 +52,7 @@ worker、connector 和控制台可能同时操作同一条记录，任何一方�
 
 执行统计有独立的 `pending → reconciling` 认领循环。读取成功后，若仍需等待观测稳定，会回到 `pending`；观测稳定或收集窗口结束后进入 `settled`。读取失败可以回到 `pending`；读取失败重试或限流延期耗尽后进入 `unavailable`。中断的认领可以被重新领取。`ingestion_status` 解释收集到的快照是否完整，`usage_coverage` 描述用量上报情况；两者都不是执行生命周期状态。
 
-<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
-
-Execution Gateway 每次读取时投影 Temporal 状态，不另存一张运行状态表。Temporal 的 `RUNNING` 对应 `running`；已完成 workflow 只有在成功信封、结果、workflow 标识和 artifact 引用通过验证后，才成为 `succeeded`。已完成但无效或不成功的结果，以及其他终态 Temporal 状态，都映射为 `failed`。提交后暂时还没有执行记录时，可以立即返回 `queued`。Review Runs 独立记录它对该 API 的观测，因此 Gateway 状态和协调恢复状态回答的是不同问题。
+Execution Gateway 每次读取时投影 Temporal 状态，不另存一张运行状态表；它如何映射为 `queued`、`running`、`succeeded` 和 `failed`，由 [Execution API 契约](../../contracts/execution-api/v1/CONTRACT.zh.md#运行状态)定义。Review Runs 独立记录它对该 API 的观测，因此 Gateway 状态和协调恢复状态回答的是不同问题。
 
 ## 共同原则
 

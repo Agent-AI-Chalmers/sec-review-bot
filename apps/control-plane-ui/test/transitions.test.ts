@@ -7,7 +7,8 @@ import {
   actualTransitions,
   latestTransitionAxis,
   transitionDuration,
-  transitionExplanation
+  transitionExplanation,
+  edgeLabel
 } from '../browser/features/runs/detail/transitions.js'
 
 function event(overrides: Partial<RunEvent>): RunEvent {
@@ -171,13 +172,7 @@ test('a terminal transition has no growing duration', () => {
 })
 
 test('transition explanations come from the state-machine edge', () => {
-  assert.strictEqual(
-    transitionExplanation(event({}), (key, ...args) => {
-      void args
-      return String(key)
-    }),
-    'input submitted'
-  )
+  assert.strictEqual(transitionExplanation(event({}), 'en'), 'input submitted')
 })
 
 test('transitions use a twelve-row page', () => {
@@ -185,33 +180,26 @@ test('transitions use a twelve-row page', () => {
 })
 
 test('operator conclusions retain their reason while absent and unknown reasons stay generic', async () => {
-  const { translate } = await import('../browser/shared/i18n.js')
-  const { axisMachine, edgeLabel } =
-    await import('../browser/features/runs/detail/transitions.js')
   const { stateMachine } =
     await import('../browser/features/runs/state-machines.generated.js')
   for (const language of ['en', 'zh'] as const) {
-    const t: import('../browser/shared/i18n.js').Translator = (key, ...args) =>
-      translate(language, key, ...args)
     const base = event({
       axis: 'preparation',
       from_status: 'disconnected',
       to_status: 'failed'
     })
-    const generic = transitionExplanation(base, t)
     const explanations = new Set<string | null>()
     for (const reason of [
       'PREPARATION_GIVEN_UP_BY_OPERATOR',
-      'EXECUTION_ALREADY_ADVANCED'
+      'PREPARATION_ABANDONED_BY_OPERATOR'
     ]) {
       const explanation = transitionExplanation(
         { ...base, reason_code: reason },
-        t
+        language
       )
       assert.ok(explanation)
-      assert.notEqual(explanation, generic)
       explanations.add(explanation)
-      const machine = stateMachine('preparation')
+      const machine = stateMachine('preparation', language)
       const edge = machine.transitions.find(
         (item) =>
           item.from === 'disconnected' &&
@@ -219,12 +207,23 @@ test('operator conclusions retain their reason while absent and unknown reasons 
           item.reason === reason
       )
       assert.ok(edge)
-      assert.equal(edgeLabel(axisMachine(machine), edge, t), explanation)
+      assert.equal(edgeLabel(machine, edge), explanation)
     }
     assert.equal(explanations.size, 2)
+    // Every transition on this pair names a reason, so an absent or unknown reason identifies
+    // none of the operator decisions: the explanation describes the reached state instead of
+    // guessing a decision.
+    const reached = stateMachine('preparation', language).details.failed
+      ?.description
+    assert.ok(reached)
+    assert.ok(!explanations.has(reached))
+    assert.equal(transitionExplanation(base, language), reached)
     assert.equal(
-      transitionExplanation({ ...base, reason_code: 'UNKNOWN_REASON' }, t),
-      generic
+      transitionExplanation(
+        { ...base, reason_code: 'UNKNOWN_REASON' },
+        language
+      ),
+      reached
     )
   }
 })

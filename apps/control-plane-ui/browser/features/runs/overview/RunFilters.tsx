@@ -1,7 +1,7 @@
 import React from 'react'
 import { Box, Button, Group, Select, Text } from '@mantine/core'
 import { IconAdjustmentsHorizontal, IconChevronDown } from '@tabler/icons-react'
-import { useMessages } from '../../../shared/i18n.js'
+import { useLanguage, useMessages } from '../../../shared/i18n.js'
 import { ICON_SIZE } from '../../../shared/design.js'
 import {
   EXECUTION_STATUSES,
@@ -23,6 +23,7 @@ export function RunFilters({
   onClear: () => void
 }): React.JSX.Element {
   const t = useMessages()
+  const { language } = useLanguage()
   const [opened, setOpened] = React.useState(false)
   const controlsId = React.useId()
   const filters = [
@@ -43,7 +44,7 @@ export function RunFilters({
       label: t('preparation'),
       options: PREPARATION_STATUSES.map((value) => ({
         value,
-        label: preparationStateLabel(value, t)
+        label: preparationStateLabel(value, language)
       }))
     },
     {
@@ -51,7 +52,7 @@ export function RunFilters({
       label: t('execution'),
       options: EXECUTION_STATUSES.map((value) => ({
         value,
-        label: executionStatusLabel(value, t)
+        label: executionStatusLabel(value, language)
       }))
     },
     {
@@ -59,7 +60,7 @@ export function RunFilters({
       label: t('publication'),
       options: PUBLICATION_STATUSES.map((value) => ({
         value,
-        label: runPublicationStatusLabel(value, t)
+        label: runPublicationStatusLabel(value, language)
       }))
     },
     {

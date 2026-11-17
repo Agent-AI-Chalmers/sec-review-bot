@@ -2,105 +2,28 @@ import type { Run, RunEvent } from '../api.js'
 import {
   machineForEvent,
   type CoordinationAxis,
-  type MachineBody,
-  type StateMachine as StateMachineDefinition
+  type MachineBody
 } from '../state-machines.generated.js'
-import { isStateLabelKey } from '../state-labels.js'
-import {
-  messages,
-  type Message,
-  type Translator
-} from '../../../shared/i18n.js'
+import type { Language } from '../../../shared/i18n.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12
 
-/** A machine the console labels: an axis, or an axis' step machine. Its translation keys are
- * the axis name, or `<axis>_step` for the steps (`state_publication_step_running_label`). */
-export interface LabelledMachine {
-  key: string
-  body: MachineBody
+export function stateLabel(machine: MachineBody, state: string): string {
+  return machine.details[state]?.label ?? state
 }
 
-export function axisMachine(machine: StateMachineDefinition): LabelledMachine {
-  return { key: machine.axis, body: machine }
-}
-
-/** The machine an audit event's states belong to, or undefined for a step event on an axis the
- * contract declares no steps for. */
-export function eventMachine(event: RunEvent): LabelledMachine | undefined {
-  const body = machineForEvent(event)
-  if (body === undefined) return undefined
-  return {
-    key: event.step_key === null ? event.axis : `${event.axis}_step`,
-    body
-  }
-}
-
-export function stateLabel(
-  machine: LabelledMachine,
-  state: string,
-  t: Translator
-): string {
-  const key = `state_${machine.key}_${state}_label`
-  if (isStateLabelKey(key)) return t(key)
-  return machine.body.details[state]?.label ?? state
-}
-
-function translatedMessage(key: string, t: Translator): string | undefined {
-  if (!Object.hasOwn(messages.en, key) || !Object.hasOwn(messages.zh, key))
-    return undefined
-  return t(key as Message)
-}
-
-const PREPARATION_CONCLUSION_MESSAGES = {
-  PREPARATION_GIVEN_UP_BY_OPERATOR:
-    'edge_preparation_disconnected_failed_given_up',
-  EXECUTION_ALREADY_ADVANCED:
-    'edge_preparation_disconnected_failed_execution_advanced'
-} as const satisfies Record<string, Message>
-
-export function stateDescription(
-  machine: LabelledMachine,
-  state: string,
-  t: Translator
-): string {
-  const key = `state_${machine.key}_${state}_desc`
-  const translated = translatedMessage(key, t)
-  return translated && translated !== key
-    ? translated
-    : (machine.body.details[state]?.description ?? '')
+export function stateDescription(machine: MachineBody, state: string): string {
+  return machine.details[state]?.description ?? ''
 }
 
 export function edgeLabel(
-  machine: LabelledMachine,
-  edge: MachineBody['transitions'][number],
-  t: Translator
+  machine: MachineBody,
+  edge: MachineBody['transitions'][number]
 ): string {
-  if (
-    machine.key === 'preparation' &&
-    edge.from === 'disconnected' &&
-    edge.to === 'failed' &&
-    edge.reason !== undefined
-  ) {
-    const entry = Object.entries(PREPARATION_CONCLUSION_MESSAGES).find(
-      ([reason]) => reason === edge.reason
-    )
-    if (entry !== undefined) return t(entry[1])
-  }
-  const key = `edge_${machine.key}_${edge.from}_${edge.to}`
-  const translated = translatedMessage(key, t)
-  if (translated && translated !== key) return translated
-  if (edge.label !== undefined) return edge.label
-  return `${stateLabel(machine, edge.from, t)} → ${stateLabel(machine, edge.to, t)}`
-}
-
-export function machineTitle(
-  machine: StateMachineDefinition,
-  t: Translator
-): string {
-  const key = `machine_${machine.axis}_title`
-  const translated = translatedMessage(key, t)
-  return translated && translated !== key ? translated : machine.title
+  return (
+    edge.label ??
+    `${stateLabel(machine, edge.from)} → ${stateLabel(machine, edge.to)}`
+  )
 }
 
 export function actualTransitions(events: RunEvent[]): RunEvent[] {
@@ -123,40 +46,36 @@ export function latestTransitionAxis(events: RunEvent[]): CoordinationAxis {
 export function stateLabelForEvent(
   event: RunEvent,
   state: string | null,
-  t: Translator
+  language: Language
 ): string {
   if (state === null) return '—'
-  const machine = eventMachine(event)
-  return machine === undefined ? state : stateLabel(machine, state, t)
+  const machine = machineForEvent(event, language)
+  return machine === undefined ? state : stateLabel(machine, state)
 }
 
+/** What an audit event did, from the contract's transition: the one whose reason matches the
+ * event, else the one without a reason, else the description of the state it reached. */
 export function transitionExplanation(
   event: RunEvent,
-  t: Translator
+  language: Language
 ): string | null {
-  const machine = eventMachine(event)
+  const machine = machineForEvent(event, language)
   if (machine === undefined) return null
-  const candidates = machine.body.transitions.filter(
+  const candidates = machine.transitions.filter(
     (candidate) =>
       candidate.from === event.from_status && candidate.to === event.to_status
   )
-  const exact =
-    event.reason_code === null
+  const chosen =
+    (event.reason_code === null
       ? undefined
-      : candidates.find((candidate) => candidate.reason === event.reason_code)
-  if (exact !== undefined) return edgeLabel(machine, exact, t)
-  const generic = candidates.find((candidate) => candidate.reason === undefined)
-  if (generic !== undefined) return edgeLabel(machine, generic, t)
-  if (candidates.length > 0) {
-    // Unknown or absent reasons do not identify one of the operator decisions.
-    return (
-      translatedMessage(
-        `edge_${machine.key}_${event.from_status}_${event.to_status}`,
-        t
-      ) ?? null
-    )
-  }
-  const description = stateDescription(machine, event.to_status, t)
+      : candidates.find(
+          (candidate) => candidate.reason === event.reason_code
+        )) ?? candidates.find((candidate) => candidate.reason === undefined)
+  if (chosen !== undefined) return edgeLabel(machine, chosen)
+  // No transition is identified (an unknown reason on a pair with only reason-specific
+  // transitions, or a pair the contract does not declare): describe where the event landed
+  // rather than guessing which decision it was.
+  const description = stateDescription(machine, event.to_status)
   return description === '' ? null : description
 }
 

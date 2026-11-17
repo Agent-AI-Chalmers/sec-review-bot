@@ -103,7 +103,7 @@ export function RunProgress({
                       cannot time the phase. */}
           <Text c="var(--muted)" size="sm">
             {run.preparation.started_at === null
-              ? preparationStateLabel(run.preparation.status, t)
+              ? preparationStateLabel(run.preparation.status, language)
               : formatDate(run.preparation.started_at, language)}
             {run.preparation.started_at !== null && (
               <>
@@ -135,7 +135,7 @@ export function RunProgress({
             // and the axis was concluded as `skipped`. The latter has an end without a
             // start, so report when it was concluded rather than a duration it never had.
             <Text c="var(--muted)" size="sm">
-              {executionStatusLabel(run.execution.status, t)}
+              {executionStatusLabel(run.execution.status, language)}
               {run.execution.finished_at !== null &&
                 ` · ${formatDate(run.execution.finished_at, language)}`}
             </Text>
@@ -225,7 +225,7 @@ export function RunProgress({
                         variant="light"
                         color={publicationStatusColor(step.status)}
                       >
-                        {publicationStatusLabel(step.status, t)}
+                        {publicationStatusLabel(step.status, language)}
                       </Badge>
                       <code className="delivery-step-key">{step.step_key}</code>
                     </div>

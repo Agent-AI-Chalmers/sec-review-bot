@@ -1,0 +1,294 @@
+# Chinese text for the Review Runs state machines, written as an OpenAPI Overlay 1.0.0 document.
+# openapi.yaml stays English-only and defines every state and transition; this overlay replaces only
+# the human-readable title, label, and description. The state-machine generator applies it and fails
+# when an action matches no node or more than one, when a text field has no translation, or when an
+# action updates anything other than those text fields.
+overlay: 1.0.0
+info:
+  title: Review Runs state machines (Chinese)
+  version: 1.0.0
+extends: ../openapi.yaml
+actions:
+  - target: "$['x-state-machines'].preparation"
+    update:
+      title: '准备'
+  - target: "$['x-state-machines'].preparation.states.pending"
+    update:
+      label: '等待中'
+      description: '已接纳，但还没有准备者领取这项工作。'
+  - target: "$['x-state-machines'].preparation.states.preparing"
+    update:
+      label: '准备中'
+      description: '协调方当前持有认领，正在构造执行输入。'
+  - target: "$['x-state-machines'].preparation.states.uncertain"
+    update:
+      label: '待确认'
+      description: '认领在准备者回报之前过期，因此不确定准备好的输入是否已到达 Review Runs。这不是失败：可以重新认领，用同一身份重建并重新提交输入，这一操作是幂等的。'
+  - target: "$['x-state-machines'].preparation.states.disconnected"
+    update:
+      label: '失联'
+      description: '自动处理停止且没有结论：运行已持久化的状态不再允许过期唯一能做的那次转换。不会自动重试；由 operator 将其恢复到 `uncertain`、放弃等待，或者作废（abandon）。'
+  - target: "$['x-state-machines'].preparation.states.submitted"
+    update:
+      label: '已提交'
+      description: '输入已被接受并交给 Execution API 提供方，准备阶段完成。'
+  - target: "$['x-state-machines'].preparation.states.failed"
+    update:
+      label: '失败'
+      description: '准备没有得到可用结果，分两种情况：(1) 准备永久失败（重试预算用尽，或无法构造输入），Execution API 提供方从未收到输入，因此执行被跳过；(2) operator 对失联的准备决定不再等待或作废。operator 决定之后，输入可能已经提交，任务也可能仍在远端执行。'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='pending' && @.to=='preparing' && !@.reason]"
+    update:
+      label: '已领取'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='preparing' && @.to=='submitted' && !@.reason]"
+    update:
+      label: '输入已被接受'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='preparing' && @.to=='pending' && !@.reason]"
+    update:
+      label: '重试'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='preparing' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '认领过期'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='uncertain' && @.to=='preparing' && !@.reason]"
+    update:
+      label: '重新领取以确认'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='preparing' && @.to=='disconnected' && @.reason=='EXECUTION_ALREADY_ADVANCED']"
+    update:
+      label: '无法自动收尾'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='disconnected' && @.to=='uncertain' && @.reason=='PREPARATION_RESUMED_BY_OPERATOR']"
+    update:
+      label: '由 operator 恢复'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='disconnected' && @.to=='failed' && @.reason=='PREPARATION_GIVEN_UP_BY_OPERATOR']"
+    update:
+      label: '由 operator 放弃等待'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='disconnected' && @.to=='failed' && @.reason=='PREPARATION_ABANDONED_BY_OPERATOR']"
+    update:
+      label: '由 operator 放弃'
+  - target: "$['x-state-machines'].preparation.transitions[?@.from=='preparing' && @.to=='failed' && !@.reason]"
+    update:
+      label: '失败'
+  - target: "$['x-state-machines'].execution"
+    update:
+      title: '执行'
+  - target: "$['x-state-machines'].execution.states.pending"
+    update:
+      label: '等待中'
+      description: '已接纳，但准备好的输入尚未提交给 Execution API 提供方。'
+  - target: "$['x-state-machines'].execution.states.queued"
+    update:
+      label: '排队中'
+      description: 'Execution API 提供方已接受提交，轮询尚未观察到它开始执行。'
+  - target: "$['x-state-machines'].execution.states.running"
+    update:
+      label: '执行中'
+      description: '轮询观察到 Execution API 提供方正在执行该运行。轮询时偶发的网络抖动不会改变这个状态：运行保留上次观察到的值并继续轮询，因此这个状态可能略有滞后。'
+  - target: "$['x-state-machines'].execution.states.succeeded"
+    update:
+      label: '执行成功'
+      description: 'Execution API 提供方返回了结果，现在可以发布。'
+  - target: "$['x-state-machines'].execution.states.skipped"
+    update:
+      label: '已跳过'
+      description: '准备失败，因此执行从未运行。这不是执行失败，原因记录在准备轴上。'
+  - target: "$['x-state-machines'].execution.states.uncertain"
+    update:
+      label: '待确认'
+      description: '任务已提交但没有收到响应，因此不确定 Execution API 提供方是否已接受。这不是失败：会用同一个 run_id 重放这次提交。'
+  - target: "$['x-state-machines'].execution.states.disconnected"
+    update:
+      label: '失联'
+      description: '自动恢复已用完预算，仍未得到 Execution API 提供方的确定答复。该运行会显示出来等待 operator 处理，不会被报告为失败。'
+  - target: "$['x-state-machines'].execution.states.failed"
+    update:
+      label: '失败'
+      description: '这个运行不再跟踪该任务，分两种情况：(1) 确定的失败：轮询得到任务不可能成功的确定答复（Execution API 提供方报告失败，或者找不到该运行、没有返回结果、响应违反协议），或重试的提交得到确定的失败；(2) operator 对失联的执行决定不再等待，或作废了这个运行的准备。operator 决定之后不会发送取消请求，因此任务可能仍在远端执行，甚至可能成功。临时网络错误（超时、5xx、连接中断）不算确定的失败。'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='pending' && @.to=='queued' && !@.reason]"
+    update:
+      label: '输入已提交'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='pending' && @.to=='skipped' && !@.reason]"
+    update:
+      label: '准备失败'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='pending' && @.to=='uncertain' && @.reason=='SUBMISSION_STATE_UNCERTAIN']"
+    update:
+      label: '提交未得到确认'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='uncertain' && @.to=='uncertain' && @.reason=='SUBMISSION_RECOVERY_CLAIMED']"
+    update:
+      label: '领取重放'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='uncertain' && @.to=='queued' && !@.reason]"
+    update:
+      label: '重放被接受'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='uncertain' && @.to=='failed' && !@.reason]"
+    update:
+      label: '重放被拒绝'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='uncertain' && @.to=='disconnected' && @.reason=='SUBMISSION_RECOVERY_EXHAUSTED']"
+    update:
+      label: '恢复停止'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='disconnected' && @.to=='uncertain' && @.reason=='SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR']"
+    update:
+      label: '由 operator 恢复'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='disconnected' && @.to=='failed' && @.reason=='SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR']"
+    update:
+      label: '由 operator 放弃等待'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='queued' && @.to=='running' && !@.reason]"
+    update:
+      label: '开始执行'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='queued' && @.to=='succeeded' && !@.reason]"
+    update:
+      label: '执行成功'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='running' && @.to=='succeeded' && !@.reason]"
+    update:
+      label: '执行成功'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='queued' && @.to=='failed' && !@.reason]"
+    update:
+      label: '轮询确认失败'
+  - target: "$['x-state-machines'].execution.transitions[?@.from=='running' && @.to=='failed' && !@.reason]"
+    update:
+      label: '轮询确认失败'
+  - target: "$['x-state-machines'].publication"
+    update:
+      title: '发布'
+  - target: "$['x-state-machines'].publication.states.pending"
+    update:
+      label: '等待中'
+      description: '等待执行成功的结果，然后开始发布。'
+  - target: "$['x-state-machines'].publication.states.publishing"
+    update:
+      label: '发布中'
+      description: '协调方持有发布认领，正在执行各项副作用。'
+  - target: "$['x-state-machines'].publication.states.uncertain"
+    update:
+      label: '待确认'
+      description: '某个步骤可能已在远端完成副作用，正在核对。该轴反映最强的步骤状态；这不是失败，其他步骤会继续发布。'
+  - target: "$['x-state-machines'].publication.states.disconnected"
+    update:
+      label: '失联'
+      description: '某个步骤的自动核对已停止且没有答案，需要 operator 确认远端的实际情况。该轴反映最强的步骤状态。'
+  - target: "$['x-state-machines'].publication.states.published"
+    update:
+      label: '已发布'
+      description: '所有发布步骤均已成功，结果已可见。'
+  - target: "$['x-state-machines'].publication.states.failed"
+    update:
+      label: '失败'
+      description: '发布以失败结束：owner 将其收尾为失败（例如出现终止失败，或仍有步骤未成功），或者 operator 放弃。可重试的失败会回到 `pending`。'
+  - target: "$['x-state-machines'].publication.states.skipped"
+    update:
+      label: '已跳过'
+      description: '执行没有成功，因此没有可发布的内容。'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='pending' && @.to=='publishing' && !@.reason]"
+    update:
+      label: '开始发布'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='pending' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '恢复发布，仍有未核对的步骤'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='uncertain' && @.to=='uncertain' && @.reason=='PUBLICATION_LEASE_EXPIRED']"
+    update:
+      label: '核对租约过期'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '某个步骤可能已生效'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='uncertain' && @.to=='publishing' && !@.reason]"
+    update:
+      label: '步骤已结算'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='uncertain' && @.to=='disconnected' && !@.reason]"
+    update:
+      label: '核对无法得出结论'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='disconnected' && @.to=='pending' && @.reason=='PUBLICATION_RESUMED_BY_OPERATOR']"
+    update:
+      label: '由 operator 恢复'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='disconnected' && @.to=='failed' && @.reason=='PUBLICATION_GIVEN_UP_BY_OPERATOR']"
+    update:
+      label: '由 operator 放弃'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='published' && !@.reason]"
+    update:
+      label: '已发布'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='publishing' && @.reason=='PUBLICATION_LEASE_EXPIRED']"
+    update:
+      label: '发布租约过期'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='pending' && !@.reason]"
+    update:
+      label: '可重试的失败'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='failed' && !@.reason]"
+    update:
+      label: '终止失败'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='uncertain' && @.to=='pending' && !@.reason]"
+    update:
+      label: '可重试的失败'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='uncertain' && @.to=='failed' && !@.reason]"
+    update:
+      label: '终止失败'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='pending' && @.to=='skipped' && !@.reason]"
+    update:
+      label: '执行结果不发布'
+  - target: "$['x-state-machines'].publication.transitions[?@.from=='publishing' && @.to=='skipped' && @.reason=='PUBLICATION_ABANDONED']"
+    update:
+      label: '执行失败'
+  - target: "$['x-state-machines'].publication.step.states.pending"
+    update:
+      label: '等待中'
+      description: '尚未尝试，或者已由 operator 放回队列并重置预算。'
+  - target: "$['x-state-machines'].publication.step.states.running"
+    update:
+      label: '进行中'
+      description: '一次尝试已经开始。它的 owner 可能仍在执行副作用，也可能在执行后中止，因此后续认领不能假定什么都没发生。'
+  - target: "$['x-state-machines'].publication.step.states.failed"
+    update:
+      label: '尝试失败'
+      description: '上一次尝试失败。还有剩余次数时会重试；次数用尽后，先核对远端结果再下结论。'
+  - target: "$['x-state-machines'].publication.step.states.uncertain"
+    update:
+      label: '待确认'
+      description: '尝试预算已用完，但任何已开始的尝试都可能已在远端生效，因此 connector 必须先核对远端，步骤才能结束。'
+  - target: "$['x-state-machines'].publication.step.states.disconnected"
+    update:
+      label: '失联'
+      description: '核对用完了预算仍没有答案，需要 operator 确认远端的实际情况。'
+  - target: "$['x-state-machines'].publication.step.states.succeeded"
+    update:
+      label: '发布成功'
+      description: '副作用已存在：由某次尝试写入，或由核对发现。'
+  - target: "$['x-state-machines'].publication.step.states.terminal_failed"
+    update:
+      label: '最终失败'
+      description: '这个步骤不会再尝试：某次尝试终止失败，或者核对确认副作用不存在。'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='pending' && @.to=='running' && !@.reason]"
+    update:
+      label: '开始尝试'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='running' && @.to=='running' && !@.reason]"
+    update:
+      label: '由新 owner 接管'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='failed' && @.to=='running' && !@.reason]"
+    update:
+      label: '开始重试'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='running' && @.to=='succeeded' && !@.reason]"
+    update:
+      label: '副作用已写入'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='running' && @.to=='failed' && !@.reason]"
+    update:
+      label: '可重试的失败'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='running' && @.to=='terminal_failed' && !@.reason]"
+    update:
+      label: '终止失败'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='running' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '尝试次数用尽'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='failed' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '尝试次数用尽'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='uncertain' && @.to=='succeeded' && !@.reason]"
+    update:
+      label: '核对确认存在'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='uncertain' && @.to=='terminal_failed' && !@.reason]"
+    update:
+      label: '核对确认不存在或终止失败'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='uncertain' && @.to=='uncertain' && !@.reason]"
+    update:
+      label: '核对无结论'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='uncertain' && @.to=='disconnected' && !@.reason]"
+    update:
+      label: '核对预算用尽'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='uncertain' && @.to=='failed' && !@.reason]"
+    update:
+      label: '报告失败且不重试'
+  - target: "$['x-state-machines'].publication.step.transitions[?@.from=='disconnected' && @.to=='pending' && @.reason=='PUBLICATION_RESUMED_BY_OPERATOR']"
+    update:
+      label: '由 operator 恢复'
