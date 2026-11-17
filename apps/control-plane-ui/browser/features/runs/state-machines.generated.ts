@@ -621,39 +621,40 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
       details: {
         pending: {
           label: '等待中',
-          summary: '任务已接收，等待开始准备审查输入。',
-          description: '已接纳，但还没有准备者领取这项工作。'
+          summary: '运行已接收，等待准备审查输入。',
+          description: '运行已接收，尚无准备进程领取任务。'
         },
         preparing: {
           label: '准备中',
           summary: '正在准备审查输入。',
-          description: '协调方当前持有认领，正在构造执行输入。'
+          description: '协调进程已领取准备任务，正在构建执行所需的输入。'
         },
         uncertain: {
           label: '待确认',
           summary:
-            '准备输入的进程未及时回报，认领已过期，尚不确定输入是否已保存。恢复后可以使用同一运行标识重新准备并提交输入。',
+            '准备任务的认领已过期，输入是否已保存尚不确定。恢复后可使用同一运行标识重新准备并提交输入。',
           description:
-            '认领在准备者回报之前过期，因此不确定准备好的输入是否已到达 Review Runs。这不是失败：可以重新认领，用同一身份重建并重新提交输入，这一操作是幂等的。'
+            '准备进程尚未报告结果，认领就已过期，因此无法确认准备好的输入是否已送达 Review Runs。这不表示准备失败。任务可被重新领取，并使用同一运行标识重建、提交输入；重复提交是幂等的。'
         },
         disconnected: {
           label: '失联',
           summary:
             '准备记录与执行进度存在冲突，自动恢复已停止。需要人工核查，再决定恢复、放弃等待或作废运行。',
           description:
-            '自动处理停止且没有结论：运行已持久化的状态不再允许过期唯一能做的那次转换。不会自动重试；由 管理员 将其恢复到 `uncertain`、放弃等待，或者作废（abandon）。'
+            '已保存的运行状态不允许执行认领过期时应有的状态转换，因此自动处理已停止，尚无最终结论。系统不会自行重试；管理员可将其恢复为 `uncertain`、放弃等待或作废运行。'
         },
         submitted: {
           label: '已提交',
           summary: '输入已准备完成并提交执行。',
-          description: '输入已被接受并交给 Execution API 提供方，准备阶段完成。'
+          description:
+            '输入已被接受并提交给 Execution API 提供方，准备阶段已完成。'
         },
         failed: {
           label: '失败',
           summary:
-            '准备因无法继续或人工决定而结束。准备失败会跳过执行；人工结束时，输入可能已经提交，远端执行也可能仍在继续。',
+            '准备已永久失败，或由管理员结束。永久失败会跳过执行；人工结束时，输入可能已提交，远端任务可能仍在执行。',
           description:
-            '准备没有得到可用结果，分两种情况：(1) 准备永久失败（重试预算用尽，或无法构造输入），Execution API 提供方从未收到输入，因此执行被跳过；(2) 管理员 对失联的准备决定不再等待或作废。管理员 决定之后，输入可能已经提交，任务也可能仍在远端执行。'
+            '准备阶段已结束，未得到可用结果。可能是准备永久失败（重试次数用尽或无法构建输入），此时输入从未提交给 Execution API 提供方，执行会被跳过；也可能是管理员对失联的准备任务选择放弃等待或作废运行，此时输入可能已经提交，任务可能仍在远端执行。'
         }
       },
       transitions: [
@@ -680,13 +681,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         {
           from: 'uncertain',
           to: 'preparing',
-          label: '重新领取以确认'
+          label: '重新领取准备任务'
         },
         {
           from: 'preparing',
           to: 'disconnected',
           reason: 'EXECUTION_ALREADY_ADVANCED',
-          label: '无法自动收尾'
+          label: '无法自动结束准备'
         },
         {
           from: 'disconnected',
@@ -734,52 +735,53 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         pending: {
           label: '等待中',
           summary: '等待将准备好的输入提交给执行服务。',
-          description: '已接纳，但准备好的输入尚未提交给 Execution API 提供方。'
+          description:
+            '运行已接收，准备好的输入尚未提交给 Execution API 提供方。'
         },
         queued: {
           label: '排队中',
           summary: '执行服务已接受任务，尚未观察到任务开始执行。',
           description:
-            'Execution API 提供方已接受提交，轮询尚未观察到它开始执行。'
+            'Execution API 提供方已接受任务，轮询尚未发现任务开始执行。'
         },
         running: {
           label: '执行中',
           summary:
             '执行服务最近一次报告任务正在执行。查询暂时失败时，会保留这个状态，因此显示可能略有延迟。',
           description:
-            '轮询观察到 Execution API 提供方正在执行该运行。轮询时偶发的网络抖动不会改变这个状态：运行保留上次观察到的值并继续轮询，因此这个状态可能略有滞后。'
+            '轮询结果表明，Execution API 提供方正在执行该任务。轮询期间出现临时网络错误时，系统会保留上次获取的状态并继续查询，因此显示的状态可能滞后。'
         },
         succeeded: {
           label: '执行成功',
           summary: '执行服务已返回成功结果，可以开始发布。',
-          description: 'Execution API 提供方返回了结果，现在可以发布。'
+          description: 'Execution API 提供方已返回结果，可以开始发布。'
         },
         skipped: {
           label: '已跳过',
           summary: '准备失败，执行已跳过。具体原因见准备阶段的失败信息。',
           description:
-            '准备失败，因此执行从未运行。这不是执行失败，原因记录在准备轴上。'
+            '准备失败，执行未开始。失败原因记录在准备轴上，不属于执行失败。'
         },
         uncertain: {
           label: '待确认',
           summary:
             '提交结果未得到确认，执行服务可能已经接受任务。系统会使用同一运行标识重新提交，以确认结果。',
           description:
-            '任务已提交但没有收到响应，因此不确定 Execution API 提供方是否已接受。这不是失败：会用同一个 run_id 重放这次提交。'
+            '任务已提交，但未收到响应，无法确认 Execution API 提供方是否已接受任务。这不表示执行失败；系统会使用同一个 run_id 重新提交。'
         },
         disconnected: {
           label: '失联',
           summary:
             '自动恢复已用完重试次数，仍未确认提交结果，需要人工核查。这不代表执行已经失败。',
           description:
-            '自动恢复已用完预算，仍未得到 Execution API 提供方的确定答复。该运行会显示出来等待 管理员 处理，不会被报告为失败。'
+            '自动恢复次数已用尽，Execution API 提供方仍未给出确定答复。该运行将等待管理员处理，不会被记为失败。'
         },
         failed: {
           label: '失败',
           summary:
             '执行跟踪已结束：执行失败、返回结果不可用，或管理员停止等待。停止等待不会取消远端任务。',
           description:
-            '这个运行不再跟踪该任务，分两种情况：(1) 确定的失败：轮询得到任务不可能成功的确定答复（Execution API 提供方报告失败，或者找不到该运行、没有返回结果、响应违反协议），或重试的提交得到确定的失败；(2) 管理员 对失联的执行决定不再等待，或作废了这个运行的准备。管理员 决定之后不会发送取消请求，因此任务可能仍在远端执行，甚至可能成功。临时网络错误（超时、5xx、连接中断）不算确定的失败。'
+            '该运行已停止跟踪执行状态。可能是轮询确认了失败（Execution API 提供方报告失败、找不到运行、未返回结果或响应违反协议），或重新提交时收到确定的失败答复；也可能是管理员对失联的执行选择放弃等待，或作废了准备阶段。管理员的这些操作不会发送取消请求，远端任务仍可能继续执行并成功。临时网络错误（超时、5xx、连接中断）不属于确定的失败。'
         }
       },
       transitions: [
@@ -803,23 +805,23 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           from: 'uncertain',
           to: 'uncertain',
           reason: 'SUBMISSION_RECOVERY_CLAIMED',
-          label: '领取重放'
+          label: '领取重新提交任务'
         },
         {
           from: 'uncertain',
           to: 'queued',
-          label: '重放被接受'
+          label: '重新提交已被接受'
         },
         {
           from: 'uncertain',
           to: 'failed',
-          label: '重放被拒绝'
+          label: '重新提交被拒绝'
         },
         {
           from: 'uncertain',
           to: 'disconnected',
           reason: 'SUBMISSION_RECOVERY_EXHAUSTED',
-          label: '恢复停止'
+          label: '自动恢复已停止'
         },
         {
           from: 'disconnected',
@@ -879,27 +881,27 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
       details: {
         pending: {
           label: '等待中',
-          summary: '等待执行成功的结果，以便发布。',
-          description: '等待执行成功的结果，然后开始发布。'
+          summary: '等待可发布的执行成功结果。',
+          description: '等待执行成功并返回结果，再开始发布。'
         },
         publishing: {
           label: '发布中',
           summary: '正在发布审查结果。',
-          description: '协调方持有发布认领，正在执行各项副作用。'
+          description: '协调进程已领取发布任务，正在执行远端发布操作。'
         },
         uncertain: {
           label: '待确认',
           summary:
             '某个发布步骤可能已在远端生效，正在核对结果。其他步骤可以继续，这不是最终失败。',
           description:
-            '某个步骤可能已在远端完成副作用，正在核对。该轴反映最强的步骤状态；这不是失败，其他步骤会继续发布。'
+            '某个发布步骤可能已在远端生效，系统正在核对结果。发布轴的状态由优先级最高的步骤状态决定。此状态不表示失败，其他步骤仍可继续发布。'
         },
         disconnected: {
           label: '失联',
           summary:
             '自动核对无法确认某个发布步骤的结果，需要人工检查远端的实际情况。',
           description:
-            '某个步骤的自动核对已停止且没有答案，需要 管理员 确认远端的实际情况。该轴反映最强的步骤状态。'
+            '某个发布步骤的自动核对已停止，结果仍不确定，需要管理员核查远端情况。发布轴的状态由优先级最高的步骤状态决定。'
         },
         published: {
           label: '已发布',
@@ -909,9 +911,9 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         failed: {
           label: '失败',
           summary:
-            '发布以失败结束，或已由人工停止。部分步骤可能已经生效。可以重试的失败会重新排队，等待发布。',
+            '发布失败，或已由管理员停止。部分步骤可能已生效。可重试的失败会重新排队。',
           description:
-            '发布以失败结束：owner 将其收尾为失败（例如出现终止失败，或仍有步骤未成功），或者 管理员 放弃。可重试的失败会回到 `pending`。'
+            '发布已结束并记为失败：可能是负责发布的进程确认发布失败（例如发生不可重试的失败，或仍有步骤未成功），也可能是管理员放弃等待。可重试的失败会回到 `pending`。'
         },
         skipped: {
           label: '已跳过',
@@ -928,7 +930,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         {
           from: 'pending',
           to: 'uncertain',
-          label: '恢复发布，仍有未核对的步骤'
+          label: '恢复发布，仍有步骤待确认'
         },
         {
           from: 'uncertain',
@@ -982,7 +984,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         {
           from: 'publishing',
           to: 'failed',
-          label: '终止失败'
+          label: '不可重试的失败'
         },
         {
           from: 'uncertain',
@@ -992,7 +994,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         {
           from: 'uncertain',
           to: 'failed',
-          label: '终止失败'
+          label: '不可重试的失败'
         },
         {
           from: 'pending',
@@ -1023,47 +1025,49 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           pending: {
             label: '等待中',
             summary:
-              '该步骤尚未尝试，或已由管理员重新排队并重置尝试和核对次数。',
-            description: '尚未尝试，或者已由 管理员 放回队列并重置预算。'
+              '该步骤尚未尝试，或已由管理员重新排队。重新排队会重置允许尝试和核对的次数。',
+            description:
+              '该步骤尚未尝试，或已由管理员重新排队并重置允许尝试和核对的次数。'
           },
           running: {
             label: '进行中',
             summary:
-              '一次发布尝试已经开始。处理进程可能仍在工作，也可能已完成远端操作后中断；后续尝试不能假定操作没有发生。',
+              '一次发布尝试已开始。进程可能仍在执行，也可能在远端操作生效后中断；再次尝试前需考虑操作已生效的可能。',
             description:
-              '一次尝试已经开始。它的 owner 可能仍在执行副作用，也可能在执行后中止，因此后续认领不能假定什么都没发生。'
+              '一次发布尝试已开始。负责该步骤的进程可能仍在执行，也可能在远端操作生效后中断。后续进程领取任务时，必须考虑操作已生效的可能。'
           },
           failed: {
             label: '尝试失败',
             summary:
-              '上次尝试失败。有剩余次数时可以重试；次数用尽后，必须先核对远端结果再下结论。',
+              '上次尝试失败。有剩余次数时可重试；次数用尽后，须先核对远端结果。',
             description:
-              '上一次尝试失败。还有剩余次数时会重试；次数用尽后，先核对远端结果再下结论。'
+              '上一次尝试失败。有剩余尝试次数时会重试；次数用尽后，须先核对远端结果，再确定最终状态。'
           },
           uncertain: {
             label: '待确认',
             summary:
               '尝试次数已用尽，但之前的操作可能已经生效。必须先核对远端结果，才能结束该步骤。',
             description:
-              '尝试预算已用完，但任何已开始的尝试都可能已在远端生效，因此 connector 必须先核对远端，步骤才能结束。'
+              '尝试次数已用尽，之前的尝试可能已在远端生效。连接器必须先核对远端结果，才能结束该步骤。'
           },
           disconnected: {
             label: '失联',
             summary: '自动核对次数已用尽，仍无法确认远端结果，需要人工核查。',
             description:
-              '核对用完了预算仍没有答案，需要 管理员 确认远端的实际情况。'
+              '核对次数已用尽，仍无法确认结果，需要管理员核查远端情况。'
           },
           succeeded: {
             label: '发布成功',
             summary: '远端操作已成功完成，或已通过后续核对确认。',
-            description: '副作用已存在：由某次尝试写入，或由核对发现。'
+            description:
+              '远端操作已生效：发布尝试已报告成功，或后续核对已确认结果存在。'
           },
           terminal_failed: {
             label: '最终失败',
             summary:
               '该步骤不会再次尝试：操作无法继续，或核对已确认远端操作未生效。',
             description:
-              '这个步骤不会再尝试：某次尝试终止失败，或者核对确认副作用不存在。'
+              '该步骤不会再次尝试：某次尝试发生不可重试的失败，或核对已确认远端操作未生效。'
           }
         },
         transitions: [
@@ -1085,7 +1089,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           {
             from: 'running',
             to: 'succeeded',
-            label: '副作用已写入'
+            label: '远端操作已生效'
           },
           {
             from: 'running',
@@ -1095,7 +1099,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           {
             from: 'running',
             to: 'terminal_failed',
-            label: '终止失败'
+            label: '不可重试的失败'
           },
           {
             from: 'running',
@@ -1110,22 +1114,22 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           {
             from: 'uncertain',
             to: 'succeeded',
-            label: '核对确认存在'
+            label: '已确认远端操作生效'
           },
           {
             from: 'uncertain',
             to: 'terminal_failed',
-            label: '核对确认不存在或终止失败'
+            label: '已确认未生效或不可重试'
           },
           {
             from: 'uncertain',
             to: 'uncertain',
-            label: '核对无结论'
+            label: '核对结果仍不确定'
           },
           {
             from: 'uncertain',
             to: 'disconnected',
-            label: '核对预算用尽'
+            label: '核对次数用尽'
           },
           {
             from: 'uncertain',

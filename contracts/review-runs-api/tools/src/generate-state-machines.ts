@@ -504,9 +504,9 @@ const PAGE_TEXT = {
     language: '语言：[English](STATE_MACHINES.md) | 中文',
     title: 'Review Runs 状态机',
     intro: (axes: string) =>
-      `Review Runs 全部生命周期状态和允许的转换，由 [openapi.yaml](openapi.yaml) 的 \`x-state-machines\` 和中文覆盖层 [overlays/zh.yaml](overlays/zh.yaml) 生成。每个 run 有三条轴（${axes}），一次发布由若干步骤组成，步骤有自己的状态机。同一个状态名在不同状态机上含义可能不同，读状态时要连同它所在的状态机一起看。例如，发布步骤的 \`failed\` 只是一次尝试失败，仍可重试或核对；轴的 \`failed\` 则是最终结论。`,
+      `Review Runs 的全部生命周期状态和允许的转换，定义于 [openapi.yaml](openapi.yaml) 的 \`x-state-machines\`，中文译文来自 [overlays/zh.yaml](overlays/zh.yaml)。每个运行有三条状态轴（${axes}）。发布包含多个步骤，每个步骤也有独立的状态机。同名状态在不同状态机中可能含义不同。例如，发布步骤的 \`failed\` 表示一次尝试失败，仍可重试或核对；状态轴的 \`failed\` 则表示该轴已最终失败。`,
     loops:
-      '保持同一状态的转换（例如接管或核对无结论）只记录审计事件，不改变状态。“记录的原因”是转换写入 run 事件日志的 `reason_code`（如有）。',
+      '有些转换会记录审计事件，但不改变状态，例如任务被接管，或核对后结果仍不确定。“记录的原因”列显示该转换写入运行事件日志的 `reason_code`；没有原因码时留空。',
     step: (title: string) => `${title}步骤`,
     field: '字段：',
     stateHeader: '| 状态 | 标签 | 角色 | 含义 |',
