@@ -23,7 +23,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:affected": "vitest run --since-last-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

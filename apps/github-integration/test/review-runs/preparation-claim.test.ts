@@ -5,7 +5,9 @@ import {
   startPreparationClaimHeartbeat
 } from '../../src/review-runs/preparation-claim.js'
 
-test('preparation heartbeat renews the claim while work remains active', async () => {
+test('preparation heartbeat renews the claim while work remains active', async ({
+  onTestFinished
+}) => {
   let renewals = 0
   const heartbeat = await startPreparationClaimHeartbeat(
     {
@@ -19,10 +21,12 @@ test('preparation heartbeat renews the claim while work remains active', async (
     'claim-1'
   )
 
-  const deadline = Date.now() + 500
-  while (renewals < 2 && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
+  onTestFinished(async () => {
+    await heartbeat.stop()
+  })
+  await expect
+    .poll(() => renewals, { timeout: 500, interval: 10 })
+    .toBeGreaterThanOrEqual(2)
   expect(await heartbeat.stop()).toBe(true)
   expect.assert(renewals >= 2)
 })

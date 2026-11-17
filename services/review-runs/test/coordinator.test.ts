@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import {
   coordinateReviewRunsOnce,
@@ -329,7 +329,15 @@ test('an unclassified execution observation failure aborts the coordination pass
   expect(observed).toStrictEqual(['active-failing'])
 })
 
-test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
+test('coordinator loop does not overlap passes and stop drains the active pass', async ({
+  onTestFinished
+}) => {
+  vi.useFakeTimers({
+    toFake: ['setInterval', 'clearInterval', 'setImmediate', 'clearImmediate']
+  })
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
   const { promise: gate, resolve: release } = Promise.withResolvers<void>()
   let passes = 0
   const loop = startReviewRunCoordinatorLoop({
@@ -343,8 +351,18 @@ test('coordinator loop does not overlap passes and stop drains the active pass',
     }
   })
 
-  await new Promise((resolve) => setTimeout(resolve, 10))
+  onTestFinished(async () => {
+    release()
+    await loop.stop()
+  })
+  await vi.advanceTimersByTimeAsync(10)
   const stopping = loop.stop()
+  let stopped = false
+  void stopping.then(() => {
+    stopped = true
+  })
+  await Promise.resolve()
+  expect(stopped).toBe(false)
   expect(passes).toBe(1)
   release()
   await stopping

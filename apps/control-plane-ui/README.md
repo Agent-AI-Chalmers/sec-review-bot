@@ -126,6 +126,7 @@ Additional UI consistency checks:
 
 - `pnpm test`: runs logic, API, and UI component tests.
 - `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
+- `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
 - `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.

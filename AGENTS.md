@@ -94,6 +94,8 @@ uv run python -m pytest
 
 ### TypeScript Checks
 
+During development, run the relevant test files first, for example `pnpm test test/example.test.ts`. For repeated source edits, append `--since-last-run` to reuse recorded test dependencies; the first invocation runs every selected test, so retain a file filter when establishing a small baseline. Changes to files read outside the import graph, including contracts, fixtures, generated artifacts, environment, or configuration, require explicit test selection or a full run. Before finishing, run the complete package checks below; an incremental run does not replace them. Keep package launchers for Git isolation and disposable integration services.
+
 For TypeScript changes, run checks from every affected package directory. The common baseline is:
 
 ```bash
