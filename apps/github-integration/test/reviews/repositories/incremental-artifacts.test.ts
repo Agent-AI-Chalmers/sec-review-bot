@@ -25,7 +25,7 @@ test('reports an ancestor when GitHub compares the head as "ahead"', async () =>
     })
   ).toBe(true)
   // The comparison is addressed by `base...head` on the compare endpoint.
-  expect(requests.length).toBe(1)
+  expect(requests).toHaveLength(1)
   expect(decodeURIComponent(new URL(requests[0]!.url).pathname)).toMatch(
     /\/repos\/octo\/example\/compare\/base123\.\.\.head456$/
   )

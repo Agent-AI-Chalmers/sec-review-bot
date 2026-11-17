@@ -160,7 +160,7 @@ test('the total is derived from normalized tokens and a disagreeing source total
       cache_creation_input_tokens: null,
       reasoning_tokens: null
     })
-    expect(warn.mock.calls.length).toBe(1)
+    expect(warn).toHaveBeenCalledTimes(1)
     const message = JSON.parse(String(warn.mock.calls[0]?.[0])) as Record<
       string,
       unknown
@@ -212,7 +212,7 @@ test('task phases and feedback retries remain separate regardless of observation
   const read = { roots: [], generations, excludedNonReviewRootCount: 0 }
   const snapshot = aggregateExecutionStatistics(read)
   expect(snapshot.observedCallCount).toBe(7)
-  expect(snapshot.groups.length).toBe(7)
+  expect(snapshot.groups).toHaveLength(7)
   expect(snapshot.tokenUsage.total_tokens).toBe(14)
   for (const agent of ['repository-triager', 'repository-delivery-planner']) {
     expect(

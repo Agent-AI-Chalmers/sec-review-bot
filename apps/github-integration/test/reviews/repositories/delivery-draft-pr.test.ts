@@ -205,8 +205,8 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
   })
 
   expect(result.reused).toBe(false)
-  expect(calls.blobs.length).toBe(1)
-  expect(calls.trees.length).toBe(1)
+  expect(calls.blobs).toHaveLength(1)
+  expect(calls.trees).toHaveLength(1)
   expect(calls.trees[0]).toStrictEqual([
     {
       path: 'src/app.txt',
@@ -221,9 +221,9 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
       sha: null
     }
   ])
-  expect(calls.commits.length).toBe(1)
-  expect(calls.refs.length).toBe(1)
-  expect(calls.pulls.length).toBe(1)
+  expect(calls.commits).toHaveLength(1)
+  expect(calls.refs).toHaveLength(1)
+  expect(calls.pulls).toHaveLength(1)
 })
 
 test('delivery-draft-pr stops before the next GitHub write after claim loss', async () => {
@@ -261,11 +261,11 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
     })
   ).rejects.toThrow(PublicationClaimLostError)
 
-  expect(calls.blobs.length).toBe(1)
-  expect(calls.trees.length).toBe(0)
-  expect(calls.commits.length).toBe(0)
-  expect(calls.refs.length).toBe(0)
-  expect(calls.pulls.length).toBe(0)
+  expect(calls.blobs).toHaveLength(1)
+  expect(calls.trees).toHaveLength(0)
+  expect(calls.commits).toHaveLength(0)
+  expect(calls.refs).toHaveLength(0)
+  expect(calls.pulls).toHaveLength(0)
 })
 
 test('delivery-draft-pr reuses a PR when the create response is lost', async () => {
@@ -340,7 +340,7 @@ test('delivery-draft-pr uses scan target branch as PR base when provided', async
     delivery
   })
 
-  expect(calls.pulls.length).toBe(1)
+  expect(calls.pulls).toHaveLength(1)
   expect(calls.pulls[0]?.base).toBe('release/2026-q2')
 })
 
@@ -378,11 +378,11 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
     })
   ).rejects.toThrow(/Sensitive repository file path/)
 
-  expect(calls.blobs.length).toBe(0)
-  expect(calls.trees.length).toBe(0)
-  expect(calls.commits.length).toBe(0)
-  expect(calls.refs.length).toBe(0)
-  expect(calls.pulls.length).toBe(0)
+  expect(calls.blobs).toHaveLength(0)
+  expect(calls.trees).toHaveLength(0)
+  expect(calls.commits).toHaveLength(0)
+  expect(calls.refs).toHaveLength(0)
+  expect(calls.pulls).toHaveLength(0)
 })
 
 test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR', async () => {
@@ -428,11 +428,11 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
     })
   ).rejects.toThrow(/Sensitive repository file path/)
 
-  expect(calls.blobs.length).toBe(0)
-  expect(calls.trees.length).toBe(0)
-  expect(calls.commits.length).toBe(0)
-  expect(calls.refs.length).toBe(0)
-  expect(calls.pulls.length).toBe(0)
+  expect(calls.blobs).toHaveLength(0)
+  expect(calls.trees).toHaveLength(0)
+  expect(calls.commits).toHaveLength(0)
+  expect(calls.refs).toHaveLength(0)
+  expect(calls.pulls).toHaveLength(0)
 })
 
 function minimalDelivery(deliveryId: string): RepositoryDelivery {
@@ -468,7 +468,7 @@ test('delivery-draft-pr reads an existing ref without force-updating it', async 
     delivery: minimalDelivery('delivery-ref-exists')
   })
 
-  expect(readRefs.length).toBe(1)
+  expect(readRefs).toHaveLength(1)
   expect(updatedRefs).toStrictEqual([])
 })
 
@@ -491,7 +491,7 @@ test('delivery-draft-pr does not create a PR from an existing branch with a diff
       delivery: minimalDelivery('delivery-ref-exists')
     })
   ).rejects.toThrow(/Existing delivery draft PR branch does not match/)
-  expect(calls.pulls.length).toBe(0)
+  expect(calls.pulls).toHaveLength(0)
 })
 
 test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {
@@ -559,7 +559,7 @@ test('delivery-draft-pr publishes symbolic link targets and deletions without de
   expect(calls.blobs).toStrictEqual([
     { content: 'dGFyZ2V0Lf8=', encoding: 'base64' }
   ])
-  expect(calls.trees.length).toBe(1)
+  expect(calls.trees).toHaveLength(1)
   expect(calls.trees[0]).toStrictEqual([
     {
       path: 'src/app.txt',
@@ -574,7 +574,7 @@ test('delivery-draft-pr publishes symbolic link targets and deletions without de
       sha: null
     }
   ])
-  expect(calls.commits.length).toBe(1)
-  expect(calls.refs.length).toBe(1)
-  expect(calls.pulls.length).toBe(1)
+  expect(calls.commits).toHaveLength(1)
+  expect(calls.refs).toHaveLength(1)
+  expect(calls.pulls).toHaveLength(1)
 })

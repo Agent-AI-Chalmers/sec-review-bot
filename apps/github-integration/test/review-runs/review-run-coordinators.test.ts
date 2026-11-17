@@ -99,7 +99,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
 
   expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
   // The installation lookup is the only request the App itself makes.
-  expect(requests.length).toBe(1)
+  expect(requests).toHaveLength(1)
   expect(requests[0]!.url).toMatch(/\/repos\/octo\/example\/installation$/)
   // The reply path then verifies the repository and posts the notice through the client.
   expect(
@@ -174,10 +174,10 @@ test('a repository scan failure reports into the repository summary issue', asyn
   )
   expect.assert(created, 'the failure must be posted as a comment')
   const body = created.body as { body: string }
-  expect.assert(
-    new URL(created.url).pathname.includes('/issues/77/'),
+  expect(
+    new URL(created.url).pathname,
     'it reports into the existing summary issue, not a new one'
-  )
+  ).toContain('/issues/77/')
   expect(body.body).toMatch(/run-repository/)
   expect(body.body).toMatch(/PREPARATION_RETRY_EXHAUSTED/)
   expect(completed).toStrictEqual([
@@ -395,7 +395,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
     store: failing
   })
 
-  expect(failures.length).toBe(1)
+  expect(failures).toHaveLength(1)
   expect(failures[0]!.message).toMatch(/Preparation input .*issue\./)
 })
 
@@ -458,7 +458,7 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
     store: failing
   })
 
-  expect(failures.length).toBe(1)
+  expect(failures).toHaveLength(1)
   expect(failures[0]!.message).toMatch(/trusted_default_branch\.head_sha/)
 })
 
@@ -516,7 +516,7 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
       store
     })
 
-    expect(failures.length, `${JSON.stringify(bad)} must be rejected`).toBe(1)
+    expect(failures, `${JSON.stringify(bad)} must be rejected`).toHaveLength(1)
     expect(failures[0]!.message).toMatch(/issue\.issue_author/)
   }
 })
@@ -713,7 +713,7 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
   }
   await prepareReviewRunsOnce({ app, store })
   expect(events).toStrictEqual(['renew', 'resolve', 'checkpoint'])
-  expect(checkpoints.length).toBe(1)
+  expect(checkpoints).toHaveLength(1)
   expect(checkpoints[0]?.slice(0, 2)).toStrictEqual([
     'reference-run',
     'recovery-token'

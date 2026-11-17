@@ -208,7 +208,7 @@ test('an internal fault is logged with its identity but not returned to the call
     })
     expect(response.statusCode).toBe(500)
     expect(response.json()).toStrictEqual({ error: 'Internal error' })
-    expect(logged.length, 'the fault must be logged exactly once').toBe(1)
+    expect(logged, 'the fault must be logged exactly once').toHaveLength(1)
     const record = JSON.parse(logged[0] ?? '') as Record<string, unknown>
     expect(record.event).toBe('review_runs_request_failed')
     expect(record.run_id).toBe('3f2504e0-4f89-41d3-9a0c-0305e82c3301')

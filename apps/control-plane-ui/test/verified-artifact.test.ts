@@ -85,9 +85,9 @@ for (const failure of ['metadata', 'storage'] as const) {
       releaseOpen.resolve()
       await completion
       expect(
-        observedClose.mock.calls.length,
+        observedClose,
         'rejection must wait for the sink to close'
-      ).toBe(1)
+      ).toHaveBeenCalledTimes(1)
       expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
       releaseOpen.resolve()

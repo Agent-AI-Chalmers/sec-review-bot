@@ -183,21 +183,19 @@ test('repository renderer derives blocked confirmed case cards from case results
 
   // The card reuses the shared status vocabulary instead of restating it, and the
   // title carries case identity rather than repeating the coverage rating.
-  expect.assert(
-    body.includes(
-      renderReviewStatusLines({
-        analysis: review_record.analysis,
-        mitigation: review_record.mitigation,
-        verification: review_record.verification
-      }).join('\n')
-    )
+  expect(body).toContain(
+    renderReviewStatusLines({
+      analysis: review_record.analysis,
+      mitigation: review_record.mitigation,
+      verification: review_record.verification
+    }).join('\n')
   )
   const titleLine = body
     .split('\n')
     .find((line) => line.startsWith('<summary>[medium] case-1'))
   expect.assert(titleLine)
-  expect.assert(
-    !titleLine.includes(coverageHeadline(review_record.verification.coverage))
+  expect(titleLine).not.toContain(
+    coverageHeadline(review_record.verification.coverage)
   )
 })
 

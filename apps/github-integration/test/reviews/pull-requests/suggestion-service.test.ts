@@ -129,7 +129,7 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
     review_record: reviewRecordWithPatchDiff(workspacePatchSample())
   })
 
-  expect(manifest.candidates.length).toBe(4)
+  expect(manifest.candidates).toHaveLength(4)
   expect(
     manifest.candidates.map((candidate) => ({
       start_line: candidate.start_line,
@@ -186,7 +186,7 @@ test('suggestion candidates accept repository-relative workspace patch paths', a
   })
 
   expect(manifest.skipped_reason).toBe(null)
-  expect(manifest.candidates.length).toBe(4)
+  expect(manifest.candidates).toHaveLength(4)
 })
 
 for (const filename of [
@@ -261,7 +261,7 @@ for (const destination of ['"b/bad\\q"', '"b/unterminated', '"b/\\377"']) {
       review_record: reviewRecordWithPatchDiff(patch)
     })
     expect(manifest.candidates).toStrictEqual([])
-    expect(manifest.unmapped_changes.length).toBe(1)
+    expect(manifest.unmapped_changes).toHaveLength(1)
     expect.assert(manifest.unmapped_changes[0]?.reason)
     expect.assert(manifest.skipped_reason)
   })

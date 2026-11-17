@@ -166,8 +166,8 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(issueComments.length).toBe(0)
-  expect(pullReviews.length).toBe(1)
+  expect(issueComments).toHaveLength(0)
+  expect(pullReviews).toHaveLength(1)
   const reviewArgs = pullReviews[0] as {
     body: string
     comments: unknown[]
@@ -256,7 +256,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(pullReviews.length).toBe(1)
+  expect(pullReviews).toHaveLength(1)
   expect((pullReviews[0] as { event: string }).event).toBe('COMMENT')
 })
 
@@ -323,8 +323,8 @@ test('pull request publish approves when analysis is not confirmed', async () =>
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(issueComments.length).toBe(0)
-  expect(pullReviews.length).toBe(1)
+  expect(issueComments).toHaveLength(0)
+  expect(pullReviews).toHaveLength(1)
   expect((pullReviews[0] as { event: string }).event).toBe('APPROVE')
 })
 
@@ -560,9 +560,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(pullReviews.length).toBe(1)
+  expect(pullReviews).toHaveLength(1)
   expect((pullReviews[0] as { event: string }).event).toBe('COMMENT')
-  expect((pullReviews[0] as { comments: unknown[] }).comments.length).toBe(1)
+  expect((pullReviews[0] as { comments: unknown[] }).comments).toHaveLength(1)
 })
 
 test('pull request publish does not create a fallback review after an uncertain suggestion submission', async () => {

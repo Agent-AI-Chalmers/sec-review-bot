@@ -154,8 +154,8 @@ async function runPublish(
 
 test('issue publish opens a draft PR when the run opted in', async () => {
   const harness = await runPublish(true)
-  expect(harness.createdPullRequests.length).toBe(1)
-  expect(harness.createdComments.length).toBe(1)
+  expect(harness.createdPullRequests).toHaveLength(1)
+  expect(harness.createdComments).toHaveLength(1)
   expect(harness.initializedSteps[0]).toStrictEqual([
     'issue:draft-pr',
     'issue:summary-comment'
@@ -164,8 +164,8 @@ test('issue publish opens a draft PR when the run opted in', async () => {
 
 test('issue publish keeps the patch in the summary comment when not opted in', async () => {
   const harness = await runPublish(false)
-  expect(harness.createdPullRequests.length).toBe(0)
-  expect(harness.createdComments.length).toBe(1)
+  expect(harness.createdPullRequests).toHaveLength(0)
+  expect(harness.createdComments).toHaveLength(1)
   expect(harness.initializedSteps[0]).toStrictEqual(['issue:summary-comment'])
 })
 
@@ -175,8 +175,8 @@ for (const next_step of ['retry-ai', 'manual-review'] as const) {
     review_record.verification.next_step = next_step
     review_record.verification.findings = ['Revert the unrelated change.']
     const harness = await runPublish(true, review_record)
-    expect(harness.createdPullRequests.length).toBe(0)
-    expect(harness.createdComments.length).toBe(1)
+    expect(harness.createdPullRequests).toHaveLength(0)
+    expect(harness.createdComments).toHaveLength(1)
     expect(harness.initializedSteps[0]).toStrictEqual(['issue:summary-comment'])
   })
 }

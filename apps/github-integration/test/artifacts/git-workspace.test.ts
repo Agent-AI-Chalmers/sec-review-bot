@@ -436,7 +436,7 @@ test('exportWorkspaceDiff returns changes the files API omits its patch for', as
     expect(diff).toMatch(/rename to new-name\.md/)
     expect(diff).toMatch(/b\/big\.html/)
     const changed_lines = diff.match(/^\+changed line$/gm) ?? []
-    expect(changed_lines.length).toBe(20_000)
+    expect(changed_lines).toHaveLength(20_000)
     expect(diff).toMatch(/changed line\n\+changed line\n/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
@@ -900,7 +900,7 @@ test('exportWorkspaceWindow lists every commit in the range, past the compare pa
       base_sha,
       head_sha
     })
-    expect(exported.commit_shas.length).toBe(expected)
+    expect(exported.commit_shas).toHaveLength(expected)
     // `--reverse` keeps the list in application order, ending at the head commit.
     expect(exported.commit_shas.at(-1)).toBe(head_sha)
   } finally {

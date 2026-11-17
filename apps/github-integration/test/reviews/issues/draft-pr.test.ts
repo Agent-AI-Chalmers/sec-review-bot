@@ -219,8 +219,8 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
   })
 
   expect(result?.number).toBe(9)
-  expect(harness.blobs.length).toBe(0)
-  expect(harness.commits.length).toBe(0)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.commits).toHaveLength(0)
 })
 
 test('issue draft PR retry reuses a branch left by a partial prior attempt without overwriting it', async () => {
@@ -313,7 +313,7 @@ test('issue draft PR does not create a PR from an existing branch with a differe
       })
     })
   ).rejects.toThrow(/Existing draft PR branch does not match/)
-  expect(harness.pulls.length).toBe(0)
+  expect(harness.pulls).toHaveLength(0)
 })
 
 test('issue draft PR stops before the next GitHub write after claim loss', async () => {
@@ -348,11 +348,11 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
     })
   ).rejects.toThrow(PublicationClaimLostError)
 
-  expect(harness.blobs.length).toBe(1)
-  expect(harness.trees.length).toBe(0)
-  expect(harness.commits.length).toBe(0)
-  expect(harness.refs.length).toBe(0)
-  expect(harness.pulls.length).toBe(0)
+  expect(harness.blobs).toHaveLength(1)
+  expect(harness.trees).toHaveLength(0)
+  expect(harness.commits).toHaveLength(0)
+  expect(harness.refs).toHaveLength(0)
+  expect(harness.pulls).toHaveLength(0)
 })
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {
@@ -444,8 +444,8 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
   })
 
   expect(result).toBe(null)
-  expect(harness.blobs.length).toBe(0)
-  expect(harness.trees.length).toBe(0)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 test('issue draft PR rejects unsupported file modes', async () => {
@@ -476,8 +476,8 @@ test('issue draft PR rejects unsupported file modes', async () => {
       review_record
     })
   ).rejects.toThrow(/unsupported file mode/)
-  expect(harness.blobs.length).toBe(0)
-  expect(harness.trees.length).toBe(0)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 test('issue draft PR rejects deleted file changes with mode', async () => {
@@ -506,8 +506,8 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
       review_record
     })
   ).rejects.toThrow(/deleted but also included a mode/)
-  expect(harness.blobs.length).toBe(0)
-  expect(harness.trees.length).toBe(0)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 for (const [path, message] of [
@@ -541,8 +541,8 @@ for (const [path, message] of [
         review_record
       })
     ).rejects.toThrow(message)
-    expect(harness.blobs.length).toBe(0)
-    expect(harness.trees.length).toBe(0)
+    expect(harness.blobs).toHaveLength(0)
+    expect(harness.trees).toHaveLength(0)
   })
 }
 

@@ -210,7 +210,7 @@ test('reads the .sec-review/config.yml path', async () => {
   expect(config.path).toBe(CONFIG_PATH)
   // The Contents API path is part of the request URL, so the recorded request proves which file
   // was read without replacing the client's method.
-  expect(requests.length).toBe(1)
+  expect(requests).toHaveLength(1)
   expect.assert(
     decodeURIComponent(new URL(requests[0]!.url).pathname).endsWith(
       `/contents/${CONFIG_PATH}`

@@ -318,7 +318,7 @@ test('a status query is split into batches the Execution API accepts', async () 
   )
   const batch = await getExecutionRunStatuses(runIds)
 
-  expect(sent.length).toBe(2)
+  expect(sent).toHaveLength(2)
   expect(sent[0]?.length).toBe(EXECUTION_STATUS_QUERY_LIMIT)
   expect(sent[1]?.length).toBe(1)
   // Split requests must still answer in the order the caller asked about runs.

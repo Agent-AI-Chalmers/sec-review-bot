@@ -217,10 +217,10 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'started_at',
       'publish_context'
     ]) {
-      expect.assert(
-        !trunkColumns.includes(moved),
+      expect(
+        trunkColumns,
         `review_runs must not keep execution column ${moved}`
-      )
+      ).not.toContain(moved)
     }
   } finally {
     await pool.end()
@@ -432,7 +432,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   try {
     const { runs: firstPage, next_cursor: cursor } =
       await restarted.queries.listRunsPage({ limit: 1 })
-    expect(firstPage.length).toBe(1)
+    expect(firstPage).toHaveLength(1)
     expect.assert(
       cursor,
       'a second run remains, so the first page must carry a cursor'
@@ -442,7 +442,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
         limit: 1,
         cursor
       })
-    expect(secondPage.length).toBe(1)
+    expect(secondPage).toHaveLength(1)
     expect(secondPage[0]?.run_id).not.toBe(firstPage[0]?.run_id)
     expect(finalCursor).toBe(null)
     expect(
@@ -503,7 +503,7 @@ test('run queries apply status filters before pagination limits', async () => {
       preparation_status: 'preparing',
       limit: 10
     })
-    expect(preparingPreparations.length).toBe(2)
+    expect(preparingPreparations).toHaveLength(2)
     expect.assert(
       preparingPreparations.every(
         (run) => run.preparation?.status === 'preparing'
@@ -513,7 +513,7 @@ test('run queries apply status filters before pagination limits', async () => {
       source_platform: 'github',
       limit: 10
     })
-    expect(githubRuns.length).toBe(3)
+    expect(githubRuns).toHaveLength(3)
     expect.assert(githubRuns.every((run) => run.source_platform === 'github'))
   } finally {
     await store.close()
@@ -553,13 +553,13 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       await store.queries.listRunsPage({
         limit: 1
       })
-    expect(firstPage.length).toBe(1)
+    expect(firstPage).toHaveLength(1)
     expect.assert(cursor)
     const { runs: secondPage } = await store.queries.listRunsPage({
       limit: 1,
       cursor
     })
-    expect(secondPage.length).toBe(1)
+    expect(secondPage).toHaveLength(1)
     expect([firstPage[0]?.run_id, secondPage[0]?.run_id].sort()).toStrictEqual(
       [...runIds].sort()
     )

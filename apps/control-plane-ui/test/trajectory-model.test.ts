@@ -189,7 +189,7 @@ test('failed analysis fixture preserves empty arguments, errors and repeated pro
   const systems = document.messages.filter(
     (message) => message.role === 'system'
   )
-  expect(systems.length).toBe(5)
+  expect(systems).toHaveLength(5)
   expect(systems[0]!.repeatedSystemId).toBe(undefined)
   expect.assert(
     systems
@@ -198,7 +198,7 @@ test('failed analysis fixture preserves empty arguments, errors and repeated pro
   )
   const response = document.messages.find((message) => message.seq === 10)!
   expect(response.content).toBe('')
-  expect(response.toolCalls.length).toBe(5)
+  expect(response.toolCalls).toHaveLength(5)
   for (const call of response.toolCalls) {
     expect(call.args).toStrictEqual({})
     expect(call.resultStatus).toBe('error')

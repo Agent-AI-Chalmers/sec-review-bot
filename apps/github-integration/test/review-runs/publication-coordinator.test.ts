@@ -474,7 +474,7 @@ test('a publication that cannot complete names the steps that kept it from compl
     console.error = restore
   }
 
-  expect(messages.length).toBe(1)
+  expect(messages).toHaveLength(1)
   expect(messages[0] ?? '').toMatch(/^PUBLICATION_STEPS_INCOMPLETE: /)
   expect(messages[0] ?? '').toMatch(
     /repository:delivery:gone \(uncertain, GITHUB_TIMEOUT\)/

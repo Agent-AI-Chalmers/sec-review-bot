@@ -771,7 +771,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE run_id=$1`,
       [blocked.runId]
     )
-    expect((await store.preparations.expireStale()).blocked.length).toBe(1)
+    expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
 
     // preparation: disconnected -> uncertain when an operator hands the row back to automatic
     // recovery. A second run is arranged for it so the abandonment below still starts from a
@@ -787,7 +787,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [resumed.runId]
     )
-    expect((await store.preparations.expireStale()).blocked.length).toBe(1)
+    expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
     await store.operatorDecisions.resumeDisconnectedPreparation(resumed.runId)
 
     // preparation: disconnected -> failed when an operator gives up on it, which is the plain
@@ -946,9 +946,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [runIds]
     )
     expect(
-      live.rows.length,
+      live.rows,
       'the driver must leave live publications in all three owned states'
-    ).toBe(3)
+    ).toHaveLength(3)
 
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
@@ -1044,9 +1044,9 @@ test('a reason the audit log writes is the reason the contract declares', async 
     expect.assert(expected !== undefined, `${key} is not declared`)
     // An edge that accepts any reason makes the whole pair open.
     if (expected.some((value) => value === null)) continue
-    expect.assert(
-      expected.includes(reason),
+    expect(
+      expected,
       `${key} was recorded with ${String(reason)} but the contract declares ${expected.join(' or ')}`
-    )
+    ).toContain(reason)
   }
 })

@@ -59,10 +59,10 @@ test('the generated artifact manifest covers the generator output and CI filter'
   ) as Record<string, string[]>
   for (const outputPath of generatedModule.outputPaths) {
     const relativeOutput = path.relative(REPO_ROOT, outputPath)
-    expect.assert(
-      (filters['contract-tools'] ?? []).includes(relativeOutput),
+    expect(
+      filters['contract-tools'] ?? [],
       `contract-tools CI filter does not cover ${relativeOutput}`
-    )
+    ).toContain(relativeOutput)
   }
 })
 
@@ -81,7 +81,7 @@ test('the shared fixture manifest covers every schema and fixture exactly once',
     ...Object.keys(manifest.schema_fixtures),
     ...Object.keys(manifest.invalid_schema_fixtures)
   ]
-  expect(names.length).toBe(new Set(names).size)
+  expect(names).toHaveLength(new Set(names).size)
   expect(names.sort()).toStrictEqual(
     readdirSync(root)
       .filter((name) => name.endsWith('.json') && name !== 'manifest.json')

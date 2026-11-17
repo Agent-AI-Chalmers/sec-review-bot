@@ -603,7 +603,7 @@ test('valid memory edits relay Catalog conflicts before uploading', async (t) =>
   expect(response.status).toBe(409)
   expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
   expect(fixture.uploads()).toBe(0)
-  expect(fixture.writes.length).toBe(1)
+  expect(fixture.writes).toHaveLength(1)
 })
 
 for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {

@@ -62,9 +62,9 @@ test('the recorded summarization prompt keeps its instructions and Markdown sect
       event.message.role === 'user'
   ).message.content as string
   const preview = markdownWithoutXmlTags(prompt)
-  expect.assert(preview.includes('Context Extraction Assistant'))
-  expect.assert(preview.includes('## SESSION INTENT'))
-  expect.assert(preview.includes('src/download.py'))
-  expect.assert(!preview.includes('<primary_objective>'))
+  expect(preview).toContain('Context Extraction Assistant')
+  expect(preview).toContain('## SESSION INTENT')
+  expect(preview).toContain('src/download.py')
+  expect(preview).not.toContain('<primary_objective>')
   expect.assert(prompt.startsWith('<role>'))
 })

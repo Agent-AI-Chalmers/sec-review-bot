@@ -373,7 +373,7 @@ test('an unrecognized mention logs at most once per repository per window', asyn
   }
 
   expect(
-    logged.length,
+    logged,
     'one diagnostic line per repository, not one per comment'
-  ).toBe(2)
+  ).toHaveLength(2)
 })

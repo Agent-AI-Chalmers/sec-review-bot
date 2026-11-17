@@ -155,8 +155,8 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
       /duplicate key value violates unique constraint/
     )
     expect(await second.queries.getRun(runId)).toBe(null)
-    expect((await first.queries.listActiveRuns()).runs.length).toBe(1)
-    expect((await second.queries.listActiveRuns()).runs.length).toBe(0)
+    expect((await first.queries.listActiveRuns()).runs).toHaveLength(1)
+    expect((await second.queries.listActiveRuns()).runs).toHaveLength(0)
     expect(await first.publicationClaims.claim(runId)).toBe(null)
     await first.executions.recordExecutionSuccess(
       runId,
@@ -303,11 +303,11 @@ test('the coordination event log records each transition once, oldest first', as
     // and the pending->queued + preparing->submitted transitions must be present.
     const events = await store.queries.listEvents(runId)
     const axes = events.map((event) => `${event.axis}:${event.to_status}`)
-    expect.assert(axes.includes('execution:pending'))
-    expect.assert(axes.includes('preparation:preparing'))
-    expect.assert(axes.includes('publication:pending'))
-    expect.assert(axes.includes('execution:queued'))
-    expect.assert(axes.includes('preparation:submitted'))
+    expect(axes).toContain('execution:pending')
+    expect(axes).toContain('preparation:preparing')
+    expect(axes).toContain('publication:pending')
+    expect(axes).toContain('execution:queued')
+    expect(axes).toContain('preparation:submitted')
 
     // Oldest first, and each transition appears exactly once.
     const times = events.map((event) => Date.parse(event.occurred_at))
@@ -662,7 +662,7 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
       first.notices.claimNext(),
       second.notices.claimNext()
     ])
-    expect(claims.filter((claim) => claim !== null).length).toBe(1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await Promise.all([
       observer.end(),
@@ -749,7 +749,7 @@ test('concurrent preparation consumers cannot own the same recovered work', asyn
       first.preparations.claimNext(),
       second.preparations.claimNext()
     ])
-    expect(claims.filter((claim) => claim !== null).length).toBe(1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -941,7 +941,7 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
       first.admissions.admit({ ...ingress, run_id: `run-${randomUUID()}` }),
       second.admissions.admit({ ...ingress, run_id: `run-${randomUUID()}` })
     ])
-    expect(admissions.filter((item) => item.created).length).toBe(1)
+    expect(admissions.filter((item) => item.created)).toHaveLength(1)
     expect(new Set(admissions.map((item) => item.record.run_id)).size).toBe(1)
   } finally {
     await Promise.all([first.close(), second.close()])
@@ -1341,9 +1341,9 @@ test('the publication axis records an event only when its derived status actuall
       { retry: true }
     )
     expect(
-      (await publicationEvents()).length,
+      await publicationEvents(),
       'an unchanged derived status must not be audited as a transition'
-    ).toBe(beforeRetry)
+    ).toHaveLength(beforeRetry)
     expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'publishing'
     )
@@ -1365,9 +1365,9 @@ test('the publication axis records an event only when its derived status actuall
       { retry: false }
     )
     expect(
-      (await publicationEvents()).length,
+      await publicationEvents(),
       'a terminal step failure does not move the axis'
-    ).toBe(before)
+    ).toHaveLength(before)
     const axisBefore = (await store.queries.getRun(runId))?.publication.status
     await store.publications.fail(
       runId,
@@ -1862,7 +1862,7 @@ test('every terminal path that concludes a run queues a failure notice', async (
       await observer.end()
     }
     const expiry = await store.preparations.expireStale()
-    expect(expiry.blocked.length).toBe(1)
+    expect(expiry.blocked).toHaveLength(1)
     // Disconnecting is a conclusion about automation, not about the run: it asks a person to
     // look, so it queues an attention notice rather than reporting a failure.
     const disconnectedNotice = (await store.queries.getRun(blockedRun))?.notices
@@ -1915,7 +1915,7 @@ test('abandoning a blocked run concludes an execution that is still in flight', 
          WHERE run_id=$1`,
         [runId, status]
       )
-      expect((await store.preparations.expireStale()).blocked.length).toBe(1)
+      expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
       const abandoned = await store.operatorDecisions.abandonBlockedPreparation(
         runId,
         'operator'
@@ -2185,7 +2185,7 @@ test('claimNextPublication returns the persisted result, context, and artifact',
   try {
     const work = await store.publicationClaims.claimNext()
     expect(work?.run_id).toBe(runId)
-    expect(work?.claim_token.length).toBe(36)
+    expect(work?.claim_token).toHaveLength(36)
     expect(work?.artifact_storage).toStrictEqual({ status: 'unavailable' })
     expect(work?.workflow_result).toStrictEqual(workflowResult)
     expect(work?.publish_context).toStrictEqual(context)
@@ -2227,7 +2227,7 @@ test('concurrent claimNextPublication consumers cannot own the same ready run', 
       first.publicationClaims.claimNext(),
       second.publicationClaims.claimNext()
     ])
-    expect(claims.filter((claim) => claim !== null).length).toBe(1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await first.close()
     await second.close()
@@ -3394,7 +3394,7 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
       { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
     ])
     const parked = await store.queries.listParkedRuns()
-    expect(parked.length).toBe(1)
+    expect(parked).toHaveLength(1)
     expect(parked[0]?.run_id).toBe(runId)
     expect(parked[0]?.axis).toBe('preparation')
     expect(parked[0]?.reason).toBe('EXECUTION_ALREADY_ADVANCED')
@@ -3508,7 +3508,7 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [runId]
     )
-    expect((await store.preparations.expireStale()).blocked.length).toBe(1)
+    expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
     const attention = await store.notices.claimNext()
     expect.assert(attention)
     expect(attention.run_id).toBe(runId)
@@ -3917,9 +3917,9 @@ test('an operator resume publishes the parked steps again instead of only reconc
         (event) =>
           event.step_key === null &&
           event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
-      ).length,
+      ),
       'each operator decision is on the record'
-    ).toBe(2)
+    ).toHaveLength(2)
   } finally {
     await pool.end()
     await store.close()
@@ -5369,7 +5369,7 @@ for (const selector of ['claim', 'claimNext'] as const) {
           )
         ).toBe(true)
         await expectUncertain()
-        expect((await events()).length).toBe(before + 1)
+        expect(await events()).toHaveLength(before + 1)
         await expect(
           store.publications.requirePublicationStepClaim(
             runId,

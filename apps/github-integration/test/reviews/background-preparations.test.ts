@@ -34,7 +34,7 @@ test('BackgroundPreparations logs failures with ingress context', async () => {
   })
   await preparations.stop()
 
-  expect(logs.length).toBe(1)
+  expect(logs).toHaveLength(1)
   expect(logs[0]?.event).toBe('review_background_preparation_failed')
   expect(logs[0]?.fields.ingress).toBe('issues.opened')
   expect(logs[0]?.fields.repo).toBe('octo/example')
@@ -96,7 +96,7 @@ test('failure before admission rejects the handler and records its ingress conte
     message: error.message
   })
   await preparations.stop()
-  expect(logs.length).toBe(1)
+  expect(logs).toHaveLength(1)
   expect(logs[0]?.error).toBe(error)
   expect(logs[0]?.ingress).toBe('issues.opened')
 })
@@ -118,11 +118,11 @@ test('failure after admission stays owned by the background tracker', async () =
     },
     { repo: 'octo/example' }
   )
-  expect(logs.length).toBe(0)
+  expect(logs).toHaveLength(0)
   expect.assert(fail)
   fail(error)
   await preparations.stop()
-  expect(logs.length).toBe(1)
+  expect(logs).toHaveLength(1)
   expect(logs[0]?.error).toBe(error)
   expect(logs[0]?.repo).toBe('octo/example')
 })
@@ -151,6 +151,6 @@ test('a synchronous command error is tracked and rejects the handler', async () 
     message: error.message
   })
   await preparations.stop()
-  expect(logs.length).toBe(1)
+  expect(logs).toHaveLength(1)
   expect(logs[0]?.error).toBe(error)
 })

@@ -299,7 +299,7 @@ test('readSetupDeclaration accepts executable files and checks trees at pinned S
       repo_name: 'demo'
     })
   ).toBe('setup:\n  - run: echo hi\n')
-  expect(requests.length).toBe(3)
+  expect(requests).toHaveLength(3)
 })
 
 test('assertWorkflowInputFits rejects an input past the contract byte limit', () => {

@@ -52,21 +52,41 @@ test('a code whose sentence is missing from the active language renders no toolt
   expect(result.explanation).toBe(null)
 })
 
-test('an abandon failure names the credential that was actually rejected', () => {
-  // The abandon route answers 401 for three unrelated causes; only the first is a bad token.
-  // Reporting the others that way tells the operator to re-type a token that was correct.
-  const cases: Array<[unknown, string]> = [
-    [new ApiError(401, 'admin_token_required'), 'abandonWrongToken'],
-    [new ApiError(401, 'unauthorized'), 'sessionExpired'],
-    // Review Runs' own 401, proxied through the BFF without a BFF error code.
-    [new ApiError(401), 'abandonFailed'],
-    [new ApiError(401, 'review_runs_unavailable'), 'abandonFailed'],
-    [new ApiError(502, 'review_runs_unavailable'), 'abandonFailed'],
-    [new Error('network down'), 'abandonFailed']
-  ]
-  for (const [error, expected] of cases) {
-    expect(abandonFailureMessageKey(error)).toBe(expected)
+// A 401 can reject the operator token, the UI session, or the upstream request.
+// Keep each cause visible as a separate case even when the displayed result is shared.
+test.each([
+  {
+    name: 'invalid operator token',
+    error: new ApiError(401, 'admin_token_required'),
+    expected: 'abandonWrongToken'
+  },
+  {
+    name: 'expired UI session',
+    error: new ApiError(401, 'unauthorized'),
+    expected: 'sessionExpired'
+  },
+  {
+    name: 'upstream 401 without a BFF code',
+    error: new ApiError(401),
+    expected: 'abandonFailed'
+  },
+  {
+    name: 'upstream 401 with an availability code',
+    error: new ApiError(401, 'review_runs_unavailable'),
+    expected: 'abandonFailed'
+  },
+  {
+    name: 'unavailable upstream',
+    error: new ApiError(502, 'review_runs_unavailable'),
+    expected: 'abandonFailed'
+  },
+  {
+    name: 'network failure',
+    error: new Error('network down'),
+    expected: 'abandonFailed'
   }
+])('abandon failure: $name', ({ error, expected }) => {
+  expect(abandonFailureMessageKey(error)).toBe(expected)
 })
 
 test('every abandon failure message has a translation in both languages', () => {

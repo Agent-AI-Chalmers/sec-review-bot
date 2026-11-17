@@ -283,7 +283,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   })
 
   expect(submitted.run_id).toBe('run-1')
-  expect(submit_calls.length).toBe(1)
+  expect(submit_calls).toHaveLength(1)
   const submitCall = submit_calls[0] as Record<string, unknown>
   expect({
     octokit: submitCall.octokit,
@@ -627,7 +627,7 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
   })
 
   expect((transitions[0] as unknown[])[0]).toBe('prepared')
-  expect(transitions.length).toBe(1)
+  expect(transitions).toHaveLength(1)
 })
 
 function withoutPreparationInput<

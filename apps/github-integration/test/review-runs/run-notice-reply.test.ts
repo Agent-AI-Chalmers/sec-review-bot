@@ -256,7 +256,7 @@ test('a notice without a failure code says so instead of inventing one', async (
     assert_notice_claim: keepNoticeClaim
   })
 
-  expect(report.bodies.length).toBe(1)
+  expect(report.bodies).toHaveLength(1)
   const body = report.bodies[0]!
   expect(body, 'no synthesized code may appear').not.toMatch(/[A-Z_]+_FAILED/)
   expect(body, 'there is no reason to state').not.toMatch(/Reason:/)
@@ -284,7 +284,7 @@ test('a notice with a failure code still states it', async () => {
     assert_notice_claim: keepNoticeClaim
   })
 
-  expect(report.bodies.length).toBe(1)
+  expect(report.bodies).toHaveLength(1)
   expect(report.bodies[0]!).toMatch(/Reason: `EXECUTION_RESULT_MISSING`\./)
 })
 

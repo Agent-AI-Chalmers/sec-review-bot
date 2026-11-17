@@ -37,7 +37,7 @@ test('an error field keeps its name, code, status, and cause', () => {
     '502',
     'socket hang up'
   ])
-    expect.assert(line.includes(part), `${part} is missing from ${line}`)
+    expect(line, `${part} is missing from ${line}`).toContain(part)
 })
 
 test('a plain object field is still logged as JSON', () => {

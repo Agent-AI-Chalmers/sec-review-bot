@@ -498,7 +498,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
   })
 
   expect((transitions[0] as unknown[])[0]).toBe('prepared')
-  expect(transitions.length).toBe(1)
+  expect(transitions).toHaveLength(1)
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Execution submission for replay', async () => {
@@ -552,7 +552,7 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
   })
 
   expect((transitions[0] as unknown[])[0]).toBe('prepared')
-  expect(transitions.length).toBe(1)
+  expect(transitions).toHaveLength(1)
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
@@ -627,7 +627,7 @@ for (const recovering of [false, true]) {
         get_pull_request_context: async () => pr,
         prepare_review: async ({ pr: preparedPr }) => {
           expect(preparedPr).toBe(pr)
-          expect(checkpoints.length).toBe(1)
+          expect(checkpoints).toHaveLength(1)
           const review = {
             pr: preparedPr,
             run_id: 'run-checkpoint',
@@ -957,7 +957,7 @@ test('a failed PR checkpoint prevents preparation and submission', async () => {
     name: error.name,
     message: error.message
   })
-  expect(failures.length).toBe(1)
+  expect(failures).toHaveLength(1)
   expect(failures[0]?.slice(0, 3)).toStrictEqual([
     'existing-run',
     'claim',

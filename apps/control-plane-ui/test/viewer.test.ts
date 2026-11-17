@@ -73,7 +73,7 @@ test('viewer projects execution events and retains model provenance', () => {
   const events = parseViewerInput(
     records.map((record) => JSON.stringify(record)).join('\n')
   )
-  expect(events.length).toBe(5)
+  expect(events).toHaveLength(5)
   expect(events[2]?.call_id).toBe('call')
   expect(events[2]?.parent_ids).toStrictEqual(['root', 'child'])
   expect(() =>

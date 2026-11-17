@@ -70,7 +70,7 @@ test('Langfuse observations are read by session without one request per root', a
     toStartTime: '2026-01-01T00:10:00.000Z'
   })
 
-  expect(requested.length).toBe(2)
+  expect(requested).toHaveLength(2)
   expect(
     requested.map((url) => [
       url.searchParams.get('sessionId'),

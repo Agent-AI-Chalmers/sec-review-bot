@@ -586,7 +586,7 @@ test('memory artifact routes select the declared source for downloads and conten
       ]
     })
   }
-  expect(fixture.objectReads.length).toBe(6)
+  expect(fixture.objectReads).toHaveLength(6)
   expect(fixture.catalogReads).toStrictEqual([
     '/v1/memory-tree/versions/2',
     '/v1/memory-tree/versions/2',

@@ -393,9 +393,8 @@ test('one extraction publishes multiple observations that paginate and consume i
       (await store.queries.getExtraction('one-run'))?.observations,
     ).toStrictEqual(extraction.observations)
     expect(
-      (await store.queries.listExtractions(undefined, 1, {})).extractions
-        .length,
-    ).toBe(1)
+      (await store.queries.listExtractions(undefined, 1, {})).extractions,
+    ).toHaveLength(1)
     // Equal timestamps force the observation ID to act as the pagination tie-breaker.
     await pool.query('update observations set created_at=$1', [
       '2026-01-01T00:00:00Z',

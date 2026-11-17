@@ -491,9 +491,9 @@ test('memory fixtures form one coherent provenance graph', async () => {
     )
 
     expect(extractions.next_cursor).toBe(null)
-    expect(extractions.extractions.length).toBe(48)
+    expect(extractions.extractions).toHaveLength(48)
     expect(observations.next_cursor).toBe(null)
-    expect(observations.observations.length).toBe(46)
+    expect(observations.observations).toHaveLength(46)
     expect(overview.totals.completed_extraction_count).toBe(
       extractions.extractions.length
     )
@@ -520,7 +520,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       (item: { extraction_id: string }) =>
         item.extraction_id === 'fixture-extraction-2'
     )
-    expect(siblings.length).toBe(2)
+    expect(siblings).toHaveLength(2)
     expect(
       new Set(
         siblings.map((item: { observation_id: string }) => item.observation_id)
@@ -583,8 +583,8 @@ test('memory fixtures form one coherent provenance graph', async () => {
           'a consumed observation must name an existing version'
         )
         expect(version.source.kind).toBe('learning')
-        expect.assert(
-          version.source.observation_ids.includes(observation.observation_id)
+        expect(version.source.observation_ids).toContain(
+          observation.observation_id
         )
       }
     }

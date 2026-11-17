@@ -1079,7 +1079,7 @@ test('publication endpoints enforce producer roles and return complete recovery 
       intent: extractionIntent,
       status: 'reserved',
     })
-    expect(calls.length).toBe(1)
+    expect(calls).toHaveLength(1)
   } finally {
     await app.close()
   }

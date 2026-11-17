@@ -62,7 +62,7 @@ test('the repository is split into owner and repo for the installation lookup', 
 
   await installationOctokitForRepo(app, 'octo/example')
 
-  expect(requests.length).toBe(1)
+  expect(requests).toHaveLength(1)
   expect(new URL(requests[0]!.url).pathname).toBe(
     '/repos/octo/example/installation'
   )

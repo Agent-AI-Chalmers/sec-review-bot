@@ -112,8 +112,8 @@ test('publication recovery preserves intents and attachment transactions select 
       store.createMemoryTreeVersion(competing),
     ])
     expect(
-      outcomes.filter((outcome) => outcome.status === 'fulfilled').length,
-    ).toBe(1)
+      outcomes.filter((outcome) => outcome.status === 'fulfilled'),
+    ).toHaveLength(1)
     const failed = outcomes.find((outcome) => outcome.status === 'rejected')
     expect.assert(
       failed?.status === 'rejected' &&
@@ -186,8 +186,8 @@ test('publication recovery preserves intents and attachment transactions select 
       candidates.map((candidate) => store.createMemoryTreeVersion(candidate)),
     )
     expect(
-      concurrent.filter((result) => result.status === 'fulfilled').length,
-    ).toBe(1)
+      concurrent.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1)
     const rejected = concurrent.find((result) => result.status === 'rejected')
     expect.assert(
       rejected?.status === 'rejected' &&
@@ -202,9 +202,10 @@ test('publication recovery preserves intents and attachment transactions select 
       ),
     )
     expect(
-      recorded.flat().filter((publication) => publication.status === 'selected')
-        .length,
-    ).toBe(1)
+      recorded
+        .flat()
+        .filter((publication) => publication.status === 'selected'),
+    ).toHaveLength(1)
     expect((await store.queries.getMemoryTree()).version).toBe(2)
 
     // Preparation cleanup is idempotent and never changes selected publications.
@@ -239,13 +240,11 @@ test('publication recovery preserves intents and attachment transactions select 
     await store.reserveVersionPublication(other)
     await store.confirmVersionPublication(other)
     expect(
-      (
-        await store.abandonVersionPublications({
-          kind: 'reorganization',
-          operation_id: 'prepared',
-        })
-      ).length,
-    ).toBe(2)
+      await store.abandonVersionPublications({
+        kind: 'reorganization',
+        operation_id: 'prepared',
+      }),
+    ).toHaveLength(2)
     expect(
       await store.abandonVersionPublications({
         kind: 'reorganization',
@@ -380,7 +379,7 @@ test('publication recovery preserves intents and attachment transactions select 
       lateOwner.kind,
       lateOwner.operation_id,
     )
-    expect(latePublications.length).toBe(2)
+    expect(latePublications).toHaveLength(2)
     expect(
       latePublications.find(
         ({ intent }) =>

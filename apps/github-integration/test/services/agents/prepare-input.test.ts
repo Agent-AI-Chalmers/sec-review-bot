@@ -609,14 +609,14 @@ test(
         incremental.input.scan_scope.incremental_changed_files.map(
           (file) => file.path
         )
-      expect.assert(
-        changed_paths.includes('src/app.ts'),
+      expect(
+        changed_paths,
         `the workspace change is missing from the scan scope: ${changed_paths.join(', ')}`
-      )
-      expect.assert(
-        !changed_paths.includes('from-api.ts'),
+      ).toContain('src/app.ts')
+      expect(
+        changed_paths,
         'the scan scope was read from the compare response instead of the workspace'
-      )
+      ).not.toContain('from-api.ts')
       const incremental_patch = await fs.readFile(
         path.join(
           incremental.input_bundle_root,

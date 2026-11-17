@@ -47,7 +47,7 @@ test('every declared transition is drawn on exactly one line', () => {
   for (const machine of STATE_MACHINES) {
     const { edges } = diagramGeometry(machine)
     const drawn = edges.flatMap((edge) => edge.transitions)
-    expect(drawn.length).toBe(machine.transitions.length)
+    expect(drawn).toHaveLength(machine.transitions.length)
     const pairs = edges.map((edge) => `${edge.from}->${edge.to}`)
     expect(
       new Set(pairs).size,

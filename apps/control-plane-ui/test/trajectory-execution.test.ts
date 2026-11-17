@@ -28,7 +28,7 @@ test('memory artifact reader keeps messages and validates execution record order
       Buffer.from(items.map((item) => JSON.stringify(item)).join('\n'))
     )
   const events = readTrajectoryArtifact(encode(records))
-  expect(events.length).toBe(5)
+  expect(events).toHaveLength(5)
   expect(events[2]?.source).toBe('summarization')
   expect(() =>
     readTrajectoryArtifact(encode([...records, records[0]]))
@@ -276,7 +276,7 @@ for (const ended of [true, false]) {
       .join('\n')
     const document = buildTrajectoryDocument(parseViewerInput(input))
     expect(document.totalUsage.total).toBe(ended ? 13 : undefined)
-    expect(document.messages.length).toBe(2)
+    expect(document.messages).toHaveLength(2)
   })
 }
 

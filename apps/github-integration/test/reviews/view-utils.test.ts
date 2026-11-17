@@ -120,7 +120,7 @@ test('view utils keep narrative scope decisions visible', () => {
   ])
   const rendered = lines.join('\n')
 
-  expect.assert(rendered.includes('path.join(EXPORT_ROOT, file)'))
-  expect.assert(rendered.includes('Only this route builds an export path.'))
-  expect.assert(rendered.includes('src/server.ts route mounting'))
+  expect(rendered).toContain('path.join(EXPORT_ROOT, file)')
+  expect(rendered).toContain('Only this route builds an export path.')
+  expect(rendered).toContain('src/server.ts route mounting')
 })

@@ -73,7 +73,7 @@ test('manual comment authorization denies missing sender without GitHub lookup',
   expect(decision.allowed).toBe(false)
   expect(decision.permission).toBe('unknown')
   expect(decision.reason).toBe('missing-sender')
-  expect(requests.length, 'no GitHub request may be made').toBe(0)
+  expect(requests, 'no GitHub request may be made').toHaveLength(0)
 })
 
 test('manual comment authorization denies when permission lookup fails', async () => {

@@ -158,7 +158,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
         await reviewRunsClient.renewPublicationClaim(runId, firstToken)
       ).toBe(false)
       expect(posts).toBe(1)
-      expect(comments.length).toBe(1)
+      expect(comments).toHaveLength(1)
       expect(step?.status).toBe('succeeded')
       expect(step?.remote_object_id).toBe(String(comments[0]?.id))
     } finally {

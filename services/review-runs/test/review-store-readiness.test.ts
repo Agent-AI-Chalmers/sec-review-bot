@@ -64,7 +64,7 @@ test('an idle-client pool error is reported instead of crashing the process', as
     console.error = originalError
   }
 
-  expect(reported.length).toBe(1)
+  expect(reported).toHaveLength(1)
   expect(reported[0] instanceof Array).toBe(true)
   const [event] = reported[0] as [string]
   expect(event).toBe('review_runs_pool_idle_client_error')

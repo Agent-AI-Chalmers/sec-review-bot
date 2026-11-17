@@ -44,7 +44,7 @@ test('dense trajectories bucket marks without overlapping', () => {
   const ticks = minimapTicks(count)
   const buckets = minimapBuckets(count, ticks)
 
-  expect(buckets.length).toBe(MAX_MINIMAP_MARKS)
+  expect(buckets).toHaveLength(MAX_MINIMAP_MARKS)
   expect(buckets[0]?.start).toBe(0)
   expect(buckets.at(-1)?.end).toBe(count - 1)
   for (let index = 1; index < buckets.length; index += 1)
@@ -62,7 +62,7 @@ test('a sparse trajectory keeps one bucket per message', () => {
   const ticks = minimapTicks(3)
   const buckets = minimapBuckets(3, ticks)
 
-  expect(buckets.length).toBe(3)
+  expect(buckets).toHaveLength(3)
   expect(buckets.map((bucket) => bucket.start)).toStrictEqual([0, 1, 2])
   expect(buckets[1]?.top).toBe(ticks.start + ticks.gap)
 })

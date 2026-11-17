@@ -156,7 +156,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       runs: Array<{ run_id: string }>
       next_cursor: string | null
     }
-    expect(firstBody.runs.length).toBe(1)
+    expect(firstBody.runs).toHaveLength(1)
     expect(firstBody.next_cursor).not.toBe(null)
     const secondPage = await fetch(
       `${base}/v1/runs?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor ?? '')}`,
@@ -165,7 +165,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const secondBody = (await secondPage.json()) as {
       runs: Array<{ run_id: string }>
     }
-    expect(secondBody.runs.length).toBe(1)
+    expect(secondBody.runs).toHaveLength(1)
     expect(secondBody.runs[0]?.run_id).not.toBe(firstBody.runs[0]?.run_id)
 
     // The coordination event log is the operator timeline the console renders. Its read path
@@ -229,8 +229,8 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       headers: readAuth
     })
     expect(
-      ((await boundedAbove.json()) as { runs: unknown[] }).runs.length
-    ).toBe(2)
+      ((await boundedAbove.json()) as { runs: unknown[] }).runs
+    ).toHaveLength(2)
     const notYet = await fetch(`${base}/v1/runs?from=${future}`, {
       headers: readAuth
     })

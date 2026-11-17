@@ -26,16 +26,22 @@ const corpusManifest = JSON.parse(
   corpus: FixtureRecord[]
 }
 
-test('the archive manifest schema accepts only the exact v1 object', () => {
+test.each([
+  { name: 'v1 manifest', value: { version: 1 }, valid: true },
+  { name: 'unsupported version', value: { version: 2 }, valid: false },
+  {
+    name: 'additional field',
+    value: { version: 1, extra: true },
+    valid: false
+  },
+  { name: 'missing version', value: {}, valid: false }
+])('archive manifest schema: $name', ({ value, valid }) => {
   const schema = JSON.parse(
     readFileSync(path.join(CONTRACT_ROOT, 'v1', 'manifest.schema.json'), 'utf8')
   ) as object
   const validate = new Ajv2020({ strict: true }).compile(schema)
 
-  expect(validate({ version: 1 })).toBe(true)
-  expect(validate({ version: 2 })).toBe(false)
-  expect(validate({ version: 1, extra: true })).toBe(false)
-  expect(validate({})).toBe(false)
+  expect(validate(value), JSON.stringify(validate.errors)).toBe(valid)
 })
 
 test('the fixture manifest covers every committed archive exactly once', () => {
@@ -58,7 +64,7 @@ for (const fixture of corpusManifest.corpus) {
     expect.assert(fixture.description.length > 0)
     expect.assert(fixture.entryCount > 0)
     if (fixture.entries !== undefined)
-      expect(fixture.entries.length).toBe(fixture.entryCount)
+      expect(fixture.entries).toHaveLength(fixture.entryCount)
     expect(fixture.size).toBe(archive.length)
     expect(fixture.sha256).toBe(digest)
     expect(fixture.objectKey).toBe(

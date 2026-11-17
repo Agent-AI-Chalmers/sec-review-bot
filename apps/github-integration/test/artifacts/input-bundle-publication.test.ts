@@ -146,9 +146,9 @@ for (const crash of [
         })
         expect(candidate.status).toBe('selected')
         expect(
-          s3.commandCalls(PutObjectCommand).length,
+          s3.commandCalls(PutObjectCommand),
           'recovery must not rebuild or upload again'
-        ).toBe(1)
+        ).toHaveLength(1)
       }
     } finally {
       await fs.rm(directory, { recursive: true, force: true })
