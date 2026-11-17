@@ -85,76 +85,7 @@ run 主干和各条生命周期轴分别存放在不同的表中。`review_runs`
 | `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | —                                                                                             |
 | `review_run_events`           | 各轴和 publication step 状态转换的只追加审计日志                       | —                                                                                             |
 
-`preparations.status`：
-
-```mermaid
-flowchart LR
-  prepending[pending] -->|领取| preparing
-  preparing -->|input 被接受| submitted
-  preparing -->|重试| prepending
-  preparing -->|领取租约过期| prepuncertain[uncertain]
-  prepuncertain -->|重新领取以确认| preparing
-  preparing -->|无法自动得出结论| prepdisconnected[disconnected]
-  prepdisconnected -->|操作员恢复| prepuncertain
-  prepdisconnected -->|操作员放弃| prepfailed[failed]
-  preparing -->|失败| prepfailed
-```
-
-`executions.status` / `execution.status`：
-
-```mermaid
-flowchart LR
-  pending -->|提交 input| queued
-  pending -->|准备失败| skipped
-  pending -->|提交结果未确认| uncertain
-  uncertain -->|重放被接受| queued
-  uncertain -->|重放被拒绝| failed
-  uncertain -->|恢复预算用尽| disconnected
-  disconnected -->|操作员恢复| uncertain
-  disconnected -->|操作员放弃| failed
-  queued --> running --> succeeded
-  queued --> succeeded
-  queued --> failed
-  running --> failed
-```
-
-`publications.status`：
-
-```mermaid
-flowchart LR
-  pubpending[pending] --> publishing --> published
-  publishing -->|某步骤可能已生效| pubuncertain[uncertain]
-  pubuncertain -->|步骤已确定| publishing
-  pubuncertain -->|核对无法得出结论| pubdisconnected[disconnected]
-  pubdisconnected -->|操作员恢复| pubpending
-  pubdisconnected -->|操作员放弃| pubfailed[failed]
-  publishing -->|可重试失败| pubpending
-  publishing -->|终态失败| pubfailed
-  pubpending -->|执行结果不可发布| skipped
-  publishing -->|执行失败| skipped
-```
-
-`publication_steps.status`：
-
-```mermaid
-flowchart LR
-  steppending[pending] -->|开始尝试| runningstep[running]
-  runningstep -->|副作用已写入| stepsucceeded[succeeded]
-  runningstep -->|可重试失败| stepfailed[failed]
-  stepfailed -->|开始重试| runningstep
-  runningstep -->|终态失败| terminalfailed[terminal_failed]
-  runningstep -->|尝试次数用尽| stepuncertain[uncertain]
-  stepfailed -->|尝试次数用尽| stepuncertain
-  stepuncertain -->|核对确认远端存在| stepsucceeded
-  stepuncertain -->|核对确认远端不存在或终态失败| terminalfailed
-  stepuncertain -->|上报失败但未要求重试| stepfailed
-  stepuncertain -->|核对预算用尽| stepdisconnected[disconnected]
-  stepdisconnected -->|操作员恢复| steppending
-```
-
-publication 轴跟随它的步骤：在被持有期间，它报告步骤中最强的状态，顺序是 `disconnected`、`uncertain`、`publishing`。因此已停放的步骤优先于仍在核对的步骤，因为运维队列需要先看到它。`published` 和 `failed` 是持有者自己的结论，从不由步骤推导。
-
-_图中省略了四条不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）只记录审计事件；publication step 的 `running → running`（新 owner 接管）和 `uncertain → uncertain`（核对无结论）推进尝试或核对计数，并记录审计事件。_
+每个状态的含义和全部允许的转换（含状态图）见生成的[状态机参考](../../contracts/review-runs-api/v1/STATE_MACHINES.zh.md)。本说明讲服务如何执行它们：领取、预算、恢复和 operator 决策。
 
 各轴之间由三个跨轴触发连接。它们是 orchestration trigger，不是同一张表内的状态迁移：
 
@@ -197,13 +128,15 @@ Preparation、submission recovery、publication、publication step 提交和 run
 
 Preparation 重试耗尽会使 run 失败、跳过 publication，并创建 connector notice。若 preparation 过期时 execution 已经推进，该 preparation 会以 `disconnect_reason=EXECUTION_ALREADY_ADVANCED` 进入 `disconnected`；后续过期处理会保留这条 parked row，并继续处理其他 run。Execution 和 publication 进入 disconnected 时会创建 attention work，因为它们的远端结果仍然未知。
 
+Publication 被持有期间，轴状态跟随其 steps，报告最强的 step 状态，顺序依次为 `disconnected`、`uncertain`、`publishing`。因此已 parked 的 step 优先于仍在 reconciliation 的 step，因为 operator 队列需要显示的正是前者。`published` 和 `failed` 是 owner 自己的结论，从不由 steps 推导。
+
 ### Operator 决策
 
 | 决策                                   | 适用对象                                           | 结果                                                                                                                                                                                              |
 | -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /v1/admin/runs/{run_id}/resume`  | 可以恢复的 disconnected 轴                         | Preparation 和 execution 回到 `uncertain` 并获得新的恢复预算。Publication 回到 `pending`；disconnected steps 回到 `pending`，并重置 attempt 和 reconciliation budget。已经成功的 steps 保持不变。 |
 | `POST /v1/admin/runs/{run_id}/give-up` | 任意 disconnected 轴                               | 停止等待，将 disconnected 轴收敛为 failed，并创建相应 notice。该决定不表示远端操作从未发生。                                                                                                      |
-| `POST /v1/admin/runs/{run_id}/abandon` | 因 `EXECUTION_ALREADY_ADVANCED` 停下的 preparation | 使用 `EXECUTION_ALREADY_ADVANCED` 使 preparation 失败，结束仍开放的下游轴，跳过 publication，并保留已经记录的终态 execution result。                                                              |
+| `POST /v1/admin/runs/{run_id}/abandon` | 因 `EXECUTION_ALREADY_ADVANCED` 停下的 preparation | 使用 `PREPARATION_ABANDONED_BY_OPERATOR` 使 preparation 失败，结束仍开放的下游轴，跳过 publication，并保留已经记录的终态 execution result。                                                       |
 
 Run 不满足适用条件时，这些操作返回 409。它们不幂等：第一次决策移动该轴后，同一请求将找不到可处理的 disconnected row。Resume publication 可能再次执行尚未完成的远端副作用；每次决策都会写入 event log。
 

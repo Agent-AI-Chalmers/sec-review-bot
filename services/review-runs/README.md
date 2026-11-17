@@ -83,76 +83,7 @@ The run trunk and the lifecycle axes are separate tables. `review_runs` holds on
 | `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals     | —                                                                                             |
 | `review_run_events`           | Append-only audit log of axis and publication step transitions     | —                                                                                             |
 
-`preparations.status`:
-
-```mermaid
-flowchart LR
-  prepending[pending] -->|claimed| preparing
-  preparing -->|input accepted| submitted
-  preparing -->|retry| prepending
-  preparing -->|claim lapsed| prepuncertain[uncertain]
-  prepuncertain -->|reclaim to confirm| preparing
-  preparing -->|cannot be concluded automatically| prepdisconnected[disconnected]
-  prepdisconnected -->|resumed by an operator| prepuncertain
-  prepdisconnected -->|given up or abandoned by an operator| prepfailed[failed]
-  preparing -->|failed| prepfailed
-```
-
-`executions.status` / `execution.status`:
-
-```mermaid
-flowchart LR
-  pending -->|input submitted| queued
-  pending -->|preparation failed| skipped
-  pending -->|submission unconfirmed| uncertain
-  uncertain -->|replay accepted| queued
-  uncertain -->|replay rejected| failed
-  uncertain -->|recovery disconnected| disconnected
-  disconnected -->|resumed by an operator| uncertain
-  disconnected -->|given up by an operator| failed
-  queued --> running --> succeeded
-  queued --> succeeded
-  queued --> failed
-  running --> failed
-```
-
-`publications.status`:
-
-```mermaid
-flowchart LR
-  pubpending[pending] --> publishing --> published
-  publishing -->|a step may have taken effect| pubuncertain[uncertain]
-  pubuncertain -->|step settled| publishing
-  pubuncertain -->|reconciliation could not conclude| pubdisconnected[disconnected]
-  pubdisconnected -->|resumed by an operator| pubpending
-  pubdisconnected -->|given up by an operator| pubfailed[failed]
-  publishing -->|retryable failure| pubpending
-  publishing -->|terminal failure| pubfailed
-  pubpending -->|execution not published| skipped
-  publishing -->|execution failed| skipped
-```
-
-`publication_steps.status`:
-
-```mermaid
-flowchart LR
-  steppending[pending] -->|attempt started| runningstep[running]
-  runningstep -->|side effect written| stepsucceeded[succeeded]
-  runningstep -->|retryable failure| stepfailed[failed]
-  stepfailed -->|retry started| runningstep
-  runningstep -->|terminal failure| terminalfailed[terminal_failed]
-  runningstep -->|attempts exhausted| stepuncertain[uncertain]
-  stepfailed -->|attempts exhausted| stepuncertain
-  stepuncertain -->|reconciled present| stepsucceeded
-  stepuncertain -->|reconciled absent or terminal failure| terminalfailed
-  stepuncertain -->|failure reported without retry| stepfailed
-  stepuncertain -->|reconciliation budget spent| stepdisconnected[disconnected]
-  stepdisconnected -->|resumed by an operator| steppending
-```
-
-The publication axis follows its steps: while it is owned, it reports the strongest step state, in the order `disconnected`, then `uncertain`, then `publishing`. A parked step therefore outranks one still being reconciled, because that is what the operator queue has to surface. `published` and `failed` are the owner's own conclusions and are never derived from steps.
-
-_The diagrams omit four self-loops that do not change the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired) only record an audit event; publication step `running → running` (taken over by a new owner) and `uncertain → uncertain` (reconciliation inconclusive) advance the attempt or reconciliation count and record an audit event._
+What each status means and every allowed transition, with diagrams, are in the generated [state machine reference](../../contracts/review-runs-api/v1/STATE_MACHINES.md). This guide covers how the service carries them out: claims, budgets, recovery, and operator decisions.
 
 The axes are connected by three cross-axis triggers. These are orchestration triggers, not status transitions within one table:
 
@@ -195,13 +126,15 @@ Preparation, submission recovery, publication, publication-step commits, and run
 
 Preparation retry exhaustion fails the run, skips publication, and queues a connector notice. A preparation whose execution already advanced becomes `disconnected` with `disconnect_reason=EXECUTION_ALREADY_ADVANCED`; later expiry passes leave it parked while continuing to process other runs. Execution and publication disconnections queue attention work because their remote outcomes remain unknown.
 
+While publication is owned, its axis status follows its steps and reports the strongest step state, in the order `disconnected`, then `uncertain`, then `publishing`. A parked step therefore outranks one still being reconciled, because that is what the operator queue has to surface. `published` and `failed` are the owner's own conclusions and are never derived from steps.
+
 ### Operator decisions
 
 | Decision                               | Eligible run                                       | Result                                                                                                                                                                                                                                 |
 | -------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /v1/admin/runs/{run_id}/resume`  | A resumable disconnected axis                      | Preparation and execution return to `uncertain` with fresh recovery budgets. Publication returns to `pending`; disconnected steps return to `pending` with fresh attempt and reconciliation budgets. Succeeded steps remain unchanged. |
 | `POST /v1/admin/runs/{run_id}/give-up` | Any disconnected axis                              | Stops waiting, concludes the disconnected axis as failed, and queues the applicable notice. It does not assert that the remote operation never happened.                                                                               |
-| `POST /v1/admin/runs/{run_id}/abandon` | Preparation parked by `EXECUTION_ALREADY_ADVANCED` | Fails preparation with `EXECUTION_ALREADY_ADVANCED`, concludes any open downstream axes, skips publication, and preserves an already-recorded terminal execution result.                                                               |
+| `POST /v1/admin/runs/{run_id}/abandon` | Preparation parked by `EXECUTION_ALREADY_ADVANCED` | Fails preparation with `PREPARATION_ABANDONED_BY_OPERATOR`, concludes any open downstream axes, skips publication, and preserves an already-recorded terminal execution result.                                                        |
 
 These operations return 409 when the run is not eligible. They are not idempotent: after the first decision moves the axis, the same request no longer has a disconnected row to act on. Publication resume may issue an unfinished side effect again; every such decision is recorded in the event log.
 

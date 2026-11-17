@@ -3596,12 +3596,11 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
       'execution result will not be delivered'
     )
     assert.strictEqual(abandoned.preparation.status, 'failed')
-    // The abandonment records the reason the row was parked under, which is the reason the
-    // contract declares for `disconnected -> failed` on this axis. Inventing a second code here
-    // would put a reason in the audit log that no declared edge names.
+    // The abandonment is recorded as the operator's decision, not as the contradiction that
+    // parked the row, so the audit log tells the two apart.
     assert.strictEqual(
       abandoned.preparation.failure_code,
-      'EXECUTION_ALREADY_ADVANCED'
+      'PREPARATION_ABANDONED_BY_OPERATOR'
     )
     assert.strictEqual(abandoned.publication.status, 'skipped')
     // The execution result is evidence, not an error to clear.
@@ -3622,7 +3621,7 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
         (event) =>
           event.axis === 'preparation' &&
           event.to_status === 'failed' &&
-          event.reason_code === 'EXECUTION_ALREADY_ADVANCED'
+          event.reason_code === 'PREPARATION_ABANDONED_BY_OPERATOR'
       )
     )
     assert.ok(
@@ -3915,7 +3914,7 @@ test('giving up on a disconnected execution stops waiting without claiming it ne
     assert.strictEqual(givenUp.execution.status, 'failed')
     assert.strictEqual(
       givenUp.failure_code,
-      'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR',
+      'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR',
       'the code names the decision, not an unproven "never ran"'
     )
     assert.strictEqual(givenUp.publication.status, 'skipped')
@@ -3994,10 +3993,7 @@ test('giving up on a disconnected publication fails rather than skipping', async
       'operator stopped'
     )
     assert.strictEqual(givenUp.publication.status, 'failed')
-    assert.strictEqual(
-      givenUp.failure_code,
-      'PUBLICATION_ABANDONED_BY_OPERATOR'
-    )
+    assert.strictEqual(givenUp.failure_code, 'PUBLICATION_GIVEN_UP_BY_OPERATOR')
     // The step is untouched: it is the record of which side effect could not be confirmed.
     assert.strictEqual(
       (

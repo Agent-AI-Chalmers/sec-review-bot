@@ -16,7 +16,7 @@ English and Chinese are equal UI languages. Maintain their labels and explanatio
 
 <!-- doc-default: control-plane-ui.state-presentation; source=apps/control-plane-ui/browser/features/runs/status.tsx -->
 
-Run summaries, filters, diagrams, and event history share state labels. [status.tsx](browser/features/runs/status.tsx) owns the visual tones, while [state-labels.ts](browser/features/runs/state-labels.ts) checks translation coverage against the API state types. The contract owns state identifiers and transitions; UI text remains in i18n. [Presentation tests](test/state-presentation.test.ts) check coverage and consistency with the generated state-machine inventory.
+Run summaries, filters, diagrams, and event history share state labels. [status.tsx](browser/features/runs/status.tsx) owns the visual tones. State, transition, and machine text is not UI text: it comes in both languages from the generated state-machine module, built from the contract and its [Chinese overlay](../../contracts/review-runs-api/v1/overlays/zh.yaml), so change it there. [Presentation tests](test/state-presentation.test.ts) check that every surface shows the same label in each language.
 
 ## Visual foundations
 

@@ -119,10 +119,11 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
   EXECUTION_ALREADY_ADVANCED: 'failureCodeExecutionAlreadyAdvanced',
   SUBMISSION_STATE_UNCERTAIN: 'failureCodeSubmissionUncertain',
   SUBMISSION_RECOVERY_EXHAUSTED: 'failureCodeSubmissionRecoveryExhausted',
-  SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR:
+  SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR:
     'failureCodeSubmissionRecoveryAbandoned',
   PREPARATION_GIVEN_UP_BY_OPERATOR: 'failureCodePreparationGivenUp',
-  PUBLICATION_ABANDONED_BY_OPERATOR: 'failureCodePublicationGivenUp',
+  PREPARATION_ABANDONED_BY_OPERATOR: 'failureCodePreparationAbandoned',
+  PUBLICATION_GIVEN_UP_BY_OPERATOR: 'failureCodePublicationGivenUp',
   EXECUTION_FAILED: 'failureCodeExecutionFailed',
   EXECUTION_RESULT_MISSING: 'failureCodeExecutionResultMissing',
   PUBLICATION_ABANDONED: 'failureCodePublicationAbandoned',

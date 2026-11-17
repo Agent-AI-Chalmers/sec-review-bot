@@ -1109,15 +1109,18 @@ x-state-machines:
         description: >-
           Automatic work stopped without a conclusion, because the run's persisted state no
           longer admits the only transition expiry could make. Nothing retries this row on its
-          own; an operator resumes it into `uncertain` or abandons it.
+          own; an operator resumes it into `uncertain`, gives it up, or abandons it.
       submitted:
         label: Submitted
         description: The input was accepted and handed to the Execution API provider; preparation is done.
       failed:
         label: Failed
         description: >-
-          Preparation failed permanently (retry budget exhausted or input could not be built).
-          The Execution API provider was never handed input, so execution is skipped.
+          Preparation ended without a usable result, in one of two ways: (1) it failed for good
+          (retry budget exhausted, or the input could not be built), so the Execution API provider
+          was never handed input and execution is skipped; (2) an operator gave up on or abandoned
+          a disconnected preparation. After an operator decision the input may already have been
+          submitted, and the task may still be running remotely.
     transitions:
       - { from: pending, to: preparing, label: claimed }
       - { from: preparing, to: submitted, label: input accepted }
@@ -1135,8 +1138,7 @@ x-state-machines:
           label: cannot be concluded automatically,
         }
       # Operator decisions can resume the preparation, give up on its outcome, or abandon the
-      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED.
-      # Both failure edges end the preparation as `failed`.
+      # contradicted run. Both failure edges end the preparation as `failed`.
       - {
           from: disconnected,
           to: uncertain,
@@ -1152,7 +1154,7 @@ x-state-machines:
       - {
           from: disconnected,
           to: failed,
-          reason: EXECUTION_ALREADY_ADVANCED,
+          reason: PREPARATION_ABANDONED_BY_OPERATOR,
           label: abandoned by an operator,
         }
       # Two write paths reach `failed`: a preparer reporting a terminal error (any
@@ -1200,11 +1202,14 @@ x-state-machines:
       failed:
         label: Failed
         description: >-
-          A definite failure, in one of two ways: (1) polling produced a conclusive answer that
-          the task cannot succeed — the Execution API provider reported it failed, or the run could not be found,
-          returned no result, or the response broke the protocol; (2) a retried submission failed
-          conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not
-          a definite failure.
+          This run no longer tracks the task, in one of two ways: (1) a definite failure, where
+          polling produced a conclusive answer that the task cannot succeed (the Execution API
+          provider reported it failed, or the run could not be found, returned no result, or the
+          response broke the protocol) or a retried submission failed conclusively; (2) an
+          operator gave up on a disconnected execution or abandoned the run's preparation. After
+          an operator decision no cancellation is sent, so the task may still be running or may
+          succeed remotely. A transient network error (a timeout, a 5xx, a dropped connection) is
+          not a definite failure.
     transitions:
       # Submission (a write). `uncertain` only ever comes from a submission whose acceptance
       # could not be confirmed — never from a run that was already queued or running.
@@ -1246,7 +1251,7 @@ x-state-machines:
       - {
           from: disconnected,
           to: failed,
-          reason: SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR,
+          reason: SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR,
           label: given up by an operator,
         }
       # Observation (a read): the console learns the Execution API provider's progress by polling. A short task
@@ -1285,7 +1290,7 @@ x-state-machines:
         description: All publication steps succeeded; the result is visible.
       failed:
         label: Failed
-        description: The publication failed after its retry budget was exhausted.
+        description: Publishing ended in failure, either because its owner concluded it as failed (for example after a terminal failure or with steps that did not succeed) or because an operator gave up. A retryable failure returns to `pending` instead.
       skipped:
         label: Skipped
         description: There was nothing to publish because execution did not succeed.
@@ -1337,7 +1342,7 @@ x-state-machines:
       - {
           from: disconnected,
           to: failed,
-          reason: PUBLICATION_ABANDONED_BY_OPERATOR,
+          reason: PUBLICATION_GIVEN_UP_BY_OPERATOR,
           label: given up by an operator,
         }
       - { from: publishing, to: published, label: published }

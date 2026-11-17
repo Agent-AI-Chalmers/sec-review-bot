@@ -15,6 +15,10 @@
 
 输入发布接口要求调用方持有输入准备任务的领取凭据（preparation claim）。调用方先预留内容完整、不可修改的发布意图；中断后可以列出意图，确认对象存在或放弃候选。提交准备结果时，内容必须与已确认存在或已选中的意图完全一致。仍持有准备任务时，可以重复提交相同内容；修改引用、输入或发布上下文会被拒绝。候选记录含存储位置和已准备输入，只供经过认证的服务协调接口使用，不进入控制台的脱敏运行记录。
 
+## 运行状态
+
+[v1/openapi.yaml](v1/openapi.yaml) 中的 `x-state-machines` 定义了全部生命周期状态和允许的转换。[v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) 由它和中文覆盖层 [v1/overlays/zh.yaml](v1/overlays/zh.yaml) 生成，覆盖层是一份 [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) 文档，只替换标题、标签和说明。两份页面都按状态机各画一张图，并列出每个状态的含义和每条转换。控制台显示的中英文文本也来自这里。
+
 ## 两种运行记录
 
 Review Runs 向 read token 调用方提供脱敏运行记录，向 service token 调用方提供完整协调记录。只有完整记录包含 `failure_message`。

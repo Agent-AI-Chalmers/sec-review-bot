@@ -32,20 +32,11 @@ These guarantees hold only when the check and the write are atomic: they run in 
 
 For publication, lease expiry allows takeover; it does not by itself invalidate the current token. The current owner can still renew or write until takeover replaces the token or a release clears it. The `uncertain` and `disconnected` states retain the owner so it can perform permitted step reconciliation. A disconnected publication cannot be automatically claimed or concluded by its owner; an operator can resume it or give up. Both decisions clear the token and lease timestamp.
 
-## Recovery Meaning By Axis
+## Operator Decisions
 
-<!-- doc-default: review-runs.recovery-meaning; source=contracts/review-runs-api/v1/openapi.yaml -->
-
-| Scope            | `uncertain`                                                                                                         | `disconnected`                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Preparation      | The preparer's claim expired before it reported; preparation can be reclaimed to establish or rebuild its input.    | The run's own records prevent automatic conclusion, such as execution already having advanced when preparation expires. |
-| Execution        | Submission may have reached the Execution Gateway without a confirmed response; recovery replays the same `run_id`. | The submission recovery budget ended without a conclusive answer.                                                       |
-| Publication step | Attempts are exhausted and a remote write may have taken effect; the connector reconciles before concluding.        | Reconciliation exhausted its budget without a conclusive answer.                                                        |
-| Publication axis | A step has an uncertain remote outcome.                                                                             | A step requires an operator decision after reconciliation stopped.                                                      |
+What `uncertain` and `disconnected` mean on each machine is defined in the [state machine reference](../../contracts/review-runs-api/v1/STATE_MACHINES.md).
 
 `disconnected` stops automatic recovery on that scope. Resume returns an eligible scope to recovery; preparation can resume only while execution remains `pending`. Give-up records an operator decision to stop waiting without establishing that a remote effect did not occur. Abandon is a separate preparation operation for contradictory records. The [Review Runs guide](../../services/review-runs/README.md) and contract define the allowed operations and their consequences.
-
-A publication step's `failed` means its last attempt failed; it can still be retried while attempts remain, or reconciled after exhaustion. `terminal_failed` is its final failure. An axis's `failed` is a terminal conclusion. Do not infer retryability from the word `failed` without identifying the scope.
 
 ## Other State Boundaries
 
@@ -59,9 +50,7 @@ A run notice starts `pending`, becomes `delivering` when claimed, and concludes 
 
 Execution statistics has its own `pending → reconciling` claim loop. A successful read can return to `pending` while waiting for stable observations, or become `settled` when observations stabilize or the collection window ends. Read failures can return to `pending`; exhausted read-failure retries or rate-limit deferral end as `unavailable`. Interrupted claims can be reclaimed. `ingestion_status` explains the collected snapshot's completeness, and `usage_coverage` describes reported usage; neither is an execution lifecycle status.
 
-<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
-
-Execution Gateway projects Temporal state on each read instead of maintaining another run-state table. Temporal `RUNNING` maps to `running`; a completed workflow becomes `succeeded` only when its success envelope, result, workflow identity, and artifact reference pass validation. Invalid or unsuccessful completed results and other terminal Temporal statuses map to `failed`. `queued` can be returned immediately after submission when no execution record is yet available. Review Runs separately records its observations of that API, so a Gateway status and a coordination recovery status answer different questions.
+Execution Gateway projects Temporal state on each read instead of maintaining another run-state table; the [Execution API contract](../../contracts/execution-api/v1/CONTRACT.md#run-status) defines how it maps to `queued`, `running`, `succeeded`, and `failed`. Review Runs separately records its observations of that API, so a Gateway status and a coordination recovery status answer different questions.
 
 ## Shared Principles
 

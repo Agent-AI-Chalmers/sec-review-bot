@@ -38,8 +38,13 @@
       "name": "state-machines",
       "script": "contracts/review-runs-api/tools/src/generate-state-machines.ts",
       "command": "pnpm --dir contracts/review-runs-api/tools run generate",
-      "inputs": ["contracts/review-runs-api/v1/openapi.yaml"],
+      "inputs": [
+        "contracts/review-runs-api/v1/openapi.yaml",
+        "contracts/review-runs-api/v1/overlays/zh.yaml"
+      ],
       "outputs": [
+        "contracts/review-runs-api/v1/STATE_MACHINES.md",
+        "contracts/review-runs-api/v1/STATE_MACHINES.zh.md",
         "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts",
         "services/review-runs/src/state-machines.generated.ts"
       ]

@@ -49,15 +49,9 @@ export class OperatorDecisionStore {
       })
     return await transaction(this.pool, async (client) => {
       // Claim the decision: only one caller may abandon a given disconnected row, and its state
-      // doubles as the "still needs a decision" flag. The reason it was parked is read here so
-      // the decision is recorded under its own name: this route only exists for the
-      // contradiction `EXECUTION_ALREADY_ADVANCED`, and every reason the audit log writes must
-      // be one the contract declares for that edge.
-      const blocked = await client.query<{
-        attempt_count: number
-        disconnect_reason: string | null
-      }>(
-        `SELECT attempt_count, disconnect_reason FROM preparations
+      // doubles as the "still needs a decision" flag.
+      const blocked = await client.query(
+        `SELECT 1 FROM preparations
          WHERE run_id=$1 AND connector_id=$2
            AND status='disconnected'
          FOR UPDATE`,
@@ -69,10 +63,9 @@ export class OperatorDecisionStore {
           { statusCode: 409 }
         )
 
-      // The stored reason is the one the contract declares for this edge, and the CHECK that
-      // pairs `disconnected` with a reason guarantees it is present for a selected row.
-      const abandonCode =
-        blocked.rows[0]?.disconnect_reason ?? 'EXECUTION_ALREADY_ADVANCED'
+      // The decision is recorded under its own name; the contradiction that parked the row
+      // (`disconnect_reason`) was already recorded when it was parked.
+      const abandonCode = 'PREPARATION_ABANDONED_BY_OPERATOR'
       const failed = await client.query(
         `UPDATE preparations
          SET status='failed', claim_token=NULL, claimed_at=NULL,
@@ -334,7 +327,7 @@ export class OperatorDecisionStore {
 
   /** Stop waiting for a disconnected execution at the operator's request.
    *
-   * The task ends `failed` with `SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR`. That code is chosen
+   * The task ends `failed` with `SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR`. That code is chosen
    * over anything resembling "never ran" on purpose: the Execution may have accepted this task and
    * may be running it right now. What ends is this run's willingness to find out. Publication is
    * skipped because no result will be delivered, not because none exists. */
@@ -346,7 +339,7 @@ export class OperatorDecisionStore {
       const gaveUp = await client.query(
         `UPDATE executions
          SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code='SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR',
+             failure_code='SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR',
              failure_message=$3,
              finished_at=COALESCE(finished_at, clock_timestamp()),
              observed_at=clock_timestamp(), updated_at=clock_timestamp()
@@ -364,7 +357,7 @@ export class OperatorDecisionStore {
         axis: 'execution',
         fromStatus: 'disconnected',
         toStatus: 'failed',
-        reasonCode: 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
+        reasonCode: 'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR'
       })
       await queueRunNotice(client, {
         runId,
@@ -372,7 +365,7 @@ export class OperatorDecisionStore {
         sourceEventId: eventId,
         kind: 'failure',
         axis: 'execution',
-        reasonCode: 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
+        reasonCode: 'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR'
       })
       const publicationFrom = await abandonInFlightPublication(
         client,
@@ -411,7 +404,7 @@ export class OperatorDecisionStore {
       const gaveUp = await client.query(
         `UPDATE publications
          SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code='PUBLICATION_ABANDONED_BY_OPERATOR',
+             failure_code='PUBLICATION_GIVEN_UP_BY_OPERATOR',
              failure_message=$3,
              finished_at=COALESCE(finished_at, clock_timestamp()),
              updated_at=clock_timestamp()
@@ -429,7 +422,7 @@ export class OperatorDecisionStore {
         axis: 'publication',
         fromStatus: 'disconnected',
         toStatus: 'failed',
-        reasonCode: 'PUBLICATION_ABANDONED_BY_OPERATOR'
+        reasonCode: 'PUBLICATION_GIVEN_UP_BY_OPERATOR'
       })
       await queueRunNotice(client, {
         runId,
@@ -437,7 +430,7 @@ export class OperatorDecisionStore {
         sourceEventId: eventId,
         kind: 'failure',
         axis: 'publication',
-        reasonCode: 'PUBLICATION_ABANDONED_BY_OPERATOR'
+        reasonCode: 'PUBLICATION_GIVEN_UP_BY_OPERATOR'
       })
       const record = await findRunRecord(client, this.connectorId, runId)
       if (record === null)

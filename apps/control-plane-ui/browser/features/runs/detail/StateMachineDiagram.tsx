@@ -3,19 +3,12 @@ import React from 'react'
 import { Tooltip } from '@mantine/core'
 
 import type { Run, RunEvent } from '../api.js'
-import { useMessages } from '../../../shared/i18n.js'
 import type {
   CoordinationAxis,
   StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
 import { NODE_H, NODE_W, diagramGeometry } from './state-machine-geometry.js'
-import {
-  edgeLabel,
-  machineTitle,
-  stateDescription,
-  stateLabel,
-  axisMachine
-} from './transitions.js'
+import { edgeLabel, stateDescription, stateLabel } from './transitions.js'
 
 /** The current state of one drawn axis, read from the run. */
 function currentState(run: Run, axis: CoordinationAxis): string {
@@ -46,14 +39,12 @@ export function StateMachineDiagram({
   events: RunEvent[]
   fit?: boolean
 }): React.JSX.Element {
-  const t = useMessages()
   const [hovered, setHovered] = React.useState<{
     label: string
     x: number
     y: number
   } | null>(null)
   const current = currentState(run, machine.axis)
-  const labelled = axisMachine(machine)
   const geometry = React.useMemo(() => diagramGeometry(machine), [machine])
   const { viewBox } = geometry
 
@@ -71,7 +62,7 @@ export function StateMachineDiagram({
         height={viewBox.height}
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
         role="group"
-        aria-label={machineTitle(machine, t)}
+        aria-label={machine.title}
         onPointerDown={() => setHovered(null)}
       >
         <defs>
@@ -104,7 +95,7 @@ export function StateMachineDiagram({
           const label = [
             ...new Set(
               edge.transitions.map((transition) =>
-                edgeLabel(labelled, transition, t)
+                edgeLabel(machine, transition)
               )
             )
           ].join(' / ')
@@ -162,7 +153,7 @@ export function StateMachineDiagram({
           return (
             <g key={state} className={className}>
               <Tooltip
-                label={stateDescription(labelled, state, t)}
+                label={stateDescription(machine, state)}
                 multiline
                 w={260}
                 withArrow
@@ -171,7 +162,7 @@ export function StateMachineDiagram({
                 <g
                   tabIndex={0}
                   role="img"
-                  aria-label={stateLabel(labelled, state, t)}
+                  aria-label={stateLabel(machine, state)}
                 >
                   <rect
                     x={x - NODE_W / 2}
@@ -186,7 +177,7 @@ export function StateMachineDiagram({
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
-                    {stateLabel(labelled, state, t)}
+                    {stateLabel(machine, state)}
                   </text>
                 </g>
               </Tooltip>

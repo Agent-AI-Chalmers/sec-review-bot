@@ -165,6 +165,14 @@ The result shape is defined by [`repository-review-result.schema.json`](schemas/
 
 A `RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is a cached review/location view that can be regenerated from the delivery baseline and `file_changes`, and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
+### Run Status
+
+<!-- doc-default: execution-gateway.status-projection; source=services/execution-gateway/src/temporal-execution-client.ts -->
+
+A run's `status` in the OpenAPI `RunResponse` is `queued`, `running`, `succeeded`, or `failed`. Execution Gateway stores no run-state table: it projects the Temporal workflow's state on each read. `running` means the workflow is still running. A completed workflow is `succeeded` only when its success envelope, result, workflow identity, and artifact reference all pass validation. A completed result that is invalid or unsuccessful, and any other terminal Temporal status, is `failed`. `queued` can be returned immediately after submission, before an execution record is available.
+
+Review Runs records its own observations of this status on its execution axis. That axis has its own states, such as `uncertain` for a submission whose acceptance was never confirmed; see the [Review Runs state machine reference](../../review-runs-api/v1/STATE_MACHINES.md#execution).
+
 ### Validation Ownership
 
 JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v1 result before interpreting it; they must not coerce an invalid value into a valid one.

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { inlineLocalRefsForTest } from '../src/generate-schemas.js'
+import { applyTextOverlay } from '../src/generate-state-machines.js'
 import {
   errorResponseCodes,
   listRunQueryParameters,
@@ -135,4 +136,134 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
     () => listRunQueryParameters(spec),
     /not the expected form-exploded object/
   )
+})
+
+// The Chinese overlay may only translate text. Each guard below stands for a way a stale or
+// careless overlay would otherwise ship a console that silently disagrees with the contract.
+function overlayBlock(): Record<string, unknown> {
+  const machine = () => ({
+    title: 'Machine',
+    states: { a: { label: 'A', description: 'State a.' } },
+    transitions: [
+      { from: 'a', to: 'a', label: 'given up', reason: 'GIVEN_UP' },
+      { from: 'a', to: 'a', label: 'resumed', reason: 'RESUMED' }
+    ]
+  })
+  return {
+    preparation: machine(),
+    execution: machine(),
+    publication: machine()
+  }
+}
+
+function fullOverlay(): { target: string; update: Record<string, string> }[] {
+  return ['preparation', 'execution', 'publication'].flatMap((axis) => [
+    { target: `$['x-state-machines'].${axis}`, update: { title: '机' } },
+    {
+      target: `$['x-state-machines'].${axis}.states.a`,
+      update: { label: '甲', description: '状态甲。' }
+    },
+    ...['GIVEN_UP', 'RESUMED'].map((reason) => ({
+      target: `$['x-state-machines'].${axis}.transitions[?@.from=='a' && @.to=='a' && @.reason=='${reason}']`,
+      update: { label: reason === 'GIVEN_UP' ? '放弃' : '恢复' }
+    }))
+  ])
+}
+
+function apply(actions: unknown[]): Record<string, unknown> {
+  const block = overlayBlock()
+  applyTextOverlay(block, { overlay: '1.0.0', actions }, 'zh.yaml')
+  return block
+}
+
+test('a complete text overlay replaces only text', () => {
+  const block = apply(fullOverlay())
+  assert.deepStrictEqual(block.preparation, {
+    title: '机',
+    states: { a: { label: '甲', description: '状态甲。' } },
+    transitions: [
+      { from: 'a', to: 'a', label: '放弃', reason: 'GIVEN_UP' },
+      { from: 'a', to: 'a', label: '恢复', reason: 'RESUMED' }
+    ]
+  })
+})
+
+test('an overlay target that no longer matches the contract fails', () => {
+  const actions = fullOverlay()
+  actions[1]!.target = "$['x-state-machines'].preparation.states.removed"
+  assert.throws(() => apply(actions), /matches no node/)
+})
+
+test('two overlay actions on one node fail', () => {
+  const actions = fullOverlay()
+  actions.push({ ...actions[0]! })
+  assert.throws(() => apply(actions), /more than one action/)
+})
+
+test('an overlay that changes contract structure fails', () => {
+  const actions = fullOverlay()
+  actions[2]!.update = { label: '放弃', reason: 'OTHER' }
+  assert.throws(() => apply(actions), /may only replace .* not reason/)
+})
+
+test('an overlay that adds a text field the contract lacks fails', () => {
+  const actions = fullOverlay()
+  actions[0]!.update = { title: '机', description: '多余' }
+  assert.throws(() => apply(actions), /not description/)
+})
+
+test('empty translated text fails', () => {
+  const actions = fullOverlay()
+  actions[0]!.update = { title: ' ' }
+  assert.throws(() => apply(actions), /must be non-empty text/)
+})
+
+test('text left untranslated fails', () => {
+  assert.throws(() => apply(fullOverlay().slice(1)), /has no title translation/)
+})
+
+test('a node translated only in part fails', () => {
+  const actions = fullOverlay()
+  actions[1]!.update = { label: '甲' }
+  assert.throws(() => apply(actions), /has no description translation/)
+})
+
+test('a transition target that matches several transitions fails', () => {
+  // Without a reason, the target must mean the transition that has none; it never picks one of
+  // several reason-specific transitions by position.
+  const block = overlayBlock()
+  ;(block.preparation as { transitions: object[] }).transitions.push(
+    { from: 'a', to: 'a', label: 'x' },
+    { from: 'a', to: 'a', label: 'y' }
+  )
+  assert.throws(
+    () =>
+      applyTextOverlay(
+        block,
+        {
+          overlay: '1.0.0',
+          actions: [
+            {
+              target:
+                "$['x-state-machines'].preparation.transitions[?@.from=='a' && @.to=='a' && !@.reason]",
+              update: { label: '甲' }
+            }
+          ]
+        },
+        'zh.yaml'
+      ),
+    /matches 2 transitions/
+  )
+})
+
+test('an overlay target outside machines, states, and transitions fails', () => {
+  const actions = fullOverlay()
+  actions[0]!.target = "$['x-state-machines'].preparation.transitions[0]"
+  assert.throws(() => apply(actions), /is not a machine, state, or transition/)
+})
+
+test('an overlay transition target may space its filter operators freely', () => {
+  const actions = fullOverlay()
+  actions[2]!.target = actions[2]!.target.replaceAll(' && ', '&&')
+  assert.doesNotThrow(() => apply(actions))
 })

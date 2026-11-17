@@ -18,7 +18,7 @@ import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
 import { eventAxisLabel } from '../status.js'
 import { useNow } from '../../../shared/useNow.js'
 import {
-  STATE_MACHINES,
+  STATE_MACHINES_BY_LANGUAGE,
   type CoordinationAxis
 } from '../state-machines.generated.js'
 import { failureCodeLabel, formatDuration } from '../format.js'
@@ -26,7 +26,6 @@ import {
   TRANSITIONS_PAGE_SIZE,
   actualTransitions,
   latestTransitionAxis,
-  machineTitle,
   stateLabelForEvent,
   transitionDuration,
   transitionExplanation
@@ -86,7 +85,7 @@ export function RunTransitions({
   const [page, setPage] = React.useState(1)
   const [fit, setFit] = React.useState(initialFit)
   const now = useNow()
-  const machines = STATE_MACHINES
+  const machines = STATE_MACHINES_BY_LANGUAGE[language]
   const machine =
     machines.find((candidate) => candidate.axis === axis) ?? machines[0]
   if (machine === undefined) return null
@@ -131,7 +130,7 @@ export function RunTransitions({
             onChange={(value) => setAxis(value as CoordinationAxis)}
             data={machines.map((candidate) => ({
               value: candidate.axis,
-              label: machineTitle(candidate, t)
+              label: candidate.title
             }))}
           />
           <Text size="xs" c="dimmed">
@@ -201,7 +200,7 @@ export function RunTransitions({
             ) : (
               <ul className="run-transition-list">
                 {visibleEvents.map((event) => {
-                  const explanation = transitionExplanation(event, t)
+                  const explanation = transitionExplanation(event, language)
                   const duration = transitionDuration(
                     event,
                     transitionEvents,
@@ -215,8 +214,8 @@ export function RunTransitions({
                         {eventAxisLabel(event, t)}
                       </Text>
                       <Text size="sm">
-                        {stateLabelForEvent(event, event.from_status, t)} →{' '}
-                        {stateLabelForEvent(event, event.to_status, t)}
+                        {stateLabelForEvent(event, event.from_status, language)}{' '}
+                        → {stateLabelForEvent(event, event.to_status, language)}
                       </Text>
                       {explanation !== null && (
                         <Text size="xs" c="dimmed">

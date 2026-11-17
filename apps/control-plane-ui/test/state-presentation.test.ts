@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
-import { isStateLabelKey } from '../browser/features/runs/state-labels.js'
+import {
+  STATE_MACHINES,
+  STATE_MACHINES_BY_LANGUAGE,
+  machineForEvent,
+  stateMachine
+} from '../browser/features/runs/state-machines.generated.js'
 import {
   EXECUTION_STATUSES,
   PREPARATION_STATUSES,
@@ -14,45 +18,26 @@ import {
   publicationStatusLabel,
   publicationStatusColor
 } from '../browser/features/runs/status.js'
-import {
-  axisMachine,
-  eventMachine,
-  stateLabel
-} from '../browser/features/runs/detail/transitions.js'
-import { messages, translate, type Translator } from '../browser/shared/i18n.js'
+import { stateLabel } from '../browser/features/runs/detail/transitions.js'
+import type { Language } from '../browser/shared/i18n.js'
 import type { RunEvent } from '../browser/features/runs/api.js'
 
-test('filters, visual tones, and translations cover exactly the contract state machines', () => {
+test('filters and visual tones cover exactly the contract state machines', () => {
   const filters = {
     preparation: PREPARATION_STATUSES,
     execution: EXECUTION_STATUSES,
     publication: PUBLICATION_STATUSES
   }
-  const keys: string[] = []
   for (const machine of STATE_MACHINES) {
     assert.deepEqual(filters[machine.axis], machine.states)
-    for (const [key, body, tones] of [
-      [machine.axis, machine, STATE_TONES[machine.axis]],
-      ['publication_step', machine.step, STATE_TONES.publication_step]
+    for (const [body, tones] of [
+      [machine, STATE_TONES[machine.axis]],
+      [machine.step, STATE_TONES.publication_step]
     ] as const) {
       if (body === undefined) continue
       assert.deepEqual(Object.keys(tones).sort(), [...body.states].sort())
-      for (const state of body.states) {
-        const labelKey = `state_${key}_${state}_label`
-        assert.ok(isStateLabelKey(labelKey))
-        assert.equal(messages.en[labelKey], body.details[state]?.label)
-        assert.ok(messages.zh[labelKey].trim())
-        keys.push(labelKey)
-      }
     }
   }
-  for (const language of ['en', 'zh'] as const)
-    assert.deepEqual(
-      keys.sort(),
-      Object.keys(messages[language])
-        .filter((key) => key.startsWith('state_') && key.endsWith('_label'))
-        .sort()
-    )
 })
 
 test('summaries, filters, diagrams, and event history use the same localized state labels', () => {
@@ -61,36 +46,44 @@ test('summaries, filters, diagrams, and event history use the same localized sta
     execution: executionStatusLabel,
     publication: runPublicationStatusLabel
   }
-  for (const language of ['en', 'zh'] as const) {
-    const t: Translator = (key, ...args) => translate(language, key, ...args)
-    for (const machine of STATE_MACHINES) {
+  for (const language of ['en', 'zh'] as const satisfies Language[]) {
+    for (const machine of STATE_MACHINES_BY_LANGUAGE[language]) {
       for (const state of machine.states) {
-        const key = `state_${machine.axis}_${state}_label`
-        assert.ok(isStateLabelKey(key))
-        const expected = t(key)
-        assert.equal(stateLabel(axisMachine(machine), state, t), expected)
+        const expected = machine.details[state]?.label
+        assert.ok(expected)
+        assert.equal(
+          stateLabel(stateMachine(machine.axis, language), state),
+          expected
+        )
         // Each axis-specific function accepts only that axis's status union.
         const label = summary[machine.axis] as (
           status: string,
-          t: Translator
+          language: Language
         ) => string
-        assert.equal(label(state, t), expected)
+        assert.equal(label(state, language), expected)
       }
       if (machine.step === undefined) continue
       for (const state of machine.step.states) {
         const event = { axis: machine.axis, step_key: 'delivery' } as RunEvent
-        const labelled = eventMachine(event)
+        const labelled = machineForEvent(event, language)
         assert.ok(labelled)
         assert.equal(
           publicationStatusLabel(
             state as Parameters<typeof publicationStatusLabel>[0],
-            t
+            language
           ),
-          stateLabel(labelled, state, t)
+          stateLabel(labelled, state)
         )
       }
     }
   }
+})
+
+test('the Chinese console shows the overlay text, not the contract English', () => {
+  // The overlay must actually reach the console: a state labelled identically in both languages
+  // would mean the Chinese text was dropped somewhere between the overlay and the screen.
+  assert.equal(executionStatusLabel('uncertain', 'en'), 'Uncertain')
+  assert.equal(executionStatusLabel('uncertain', 'zh'), '待确认')
 })
 
 test('retryable publication step failures remain visually distinct from terminal failure', () => {
@@ -104,8 +97,7 @@ test('publication attempt failure and terminal failure have distinct labels in b
     ['en', 'Attempt failed', 'Terminal failure'],
     ['zh', '尝试失败', '最终失败']
   ] as const) {
-    const t: Translator = (key, ...args) => translate(language, key, ...args)
-    assert.equal(publicationStatusLabel('failed', t), attempt)
-    assert.equal(publicationStatusLabel('terminal_failed', t), terminal)
+    assert.equal(publicationStatusLabel('failed', language), attempt)
+    assert.equal(publicationStatusLabel('terminal_failed', language), terminal)
   }
 })

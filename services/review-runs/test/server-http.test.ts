@@ -915,7 +915,9 @@ test('the admin surface is absent unless an admin token is configured', async ()
       finished_at: null,
       updated_at: '2026-01-01T00:00:00.000Z',
       failure_code:
-        preparationStatus === 'failed' ? 'EXECUTION_ALREADY_ADVANCED' : null
+        preparationStatus === 'failed'
+          ? 'PREPARATION_ABANDONED_BY_OPERATOR'
+          : null
     },
     execution: {
       status: 'succeeded',

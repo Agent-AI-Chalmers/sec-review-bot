@@ -14,10 +14,11 @@ import {
 } from './api.js'
 import {
   STATE_MACHINES,
-  type CoordinationAxis
+  stateMachine,
+  type CoordinationAxis,
+  type Language as StateMachineLanguage
 } from './state-machines.generated.js'
-import { isStateLabelKey } from './state-labels.js'
-import { useMessages } from '../../shared/i18n.js'
+import { useLanguage, useMessages, type Language } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 export type PublicationStepStatus = PublicationStep['status']
@@ -109,10 +110,10 @@ export function ExecutionStatus({
 }: {
   status: Run['execution']['status']
 }): React.JSX.Element {
-  const t = useMessages()
+  const { language } = useLanguage()
   return (
     <StatusText
-      label={executionStatusLabel(status, t)}
+      label={executionStatusLabel(status, language)}
       tone={executionTone(status)}
     />
   )
@@ -123,10 +124,10 @@ export function PreparationStatus({
 }: {
   preparation: Run['preparation']
 }): React.JSX.Element {
-  const t = useMessages()
+  const { language } = useLanguage()
   return (
     <StatusText
-      label={preparationStatusLabel(preparation, t)}
+      label={preparationStateLabel(preparation.status, language)}
       tone={preparationTone(preparation)}
     />
   )
@@ -137,10 +138,10 @@ export function PublicationStatus({
 }: {
   status: Run['publication']['status']
 }): React.JSX.Element {
-  const t = useMessages()
+  const { language } = useLanguage()
   return (
     <StatusText
-      label={runPublicationStatusLabel(status, t)}
+      label={runPublicationStatusLabel(status, language)}
       tone={publicationTone(status)}
     />
   )
@@ -155,11 +156,35 @@ export function statusBullet(tone: StatusTone): React.ReactNode {
   return <IconClock size={ICON_SIZE.sm} />
 }
 
+/** The console's languages and the generated state-machine text must name the same languages:
+ * a UI language with no overlay would index missing machines at run time. This fails to compile
+ * when either side gains a language the other lacks. */
+export type StateMachineLanguagesMatchConsole = [Language] extends [
+  StateMachineLanguage
+]
+  ? [StateMachineLanguage] extends [Language]
+    ? true
+    : never
+  : never
+
+true satisfies StateMachineLanguagesMatchConsole
+
+/** A status label from the contract's state machine, in the console's language. */
+function axisStateLabel(
+  axis: CoordinationAxis,
+  status: string,
+  language: Language
+): string {
+  return stateMachine(axis, language).details[status]?.label ?? status
+}
+
 export function publicationStatusLabel(
   status: PublicationStepStatus,
-  t: ReturnType<typeof useMessages>
+  language: Language
 ): string {
-  return t(`state_publication_step_${status}_label`)
+  return (
+    stateMachine('publication', language).step?.details[status]?.label ?? status
+  )
 }
 
 export function publicationStatusColor(status: PublicationStepStatus): string {
@@ -168,19 +193,15 @@ export function publicationStatusColor(status: PublicationStepStatus): string {
 
 export function executionStatusLabel(
   status: Run['execution']['status'],
-  t: ReturnType<typeof useMessages>
+  language: Language
 ): string {
-  return t(`state_execution_${status}_label`)
+  return axisStateLabel('execution', status, language)
 }
 
 function axisStatuses<A extends CoordinationAxis>(axis: A): Run[A]['status'][] {
   const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
   if (machine === undefined) throw new Error(`Missing state machine: ${axis}`)
-  return machine.states.map((state) => {
-    if (!isStateLabelKey(`state_${axis}_${state}_label`))
-      throw new Error(`Missing state label: ${axis}.${state}`)
-    return state as Run[A]['status']
-  })
+  return machine.states.map((state) => state as Run[A]['status'])
 }
 
 export const PREPARATION_STATUSES = axisStatuses('preparation')
@@ -189,9 +210,9 @@ export const PUBLICATION_STATUSES = axisStatuses('publication')
 
 export function preparationStateLabel(
   status: Run['preparation']['status'],
-  t: ReturnType<typeof useMessages>
+  language: Language
 ): string {
-  return t(`state_preparation_${status}_label`)
+  return axisStateLabel('preparation', status, language)
 }
 
 /** Human label for a coordination axis.
@@ -226,19 +247,11 @@ export function axisLabel(
   }
 }
 
-export function preparationStatusLabel(
-  preparation: Run['preparation'],
-  t: ReturnType<typeof useMessages>
-): string {
-  // `disconnected` is a state of its own now, so the stalled case needs no derived wording here.
-  return preparationStateLabel(preparation.status, t)
-}
-
 export function runPublicationStatusLabel(
   status: Run['publication']['status'],
-  t: ReturnType<typeof useMessages>
+  language: Language
 ): string {
-  return t(`state_publication_${status}_label`)
+  return axisStateLabel('publication', status, language)
 }
 
 export function artifactStatusLabel(

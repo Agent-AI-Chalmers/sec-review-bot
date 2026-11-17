@@ -262,8 +262,8 @@ export function createRunsHandler(): (
         axis === 'preparation'
           ? 'PREPARATION_GIVEN_UP_BY_OPERATOR'
           : axis === 'execution'
-            ? 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
-            : 'PUBLICATION_ABANDONED_BY_OPERATOR'
+            ? 'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR'
+            : 'PUBLICATION_GIVEN_UP_BY_OPERATOR'
       if (axis === 'preparation') {
         run.preparation.status = 'failed'
         run.preparation.failure_code = reasonCode
@@ -358,14 +358,14 @@ export function createRunsHandler(): (
       // the operator a run that looks untouched after an irreversible decision.
       const now = new Date().toISOString()
       run.preparation.status = 'failed'
-      run.preparation.failure_code = 'EXECUTION_ALREADY_ADVANCED'
+      run.preparation.failure_code = 'PREPARATION_ABANDONED_BY_OPERATOR'
       run.notices = [
         {
           notice_id: `fixture-${run.run_id}-abandoned`,
           kind: 'failure',
           status: 'pending',
           axis: 'preparation',
-          reason_code: 'EXECUTION_ALREADY_ADVANCED',
+          reason_code: 'PREPARATION_ABANDONED_BY_OPERATOR',
           comment_url: null
         }
       ]
