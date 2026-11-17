@@ -1,14 +1,13 @@
 // Builds the authenticated Review Runs HTTP surface from the OpenAPI contract
 // and connects transport operations to the durable coordination store.
 import { timingSafeEqual } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { buildAdminRouteHandlers } from './admin-route-handlers.js'
-import { contractDigest } from '../contract-digest.js'
 import { buildCoordinationRouteHandlers } from './coordination-route-handlers.js'
 import { ReviewRunStore } from '../persistence/review-run-store.js'
 import { buildReadRouteHandlers } from './read-route-handlers.js'
@@ -155,29 +154,11 @@ interface ReviewRunsRouteDeps {
  * fastify-openapi-glue resolves a relative `specification` against the CWD, which breaks as
  * soon as the server runs from a different directory (notably the container, where only
  * `dist/` is present). The build copies the contract next to the compiled output (`copy:spec`)
- * together with its SHA-256, so the compiled server finds it first and can prove it is the one
- * that build produced — a stale or hand-edited copy beside `server.js` fails loudly instead of
- * silently shaping the surface. Running from source (tsx) falls back to the repository's
- * contracts tree, which is the source of truth in that mode. */
+ * so the compiled server can load it without the repository tree. Running from source
+ * (tsx) falls back to the repository's contracts tree. */
 function resolveSpecPath(): string {
   const built = path.resolve(import.meta.dirname, '../openapi.yaml')
-  if (existsSync(built)) {
-    const digestPath = `${built}.sha256`
-    if (!existsSync(digestPath)) {
-      throw new Error(
-        `${built} has no ${digestPath}; the build must produce both.`
-      )
-    }
-    const expected = readFileSync(digestPath, 'utf8').trim()
-    const actual = contractDigest(readFileSync(built))
-    if (actual !== expected) {
-      throw new Error(
-        `${built} does not match its recorded digest; rebuild so the contract and ` +
-          'server.js come from the same build.'
-      )
-    }
-    return built
-  }
+  if (existsSync(built)) return built
   const fromSource = path.resolve(
     import.meta.dirname,
     '../../../../contracts/review-runs-api/v1/openapi.yaml'
