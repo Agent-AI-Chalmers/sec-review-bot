@@ -1,4 +1,4 @@
-# Deployment and submission smoke tests
+# Smoke tests
 
 Language: English | [中文](README.zh.md)
 
@@ -10,7 +10,7 @@ Install Docker Engine and Docker Compose 2.24.4 or newer. From the repository ro
 bash smoke-tests/run.sh
 ```
 
-The script builds the services from their production Dockerfiles and builds a test image for the probes. It uses the root `compose.yaml` with [`compose.test.yaml`](compose.test.yaml) to start the services and wait for them to be ready. You do not need Node or pnpm on the host.
+The script builds the services from their production Dockerfiles and builds a test image for the probes. The root [`compose.yaml`](../compose.yaml) defines how the services are built and connected. [`compose.test.yaml`](compose.test.yaml) changes their ports and data volumes for testing and adds the probe container. The script combines both files to start the services and wait for them to be ready. You do not need Node or pnpm on the host.
 
 The first run may download dependencies and infrastructure images. Docker keeps the built images and layers for later runs.
 
@@ -45,16 +45,6 @@ Input preparation, agent execution, model calls, and GitHub publication are outs
 Each run gets its own Compose project and named data volumes. It uses fixed test credentials, ignores the operator's `.env`, and does not publish ports on the host.
 
 If a check fails, the script prints container status and logs. On exit, it removes the containers, networks, and data volumes. It keeps images and build caches.
-
-SIGKILL and host shutdown prevent the exit handler from running. For a local run left behind, find its project with `docker compose ls --all`, replace the placeholder below with that exact project name, and remove only its labeled resources. The `xargs -r` commands require GNU xargs. GitHub-hosted runners are discarded after the job.
-
-```bash
-docker compose ls --all
-smoke_project='sec-review-smoke-<timestamp>-<pid>'
-docker ps -aq --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker rm -f
-docker network ls -q --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker network rm
-docker volume ls -q --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker volume rm
-```
 
 ## Files
 
