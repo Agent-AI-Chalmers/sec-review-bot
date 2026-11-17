@@ -82,3 +82,26 @@ test('run files error state', async ({ page }) => {
     .waitFor()
   await expectPageSnapshot(page, 'run-files-error-dark.png')
 })
+
+for (const surface of ['runs', 'memory'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`${surface} unavailable ${theme}`, async ({ page }) => {
+      await page.route(`**/api/${surface}**`, (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: '{}'
+        })
+      )
+      await openFixturePage(page, `/${surface}`, theme)
+      await expect(page.getByRole('alert')).toHaveCount(1)
+      await expect(
+        page.getByRole('button', { name: 'Retry', exact: true })
+      ).toBeVisible()
+      await expectPageSnapshot(page, `${surface}-unavailable-${theme}.png`)
+      await page.unroute(`**/api/${surface}**`)
+      await page.getByRole('button', { name: 'Retry', exact: true }).click()
+      await expect(page.getByRole('alert')).toHaveCount(0)
+    })
+  }
+}

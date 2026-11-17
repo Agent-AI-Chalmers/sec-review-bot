@@ -31,6 +31,11 @@ export const messages = {
     jsonlInvalidRecord: 'Invalid JSON',
     previewUnavailable: 'Preview unavailable',
     contentUnavailable: 'Content unavailable',
+    runsUnavailable: 'Run list unavailable',
+    memoryUnavailable: 'Memory unavailable',
+    resourceRetryHelp: 'Please retry to load this content.',
+    memoryUnavailableHelp:
+      'Memory settings, the current version, and the overview could not be loaded. Retry to reconnect.',
     previewUnavailableDescription:
       'This {size} file is binary or exceeds the online preview limit. Download the original bundle to inspect it.',
     runFiles: 'Run files',
@@ -253,7 +258,7 @@ export const messages = {
     filterTo: 'Until',
     noRunsYet: 'No runs yet',
     runsLoadFailed:
-      'Could not load these results. Retry or change your filters.',
+      'Could not retrieve the run list. Please retry. Your filters have been kept.',
     workflowIssueReview: 'Issue review',
     workflowPullRequestReview: 'Pull request review',
     workflowRepositoryReview: 'Repository review',
@@ -496,6 +501,10 @@ export const messages = {
     jsonlInvalidRecord: 'JSON 无效',
     previewUnavailable: '无法在线预览',
     contentUnavailable: '内容不可用',
+    runsUnavailable: '运行列表暂时无法加载',
+    memoryUnavailable: '记忆暂时无法加载',
+    resourceRetryHelp: '请重试以重新加载此内容。',
+    memoryUnavailableHelp: '未能获取记忆设置、当前版本和概览，请重试。',
     previewUnavailableDescription:
       '该文件大小为 {size}，因属于二进制文件或超过大小限制，无法在线预览。请下载原始包查看。',
     runFiles: '运行文件',
@@ -711,7 +720,7 @@ export const messages = {
     filterFrom: '开始时间',
     filterTo: '截止时间',
     noRunsYet: '暂无运行',
-    runsLoadFailed: '无法加载这些结果，请重试或调整筛选条件。',
+    runsLoadFailed: '未能获取运行列表，请重试。已保留当前筛选条件。',
     workflowIssueReview: 'Issue 审查',
     workflowPullRequestReview: 'PR 审查',
     workflowRepositoryReview: '仓库审查',

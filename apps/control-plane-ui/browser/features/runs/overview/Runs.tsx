@@ -78,7 +78,7 @@ export function Runs(): React.JSX.Element {
           {failureReason(error, t) && ` ${failureReason(error, t)}`}
         </Text>
       )}
-      {auxiliaryError !== undefined && (
+      {auxiliaryError !== undefined && data !== undefined && (
         <Text role="alert" c="red" mb="md">
           {t('parkedRunsError')}
           {failureReason(auxiliaryError, t) &&
@@ -93,9 +93,15 @@ export function Runs(): React.JSX.Element {
       <Box aria-busy={refreshing}>
         {data === undefined && Boolean(error) ? (
           <ResourceLoadError
+            fill
+            title={t('runsUnavailable')}
             message={`${t('runsLoadFailed')} ${failureReason(error, t) ?? ''}`.trim()}
             actions={
-              <Button variant="default" onClick={() => void refresh()}>
+              <Button
+                variant="default"
+                loading={refreshing}
+                onClick={() => void refresh()}
+              >
                 {t('retry')}
               </Button>
             }
