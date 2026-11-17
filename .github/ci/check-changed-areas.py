@@ -153,19 +153,6 @@ def check_generated_artifacts(
             )
 
 
-def check_client_server_seam(areas: dict[str, list[str]]) -> None:
-    seam_paths = (
-        "apps/github-integration/src/review-runs/client.ts",
-        "apps/github-integration/src/review-runs/review-runs-api.ts",
-        "services/review-runs/src/http/server-surface.ts",
-        "system-tests/review-runs-http/review-runs-http.test.mjs",
-        "contracts/review-runs-api/v1/openapi.yaml",
-    )
-    for candidate in seam_paths:
-        if not covers(areas["system-tests"], candidate):
-            raise AssertionError(f"the system-tests area must trigger on {candidate}")
-
-
 def check_execution_workflow(areas: dict[str, list[str]]) -> None:
     schema = "contracts/execution-workflow/v1/execution-workflow-input.schema.json"
     if not covers(areas["execution-gateway"], schema):
@@ -211,7 +198,6 @@ def main() -> int:
                 tracked_files,
             ),
         ),
-        ("client/server seam", lambda: check_client_server_seam(areas)),
         ("Execution Workflow coverage", lambda: check_execution_workflow(areas)),
         ("tracked-file coverage", lambda: check_tracked_files(areas, tracked_files)),
     )

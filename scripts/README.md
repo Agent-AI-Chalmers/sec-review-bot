@@ -61,9 +61,7 @@ source agents/.venv/bin/activate
 python -m scripts.replay.repository_triage --help
 ```
 
-## System Test
-
-See [Cross-service System Tests](../system-tests/README.md) for the submission test, model-free smoke probes, and manual execution lifecycle probe, including prerequisites, commands, coverage limits, isolation, and CI cost controls.
+## Operational Probes
 
 ### Langfuse Run Statistics Probe
 

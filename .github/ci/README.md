@@ -54,7 +54,7 @@ node --test .github/ci/check-package-boundaries.test.mjs
 
 <!-- doc-default: node-package-boundaries; source=.github/ci/check-package-boundaries.mjs -->
 
-Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Tests that combine packages belong under `system-tests/`. Computed paths assembled at runtime are outside this static check's coverage.
+Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Computed paths assembled at runtime are outside this static check's coverage.
 
 ## Shared Python Setup
 
@@ -85,14 +85,6 @@ ruby .github/ci/check-review-setup.rb
 
 The first checks that every CI job contributes to `CI Status`. The second checks that trusted review setup installs every tracked pnpm package.
 
-## Cross-service Smoke Checks
-
-[The smoke inventory](../../system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission and Integration-to-Review-Runs HTTP checks run in `Smoke — Service Boundaries`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
-
-The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
-
-[The execution lifecycle workflow](../workflows/execution-lifecycle.yml) is manual-only and separate from required PR checks. It uses a deterministic analysis activity and does not measure model quality.
-
 ## Regression Probes
 
 Run `python3 .github/ci/test_ci.py` from the repository root. The automation job runs the same probes for aggregate failure/cancellation handling and missing dependency rejection. They execute the real scripts and parsed workflow configuration using Python's standard library and Ruby's YAML parser.
@@ -116,7 +108,6 @@ CI cannot see a cross-package dependency in an import graph, so the couplings ar
 
 - **Shared contract.** `contracts/**` is read by every consumer of a contract family, so it is listed under `contract-tools`, `review-runs`, `github-integration`, `control-plane-ui`, and `agents`.
 - **Generated artifacts.** A contract tool renders a projection into another package, so `contract-tools` lists each one. The checker derives that set from the tools' `generated-artifacts.json` manifests, so a new projection cannot be added without wiring it up.
-- **Cross-package tests.** The repository-level `review-runs-http.test.mjs` combines the Integration client and Review Runs server. The `system-tests` area covers both participants and the test entrypoint.
 
 If a path is missed, a change to it runs **no job at all**, and CI reports green. An empty-200 response once broke the client this way: the job that would have caught it was not wired to the file that changed.
 
@@ -126,7 +117,6 @@ The model is trusted as given because it states intent. The checker checks **com
 
 - every generated artifact (from the tools' manifests) is covered by `contract-tools`;
 - every tracked file is covered by an area or acknowledged in `UNCOVERED`;
-- the client↔server seam is wired to both packages;
 - no filter is dead (an area declared with no job, or a job gating on an area not declared).
 
 It does not second-guess the model's own contents, since there is no rendered copy of the model to compare against.
@@ -149,7 +139,6 @@ The checker runs in CI's `automation-config` job (whose filter includes `.github
 - a job gates on an area the model does not declare, or the model declares an area no job uses;
 - the `changes` job's `outputs:` map does not expose exactly the model's areas;
 - a contract tool's generated artifact is not covered by the `contract-tools` area;
-- the client↔server seam is no longer wired to both packages;
 - a tracked file is covered by neither an area nor the `UNCOVERED` allow-list in the checker.
 
 A tracked file the model does not cover has to be added to an area, or to `UNCOVERED` with a reason. `UNCOVERED` is a short constant (report data, binary assets, root metadata) kept beside the check, so leaving a path uncovered is a deliberate choice that shows up in review.

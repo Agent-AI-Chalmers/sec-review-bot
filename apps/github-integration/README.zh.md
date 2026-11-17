@@ -36,7 +36,7 @@ pnpm test
 
 `pnpm test` 运行不依赖外部服务的测试。选择单个文件时也应保留启动器，例如 `pnpm test test/artifacts/git-workspace.test.ts`：它会在运行测试前隔离继承的 Git 配置。
 
-`pnpm run test:integration` 运行按需启用的 S3 上传测试。请为可清空的测试桶设置 `SEC_REVIEW_TEST_S3_ENDPOINT`、`SEC_REVIEW_TEST_S3_BUCKET` 和 AWS 凭证；未设置端点或桶时，测试会跳过。本地 S3 兼容服务应设置 `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`。Integration 与 Review Runs 之间的 HTTP 测试由仓库级[系统测试](../../system-tests/README.zh.md)负责。
+`pnpm run test:integration` 运行按需启用的 S3 上传测试。请为可清空的测试桶设置 `SEC_REVIEW_TEST_S3_ENDPOINT`、`SEC_REVIEW_TEST_S3_BUCKET` 和 AWS 凭证；未设置端点或桶时，测试会跳过。本地 S3 兼容服务应设置 `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`。
 
 ## 本地接收端
 
