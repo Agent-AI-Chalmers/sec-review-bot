@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   test: {
+    // jsdom workers are expensive to start; 3 was fastest locally, and one worker per core times out.
     maxWorkers: 3,
     projects: [
       {

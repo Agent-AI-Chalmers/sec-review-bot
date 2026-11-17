@@ -4,7 +4,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test.mjs'],
-    maxWorkers: 3,
     testTimeout: 30_000
   }
 })

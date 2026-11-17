@@ -2,7 +2,6 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    maxWorkers: 3,
     restoreMocks: true,
     testTimeout: 30_000,
     projects: [
