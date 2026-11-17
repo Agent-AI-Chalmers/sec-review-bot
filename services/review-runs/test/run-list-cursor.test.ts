@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   decodeRunListCursor,
@@ -17,17 +16,14 @@ const CURSOR = {
  * encoder writes.
  */
 test('a run list cursor round-trips through the wire form', () => {
-  assert.deepStrictEqual(
-    decodeRunListCursor(encodeRunListCursor(CURSOR)),
-    CURSOR
-  )
+  expect(decodeRunListCursor(encodeRunListCursor(CURSOR))).toStrictEqual(CURSOR)
 })
 
 test('a cursor with a third segment names no row', () => {
   const tampered = Buffer.from(
     `${CURSOR.created_at_cursor}|${CURSOR.run_id}|extra`
   ).toString('base64url')
-  assert.strictEqual(decodeRunListCursor(tampered), null)
+  expect(decodeRunListCursor(tampered)).toBe(null)
 })
 
 test('a cursor missing either part names no row', () => {
@@ -37,17 +33,15 @@ test('a cursor missing either part names no row', () => {
     CURSOR.created_at_cursor,
     ''
   ])
-    assert.strictEqual(
+    expect(
       decodeRunListCursor(Buffer.from(decoded).toString('base64url')),
-      null,
       decoded
-    )
+    ).toBe(null)
 })
 
 test('a cursor whose timestamp cannot be ordered names no row', () => {
   const decoded = `not-a-date|${CURSOR.run_id}`
-  assert.strictEqual(
-    decodeRunListCursor(Buffer.from(decoded).toString('base64url')),
+  expect(decodeRunListCursor(Buffer.from(decoded).toString('base64url'))).toBe(
     null
   )
 })

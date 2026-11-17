@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   buildDraftBranchName,
@@ -219,9 +218,9 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
     })
   })
 
-  assert.strictEqual(result?.number, 9)
-  assert.strictEqual(harness.blobs.length, 0)
-  assert.strictEqual(harness.commits.length, 0)
+  expect(result?.number).toBe(9)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.commits).toHaveLength(0)
 })
 
 test('issue draft PR retry reuses a branch left by a partial prior attempt without overwriting it', async () => {
@@ -252,13 +251,13 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
     review_record
   })
 
-  assert.strictEqual(result?.number, 1)
+  expect(result?.number).toBe(1)
   // The whole run id names the branch. A shorter segment (the last 8 characters) is what two
   // runs can share, and this branch is the publication's idempotency key.
-  assert.deepStrictEqual(harness.readRefs, [
+  expect(harness.readRefs).toStrictEqual([
     'heads/sec-review-bot/issue-42-run-12345678'
   ])
-  assert.deepStrictEqual(harness.updatedRefs, [])
+  expect(harness.updatedRefs).toStrictEqual([])
 })
 
 test('two runs of the same issue never share a draft branch', () => {
@@ -278,9 +277,8 @@ test('two runs of the same issue never share a draft branch', () => {
     issue,
     'bbbbbbbb-2222-4222-8222-00000000c0de'
   )
-  assert.notStrictEqual(first, second)
-  assert.notStrictEqual(
-    buildDraftBranchName(issue, undefined),
+  expect(first).not.toBe(second)
+  expect(buildDraftBranchName(issue, undefined)).not.toBe(
     buildDraftBranchName(issue, 'aaaaaaaa-1111-4111-8111-00000000c0de')
   )
 })
@@ -293,7 +291,7 @@ test('issue draft PR does not create a PR from an existing branch with a differe
     existingCommitTreeSha: 'different-tree-sha'
   })
 
-  await assert.rejects(
+  await expect(
     createDraftPullRequestFromIssueReviewRecord({
       octokit,
       issue: {
@@ -313,17 +311,16 @@ test('issue draft PR does not create a PR from an existing branch with a differe
           }
         ]
       })
-    }),
-    /Existing draft PR branch does not match/
-  )
-  assert.strictEqual(harness.pulls.length, 0)
+    })
+  ).rejects.toThrow(/Existing draft PR branch does not match/)
+  expect(harness.pulls).toHaveLength(0)
 })
 
 test('issue draft PR stops before the next GitHub write after claim loss', async () => {
   const { octokit, calls: harness } = createOctokitMock()
   let ownershipChecks = 0
 
-  await assert.rejects(
+  await expect(
     createDraftPullRequestWithClaim({
       octokit,
       issue: {
@@ -348,15 +345,14 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
         if (ownershipChecks === 2)
           throw new PublicationClaimLostError('run-12345678')
       }
-    }),
-    PublicationClaimLostError
-  )
+    })
+  ).rejects.toThrow(PublicationClaimLostError)
 
-  assert.strictEqual(harness.blobs.length, 1)
-  assert.strictEqual(harness.trees.length, 0)
-  assert.strictEqual(harness.commits.length, 0)
-  assert.strictEqual(harness.refs.length, 0)
-  assert.strictEqual(harness.pulls.length, 0)
+  expect(harness.blobs).toHaveLength(1)
+  expect(harness.trees).toHaveLength(0)
+  expect(harness.commits).toHaveLength(0)
+  expect(harness.refs).toHaveLength(0)
+  expect(harness.pulls).toHaveLength(0)
 })
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {
@@ -392,14 +388,14 @@ test('issue draft PR publishes from review_record file_changes without workspace
     review_record
   })
 
-  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
-  assert.deepStrictEqual(harness.blobs, [
+  expect(result?.html_url).toBe('https://example.test/pull/1')
+  expect(harness.blobs).toStrictEqual([
     {
       content: 'fixed\n',
       encoding: 'utf-8'
     }
   ])
-  assert.deepStrictEqual(harness.trees[0], [
+  expect(harness.trees[0]).toStrictEqual([
     {
       path: 'workspace/src/app.txt',
       mode: '100755',
@@ -413,25 +409,24 @@ test('issue draft PR publishes from review_record file_changes without workspace
       sha: null
     }
   ])
-  assert.deepStrictEqual(harness.commits, [
+  expect(harness.commits).toStrictEqual([
     {
       message: 'Mitigate issue #42',
       tree: 'tree-sha',
       parents: ['base-sha']
     }
   ])
-  assert.strictEqual(harness.pulls[0]?.draft, true)
+  expect(harness.pulls[0]?.draft).toBe(true)
   // The PR base is the API-resolved default branch, not the webhook payload's
   // repository.default_branch (which the trusted flow refuses elsewhere too).
-  assert.strictEqual(harness.pulls[0]?.base, 'main')
+  expect(harness.pulls[0]?.base).toBe('main')
   // The opening status lines come from the shared vocabulary, so this body stays
   // comparable with the PR review comment and the repository delivery bodies.
-  assert.match(harness.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
-  assert.match(
-    harness.pulls[0]?.body ?? '',
+  expect(harness.pulls[0]?.body ?? '').toMatch(/- Analysis: `unknown`/)
+  expect(harness.pulls[0]?.body ?? '').toMatch(
     /- Verification: `full coverage; not recorded; checks not run`/
   )
-  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed coverage=/)
+  expect(harness.pulls[0]?.body ?? '').toMatch(/Verifier assessed coverage=/)
 })
 
 test('issue draft PR is not promoted when file_changes are absent', async () => {
@@ -448,9 +443,9 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
     review_record: reviewRecordWithMitigation({})
   })
 
-  assert.strictEqual(result, null)
-  assert.strictEqual(harness.blobs.length, 0)
-  assert.strictEqual(harness.trees.length, 0)
+  expect(result).toBe(null)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 test('issue draft PR rejects unsupported file modes', async () => {
@@ -468,23 +463,21 @@ test('issue draft PR rejects unsupported file modes', async () => {
   })
   review_record.verification.coverage = 'full'
 
-  await assert.rejects(
-    async () =>
-      createDraftPullRequestFromIssueReviewRecord({
-        octokit,
-        issue: {
-          issue_number: 42,
-          owner_login: 'octo-org',
-          repo_name: 'example-repo'
-        },
-        run_id: 'run-12345678',
-        workspace_ref: 'base-sha',
-        review_record
-      }),
-    /unsupported file mode/
-  )
-  assert.strictEqual(harness.blobs.length, 0)
-  assert.strictEqual(harness.trees.length, 0)
+  await expect(
+    createDraftPullRequestFromIssueReviewRecord({
+      octokit,
+      issue: {
+        issue_number: 42,
+        owner_login: 'octo-org',
+        repo_name: 'example-repo'
+      },
+      run_id: 'run-12345678',
+      workspace_ref: 'base-sha',
+      review_record
+    })
+  ).rejects.toThrow(/unsupported file mode/)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 test('issue draft PR rejects deleted file changes with mode', async () => {
@@ -500,23 +493,21 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
   })
   review_record.verification.coverage = 'full'
 
-  await assert.rejects(
-    async () =>
-      createDraftPullRequestFromIssueReviewRecord({
-        octokit,
-        issue: {
-          issue_number: 42,
-          owner_login: 'octo-org',
-          repo_name: 'example-repo'
-        },
-        run_id: 'run-12345678',
-        workspace_ref: 'base-sha',
-        review_record
-      }),
-    /deleted but also included a mode/
-  )
-  assert.strictEqual(harness.blobs.length, 0)
-  assert.strictEqual(harness.trees.length, 0)
+  await expect(
+    createDraftPullRequestFromIssueReviewRecord({
+      octokit,
+      issue: {
+        issue_number: 42,
+        owner_login: 'octo-org',
+        repo_name: 'example-repo'
+      },
+      run_id: 'run-12345678',
+      workspace_ref: 'base-sha',
+      review_record
+    })
+  ).rejects.toThrow(/deleted but also included a mode/)
+  expect(harness.blobs).toHaveLength(0)
+  expect(harness.trees).toHaveLength(0)
 })
 
 for (const [path, message] of [
@@ -537,23 +528,21 @@ for (const [path, message] of [
     })
     review_record.verification.coverage = 'full'
 
-    await assert.rejects(
-      async () =>
-        createDraftPullRequestFromIssueReviewRecord({
-          octokit,
-          issue: {
-            issue_number: 42,
-            owner_login: 'octo-org',
-            repo_name: 'example-repo'
-          },
-          run_id: 'run-12345678',
-          workspace_ref: 'base-sha',
-          review_record
-        }),
-      message
-    )
-    assert.strictEqual(harness.blobs.length, 0)
-    assert.strictEqual(harness.trees.length, 0)
+    await expect(
+      createDraftPullRequestFromIssueReviewRecord({
+        octokit,
+        issue: {
+          issue_number: 42,
+          owner_login: 'octo-org',
+          repo_name: 'example-repo'
+        },
+        run_id: 'run-12345678',
+        workspace_ref: 'base-sha',
+        review_record
+      })
+    ).rejects.toThrow(message)
+    expect(harness.blobs).toHaveLength(0)
+    expect(harness.trees).toHaveLength(0)
   })
 }
 
@@ -590,14 +579,14 @@ test('issue draft PR publishes symbolic link targets and deletions without works
     review_record
   })
 
-  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
-  assert.deepStrictEqual(harness.blobs, [
+  expect(result?.html_url).toBe('https://example.test/pull/1')
+  expect(harness.blobs).toStrictEqual([
     {
       content: 'dGFyZ2V0Lf8=',
       encoding: 'base64'
     }
   ])
-  assert.deepStrictEqual(harness.trees[0], [
+  expect(harness.trees[0]).toStrictEqual([
     {
       path: 'src/app.txt',
       mode: '120000',
@@ -611,25 +600,24 @@ test('issue draft PR publishes symbolic link targets and deletions without works
       sha: null
     }
   ])
-  assert.deepStrictEqual(harness.commits, [
+  expect(harness.commits).toStrictEqual([
     {
       message: 'Mitigate issue #42',
       tree: 'tree-sha',
       parents: ['base-sha']
     }
   ])
-  assert.strictEqual(harness.pulls[0]?.draft, true)
+  expect(harness.pulls[0]?.draft).toBe(true)
   // The PR base is the API-resolved default branch, not the webhook payload's
   // repository.default_branch (which the trusted flow refuses elsewhere too).
-  assert.strictEqual(harness.pulls[0]?.base, 'main')
+  expect(harness.pulls[0]?.base).toBe('main')
   // The opening status lines come from the shared vocabulary, so this body stays
   // comparable with the PR review comment and the repository delivery bodies.
-  assert.match(harness.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
-  assert.match(
-    harness.pulls[0]?.body ?? '',
+  expect(harness.pulls[0]?.body ?? '').toMatch(/- Analysis: `unknown`/)
+  expect(harness.pulls[0]?.body ?? '').toMatch(
     /- Verification: `full coverage; not recorded; checks not run`/
   )
-  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed coverage=/)
+  expect(harness.pulls[0]?.body ?? '').toMatch(/Verifier assessed coverage=/)
 })
 
 const blockedVerificationCases: Array<{
@@ -672,7 +660,7 @@ for (const { name, verification } of blockedVerificationCases) {
       issue,
       review_record
     })
-    assert.equal(plan.patch_ready, false)
+    expect(plan.patch_ready).toBe(false)
     const { octokit, requests } = fakeGitHub(() => {
       throw new Error('Unapproved changes must not reach GitHub.')
     })
@@ -683,8 +671,8 @@ for (const { name, verification } of blockedVerificationCases) {
       workspace_ref: 'base-sha',
       review_record
     })
-    assert.equal(result, null)
-    assert.deepEqual(requests, [])
+    expect(result).toBe(null)
+    expect(requests).toStrictEqual([])
   })
 }
 for (const regression of ['passed', 'not-run', 'not-applicable'] as const) {
@@ -694,24 +682,22 @@ for (const regression of ['passed', 'not-run', 'not-applicable'] as const) {
     })
     review_record.verification.regression = regression
     const issue = { issue_number: 42 }
-    assert.equal(
+    expect(
       (
         await buildSuggestedDraftPrPlanFromReviewRecord({
           issue,
           review_record
         })
-      ).patch_ready,
-      true
-    )
+      ).patch_ready
+    ).toBe(true)
     review_record.mitigation.file_changes = []
-    assert.equal(
+    expect(
       (
         await buildSuggestedDraftPrPlanFromReviewRecord({
           issue,
           review_record
         })
-      ).patch_ready,
-      false
-    )
+      ).patch_ready
+    ).toBe(false)
   })
 }

@@ -239,6 +239,14 @@ pnpm test
 pnpm run test:integration
 ```
 
+<!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
+
+`pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。
+
+`pnpm run test:types` 单独报告处理函数的请求、返回值及注册表完整性的编译期契约检查，不启动服务。
+
+`pnpm test` 构建服务并运行隔离测试。开发时可用 `pnpm test test/env.test.ts` 只运行一个文件。集成测试通过 `pnpm run test:integration` 单独运行，也可以追加测试路径或测试运行选项。
+
 契约本身由族工具（位于 [`contracts/review-runs-api/tools`](../../contracts/review-runs-api/tools/README.md)）用 Spectral 检查，其投影也由该工具做新鲜度校验。
 
 `pnpm run test:integration` 在提供 `TEST_DATABASE_URL` 或 `DATABASE_URL` 时使用该地址；它必须指向可清空的 PostgreSQL 数据库。两个变量都未提供时，该命令会用仓库根目录 `compose.yaml` 声明的 PostgreSQL 镜像启动一个短生命周期本地 Docker 容器，并在测试完成后删除。Docker 在本地缺少该镜像时会拉取，因此此回退方式要求 Docker 可用且能访问镜像仓库；可通过 `TEST_POSTGRES_IMAGE` 显式使用其他镜像。

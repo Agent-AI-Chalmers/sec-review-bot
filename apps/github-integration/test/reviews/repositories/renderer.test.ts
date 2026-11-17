@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   buildRepositorySummaryWorkflowView,
@@ -160,45 +159,43 @@ test('repository renderer derives blocked confirmed case cards from case results
     target_branch: 'main'
   })
 
-  assert.match(body, /Blocked confirmed cases: `1`/)
-  assert.match(body, /### Blocked Confirmed Cases/)
-  assert.match(body, /<summary>\[medium\] case-1/)
-  assert.match(body, /<summary>Analysis<\/summary>/)
-  assert.match(body, /<summary>CVSS<\/summary>/)
-  assert.match(body, /<summary>Mitigation<\/summary>/)
-  assert.match(body, /<summary>Reference patch<\/summary>/)
-  assert.match(body, /```diff\n(?:.|\n)*verifyRetrySignature/)
-  assert.match(body, /<summary>Verification<\/summary>/)
-  assert.ok(
+  expect(body).toMatch(/Blocked confirmed cases: `1`/)
+  expect(body).toMatch(/### Blocked Confirmed Cases/)
+  expect(body).toMatch(/<summary>\[medium\] case-1/)
+  expect(body).toMatch(/<summary>Analysis<\/summary>/)
+  expect(body).toMatch(/<summary>CVSS<\/summary>/)
+  expect(body).toMatch(/<summary>Mitigation<\/summary>/)
+  expect(body).toMatch(/<summary>Reference patch<\/summary>/)
+  expect(body).toMatch(/```diff\n(?:.|\n)*verifyRetrySignature/)
+  expect(body).toMatch(/<summary>Verification<\/summary>/)
+  expect.assert(
     body.indexOf('<summary>Analysis</summary>') <
       body.indexOf('<summary>CVSS</summary>')
   )
-  assert.ok(
+  expect.assert(
     body.indexOf('<summary>CVSS</summary>') <
       body.indexOf('<summary>Mitigation</summary>')
   )
-  assert.ok(
+  expect.assert(
     body.indexOf('<summary>Mitigation</summary>') <
       body.indexOf('<summary>Verification</summary>')
   )
 
   // The card reuses the shared status vocabulary instead of restating it, and the
   // title carries case identity rather than repeating the coverage rating.
-  assert.ok(
-    body.includes(
-      renderReviewStatusLines({
-        analysis: review_record.analysis,
-        mitigation: review_record.mitigation,
-        verification: review_record.verification
-      }).join('\n')
-    )
+  expect(body).toContain(
+    renderReviewStatusLines({
+      analysis: review_record.analysis,
+      mitigation: review_record.mitigation,
+      verification: review_record.verification
+    }).join('\n')
   )
   const titleLine = body
     .split('\n')
     .find((line) => line.startsWith('<summary>[medium] case-1'))
-  assert.ok(titleLine)
-  assert.ok(
-    !titleLine.includes(coverageHeadline(review_record.verification.coverage))
+  expect.assert(titleLine)
+  expect(titleLine).not.toContain(
+    coverageHeadline(review_record.verification.coverage)
   )
 })
 
@@ -227,16 +224,14 @@ test('repository blocked confirmed case uses deliverable reason as mitigation an
     target_branch: 'main'
   })
 
-  assert.match(
-    body,
+  expect(body).toMatch(
     /<summary>Mitigation<\/summary>\n\nVerifier rejected the incomplete patch\./
   )
-  assert.match(
-    body,
+  expect(body).toMatch(
     /<summary>Verification<\/summary>\n\nVerifier rejected the incomplete patch\./
   )
-  assert.doesNotMatch(body, /No mitigation overview was recorded\./)
-  assert.doesNotMatch(body, /No verification overview was recorded\./)
+  expect(body).not.toMatch(/No mitigation overview was recorded\./)
+  expect(body).not.toMatch(/No verification overview was recorded\./)
 })
 
 test('repository renderer preserves CVSS not-scored state', () => {
@@ -281,16 +276,15 @@ test('repository renderer preserves CVSS not-scored state', () => {
     target_branch: 'main'
   })
 
-  assert.match(summary, /CVSS scored cases: `1`/)
-  assert.match(summary, /CVSS not-scored cases: `1`/)
-  assert.match(summary, /Case CVSS severities: `critical=0`, `high=1`/)
-  assert.match(
-    summary,
+  expect(summary).toMatch(/CVSS scored cases: `1`/)
+  expect(summary).toMatch(/CVSS not-scored cases: `1`/)
+  expect(summary).toMatch(/Case CVSS severities: `critical=0`, `high=1`/)
+  expect(summary).toMatch(
     /Grouped by each delivery PR's highest case CVSS severity\./
   )
-  assert.match(summary, /#### not-scored \(1\)/)
-  assert.match(summary, /\[CVSS not-scored\] \[sec\] container-runs-as-root/)
-  assert.doesNotMatch(summary, /\[CVSS 0\.0\]/)
+  expect(summary).toMatch(/#### not-scored \(1\)/)
+  expect(summary).toMatch(/\[CVSS not-scored\] \[sec\] container-runs-as-root/)
+  expect(summary).not.toMatch(/\[CVSS 0\.0\]/)
 
   const body = buildDeliveryDraftPrBody({
     repo: { repo_full_name: 'octo-org/example' },
@@ -314,33 +308,32 @@ test('repository renderer preserves CVSS not-scored state', () => {
     ]
   })
 
-  assert.match(body, /Outcome: `not-scored`/)
-  assert.match(body, /## Case Details/)
-  assert.doesNotMatch(body, /#### Case Summary/)
-  assert.doesNotMatch(body, /Verdict: `confirmed-defect`/)
-  assert.doesNotMatch(body, /Affected paths:/)
-  assert.doesNotMatch(body, /##### Evidence anchors/)
-  assert.doesNotMatch(body, /Coverage: `full`/)
-  assert.doesNotMatch(body, /Next step: `none`/)
-  assert.doesNotMatch(body, /Case deliverable:/)
-  assert.doesNotMatch(body, /- Analysis: `confirmed security defect`/)
-  assert.doesNotMatch(body, /## Delivery CVSS/)
-  assert.match(body, /<summary>CVSS<\/summary>/)
-  assert.doesNotMatch(body, /<!-- case-level mitigation overview -->/)
-  assert.doesNotMatch(body, /#### Mitigation notes/)
-  assert.doesNotMatch(body, /- Outcome: `patched`/)
-  assert.doesNotMatch(body, /Reviewer-visible concern\./)
-  assert.doesNotMatch(body, /##### Residual risks/)
-  assert.doesNotMatch(body, /^#### Evidence$/m)
-  assert.doesNotMatch(body, /#### Analyzer Result/)
-  assert.doesNotMatch(body, /#### CVSS Scoring/)
-  assert.doesNotMatch(body, /<summary>Audit metadata<\/summary>/)
-  assert.doesNotMatch(
-    body,
+  expect(body).toMatch(/Outcome: `not-scored`/)
+  expect(body).toMatch(/## Case Details/)
+  expect(body).not.toMatch(/#### Case Summary/)
+  expect(body).not.toMatch(/Verdict: `confirmed-defect`/)
+  expect(body).not.toMatch(/Affected paths:/)
+  expect(body).not.toMatch(/##### Evidence anchors/)
+  expect(body).not.toMatch(/Coverage: `full`/)
+  expect(body).not.toMatch(/Next step: `none`/)
+  expect(body).not.toMatch(/Case deliverable:/)
+  expect(body).not.toMatch(/- Analysis: `confirmed security defect`/)
+  expect(body).not.toMatch(/## Delivery CVSS/)
+  expect(body).toMatch(/<summary>CVSS<\/summary>/)
+  expect(body).not.toMatch(/<!-- case-level mitigation overview -->/)
+  expect(body).not.toMatch(/#### Mitigation notes/)
+  expect(body).not.toMatch(/- Outcome: `patched`/)
+  expect(body).not.toMatch(/Reviewer-visible concern\./)
+  expect(body).not.toMatch(/##### Residual risks/)
+  expect(body).not.toMatch(/^#### Evidence$/m)
+  expect(body).not.toMatch(/#### Analyzer Result/)
+  expect(body).not.toMatch(/#### CVSS Scoring/)
+  expect(body).not.toMatch(/<summary>Audit metadata<\/summary>/)
+  expect(body).not.toMatch(
     /This is hardening, not an independent vulnerability\./
   )
-  assert.doesNotMatch(body, /CVSS v4 base score: `n\/a` \(`unknown`\)/)
-  assert.doesNotMatch(body, /Target claim: \(none\)/)
+  expect(body).not.toMatch(/CVSS v4 base score: `n\/a` \(`unknown`\)/)
+  expect(body).not.toMatch(/Target claim: \(none\)/)
 })
 
 test('repository summary workflow view projects a validated repository result without reparsing', () => {
@@ -355,7 +348,7 @@ test('repository summary workflow view projects a validated repository result wi
     { run_id: 'run-1' }
   )
 
-  assert.deepStrictEqual(view, {
+  expect(view).toStrictEqual({
     run_id: 'run-1',
     case_count: 1,
     deletion_review_skipped: false,
@@ -396,9 +389,9 @@ test('repository draft PR body lists delivery modified files', () => {
     }
   })
 
-  assert.match(body, /## Modified Files/)
-  assert.match(body, /- `src\/server\.js`/)
-  assert.doesNotMatch(body, /Removed sensitive health metadata/)
+  expect(body).toMatch(/## Modified Files/)
+  expect(body).toMatch(/- `src\/server\.js`/)
+  expect(body).not.toMatch(/Removed sensitive health metadata/)
 })
 
 test('repository draft PR body renders case details from case results', () => {
@@ -443,16 +436,16 @@ test('repository draft PR body renders case details from case results', () => {
     ]
   })
 
-  assert.match(body, /## Case Details/)
-  assert.match(body, /<summary>View case case-1<\/summary>/)
-  assert.match(body, /- Analysis: `confirmed security defect`/)
-  assert.match(body, /<summary>Analysis<\/summary>/)
-  assert.match(body, /<summary>CVSS<\/summary>/)
-  assert.match(body, /<summary>Mitigation<\/summary>/)
-  assert.match(body, /<summary>Verification<\/summary>/)
-  assert.match(body, /Restrict preview root\./)
-  assert.match(body, /Reviewer-visible concern\./)
-  assert.doesNotMatch(body, /delivery\.cases/)
+  expect(body).toMatch(/## Case Details/)
+  expect(body).toMatch(/<summary>View case case-1<\/summary>/)
+  expect(body).toMatch(/- Analysis: `confirmed security defect`/)
+  expect(body).toMatch(/<summary>Analysis<\/summary>/)
+  expect(body).toMatch(/<summary>CVSS<\/summary>/)
+  expect(body).toMatch(/<summary>Mitigation<\/summary>/)
+  expect(body).toMatch(/<summary>Verification<\/summary>/)
+  expect(body).toMatch(/Restrict preview root\./)
+  expect(body).toMatch(/Reviewer-visible concern\./)
+  expect(body).not.toMatch(/delivery\.cases/)
 })
 
 test('repository draft PR case details use delivery fallback text', () => {
@@ -484,15 +477,13 @@ test('repository draft PR case details use delivery fallback text', () => {
     ]
   })
 
-  assert.match(
-    body,
+  expect(body).toMatch(
     /<summary>Mitigation<\/summary>\n\nNo mitigation overview was recorded\./
   )
-  assert.match(
-    body,
+  expect(body).toMatch(
     /<summary>Verification<\/summary>\n\nNo verification overview was recorded\./
   )
-  assert.doesNotMatch(body, /Verifier rejected the incomplete patch\./)
+  expect(body).not.toMatch(/Verifier rejected the incomplete patch\./)
 })
 
 test('repository summary notes shared modified files across deliveries', () => {
@@ -534,15 +525,14 @@ test('repository summary notes shared modified files across deliveries', () => {
     target_branch: 'main'
   })
 
-  assert.match(body, /### Coordination Notes/)
-  assert.match(body, /Shared modified file `src\/server\.js`/)
-  assert.match(body, /\[`case-1`\]\(https:\/\/example\.test\/pull\/1\)/)
-  assert.match(body, /\[`case-2`\]\(https:\/\/example\.test\/pull\/2\)/)
-  assert.match(
-    body,
+  expect(body).toMatch(/### Coordination Notes/)
+  expect(body).toMatch(/Shared modified file `src\/server\.js`/)
+  expect(body).toMatch(/\[`case-1`\]\(https:\/\/example\.test\/pull\/1\)/)
+  expect(body).toMatch(/\[`case-2`\]\(https:\/\/example\.test\/pull\/2\)/)
+  expect(body).toMatch(
     /These delivery PRs touch the same file; review publish order if publishing them together\./
   )
-  assert.doesNotMatch(body, /Shared modified file `Dockerfile`/)
+  expect(body).not.toMatch(/Shared modified file `Dockerfile`/)
 })
 
 test('repository renderer warns when deletion review was skipped', () => {
@@ -565,14 +555,14 @@ test('repository renderer warns when deletion review was skipped', () => {
     target_branch: 'main'
   })
 
-  assert.match(body, /Deletion review skipped/)
-  assert.match(body, /`250` files/)
+  expect(body).toMatch(/Deletion review skipped/)
+  expect(body).toMatch(/`250` files/)
   // The warning sits above the summary details, so skimming the top of the comment shows it.
-  assert.ok(
+  expect.assert(
     body.indexOf('Deletion review skipped') <
       body.indexOf('Review summary details')
   )
-  assert.match(body, /Deleted files in window: `250`/)
+  expect(body).toMatch(/Deleted files in window: `250`/)
 })
 
 test('repository renderer stays quiet when deletion review ran', () => {
@@ -592,8 +582,8 @@ test('repository renderer stays quiet when deletion review ran', () => {
     target_branch: 'main'
   })
 
-  assert.doesNotMatch(body, /Deletion review skipped/)
-  assert.match(body, /Deleted files in window: `4`/)
+  expect(body).not.toMatch(/Deletion review skipped/)
+  expect(body).toMatch(/Deleted files in window: `4`/)
 })
 
 test('repository summary distinguishes triage, reviewed and delivery-ready case counts', () => {
@@ -615,16 +605,16 @@ test('repository summary distinguishes triage, reviewed and delivery-ready case 
     scan_summary: { triaged_case_count: 1, deleted_file_count: 3 }
   })
   const view = buildRepositorySummaryWorkflowView(result, { run_id: 'counts' })
-  assert.equal(view.case_count, 2)
-  assert.equal(view.scan_summary.triaged_case_count, 1)
+  expect(view.case_count).toBe(2)
+  expect(view.scan_summary.triaged_case_count).toBe(1)
   const body = renderRepositorySecuritySummaryComment({
     workflow_result: view,
     published_delivery_entries: [],
     event_type: 'manual',
     target_branch: 'main'
   })
-  assert.match(body, /Reviewed cases: .2./)
-  assert.match(body, /Cases after triage: .1./)
-  assert.match(body, /Deleted files in window: .3./)
-  assert.match(body, /Ready for delivery: .1./)
+  expect(body).toMatch(/Reviewed cases: .2./)
+  expect(body).toMatch(/Cases after triage: .1./)
+  expect(body).toMatch(/Deleted files in window: .3./)
+  expect(body).toMatch(/Ready for delivery: .1./)
 })

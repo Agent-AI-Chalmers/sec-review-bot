@@ -1,6 +1,5 @@
 // Verifies a failure notice resolves its target repository without posting to the wrong one.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { classifyPreparationFailure } from '../../src/review-runs/preparation-failure.js'
 import { sendRunNoticeReply } from '../../src/review-runs/run-notice-reply.js'
@@ -95,16 +94,14 @@ test('a repository failure target must be exactly owner/repo', async () => {
       kind: 'failure',
       assert_notice_claim: keepNoticeClaim
     })
-    assert.strictEqual(
+    expect(
       result,
-      null,
       `${JSON.stringify(verified_repository)} must not resolve to a repository`
-    )
-    assert.deepStrictEqual(
+    ).toBe(null)
+    expect(
       report.created,
-      [],
       'no issue may be created for an invalid target'
-    )
+    ).toStrictEqual([])
   }
 })
 
@@ -128,9 +125,9 @@ test('a repository failure target tolerates surrounding whitespace', async () =>
     kind: 'failure',
     assert_notice_claim: keepNoticeClaim
   })
-  assert.deepStrictEqual(report.created, [{ owner: 'octo', repo: 'example' }])
-  assert.deepStrictEqual(report.commented, [9])
-  assert.strictEqual(result?.comment_url, 'https://example.test/comment/1')
+  expect(report.created).toStrictEqual([{ owner: 'octo', repo: 'example' }])
+  expect(report.commented).toStrictEqual([9])
+  expect(result?.comment_url).toBe('https://example.test/comment/1')
 })
 
 test('the reply target and the installation lookup agree on what names a repository', async () => {
@@ -163,11 +160,10 @@ test('the reply target and the installation lookup agree on what names a reposit
       assert_notice_claim: keepNoticeClaim
     })
     const namesARepository = repositoryFullName(verified_repository) !== null
-    assert.strictEqual(
+    expect(
       result !== null,
-      namesARepository,
       `${JSON.stringify(verified_repository)} must resolve the same way on both paths`
-    )
+    ).toBe(namesARepository)
   }
 })
 
@@ -191,7 +187,7 @@ test('an inaccessible target repository is refused before any write', async () =
       commented: [] as number[],
       installed: ['octo/example']
     }
-    await assert.rejects(
+    await expect(
       sendRunNoticeReply(stubOctokit(report), {
         run_id: 'run-foreign',
         notice_id: 'notice-foreign',
@@ -201,15 +197,14 @@ test('an inaccessible target repository is refused before any write', async () =
         kind: 'failure',
         assert_notice_claim: keepNoticeClaim
       }),
-      (error: unknown) => {
-        assert.strictEqual(classifyPreparationFailure(error, 1).retry, false)
-        assert.strictEqual((error as { status: number }).status, 404)
-        return true
-      },
       `${JSON.stringify(input)} must be refused`
-    )
-    assert.deepStrictEqual(report.created, [], 'no issue may be created')
-    assert.deepStrictEqual(report.commented, [], 'no comment may be posted')
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(classifyPreparationFailure(error, 1).retry).toBe(false)
+      expect((error as { status: number }).status).toBe(404)
+      return true
+    })
+    expect(report.created, 'no issue may be created').toStrictEqual([])
+    expect(report.commented, 'no comment may be posted').toStrictEqual([])
   }
 })
 
@@ -221,7 +216,7 @@ test('a transient repository lookup fault stays retryable', async () => {
     commented: [] as number[],
     installed: ['octo/example']
   }
-  await assert.rejects(
+  await expect(
     sendRunNoticeReply(stubOctokit(report, { repoLookupFailsWith: 502 }), {
       run_id: 'run-transient',
       notice_id: 'notice-test',
@@ -233,10 +228,9 @@ test('a transient repository lookup fault stays retryable', async () => {
       reason_code: 'PREPARATION_RETRY_EXHAUSTED',
       kind: 'failure',
       assert_notice_claim: keepNoticeClaim
-    }),
-    /Server Error/
-  )
-  assert.deepStrictEqual(report.created, [])
+    })
+  ).rejects.toThrow(/Server Error/)
+  expect(report.created).toStrictEqual([])
 })
 
 test('a notice without a failure code says so instead of inventing one', async () => {
@@ -262,12 +256,12 @@ test('a notice without a failure code says so instead of inventing one', async (
     assert_notice_claim: keepNoticeClaim
   })
 
-  assert.strictEqual(report.bodies.length, 1)
+  expect(report.bodies).toHaveLength(1)
   const body = report.bodies[0]!
-  assert.doesNotMatch(body, /[A-Z_]+_FAILED/, 'no synthesized code may appear')
-  assert.doesNotMatch(body, /Reason:/, 'there is no reason to state')
-  assert.match(body, /no failure code/i)
-  assert.match(body, /run-no-code/, 'the run is still identified')
+  expect(body, 'no synthesized code may appear').not.toMatch(/[A-Z_]+_FAILED/)
+  expect(body, 'there is no reason to state').not.toMatch(/Reason:/)
+  expect(body).toMatch(/no failure code/i)
+  expect(body, 'the run is still identified').toMatch(/run-no-code/)
 })
 
 test('a notice with a failure code still states it', async () => {
@@ -290,8 +284,8 @@ test('a notice with a failure code still states it', async () => {
     assert_notice_claim: keepNoticeClaim
   })
 
-  assert.strictEqual(report.bodies.length, 1)
-  assert.match(report.bodies[0]!, /Reason: `EXECUTION_RESULT_MISSING`\./)
+  expect(report.bodies).toHaveLength(1)
+  expect(report.bodies[0]!).toMatch(/Reason: `EXECUTION_RESULT_MISSING`\./)
 })
 
 test('a lost notice claim stops before the public comment write', async () => {
@@ -301,7 +295,7 @@ test('a lost notice claim stops before the public comment write', async () => {
     installed: ['octo/example']
   }
 
-  await assert.rejects(
+  await expect(
     sendRunNoticeReply(stubOctokit(report), {
       run_id: 'run-resumed',
       notice_id: 'notice-superseded',
@@ -319,15 +313,13 @@ test('a lost notice claim stops before the public comment write', async () => {
       assert_notice_claim: async () => {
         throw new Error('notice claim lost')
       }
-    }),
-    /notice claim lost/
-  )
-  assert.deepStrictEqual(report.created, [])
-  assert.deepStrictEqual(
+    })
+  ).rejects.toThrow(/notice claim lost/)
+  expect(report.created).toStrictEqual([])
+  expect(
     report.commented,
-    [],
     'the repository may be read, but no comment may be written after claim loss'
-  )
+  ).toStrictEqual([])
 })
 
 for (const limited of [true, false]) {
@@ -349,7 +341,7 @@ for (const limited of [true, false]) {
           }
         )
     )
-    await assert.rejects(
+    await expect(
       sendRunNoticeReply(octokit, {
         run_id: 'run-limited',
         notice_id: 'notice-limited',
@@ -360,13 +352,12 @@ for (const limited of [true, false]) {
         kind: 'failure',
         reason_code: null,
         assert_notice_claim: keepNoticeClaim
-      }),
-      (error: unknown) => {
-        const classification = classifyPreparationFailure(error, 1)
-        assert.strictEqual(classification.retry, limited)
-        if (limited) assert.strictEqual(classification.retryAfterMs, 60_000)
-        return true
-      }
-    )
+      })
+    ).rejects.toSatisfy((error: unknown) => {
+      const classification = classifyPreparationFailure(error, 1)
+      expect(classification.retry).toBe(limited)
+      if (limited) expect(classification.retryAfterMs).toBe(60_000)
+      return true
+    })
   })
 }

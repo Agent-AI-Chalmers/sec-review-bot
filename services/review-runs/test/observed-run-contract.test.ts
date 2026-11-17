@@ -4,10 +4,9 @@
 // they cannot drift apart by construction. This test covers what that cannot see: that the
 // producer's own output actually satisfies the schema, and that the shared fixtures match or
 // violate it exactly as the manifest claims, by running a real JSON Schema validator.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   Ajv2020,
@@ -67,20 +66,18 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Review Runs never sends, so both directions are asserted.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    assert.strictEqual(
+    expect(
       validate(schemaName, fixture(name)),
-      true,
       `${name} must be accepted`
-    )
+    ).toBe(true)
   }
   for (const [name, schemaName] of Object.entries(
     manifest.invalid_schema_fixtures
   )) {
-    assert.strictEqual(
+    expect(
       validate(schemaName, fixture(name)),
-      false,
       `${name} must be rejected`
-    )
+    ).toBe(false)
   }
 })
 
@@ -98,23 +95,20 @@ test('a comment_url must be an absolute URI, not just any string', () => {
       }
     ]
   })
-  assert.strictEqual(
+  expect(
     validate('observed-run.schema.json', withUrl('https://example.test/c/1')),
-    true,
     'an absolute https URI is accepted'
-  )
+  ).toBe(true)
   for (const bad of ['not a url', '', 'example.test/c/1', 42]) {
-    assert.strictEqual(
+    expect(
       validate('observed-run.schema.json', withUrl(bad)),
-      false,
       `${JSON.stringify(bad)} must not be accepted as a comment_url`
-    )
+    ).toBe(false)
   }
-  assert.strictEqual(
+  expect(
     validate('observed-run.schema.json', withUrl(null)),
-    true,
     'null stays valid: it is how "nobody was told" is reported'
-  )
+  ).toBe(true)
 })
 
 /** Every key path in `value`, so two fixtures can be compared by shape alone. */
@@ -157,7 +151,7 @@ test('token usage keeps the documented subset invariants', () => {
       const cacheRead = usage.cache_read_input_tokens
       const cacheCreation = usage.cache_creation_input_tokens
       if (input != null && cacheRead != null && cacheCreation != null) {
-        assert.ok(
+        expect.assert(
           cacheRead + cacheCreation <= input,
           `${name}: cache read + creation must not exceed input_tokens`
         )
@@ -165,18 +159,17 @@ test('token usage keeps the documented subset invariants', () => {
       const output = usage.output_tokens
       const reasoning = usage.reasoning_tokens
       if (output != null && reasoning != null) {
-        assert.ok(
+        expect.assert(
           reasoning <= output,
           `${name}: reasoning_tokens must not exceed output_tokens`
         )
       }
       const total = usage.total_tokens
       if (total != null && input != null && output != null) {
-        assert.strictEqual(
+        expect(
           total,
-          input + output,
           `${name}: total_tokens must equal input_tokens + output_tokens`
-        )
+        ).toBe(input + output)
       }
     }
   }
@@ -205,7 +198,7 @@ test('each invalid fixture differs from its valid counterpart only where it inte
       const extra = actual.filter((item) => !expected.includes(item))
       const missing = expected.filter((item) => !actual.includes(item))
       const mayOmit = name.includes('missing-') || name.includes('without-')
-      assert.ok(
+      expect.assert(
         extra.length <= 1 && (mayOmit || missing.length === 0),
         `${name} must keep the shape of ${valid} so it fails on its own defect ` +
           `(unexpected: ${extra.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'})`
@@ -266,31 +259,30 @@ test('the redacted read never carries a field the observed schema does not decla
   // rule that a new internal field must enter the read contract or stay off the record.
   const record = recordWith(null)
   const observed = observeRun(record) as unknown as Record<string, unknown>
-  assert.deepStrictEqual(
+  expect(
     Object.keys(observed).sort(),
-    [
-      'artifact_storage',
-      'connector_id',
-      'created_at',
-      'execution',
-      'execution_statistics',
-      'failure_code',
-      'notices',
-      'preparation',
-      'publication',
-      'run_id',
-      'source_platform',
-      'workflow'
-    ],
     'the observed run must carry exactly the fields its schema declares'
-  )
+  ).toStrictEqual([
+    'artifact_storage',
+    'connector_id',
+    'created_at',
+    'execution',
+    'execution_statistics',
+    'failure_code',
+    'notices',
+    'preparation',
+    'publication',
+    'run_id',
+    'source_platform',
+    'workflow'
+  ])
   // The connector-owned record fields are the ones that must not survive redaction.
   for (const dropped of [
     'publish_context',
     'execution_input',
     'failure_message'
   ]) {
-    assert.ok(
+    expect.assert(
       !(dropped in observed),
       `${dropped} is record-only and must not reach the redacted read`
     )
@@ -299,30 +291,28 @@ test('the redacted read never carries a field the observed schema does not decla
   // case that matters most: an internal field attached to an axis. The preparation summary is
   // the axis most likely to grow one, and every field it carries must be one the schema names.
   const preparation = observed.preparation as Record<string, unknown>
-  assert.deepStrictEqual(
+  expect(
     Object.keys(preparation).sort(),
-    [
-      'attempt_count',
-      'disconnect_reason',
-      'failure_code',
-      'finished_at',
-      'started_at',
-      'status',
-      'updated_at'
-    ],
     'every preparation field must be a field the read contract declares'
-  )
+  ).toStrictEqual([
+    'attempt_count',
+    'disconnect_reason',
+    'failure_code',
+    'finished_at',
+    'started_at',
+    'status',
+    'updated_at'
+  ])
 })
 
 test('what observeRun returns validates against the shared schema', () => {
   // The schema is only a contract while the producer's own output satisfies it. This is
   // the check that would catch a status the schema's enum does not list.
   const withoutArtifact = observeRun(recordWith(null))
-  assert.strictEqual(
+  expect(
     validate('observed-run.schema.json', withoutArtifact),
-    true,
     `observeRun output must be accepted: ${JSON.stringify(withoutArtifact)}`
-  )
+  ).toBe(true)
 
   const withArtifact = observeRun(
     recordWith({
@@ -336,9 +326,8 @@ test('what observeRun returns validates against the shared schema', () => {
       }
     } as ReviewRunRecord['artifact_storage'])
   )
-  assert.strictEqual(
+  expect(
     validate('observed-run.schema.json', withArtifact),
-    true,
     `observeRun output must be accepted: ${JSON.stringify(withArtifact)}`
-  )
+  ).toBe(true)
 })

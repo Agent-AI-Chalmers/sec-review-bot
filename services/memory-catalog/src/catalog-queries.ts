@@ -13,7 +13,7 @@ import type {
   MemoryTreeVersion,
   MemoryTreeVersionList,
   ObservationBacklog,
-  ObservationList,
+  ObservationList
 } from './contract-types-generated.js'
 
 type CatalogOverviewRange = '30d' | '90d' | 'all'
@@ -34,12 +34,12 @@ export interface MemoryCatalogQueries {
   listExtractions(
     cursor: string | undefined,
     limit: number,
-    filters: ExtractionListFilters,
+    filters: ExtractionListFilters
   ): Promise<ExtractionList>
   listObservations(
     cursor: string | undefined,
     limit: number,
-    filters: ObservationListFilters,
+    filters: ObservationListFilters
   ): Promise<ObservationList>
   getObservationBacklog(): Promise<ObservationBacklog>
   getCatalogOverview(range: CatalogOverviewRange): Promise<CatalogOverview>
@@ -48,7 +48,7 @@ export interface MemoryCatalogQueries {
   getMemoryTreeVersion(version: number): Promise<MemoryTreeVersion | undefined>
   listMemoryTreeVersions(
     beforeVersion: number | undefined,
-    limit: number,
+    limit: number
   ): Promise<MemoryTreeVersionList>
 }
 
@@ -82,7 +82,7 @@ function decodeCursor(value: string | undefined): CatalogCursor | undefined {
   if (value === undefined) return undefined
   try {
     const decoded: unknown = JSON.parse(
-      Buffer.from(value, 'base64url').toString('utf8'),
+      Buffer.from(value, 'base64url').toString('utf8')
     )
     if (
       typeof decoded !== 'object' ||
@@ -99,7 +99,7 @@ function decodeCursor(value: string | undefined): CatalogCursor | undefined {
     }
     return {
       createdAt: decoded.createdAt,
-      rowId: decoded.rowId,
+      rowId: decoded.rowId
     }
   } catch {
     throw new InvalidCatalogCursorError('Invalid catalog pagination cursor.')
@@ -111,7 +111,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   constructor(private readonly pool: Pick<Pool, 'query'>) {}
 
   async getExtraction(
-    extractionId: string,
+    extractionId: string
   ): Promise<ExtractionRecord | undefined> {
     const result = await this.pool.query<{
       extraction_id: string
@@ -132,7 +132,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
               extraction.created_at
        from extractions extraction
        where extraction.extraction_id=$1`,
-      [extractionId],
+      [extractionId]
     )
     const row = result.rows[0]
     return row
@@ -144,7 +144,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
           execution_archive_digest: row.execution_archive_digest,
           trajectory_reference: row.trajectory_reference,
           observations: row.observations,
-          created_at: row.created_at.toISOString(),
+          created_at: row.created_at.toISOString()
         }
       : undefined
   }
@@ -152,7 +152,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   async listExtractions(
     cursorValue: string | undefined,
     limit: number,
-    filters: ExtractionListFilters,
+    filters: ExtractionListFilters
   ): Promise<ExtractionList> {
     const cursor = decodeCursor(cursorValue)
     const result = await this.pool.query<{
@@ -186,8 +186,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         filters.sourceWorkflow ?? null,
         filters.sourceRunId ?? null,
         filters.hasObservation ?? null,
-        limit + 1,
-      ],
+        limit + 1
+      ]
     )
     const rows = result.rows.slice(0, limit)
     return {
@@ -196,16 +196,16 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
               createdAt: rows[rows.length - 1]!.created_at.toISOString(),
-              rowId: rows[rows.length - 1]!.extraction_id,
+              rowId: rows[rows.length - 1]!.extraction_id
             })
-          : null,
+          : null
     }
   }
 
   async listObservations(
     cursorValue: string | undefined,
     limit: number,
-    filters: ObservationListFilters,
+    filters: ObservationListFilters
   ): Promise<ObservationList> {
     const cursor = decodeCursor(cursorValue)
     const result = await this.pool.query<{
@@ -236,8 +236,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         cursor?.rowId ?? null,
         filters.status ?? null,
         filters.consumedVersion ?? null,
-        limit + 1,
-      ],
+        limit + 1
+      ]
     )
     const rows = result.rows.slice(0, limit)
     return {
@@ -249,15 +249,15 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         body_markdown: row.body_markdown,
         consumed_version:
           row.consumed_version === null ? null : Number(row.consumed_version),
-        created_at: row.created_at.toISOString(),
+        created_at: row.created_at.toISOString()
       })),
       next_cursor:
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
               createdAt: rows[rows.length - 1]!.created_at.toISOString(),
-              rowId: rows[rows.length - 1]!.observation_id,
+              rowId: rows[rows.length - 1]!.observation_id
             })
-          : null,
+          : null
     }
   }
 
@@ -274,12 +274,12 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
     return {
       pending_count: Number(row.pending_count),
       oldest_pending_created_at:
-        row.oldest_pending_created_at?.toISOString() ?? null,
+        row.oldest_pending_created_at?.toISOString() ?? null
     }
   }
 
   async getCatalogOverview(
-    range: CatalogOverviewRange,
+    range: CatalogOverviewRange
   ): Promise<CatalogOverview> {
     const boundedTrend = `with bounds as (
              select (current_timestamp at time zone 'UTC')::date as current_period
@@ -377,7 +377,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         units_with_observation_count: string
       }>(
         range === 'all' ? allTimeTrend : boundedTrend,
-        range === 'all' ? [] : [range === '30d' ? 29 : 89],
+        range === 'all' ? [] : [range === '30d' ? 29 : 89]
       ),
       this.pool.query<{
         source_workflow: string
@@ -400,7 +400,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
                   count(*) filter (where not has_observation)
                     as units_without_observation_count
            from unit_outcomes group by source_workflow
-           order by extracted_unit_count desc, source_workflow`),
+           order by extracted_unit_count desc, source_workflow`)
     ])
     const totals = totalsResult.rows[0]
     if (totals === undefined)
@@ -410,29 +410,29 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         completed_extraction_count: Number(totals.completed_extraction_count),
         extracted_unit_count: Number(totals.extracted_unit_count),
         units_with_observation_count: Number(
-          totals.units_with_observation_count,
+          totals.units_with_observation_count
         ),
         units_without_observation_count: Number(
-          totals.units_without_observation_count,
+          totals.units_without_observation_count
         ),
         observation_count: Number(totals.observation_count),
         pending_observation_count: Number(totals.pending_observation_count),
-        consumed_observation_count: Number(totals.consumed_observation_count),
+        consumed_observation_count: Number(totals.consumed_observation_count)
       },
       trend_granularity: range === 'all' ? 'month' : 'day',
       trend_points: trendResult.rows.map((row) => ({
         period_start: row.period_start,
         extracted_unit_count: Number(row.extracted_unit_count),
-        units_with_observation_count: Number(row.units_with_observation_count),
+        units_with_observation_count: Number(row.units_with_observation_count)
       })),
       workflows: workflowsResult.rows.map((row) => ({
         source_workflow: row.source_workflow,
         extracted_unit_count: Number(row.extracted_unit_count),
         units_with_observation_count: Number(row.units_with_observation_count),
         units_without_observation_count: Number(
-          row.units_without_observation_count,
-        ),
-      })),
+          row.units_without_observation_count
+        )
+      }))
     }
   }
 
@@ -451,7 +451,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       state: row.state,
       version: Number(row.version),
       changed_by: row.changed_by,
-      changed_at: row.changed_at.toISOString(),
+      changed_at: row.changed_at.toISOString()
     }
   }
 
@@ -468,12 +468,12 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
     if (row === undefined) throw new Error('Memory tree state row is missing.')
     return {
       version: Number(row.version),
-      memory_tree_reference: row.memory_tree_reference,
+      memory_tree_reference: row.memory_tree_reference
     }
   }
 
   async getMemoryTreeVersion(
-    version: number,
+    version: number
   ): Promise<MemoryTreeVersion | undefined> {
     const result = await this.pool.query<VersionRow>(
       `select version.version, version.predecessor_version, version.source_kind,
@@ -487,7 +487,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
          on observation.consumed_version=version.version
        where version.version=$1
        group by version.version`,
-      [version],
+      [version]
     )
     const row = result.rows[0]
     return row ? projectVersion(row) : undefined
@@ -495,7 +495,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
 
   async listMemoryTreeVersions(
     beforeVersion: number | undefined,
-    limit: number,
+    limit: number
   ): Promise<MemoryTreeVersionList> {
     const result = await this.pool.query<VersionRow>(
       `select version.version, version.predecessor_version, version.source_kind,
@@ -510,7 +510,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
        where ($1::bigint is null or version.version < $1)
        group by version.version
        order by version.version desc limit $2`,
-      [beforeVersion ?? null, limit + 1],
+      [beforeVersion ?? null, limit + 1]
     )
     const rows = result.rows.slice(0, limit)
     return {
@@ -518,7 +518,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       next_before_version:
         result.rows.length > limit && rows.length > 0
           ? Number(rows[rows.length - 1]?.version)
-          : null,
+          : null
     }
   }
 }
@@ -541,7 +541,7 @@ function projectExtraction(row: {
     execution_archive_digest: row.execution_archive_digest,
     trajectory_reference: row.trajectory_reference,
     observations: row.observations,
-    created_at: row.created_at.toISOString(),
+    created_at: row.created_at.toISOString()
   }
 }
 
@@ -554,12 +554,12 @@ function projectVersion(row: VersionRow): MemoryTreeVersion {
           observation_ids: row.observation_ids,
           trajectory_reference: requireValue(
             row.trajectory_reference,
-            'trajectory_reference',
+            'trajectory_reference'
           ),
           maintenance_report: requireValue(
             row.maintenance_report,
-            'maintenance_report',
-          ),
+            'maintenance_report'
+          )
         }
       : row.source_kind === 'reorganization'
         ? {
@@ -567,17 +567,17 @@ function projectVersion(row: VersionRow): MemoryTreeVersion {
             operation_id: row.operation_id,
             trajectory_reference: requireValue(
               row.trajectory_reference,
-              'trajectory_reference',
+              'trajectory_reference'
             ),
             maintenance_report: requireValue(
               row.maintenance_report,
-              'maintenance_report',
-            ),
+              'maintenance_report'
+            )
           }
         : {
             kind: 'manual' as const,
             operation_id: row.operation_id,
-            actor: requireValue(row.actor, 'actor'),
+            actor: requireValue(row.actor, 'actor')
           }
   return {
     version: Number(row.version),
@@ -585,7 +585,7 @@ function projectVersion(row: VersionRow): MemoryTreeVersion {
       row.predecessor_version === null ? null : Number(row.predecessor_version),
     memory_tree_reference: row.memory_tree_reference,
     source,
-    created_at: row.created_at.toISOString(),
+    created_at: row.created_at.toISOString()
   }
 }
 

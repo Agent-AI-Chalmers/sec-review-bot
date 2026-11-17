@@ -1,7 +1,7 @@
 import type {
   RunResponse,
   ExecutionWorkflow,
-  WorkflowInputByName,
+  WorkflowInputByName
 } from './execution-api-types-generated.js'
 
 // Derive each workflow/input pair from the generated API mapping. The Temporal
@@ -24,7 +24,7 @@ export class ExecutionRunConflictError extends Error {
   constructor(
     readonly runId: string,
     readonly requestedWorkflow: string,
-    readonly existingWorkflow?: string,
+    readonly existingWorkflow?: string
   ) {
     super(`Execution run_id ${runId} is already bound to another request.`)
   }

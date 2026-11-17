@@ -17,6 +17,14 @@
 // was unnecessary. It returns result objects rather than calling `context.report`, which is
 // how Spectral 6's plain function form communicates findings.
 
+// @ts-check
+
+/**
+ * @param {{ security?: unknown }} operation
+ * @param {unknown} _options
+ * @param {{ path: (string | number)[] }} context
+ * @returns {{ message: string, path: (string | number)[] }[] | undefined}
+ */
 export default function operationRequiresSecurity(
   operation,
   _options,

@@ -1,12 +1,11 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { Pool } from 'pg'
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 async function fixture() {
   const connectionString = process.env.TEST_DATABASE_URL
-  assert.ok(connectionString)
+  expect.assert(connectionString)
   const connectorId = `input-publication:${randomUUID()}`
   const store = new ReviewRunStore({ connectionString, connectorId })
   await store.initialize()
@@ -18,7 +17,7 @@ async function fixture() {
     preparation_input_version: 'v1',
     preparation_input: { kind: 'test' }
   })
-  assert.ok(admitted.preparation_token)
+  expect.assert(admitted.preparation_token)
   const runId = admitted.record.run_id
   const token = admitted.preparation_token
   const reference = {
@@ -49,25 +48,23 @@ test('selection requires published identical input and commits candidate, input 
   const f = await fixture()
   try {
     const { store, runId, token, intent } = f
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.savePreparedSubmission(
         runId,
         token,
         intent.publish_context,
         intent.input
-      ),
-      /no matching published candidate/
-    )
+      )
+    ).rejects.toThrow(/no matching published candidate/)
     await store.inputBundleCandidates.reserve(runId, token, intent)
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.savePreparedSubmission(
         runId,
         token,
         intent.publish_context,
         intent.input
-      ),
-      /no matching published candidate/
-    )
+      )
+    ).rejects.toThrow(/no matching published candidate/)
     await store.inputBundleCandidates.settle(
       runId,
       token,
@@ -80,19 +77,17 @@ test('selection requires published identical input and commits candidate, input 
       `UPDATE executions SET status='skipped', finished_at=clock_timestamp() WHERE run_id=$1`,
       [runId]
     )
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.savePreparedSubmission(
         runId,
         token,
         intent.publish_context,
         intent.input
-      ),
-      /outside pending/
-    )
-    assert.equal(
-      (await store.inputBundleCandidates.list(runId, token))[0]?.status,
-      'present'
-    )
+      )
+    ).rejects.toThrow(/outside pending/)
+    expect(
+      (await store.inputBundleCandidates.list(runId, token))[0]?.status
+    ).toBe('present')
     await f.pool.query(
       `UPDATE executions SET status='pending', finished_at=NULL WHERE run_id=$1`,
       [runId]
@@ -110,28 +105,27 @@ test('selection requires published identical input and commits candidate, input 
       intent.publish_context,
       intent.input
     )
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.savePreparedSubmission(
         runId,
         token,
         intent.publish_context,
         { ...intent.input, snapshot: 'changed' }
-      ),
-      /no matching published candidate/
-    )
-    await assert.rejects(
+      )
+    ).rejects.toThrow(/no matching published candidate/)
+    await expect(
       store.inputBundleCandidates.settle(
         runId,
         token,
         intent.reference.digest,
         'abandoned'
       )
-    )
+    ).rejects.toSatisfy(() => true)
     const rows = await f.pool.query(
       `SELECT c.status,e.input,p.input AS context FROM input_bundle_candidates c JOIN executions e USING(run_id) JOIN publications p USING(run_id) WHERE c.run_id=$1`,
       [runId]
     )
-    assert.deepStrictEqual(rows.rows, [
+    expect(rows.rows).toStrictEqual([
       {
         status: 'selected',
         input: intent.input,
@@ -151,37 +145,34 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
       `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [f.runId]
     )
-    assert.equal(await f.store.preparations.renewClaim(f.runId, f.token), false)
-    await assert.rejects(
-      f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent),
-      /claim was lost/
-    )
-    await assert.rejects(
+    expect(await f.store.preparations.renewClaim(f.runId, f.token)).toBe(false)
+    await expect(
+      f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
+    ).rejects.toThrow(/claim was lost/)
+    await expect(
       f.store.inputBundleCandidates.settle(
         f.runId,
         f.token,
         f.intent.reference.digest,
         'present'
-      ),
-      /claim was lost/
-    )
-    await assert.rejects(
+      )
+    ).rejects.toThrow(/claim was lost/)
+    await expect(
       f.store.submissionTransitions.savePreparedSubmission(
         f.runId,
         f.token,
         f.intent.publish_context,
         f.intent.input
-      ),
-      /claim was lost/
-    )
+      )
+    ).rejects.toThrow(/claim was lost/)
     await f.store.preparations.expireStale()
     const next = await f.store.preparations.claimNext()
-    assert.ok(next)
+    expect.assert(next)
     const candidates = await f.store.inputBundleCandidates.list(
       f.runId,
       next.claim_token
     )
-    assert.deepStrictEqual(candidates[0]?.input, f.intent.input)
+    expect(candidates[0]?.input).toStrictEqual(f.intent.input)
     await f.store.inputBundleCandidates.settle(
       f.runId,
       next.claim_token,
@@ -194,15 +185,14 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
       f.intent.publish_context,
       f.intent.input
     )
-    await assert.rejects(
+    await expect(
       f.store.inputBundleCandidates.settle(
         f.runId,
         f.token,
         f.intent.reference.digest,
         'present'
-      ),
-      /claim was lost/
-    )
+      )
+    ).rejects.toThrow(/claim was lost/)
   } finally {
     await f.close()
   }
@@ -216,34 +206,30 @@ test('reservation replay is immutable and connector/run ownership cannot be cros
       f.token,
       f.intent
     )
-    assert.deepStrictEqual(
-      await f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent),
-      first
-    )
-    await assert.rejects(
+    expect(
+      await f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
+    ).toStrictEqual(first)
+    await expect(
       f.store.inputBundleCandidates.reserve(f.runId, f.token, {
         ...f.intent,
         publish_context: { target: 'changed' }
-      }),
-      /conflicts/
-    )
+      })
+    ).rejects.toThrow(/conflicts/)
     const intruder = new ReviewRunStore({
       connectionString: process.env.TEST_DATABASE_URL!,
       connectorId: 'intruder'
     })
     await intruder.initialize()
     try {
-      await assert.rejects(
-        intruder.inputBundleCandidates.list(f.runId, f.token),
-        /claim was lost/
-      )
+      await expect(
+        intruder.inputBundleCandidates.list(f.runId, f.token)
+      ).rejects.toThrow(/claim was lost/)
     } finally {
       await intruder.close()
     }
-    await assert.rejects(
-      f.store.inputBundleCandidates.reserve(randomUUID(), f.token, f.intent),
-      /does not match its run/
-    )
+    await expect(
+      f.store.inputBundleCandidates.reserve(randomUUID(), f.token, f.intent)
+    ).rejects.toThrow(/does not match its run/)
     await f.store.preparations.fail(f.runId, f.token, {
       message: 'terminal failure'
     })
@@ -251,7 +237,7 @@ test('reservation replay is immutable and connector/run ownership cannot be cros
       'SELECT status FROM input_bundle_candidates WHERE run_id=$1',
       [f.runId]
     )
-    assert.equal(result.rows[0]?.status, 'abandoned')
+    expect(result.rows[0]?.status).toBe('abandoned')
   } finally {
     await f.close()
   }
@@ -266,10 +252,9 @@ test('takeover wins against a reservation waiting for its preparation lock', asy
       'SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE',
       [f.runId]
     )
-    const rejected = assert.rejects(
-      f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent),
-      /claim was lost/
-    )
+    const rejected = expect(
+      f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
+    ).rejects.toThrow(/claim was lost/)
     await blocker.query(
       `UPDATE preparations SET claim_token=$2 WHERE run_id=$1`,
       [f.runId, randomUUID()]
@@ -280,7 +265,7 @@ test('takeover wins against a reservation waiting for its preparation lock', asy
       'SELECT * FROM input_bundle_candidates WHERE run_id=$1',
       [f.runId]
     )
-    assert.equal(rows.rowCount, 0)
+    expect(rows.rowCount).toBe(0)
   } finally {
     blocker.release()
     await f.close()
@@ -308,24 +293,23 @@ test('publication operations cross the authenticated HTTP contract with real Pos
       headers: { authorization: 'Bearer publication-test' },
       payload: { token: f.token, ...f.intent }
     }
-    assert.equal(
+    expect(
       (
         await app.inject({
           ...request,
           headers: { authorization: 'Bearer reader-test' }
         })
-      ).statusCode,
-      401
-    )
-    assert.equal((await app.inject(request)).statusCode, 200)
+      ).statusCode
+    ).toBe(401)
+    expect((await app.inject(request)).statusCode).toBe(200)
     const listed = await app.inject({
       ...request,
       url: `${url}/reconcile`,
       payload: { token: f.token }
     })
-    assert.equal(listed.statusCode, 200)
-    assert.deepStrictEqual(listed.json()[0].input, f.intent.input)
-    assert.equal(
+    expect(listed.statusCode).toBe(200)
+    expect(listed.json()[0].input).toStrictEqual(f.intent.input)
+    expect(
       (
         await app.inject({
           ...request,
@@ -336,9 +320,8 @@ test('publication operations cross the authenticated HTTP contract with real Pos
             status: 'present'
           }
         })
-      ).statusCode,
-      200
-    )
+      ).statusCode
+    ).toBe(200)
     const invalid = await app.inject({
       ...request,
       payload: {
@@ -346,7 +329,7 @@ test('publication operations cross the authenticated HTTP contract with real Pos
         reference: { ...f.intent.reference, size_bytes: -1 }
       }
     })
-    assert.equal(invalid.statusCode, 400)
+    expect(invalid.statusCode).toBe(400)
   } finally {
     await app.close()
     await f.close()

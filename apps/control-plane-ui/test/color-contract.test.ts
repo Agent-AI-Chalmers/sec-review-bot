@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   parseThemeColors,
@@ -36,7 +35,7 @@ test('theme colors are read from the actual CSS rules', () => {
     [data-theme='dark'] { --surface-raised: #202020; --muted: #b5b5b5; }
   `)
 
-  assert.deepEqual(themes, {
+  expect(themes).toStrictEqual({
     light: {
       '--surface-raised': 'white',
       '--muted': '#595959'
@@ -57,7 +56,7 @@ test('insufficient semantic contrast blocks the color contract', () => {
     ['#ffffff', '#777777', '#111111']
   )
 
-  assert.ok(
+  expect.assert(
     issues.some(
       (issue) =>
         issue.severity === 'error' && issue.message.includes('light: --muted')
@@ -74,13 +73,12 @@ test('a registered color missing from both themes blocks the contract', () => {
 
   const issues = validateColorContract(themes, [])
 
-  assert.deepEqual(
-    issues.filter((issue) => issue.message.includes('--orphan')),
-    [
-      { severity: 'error', message: 'light: missing --orphan' },
-      { severity: 'error', message: 'dark: missing --orphan' }
-    ]
-  )
+  expect(
+    issues.filter((issue) => issue.message.includes('--orphan'))
+  ).toStrictEqual([
+    { severity: 'error', message: 'light: missing --orphan' },
+    { severity: 'error', message: 'dark: missing --orphan' }
+  ])
 })
 
 test('every registered color participates in the theme cross-fade', () => {
@@ -92,7 +90,7 @@ test('every registered color participates in the theme cross-fade', () => {
     }
   `)
 
-  assert.deepEqual(issues, [
+  expect(issues).toStrictEqual([
     {
       severity: 'error',
       message: '.theme-transition does not animate --link'
@@ -112,14 +110,14 @@ test('brand shades must get darker while near-duplicates only warn', () => {
     '#111111'
   ])
 
-  assert.ok(
+  expect.assert(
     reversed.some(
       (issue) =>
         issue.severity === 'error' &&
         issue.message === 'brand.2 must be darker than brand.1'
     )
   )
-  assert.ok(
+  expect.assert(
     duplicate.some(
       (issue) =>
         issue.severity === 'warning' && issue.message.includes('ΔE2000')

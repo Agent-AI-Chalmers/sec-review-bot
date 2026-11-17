@@ -1,12 +1,11 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { asErrorWithResponse } from '../../src/utils/error-utils.js'
 
 test('asErrorWithResponse reads an Octokit top-level status', () => {
   const error = Object.assign(new Error('Not Found'), { status: 404 })
 
-  assert.strictEqual(asErrorWithResponse(error).status, 404)
+  expect(asErrorWithResponse(error).status).toBe(404)
 })
 
 test('asErrorWithResponse falls back to a response status', () => {
@@ -18,5 +17,5 @@ test('asErrorWithResponse falls back to a response status', () => {
     }
   })
 
-  assert.strictEqual(asErrorWithResponse(error).status, 422)
+  expect(asErrorWithResponse(error).status).toBe(422)
 })

@@ -2,8 +2,7 @@
 // overlay; the generator refuses an overlay that leaves any of it untranslated. What the console
 // still has to guarantee is that it can tell apart transitions sharing a state pair, such as the
 // two operator conclusions of a disconnected preparation, in every language.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { STATE_MACHINES_BY_LANGUAGE } from '../browser/features/runs/state-machines.generated.js'
 import type { Language } from '../browser/shared/i18n.js'
@@ -21,7 +20,7 @@ test('transitions sharing a state pair retain distinct explanations in every lan
         for (const edges of groups.values()) {
           if (edges.length < 2) continue
           const labels: string[] = edges.map((edge) => edgeLabel(body, edge))
-          assert.equal(new Set(labels).size, edges.length, labels.join(' | '))
+          expect(new Set(labels).size, labels.join(' | ')).toBe(edges.length)
         }
       }
     }

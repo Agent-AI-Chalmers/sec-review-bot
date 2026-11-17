@@ -1,7 +1,6 @@
 import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Verifies durable run notices and recovered preparations through their separate coordinators.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parsePullRequestPreparationInput } from '../../src/review-runs/preparation-input.js'
 import {
@@ -98,24 +97,23 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
     }
   }
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
   // The installation lookup is the only request the App itself makes.
-  assert.strictEqual(requests.length, 1)
-  assert.match(requests[0]!.url, /\/repos\/octo\/example\/installation$/)
+  expect(requests).toHaveLength(1)
+  expect(requests[0]!.url).toMatch(/\/repos\/octo\/example\/installation$/)
   // The reply path then verifies the repository and posts the notice through the client.
-  assert.deepStrictEqual(
+  expect(
     client.requests.map(
       (request) => `${request.method} ${new URL(request.url).pathname}`
-    ),
-    [
-      'GET /repos/octo/example',
-      'GET /repos/octo/example/issues/7/comments',
-      'POST /repos/octo/example/issues/7/comments'
-    ]
-  )
+    )
+  ).toStrictEqual([
+    'GET /repos/octo/example',
+    'GET /repos/octo/example/issues/7/comments',
+    'POST /repos/octo/example/issues/7/comments'
+  ])
   const posted = client.requests[2]!.body as { body: string }
-  assert.match(posted.body, /run-pr-reference/)
-  assert.deepStrictEqual(completed, [
+  expect(posted.body).toMatch(/run-pr-reference/)
+  expect(completed).toStrictEqual([
     // The comment that was posted, so the console can link the requester to it.
     ['notice-test', 'notice-token', true, 'https://example.test/comment/9']
   ])
@@ -168,21 +166,21 @@ test('a repository scan failure reports into the repository summary issue', asyn
     }
   }
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
   const created = client.requests.find(
     (request) =>
       request.method === 'POST' &&
       new URL(request.url).pathname.endsWith('/comments')
   )
-  assert.ok(created, 'the failure must be posted as a comment')
+  expect.assert(created, 'the failure must be posted as a comment')
   const body = created.body as { body: string }
-  assert.ok(
-    new URL(created.url).pathname.includes('/issues/77/'),
+  expect(
+    new URL(created.url).pathname,
     'it reports into the existing summary issue, not a new one'
-  )
-  assert.match(body.body, /run-repository/)
-  assert.match(body.body, /PREPARATION_RETRY_EXHAUSTED/)
-  assert.deepStrictEqual(completed, [
+  ).toContain('/issues/77/')
+  expect(body.body).toMatch(/run-repository/)
+  expect(body.body).toMatch(/PREPARATION_RETRY_EXHAUSTED/)
+  expect(completed).toStrictEqual([
     ['notice-test', 'notice-token', true, 'https://example.test/comment/5']
   ])
 })
@@ -219,15 +217,14 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     respond: () => githubJson({ message: 'Not Found' }, 404)
   })
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
-  assert.deepStrictEqual(
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
+  expect(
     completed,
-    [
-      // No comment URL: nothing was posted, and the notice says so instead of staying open.
-      ['notice-test', 'notice-token', false]
-    ],
     'an unrecoverable notice is concluded, not left claimable'
-  )
+  ).toStrictEqual([
+    // No comment URL: nothing was posted, and the notice says so instead of staying open.
+    ['notice-test', 'notice-token', false]
+  ])
 })
 
 test('a process without the GitHub installation concludes the notice, which the single-role assumption forbids', async () => {
@@ -271,17 +268,14 @@ test('a process without the GitHub installation concludes the notice, which the 
     respond: () => githubJson({ message: 'Not Found' }, 404)
   })
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
-  assert.strictEqual(
-    claimed,
-    1,
-    'the claim is per connector, so this process takes it'
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
+  expect(claimed, 'the claim is per connector, so this process takes it').toBe(
+    1
   )
-  assert.deepStrictEqual(
+  expect(
     completed,
-    [['notice-test', 'notice-token', false]],
     'the notice is concluded as undelivered, not left for a process that could deliver it'
-  )
+  ).toStrictEqual([['notice-test', 'notice-token', false]])
 })
 
 test('a transient notice failure stays claimable for another attempt', async () => {
@@ -313,12 +307,11 @@ test('a transient notice failure stays claimable for another attempt', async () 
     respond: () => githubJson({ message: 'Server Error' }, 503)
   })
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
-  assert.deepStrictEqual(
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
+  expect(
     completed,
-    [],
     'a transient failure leaves the notice claimed for the next lease'
-  )
+  ).toStrictEqual([])
 })
 
 test('a notice whose claim was superseded never reaches GitHub', async () => {
@@ -347,17 +340,15 @@ test('a notice whose claim was superseded never reaches GitHub', async () => {
     respond: () => githubJson({ id: 42 })
   })
 
-  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
-  assert.deepStrictEqual(
+  expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
+  expect(
     requests,
-    [],
     'losing the durable claim must stop before even resolving a GitHub installation'
-  )
-  assert.strictEqual(
+  ).toStrictEqual([])
+  expect(
     completed,
-    false,
     'the stale owner cannot conclude a notice the operator already superseded'
-  )
+  ).toBe(false)
 })
 
 test('a recovered preparation with a malformed persisted issue is rejected, not cast', async () => {
@@ -404,8 +395,8 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
     store: failing
   })
 
-  assert.strictEqual(failures.length, 1)
-  assert.match(failures[0]!.message, /Preparation input .*issue\./)
+  expect(failures).toHaveLength(1)
+  expect(failures[0]!.message).toMatch(/Preparation input .*issue\./)
 })
 
 test('a recovered preparation with a malformed trusted default branch is rejected', async () => {
@@ -467,8 +458,8 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
     store: failing
   })
 
-  assert.strictEqual(failures.length, 1)
-  assert.match(failures[0]!.message, /trusted_default_branch\.head_sha/)
+  expect(failures).toHaveLength(1)
+  expect(failures[0]!.message).toMatch(/trusted_default_branch\.head_sha/)
 })
 
 test('a recovered issue carrying a non-string author is rejected', async () => {
@@ -525,12 +516,8 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
       store
     })
 
-    assert.strictEqual(
-      failures.length,
-      1,
-      `${JSON.stringify(bad)} must be rejected`
-    )
-    assert.match(failures[0]!.message, /issue\.issue_author/)
+    expect(failures, `${JSON.stringify(bad)} must be rejected`).toHaveLength(1)
+    expect(failures[0]!.message).toMatch(/issue\.issue_author/)
   }
 })
 
@@ -655,22 +642,20 @@ test('a claimed synchronize preparation recovers from the payload admission pers
   const validation_failures = failures.filter((message) =>
     /^Preparation input is missing /.test(message)
   )
-  assert.deepStrictEqual(
+  expect(
     validation_failures,
-    [],
     `recovery rejected the admitted payload: ${validation_failures.join('; ')}`
-  )
+  ).toStrictEqual([])
   // The recovered run must not narrow to a freshly fetched pull request: the
   // webhook `before` commit only exists in the persisted payload.
-  assert.strictEqual(
+  expect(
     client.requests.some(
       (request) =>
         request.method === 'GET' &&
         /\/pulls\/7$/.test(new URL(request.url).pathname)
     ),
-    false,
     'recovery must not re-read the pull request'
-  )
+  ).toBe(false)
 })
 
 test('reference recovery renews its claim and checkpoints the resolved PR before preparation', async () => {
@@ -680,8 +665,8 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
   const checkpoints: unknown[][] = []
   const failures: string[] = []
   const client = fakeGitHub(({ url }) => {
-    assert.equal(new URL(url).pathname, '/repos/octo/demo/pulls/7')
-    assert.deepEqual(events, ['renew'])
+    expect(new URL(url).pathname).toBe('/repos/octo/demo/pulls/7')
+    expect(events).toStrictEqual(['renew'])
     events.push('resolve')
     return githubJson({
       number: 7,
@@ -727,18 +712,18 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
     }
   }
   await prepareReviewRunsOnce({ app, store })
-  assert.deepEqual(events, ['renew', 'resolve', 'checkpoint'])
-  assert.equal(checkpoints.length, 1)
-  assert.deepEqual(checkpoints[0]?.slice(0, 2), [
+  expect(events).toStrictEqual(['renew', 'resolve', 'checkpoint'])
+  expect(checkpoints).toHaveLength(1)
+  expect(checkpoints[0]?.slice(0, 2)).toStrictEqual([
     'reference-run',
     'recovery-token'
   ])
   const checkpoint = parsePullRequestPreparationInput(checkpoints[0]?.[2])
-  assert.equal(checkpoint.pr?.head_sha, 'captured-head')
-  assert.equal(checkpoint.test_changes, 'deny')
-  assert.equal(checkpoint.pr_reference, undefined)
-  assert.ok(failures.length > 0)
-  assert.ok(failures.every((message) => message === 'stop at checkpoint'))
+  expect(checkpoint.pr?.head_sha).toBe('captured-head')
+  expect(checkpoint.test_changes).toBe('deny')
+  expect(checkpoint.pr_reference).toBe(undefined)
+  expect.assert(failures.length > 0)
+  expect.assert(failures.every((message) => message === 'stop at checkpoint'))
 })
 
 for (const kind of ['preparation', 'notice'] as const) {
@@ -809,11 +794,11 @@ for (const kind of ['preparation', 'notice'] as const) {
     })
     try {
       await Promise.resolve()
-      assert.strictEqual(stopped, false)
+      expect(stopped).toBe(false)
       releaseWork()
       await stopping
-      assert.strictEqual(completed, true)
-      assert.strictEqual(claims, 1)
+      expect(completed).toBe(true)
+      expect(claims).toBe(1)
     } finally {
       releaseWork()
       await stopping

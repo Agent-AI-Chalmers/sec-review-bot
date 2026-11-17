@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { promisify } from 'node:util'
 
 import type { Octokit } from 'octokit'
@@ -193,7 +192,7 @@ function issueContext(default_branch = 'main'): IssueContext {
 
 test(
   'issue prepare-input reads the setup declaration through the authenticated octokit',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'setup-auth-issue-'))
     const previousServer = process.env['GITHUB_SERVER_URL']
@@ -211,9 +210,9 @@ test(
         issue: issueContext(),
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
+      expect(prepared.input.setup_declaration).toBe(DECLARATION)
       // Read at the exact default-branch SHA, not a branch name.
-      assert.deepStrictEqual(contentRequests, [
+      expect(contentRequests).toStrictEqual([
         {
           owner: 'octo',
           repo: 'demo',
@@ -234,7 +233,7 @@ test(
 
 test(
   'repository prepare-input reads the setup declaration through the authenticated octokit',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'setup-auth-repo-'))
     const previousServer = process.env['GITHUB_SERVER_URL']
@@ -253,8 +252,8 @@ test(
         trusted_default_branch: { default_branch: 'main', head_sha },
         scan_mode: 'full'
       })
-      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
-      assert.deepStrictEqual(contentRequests, [
+      expect(prepared.input.setup_declaration).toBe(DECLARATION)
+      expect(contentRequests).toStrictEqual([
         {
           owner: 'octo',
           repo: 'demo',
@@ -275,7 +274,7 @@ test(
 
 test(
   'PR prepare-input reads the declaration from the base-repo identity, not the payload repository',
-  { concurrency: false },
+  { concurrent: false },
   async () => {
     // The default-branch SHA is resolved from the base repo
     // (`resolveTrustedRepositoryIdentity`). The declaration read must use the
@@ -338,8 +337,8 @@ test(
         }),
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
-      assert.deepStrictEqual(contentRequests, [
+      expect(prepared.input.setup_declaration).toBe(DECLARATION)
+      expect(contentRequests).toStrictEqual([
         {
           owner: 'mirror',
           repo: 'demo',

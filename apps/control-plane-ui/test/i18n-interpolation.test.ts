@@ -1,37 +1,31 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { messages, translate } from '../browser/shared/i18n.js'
 
 test('file names are literal values, including replacement syntax and placeholders', () => {
   for (const language of ['en', 'zh'] as const) {
     for (const file of ["cost-$&-$$-$`-$'.md", '{file}-{count}.md']) {
-      assert.equal(
-        translate(language, 'deleteFileWarning', { file }),
+      expect(translate(language, 'deleteFileWarning', { file })).toBe(
         messages[language].deleteFileWarning.split('{file}').join(file)
       )
     }
-    assert.equal(
-      translate(language, 'trajectoryEmptyArguments'),
+    expect(translate(language, 'trajectoryEmptyArguments')).toBe(
       messages[language].trajectoryEmptyArguments
     )
   }
 })
 
 test('multiple numeric parameters render in both languages', () => {
-  assert.equal(
-    translate('en', 'trajectoryShowing', { shown: 2, total: 10 }),
+  expect(translate('en', 'trajectoryShowing', { shown: 2, total: 10 })).toBe(
     'Showing 2 of 10 messages'
   )
-  assert.equal(
-    translate('zh', 'trajectoryShowing', { shown: 2, total: 10 }),
+  expect(translate('zh', 'trajectoryShowing', { shown: 2, total: 10 })).toBe(
     '显示 2 / 10 条消息'
   )
 })
 
 test('both catalogs have matching keys and interpolation parameters', () => {
-  assert.deepEqual(
-    Object.keys(messages.en).sort(),
+  expect(Object.keys(messages.en).sort()).toStrictEqual(
     Object.keys(messages.zh).sort()
   )
   for (const key of Object.keys(messages.en) as (keyof typeof messages.en)[]) {
@@ -39,10 +33,8 @@ test('both catalogs have matching keys and interpolation parameters', () => {
       [
         ...new Set([...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]))
       ].sort()
-    assert.deepEqual(
-      parameters(messages.en[key]),
-      parameters(messages.zh[key]),
-      key
+    expect(parameters(messages.en[key]), key).toStrictEqual(
+      parameters(messages.zh[key])
     )
   }
 })

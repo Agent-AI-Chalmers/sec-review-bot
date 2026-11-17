@@ -4,8 +4,7 @@
 // each case the dangerous failure is a *silent* one: the output still looks valid while
 // describing something the contract does not say. These pin the shapes that would be
 // silently mistranslated, so they fail the build instead.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { inlineLocalRefsForTest } from '../src/generate-schemas.js'
 import { applyTextOverlay } from '../src/generate-state-machines.js'
@@ -27,7 +26,7 @@ test('a non-string ErrorResponse.code member fails rather than disappearing', ()
     }
   } as unknown as OpenApiDocument
 
-  assert.throws(() => errorResponseCodes(spec), /must contain only strings/)
+  expect(() => errorResponseCodes(spec)).toThrow(/must contain only strings/)
 })
 
 test('string ErrorResponse.code members are returned sorted', () => {
@@ -37,7 +36,7 @@ test('string ErrorResponse.code members are returned sorted', () => {
     }
   } as unknown as OpenApiDocument
 
-  assert.deepStrictEqual(errorResponseCodes(spec), ['A', 'B'])
+  expect(errorResponseCodes(spec)).toStrictEqual(['A', 'B'])
 })
 
 test('a $ref with sibling keywords fails rather than dropping the siblings', () => {
@@ -46,30 +45,25 @@ test('a $ref with sibling keywords fails rather than dropping the siblings', () 
   // generator rejects it instead of emitting a schema that says less than the contract.
   const schemas = { Target: { type: 'string' } }
 
-  assert.throws(
-    () =>
-      inlineLocalRefsForTest(
-        { $ref: '#/components/schemas/Target', description: 'kept?' },
-        schemas
-      ),
-    /\$ref .* has sibling keywords \(description\)/
-  )
+  expect(() =>
+    inlineLocalRefsForTest(
+      { $ref: '#/components/schemas/Target', description: 'kept?' },
+      schemas
+    )
+  ).toThrow(/\$ref .* has sibling keywords \(description\)/)
 })
 
 test('a bare local $ref is inlined, and a dangling one fails', () => {
   const schemas = { Target: { type: 'string' } }
 
-  assert.deepStrictEqual(
-    inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas),
-    {
-      type: 'string'
-    }
-  )
-  assert.throws(
-    () =>
-      inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas),
-    /dangling \$ref/
-  )
+  expect(
+    inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas)
+  ).toStrictEqual({
+    type: 'string'
+  })
+  expect(() =>
+    inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas)
+  ).toThrow(/dangling \$ref/)
 })
 
 /** The `listRuns` query parameter the projection reads: one form-exploded object whose
@@ -101,7 +95,7 @@ test('the declared form-exploded query object projects to its property names', (
     properties: { limit: { type: 'integer' }, workflow: { type: 'string' } }
   })
 
-  assert.deepStrictEqual(listRunQueryParameters(spec), ['limit', 'workflow'])
+  expect(listRunQueryParameters(spec)).toStrictEqual(['limit', 'workflow'])
 })
 
 test('dropping additionalProperties: false fails rather than silently relaxing the query', () => {
@@ -113,8 +107,7 @@ test('dropping additionalProperties: false fails rather than silently relaxing t
     properties: { limit: { type: 'integer' } }
   })
 
-  assert.throws(
-    () => listRunQueryParameters(spec),
+  expect(() => listRunQueryParameters(spec)).toThrow(
     /additionalProperties: false on its query object/
   )
 })
@@ -132,8 +125,7 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
     }
   } as unknown as OpenApiDocument
 
-  assert.throws(
-    () => listRunQueryParameters(spec),
+  expect(() => listRunQueryParameters(spec)).toThrow(
     /not the expected form-exploded object/
   )
 })
@@ -178,7 +170,7 @@ function apply(actions: unknown[]): Record<string, unknown> {
 
 test('a complete text overlay replaces only text', () => {
   const block = apply(fullOverlay())
-  assert.deepStrictEqual(block.preparation, {
+  expect(block.preparation).toStrictEqual({
     title: '机',
     states: {
       a: { label: '甲', summary: '甲概述。', description: '状态甲。' }
@@ -193,41 +185,43 @@ test('a complete text overlay replaces only text', () => {
 test('an overlay target that no longer matches the contract fails', () => {
   const actions = fullOverlay()
   actions[1]!.target = "$['x-state-machines'].preparation.states.removed"
-  assert.throws(() => apply(actions), /matches no node/)
+  expect(() => apply(actions)).toThrow(/matches no node/)
 })
 
 test('two overlay actions on one node fail', () => {
   const actions = fullOverlay()
   actions.push({ ...actions[0]! })
-  assert.throws(() => apply(actions), /more than one action/)
+  expect(() => apply(actions)).toThrow(/more than one action/)
 })
 
 test('an overlay that changes contract structure fails', () => {
   const actions = fullOverlay()
   actions[2]!.update = { label: '放弃', reason: 'OTHER' }
-  assert.throws(() => apply(actions), /may only replace .* not reason/)
+  expect(() => apply(actions)).toThrow(/may only replace .* not reason/)
 })
 
 test('an overlay that adds a text field the contract lacks fails', () => {
   const actions = fullOverlay()
   actions[0]!.update = { title: '机', description: '多余' }
-  assert.throws(() => apply(actions), /not description/)
+  expect(() => apply(actions)).toThrow(/not description/)
 })
 
 test('empty translated text fails', () => {
   const actions = fullOverlay()
   actions[0]!.update = { title: ' ' }
-  assert.throws(() => apply(actions), /must be non-empty text/)
+  expect(() => apply(actions)).toThrow(/must be non-empty text/)
 })
 
 test('text left untranslated fails', () => {
-  assert.throws(() => apply(fullOverlay().slice(1)), /has no title translation/)
+  expect(() => apply(fullOverlay().slice(1))).toThrow(
+    /has no title translation/
+  )
 })
 
 test('a node translated only in part fails', () => {
   const actions = fullOverlay()
   delete actions[1]!.update.description
-  assert.throws(() => apply(actions), /has no description translation/)
+  expect(() => apply(actions)).toThrow(/has no description translation/)
 })
 
 test('a transition target that matches several transitions fails', () => {
@@ -238,40 +232,38 @@ test('a transition target that matches several transitions fails', () => {
     { from: 'a', to: 'a', label: 'x' },
     { from: 'a', to: 'a', label: 'y' }
   )
-  assert.throws(
-    () =>
-      applyTextOverlay(
-        block,
-        {
-          overlay: '1.0.0',
-          actions: [
-            {
-              target:
-                "$['x-state-machines'].preparation.transitions[?@.from=='a' && @.to=='a' && !@.reason]",
-              update: { label: '甲' }
-            }
-          ]
-        },
-        'zh.yaml'
-      ),
-    /matches 2 transitions/
-  )
+  expect(() =>
+    applyTextOverlay(
+      block,
+      {
+        overlay: '1.0.0',
+        actions: [
+          {
+            target:
+              "$['x-state-machines'].preparation.transitions[?@.from=='a' && @.to=='a' && !@.reason]",
+            update: { label: '甲' }
+          }
+        ]
+      },
+      'zh.yaml'
+    )
+  ).toThrow(/matches 2 transitions/)
 })
 
 test('an overlay target outside machines, states, and transitions fails', () => {
   const actions = fullOverlay()
   actions[0]!.target = "$['x-state-machines'].preparation.transitions[0]"
-  assert.throws(() => apply(actions), /is not a machine, state, or transition/)
+  expect(() => apply(actions)).toThrow(/is not a machine, state, or transition/)
 })
 
 test('an overlay transition target may space its filter operators freely', () => {
   const actions = fullOverlay()
   actions[2]!.target = actions[2]!.target.replaceAll(' && ', '&&')
-  assert.doesNotThrow(() => apply(actions))
+  expect(() => apply(actions)).not.toThrow()
 })
 
 test('a state summary must be translated independently of its description', () => {
   const actions = fullOverlay()
   delete actions[1]!.update.summary
-  assert.throws(() => apply(actions), /has no summary translation/)
+  expect(() => apply(actions)).toThrow(/has no summary translation/)
 })

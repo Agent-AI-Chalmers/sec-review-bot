@@ -17,7 +17,7 @@ function schema(): Record<string, unknown> & ExecutionWorkflowInputSchema {
     contractsRoot(),
     'execution-workflow',
     'v1',
-    'execution-workflow-input.schema.json',
+    'execution-workflow-input.schema.json'
   )
   return JSON.parse(readFileSync(schemaPath, 'utf8')) as Record<
     string,
@@ -31,28 +31,28 @@ export function executionWorkflowType(): string {
 }
 
 export function validateExecutionWorkflowInput(
-  value: unknown,
+  value: unknown
 ): asserts value is Omit<ExecutionWorkflowInput, 'input'> & { input: unknown } {
   if (!validator) {
     const ajv = new Ajv2020Module.default({ allErrors: true, strict: true })
     ajv.addKeyword({
       keyword: 'x-temporal-workflow-type',
       schemaType: 'string',
-      valid: true,
+      valid: true
     })
     validator = ajv.compile(schema())
   }
   if (!validator(value)) {
     const first = validator.errors?.[0]
     throw new Error(
-      `Execution Workflow input does not match execution-workflow/v1: ${first?.instancePath || '<root>'} ${first?.message ?? 'is invalid'}`,
+      `Execution Workflow input does not match execution-workflow/v1: ${first?.instancePath || '<root>'} ${first?.message ?? 'is invalid'}`
     )
   }
 }
 
 /** Validate a complete submission and preserve its workflow/input relationship. */
 export function validateExecutionSubmission(
-  value: unknown,
+  value: unknown
 ): asserts value is ExecutionWorkflowInput {
   validateExecutionWorkflowInput(value)
   validateExecutionInput(value.workflow, value.input)

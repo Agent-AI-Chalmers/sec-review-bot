@@ -2,7 +2,7 @@
 // or a short-lived local Docker PostgreSQL instance, then always removes any instance it owns.
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { parse } from 'yaml'
@@ -21,7 +21,7 @@ async function configuredPostgresImage(): Promise<string> {
   // Compose owns the deployed PostgreSQL version. The ephemeral test database
   // deliberately uses that same image rather than maintaining a second tag.
   const compose = parse(
-    await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8'),
+    await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8')
   ) as { services?: { postgres?: { image?: unknown } } }
   const image = compose.services?.postgres?.image
   if (typeof image !== 'string' || image.trim() === '')
@@ -32,13 +32,13 @@ async function configuredPostgresImage(): Promise<string> {
 function run(
   command: string,
   args: string[],
-  environment = process.env,
+  environment = process.env
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: catalogDirectory,
       env: environment,
-      stdio: 'inherit',
+      stdio: 'inherit'
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
@@ -47,8 +47,8 @@ function run(
         new Error(
           `${command} ${args.join(' ')} exited with ${
             signal === null ? `code ${code}` : `signal ${signal}`
-          }.`,
-        ),
+          }.`
+        )
       )
     })
   })
@@ -59,7 +59,7 @@ function capture(command: string, args: string[]): Promise<string> {
     let output = ''
     const child = spawn(command, args, {
       cwd: catalogDirectory,
-      stdio: ['ignore', 'pipe', 'inherit'],
+      stdio: ['ignore', 'pipe', 'inherit']
     })
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {
@@ -69,7 +69,7 @@ function capture(command: string, args: string[]): Promise<string> {
     child.once('exit', (code) => {
       if (code === 0) return resolve(output.trim())
       reject(
-        new Error(`${command} ${args.join(' ')} exited with code ${code}.`),
+        new Error(`${command} ${args.join(' ')} exited with code ${code}.`)
       )
     })
   })
@@ -88,7 +88,7 @@ async function waitForPostgres(containerName: string): Promise<void> {
         containerName,
         'pg_isready',
         '--username=postgres',
-        '--dbname=postgres',
+        '--dbname=postgres'
       ])
       return
     } catch {
@@ -98,20 +98,19 @@ async function waitForPostgres(containerName: string): Promise<void> {
   throw new Error('Timed out waiting for temporary PostgreSQL to become ready.')
 }
 
-async function integrationTestFiles(): Promise<string[]> {
-  const directory = path.join(catalogDirectory, 'test', 'integration')
-  return (await readdir(directory))
-    .filter((entry) => entry.endsWith('.test.ts'))
-    .map((entry) => path.join('test', 'integration', entry))
-    .sort()
-}
-
 async function runTests(databaseUrl: string): Promise<void> {
   await run('pnpm', ['run', 'build'])
   await run(
-    process.execPath,
-    ['--import', 'tsx', '--test', ...(await integrationTestFiles())],
-    { ...process.env, TEST_DATABASE_URL: databaseUrl },
+    'pnpm',
+    [
+      'exec',
+      'vitest',
+      'run',
+      '--project',
+      'integration',
+      ...process.argv.slice(2)
+    ],
+    { ...process.env, TEST_DATABASE_URL: databaseUrl }
   )
 }
 
@@ -136,7 +135,7 @@ async function main(): Promise<void> {
       '127.0.0.1::5432',
       '--env',
       `POSTGRES_PASSWORD=${password}`,
-      postgresImage,
+      postgresImage
     ])
     containerStarted = true
     await waitForPostgres(containerName)
@@ -144,15 +143,15 @@ async function main(): Promise<void> {
     const hostPort = address.replace(/^.*:/, '')
     if (!/^\d+$/.test(hostPort))
       throw new Error(
-        `Docker returned an invalid PostgreSQL address: ${address}`,
+        `Docker returned an invalid PostgreSQL address: ${address}`
       )
     await runTests(
-      `postgresql://postgres:${password}@127.0.0.1:${hostPort}/postgres`,
+      `postgresql://postgres:${password}@127.0.0.1:${hostPort}/postgres`
     )
   } finally {
     if (containerStarted)
       await run('docker', ['rm', '--force', containerName]).catch(
-        () => undefined,
+        () => undefined
       )
   }
 }

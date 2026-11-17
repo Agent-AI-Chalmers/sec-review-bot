@@ -6,8 +6,7 @@
 // store and asserts the transport-level behaviour — health, auth, validation errors, and the
 // deterministic 409 mapping. Without this, a regression that only appears when the server
 // really starts (as with the contract's path resolution) would pass the rest of the suite.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { URLSearchParams } from 'node:url'
 
 import Fastify from 'fastify'
@@ -51,8 +50,8 @@ test('the compiled server registers the contract from any working directory', as
   const app = await buildApp({})
   try {
     const health = await app.inject({ method: 'GET', url: '/healthz' })
-    assert.strictEqual(health.statusCode, 200)
-    assert.deepStrictEqual(health.json(), { status: 'ok' })
+    expect(health.statusCode).toBe(200)
+    expect(health.json()).toStrictEqual({ status: 'ok' })
   } finally {
     await app.close()
   }
@@ -71,15 +70,15 @@ test('readiness requires a usable PostgreSQL store without exposing its failure'
   })
   try {
     const readyResponse = await ready.inject({ method: 'GET', url: '/readyz' })
-    assert.strictEqual(readyResponse.statusCode, 200)
-    assert.deepStrictEqual(readyResponse.json(), { status: 'ok' })
+    expect(readyResponse.statusCode).toBe(200)
+    expect(readyResponse.json()).toStrictEqual({ status: 'ok' })
 
     const unavailableResponse = await unavailable.inject({
       method: 'GET',
       url: '/readyz'
     })
-    assert.strictEqual(unavailableResponse.statusCode, 503)
-    assert.deepStrictEqual(unavailableResponse.json(), {
+    expect(unavailableResponse.statusCode).toBe(503)
+    expect(unavailableResponse.json()).toStrictEqual({
       status: 'unavailable'
     })
   } finally {
@@ -92,8 +91,8 @@ test('unknown routes return the not-found envelope', async () => {
   const app = await buildApp({})
   try {
     const response = await app.inject({ method: 'GET', url: '/v1/nope' })
-    assert.strictEqual(response.statusCode, 404)
-    assert.deepStrictEqual(response.json(), { error: 'not_found' })
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toStrictEqual({ error: 'not_found' })
   } finally {
     await app.close()
   }
@@ -103,7 +102,7 @@ test('operations reject missing or wrong credentials with 401', async () => {
   const app = await buildApp({})
   try {
     const read = await app.inject({ method: 'GET', url: '/v1/runs' })
-    assert.strictEqual(read.statusCode, 401)
+    expect(read.statusCode).toBe(401)
 
     const write = await app.inject({
       method: 'POST',
@@ -118,13 +117,13 @@ test('operations reject missing or wrong credentials with 401', async () => {
         ingress_key: 'k'
       }
     })
-    assert.strictEqual(write.statusCode, 401)
+    expect(write.statusCode).toBe(401)
 
     // The envelope is the surface's own, not glue's default: glue's message names the
     // security scheme ("None of the security schemes (readToken) ..."), which is not the
     // caller's business and is the only response body outside the `{ error, code? }` shape.
-    assert.deepStrictEqual(read.json(), { error: 'unauthorized' })
-    assert.deepStrictEqual(write.json(), { error: 'unauthorized' })
+    expect(read.json()).toStrictEqual({ error: 'unauthorized' })
+    expect(write.json()).toStrictEqual({ error: 'unauthorized' })
   } finally {
     await app.close()
   }
@@ -157,16 +156,16 @@ test('the two bearer tokens are not interchangeable', async () => {
         ingress_key: 'k'
       }
     })
-    assert.strictEqual(readOnWrite.statusCode, 401)
-    assert.deepStrictEqual(readOnWrite.json(), { error: 'unauthorized' })
+    expect(readOnWrite.statusCode).toBe(401)
+    expect(readOnWrite.json()).toStrictEqual({ error: 'unauthorized' })
 
     const serviceOnRedactedRead = await app.inject({
       method: 'GET',
       url: '/v1/runs',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.strictEqual(serviceOnRedactedRead.statusCode, 401)
-    assert.deepStrictEqual(serviceOnRedactedRead.json(), {
+    expect(serviceOnRedactedRead.statusCode).toBe(401)
+    expect(serviceOnRedactedRead.json()).toStrictEqual({
       error: 'unauthorized'
     })
 
@@ -177,7 +176,7 @@ test('the two bearer tokens are not interchangeable', async () => {
       url: '/v1/runs',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.strictEqual(read.statusCode, 200)
+    expect(read.statusCode).toBe(200)
   } finally {
     await app.close()
   }
@@ -207,17 +206,13 @@ test('an internal fault is logged with its identity but not returned to the call
       url: '/v1/internal/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.strictEqual(response.statusCode, 500)
-    assert.deepStrictEqual(response.json(), { error: 'Internal error' })
-    assert.strictEqual(
-      logged.length,
-      1,
-      'the fault must be logged exactly once'
-    )
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toStrictEqual({ error: 'Internal error' })
+    expect(logged, 'the fault must be logged exactly once').toHaveLength(1)
     const record = JSON.parse(logged[0] ?? '') as Record<string, unknown>
-    assert.strictEqual(record.event, 'review_runs_request_failed')
-    assert.strictEqual(record.run_id, '3f2504e0-4f89-41d3-9a0c-0305e82c3301')
-    assert.match(String(record.message), /missing its artifact/)
+    expect(record.event).toBe('review_runs_request_failed')
+    expect(record.run_id).toBe('3f2504e0-4f89-41d3-9a0c-0305e82c3301')
+    expect(String(record.message)).toMatch(/missing its artifact/)
   } finally {
     console.error = originalError
     await app.close()
@@ -248,17 +243,14 @@ test('a request body missing a required contract field is rejected before the ha
         ingress_key: 'k'
       }
     })
-    assert.strictEqual(response.statusCode, 400)
-    assert.strictEqual(
-      handlerCalls,
-      0,
-      'validation must reject before the handler runs'
+    expect(response.statusCode).toBe(400)
+    expect(handlerCalls, 'validation must reject before the handler runs').toBe(
+      0
     )
-    assert.strictEqual(
+    expect(
       (response.json() as { code?: string }).code,
-      'INVALID_BODY',
       'a body that fails the contract is INVALID_BODY, not the query filter code'
-    )
+    ).toBe('INVALID_BODY')
   } finally {
     await app.close()
   }
@@ -282,11 +274,8 @@ test('schema validation names which part of the request failed', async () => {
       url: '/v1/runs?limit=0',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.strictEqual(query.statusCode, 400)
-    assert.strictEqual(
-      (query.json() as { code?: string }).code,
-      'INVALID_QUERY'
-    )
+    expect(query.statusCode).toBe(400)
+    expect((query.json() as { code?: string }).code).toBe('INVALID_QUERY')
 
     // The query is one `additionalProperties: false` object, so a parameter the contract
     // does not declare is rejected before the handler runs — not silently ignored, which is
@@ -296,16 +285,12 @@ test('schema validation names which part of the request failed', async () => {
       url: '/v1/runs?bogus=1',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.strictEqual(unknown.statusCode, 400)
-    assert.strictEqual(
-      (unknown.json() as { code?: string }).code,
-      'INVALID_QUERY'
-    )
-    assert.strictEqual(
+    expect(unknown.statusCode).toBe(400)
+    expect((unknown.json() as { code?: string }).code).toBe('INVALID_QUERY')
+    expect(
       listCalls,
-      0,
       'an undeclared query parameter must be rejected before the handler'
-    )
+    ).toBe(0)
 
     const path = await app.inject({
       method: 'POST',
@@ -316,9 +301,8 @@ test('schema validation names which part of the request failed', async () => {
       },
       payload: { preparation_token: 't', publish_context: {}, input: {} }
     })
-    assert.strictEqual(path.statusCode, 400)
-    assert.strictEqual(
-      (path.json() as { code?: string }).code,
+    expect(path.statusCode).toBe(400)
+    expect((path.json() as { code?: string }).code).toBe(
       'INVALID_PATH_PARAMETER'
     )
   } finally {
@@ -356,8 +340,8 @@ test('the completion route keeps the comment_url its branch requires', async () 
         comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
       }
     })
-    assert.strictEqual(delivered.statusCode, 200)
-    assert.deepStrictEqual(completed, [
+    expect(delivered.statusCode).toBe(200)
+    expect(completed).toStrictEqual([
       [
         'notice-http-1',
         'notice-claim',
@@ -380,11 +364,10 @@ test('the completion route keeps the comment_url its branch requires', async () 
         comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
       }
     })
-    assert.strictEqual(
+    expect(
       notDelivered.statusCode,
-      400,
       'an undelivered notice must not carry a comment_url'
-    )
+    ).toBe(400)
   } finally {
     await app.close()
   }
@@ -404,8 +387,8 @@ test('an operation with no response body sends an empty 200, not a null body', a
       },
       payload: { token: 't', failure: { message: 'm' } }
     })
-    assert.strictEqual(response.statusCode, 200)
-    assert.strictEqual(response.body, '')
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toBe('')
   } finally {
     await app.close()
   }
@@ -431,9 +414,9 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
       },
       payload: { token: 'notice-claim', delivered: false }
     })
-    assert.strictEqual(response.statusCode, 200)
-    assert.strictEqual(response.json(), true)
-    assert.deepStrictEqual(completions, [
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toBe(true)
+    expect(completions).toStrictEqual([
       // An undelivered notice carries no URL, so the store sees three arguments, not four.
       ['notice-http-2', 'notice-claim', false]
     ])
@@ -464,8 +447,8 @@ test('run notice claims use the notice store for every lifecycle axis', async ()
         url: '/v1/run-notices/claims/next',
         headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
       })
-      assert.strictEqual(response.statusCode, 200, response.body)
-      assert.deepStrictEqual(response.json(), expected)
+      expect(response.statusCode, response.body).toBe(200)
+      expect(response.json()).toStrictEqual(expected)
     }
   } finally {
     await app.close()
@@ -493,17 +476,17 @@ test('run notice claim renewal and heartbeat configuration are exposed on the se
       },
       payload: { token: 'notice-claim' }
     })
-    assert.strictEqual(renewed.statusCode, 200, renewed.body)
-    assert.strictEqual(renewed.json(), true)
-    assert.deepStrictEqual(renewals, [['notice-http-3', 'notice-claim']])
+    expect(renewed.statusCode, renewed.body).toBe(200)
+    expect(renewed.json()).toBe(true)
+    expect(renewals).toStrictEqual([['notice-http-3', 'notice-claim']])
 
     const interval = await app.inject({
       method: 'GET',
       url: '/v1/config/run-notice-heartbeat-interval',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.strictEqual(interval.statusCode, 200, interval.body)
-    assert.strictEqual(interval.json(), 12_345)
+    expect(interval.statusCode, interval.body).toBe(200)
+    expect(interval.json()).toBe(12_345)
   } finally {
     await app.close()
   }
@@ -528,9 +511,9 @@ test('a preparation input checkpoint is fenced by the HTTP route claim token', a
       },
       payload: { token: 'preparation-claim', input: { resolved: true } }
     })
-    assert.strictEqual(response.statusCode, 200, response.body)
-    assert.strictEqual(response.body, '')
-    assert.deepStrictEqual(checkpoints, [
+    expect(response.statusCode, response.body).toBe(200)
+    expect(response.body).toBe('')
+    expect(checkpoints).toStrictEqual([
       [
         '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
         'preparation-claim',
@@ -565,8 +548,8 @@ test('a deterministic publication failure maps to 409 with its code', async () =
       },
       payload: { token: 'token-1' }
     })
-    assert.strictEqual(response.statusCode, 409)
-    assert.deepStrictEqual(response.json(), {
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toStrictEqual({
       error: 'duplicate step set',
       code: 'PUBLICATION_STEP_SET_DUPLICATE'
     })
@@ -613,12 +596,11 @@ test('an undeclared body field is rejected, matching the contract', async () => 
         run_id: 'attacker-supplied'
       }
     })
-    assert.strictEqual(response.statusCode, 400)
-    assert.strictEqual(
+    expect(response.statusCode).toBe(400)
+    expect(
       handlerCalls,
-      0,
       'an undeclared field must be rejected before the handler'
-    )
+    ).toBe(0)
   } finally {
     await app.close()
   }
@@ -658,12 +640,11 @@ test('remote_object.id is accepted only in its canonical string form', async () 
           remote_object: { id, url: 'https://example.test/1' }
         }
       })
-      assert.strictEqual(
+      expect(
         response.statusCode,
-        200,
         `id ${JSON.stringify(id)} must validate`
-      )
-      assert.deepStrictEqual(received, { id, url: 'https://example.test/1' })
+      ).toBe(200)
+      expect(received).toStrictEqual({ id, url: 'https://example.test/1' })
     }
   } finally {
     await app.close()
@@ -694,22 +675,19 @@ test('a remote_object.id the contract does not declare is rejected', async () =>
         },
         payload: { token: 'token-1', remote_object: { id } }
       })
-      assert.strictEqual(
+      expect(
         response.statusCode,
-        400,
         `id ${JSON.stringify(id)} must be rejected`
-      )
-      assert.strictEqual(
+      ).toBe(400)
+      expect(
         (response.json() as { code?: string }).code,
-        'INVALID_BODY',
         'a body that fails the contract is INVALID_BODY'
-      )
+      ).toBe('INVALID_BODY')
     }
-    assert.strictEqual(
+    expect(
       handlerCalls,
-      0,
       'an invalid id must be rejected before the handler'
-    )
+    ).toBe(0)
   } finally {
     await app.close()
   }
@@ -735,8 +713,8 @@ test('the query string is coerced to the declared types, and only there', async 
       url: '/v1/runs?limit=10',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.strictEqual(ok.statusCode, 200)
-    assert.strictEqual(calls, 1, 'a coerced integer must reach the handler')
+    expect(ok.statusCode).toBe(200)
+    expect(calls, 'a coerced integer must reach the handler').toBe(1)
 
     // The contract also bounds the page: 0 and 101 are integers the schema refuses, so the
     // read model never has to clamp a value the caller was allowed to send.
@@ -746,17 +724,13 @@ test('the query string is coerced to the declared types, and only there', async 
         url: `/v1/runs?limit=${bad}`,
         headers: { authorization: `Bearer ${READ_TOKEN}` }
       })
-      assert.strictEqual(
+      expect(
         response.statusCode,
-        400,
         `limit=${JSON.stringify(bad)} must be rejected`
-      )
-      assert.strictEqual(
-        (response.json() as { code?: string }).code,
-        'INVALID_QUERY'
-      )
+      ).toBe(400)
+      expect((response.json() as { code?: string }).code).toBe('INVALID_QUERY')
     }
-    assert.strictEqual(calls, 1, 'a rejected query must not reach the handler')
+    expect(calls, 'a rejected query must not reach the handler').toBe(1)
   } finally {
     await app.close()
   }
@@ -791,9 +765,9 @@ test('run list filters reach the store as validated values with normalized dates
         url: `/v1/runs${query}`,
         headers: { authorization: `Bearer ${READ_TOKEN}` }
       })
-      assert.strictEqual(response.statusCode, 200)
+      expect(response.statusCode).toBe(200)
     }
-    assert.deepStrictEqual(calls, [
+    expect(calls).toStrictEqual([
       { limit: 50 },
       {
         ...filters,
@@ -822,8 +796,8 @@ test('a malformed JSON body is a 400 that names the body, like any other bad bod
       },
       payload: '{not json'
     })
-    assert.strictEqual(response.statusCode, 400)
-    assert.deepStrictEqual(response.json(), {
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toStrictEqual({
       error: 'Request body must be valid JSON.',
       code: 'INVALID_BODY'
     })
@@ -839,7 +813,7 @@ test('a request body over the size limit is a 413 with the declared envelope', a
   const app = await buildApp({
     admissions: {
       admit: async () =>
-        assert.fail('the handler must not run for an oversized body')
+        expect.unreachable('the handler must not run for an oversized body')
     }
   })
   try {
@@ -852,8 +826,8 @@ test('a request body over the size limit is a 413 with the declared envelope', a
       },
       payload: JSON.stringify({ padding: 'a'.repeat(1024 * 1024 + 1) })
     })
-    assert.strictEqual(response.statusCode, 413)
-    assert.deepStrictEqual(response.json(), {
+    expect(response.statusCode).toBe(413)
+    expect(response.json()).toStrictEqual({
       error: 'Request body is too large.'
     })
   } finally {
@@ -886,12 +860,11 @@ test('the admin surface is absent unless an admin token is configured', async ()
         headers: { ...headers, 'content-type': 'application/json' },
         payload: body
       })
-      assert.strictEqual(
+      expect(
         response.statusCode,
-        404,
         `an unconfigured admin surface must not exist (tried ${JSON.stringify(headers)})`
-      )
-      assert.deepStrictEqual(response.json(), { error: 'not_found' })
+      ).toBe(404)
+      expect(response.json()).toStrictEqual({ error: 'not_found' })
     }
   } finally {
     await unconfigured.close()
@@ -953,7 +926,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
       headers: { 'content-type': 'application/json' },
       payload: body
     })
-    assert.strictEqual(anonymous.statusCode, 401)
+    expect(anonymous.statusCode).toBe(401)
     const viaService = await configured.inject({
       method: 'POST',
       url: path,
@@ -963,11 +936,10 @@ test('the admin surface is absent unless an admin token is configured', async ()
       },
       payload: body
     })
-    assert.strictEqual(
+    expect(
       viaService.statusCode,
-      401,
       'the service token must not reach an operator decision'
-    )
+    ).toBe(401)
     const accepted = await configured.inject({
       method: 'POST',
       url: path,
@@ -977,12 +949,11 @@ test('the admin surface is absent unless an admin token is configured', async ()
       },
       payload: body
     })
-    assert.strictEqual(accepted.statusCode, 200)
-    assert.strictEqual(
+    expect(accepted.statusCode).toBe(200)
+    expect(
       (accepted.json() as { preparation: { status: string } }).preparation
-        .status,
-      'failed'
-    )
+        .status
+    ).toBe('failed')
 
     // Resuming is an operator decision too, and it goes through the same credential gate. It
     // posts no body, so the route must not require one.
@@ -991,19 +962,19 @@ test('the admin surface is absent unless an admin token is configured', async ()
       method: 'POST',
       url: resumePath
     })
-    assert.strictEqual(anonymousResume.statusCode, 401)
+    expect(anonymousResume.statusCode).toBe(401)
     const viaServiceResume = await configured.inject({
       method: 'POST',
       url: resumePath,
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.strictEqual(viaServiceResume.statusCode, 401)
+    expect(viaServiceResume.statusCode).toBe(401)
     const resumed = await configured.inject({
       method: 'POST',
       url: resumePath,
       headers: { authorization: `Bearer ${adminToken}` }
     })
-    assert.strictEqual(resumed.statusCode, 200)
+    expect(resumed.statusCode).toBe(200)
   } finally {
     await configured.close()
   }
@@ -1032,7 +1003,7 @@ test('the resume route answers 409 for a run that is not disconnected', async ()
       url: '/v1/admin/runs/0123abcd-4567-89ef-0123-456789abcdef/resume',
       headers: { authorization: 'Bearer admin-token' }
     })
-    assert.strictEqual(response.statusCode, 409)
+    expect(response.statusCode).toBe(409)
   } finally {
     await app.close()
   }
@@ -1060,8 +1031,8 @@ test('the blocked preparation queue is readable with the read token', async () =
       url: '/v1/runs/parked',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.strictEqual(response.statusCode, 200)
-    assert.deepStrictEqual(response.json(), {
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toStrictEqual({
       blocks: [
         {
           run_id: 'run-1',
@@ -1075,7 +1046,7 @@ test('the blocked preparation queue is readable with the read token', async () =
       method: 'GET',
       url: '/v1/runs/parked'
     })
-    assert.strictEqual(anonymous.statusCode, 401)
+    expect(anonymous.statusCode).toBe(401)
   } finally {
     await app.close()
   }

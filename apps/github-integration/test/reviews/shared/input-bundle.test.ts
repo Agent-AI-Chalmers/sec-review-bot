@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Octokit } from 'octokit'
 import {
@@ -76,9 +75,9 @@ test('readSetupDeclaration returns the declaration text from the default branch 
     repo_name: 'demo'
   })
 
-  assert.strictEqual(declaration, 'setup:\n  - run: echo hi\n')
+  expect(declaration).toBe('setup:\n  - run: echo hi\n')
   // Reads the exact commit, not a branch name, so a fork cannot change it.
-  assert.deepStrictEqual(requests, [
+  expect(requests).toStrictEqual([
     { path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }
   ])
 })
@@ -93,7 +92,7 @@ test('readSetupDeclaration returns null when the declaration is absent', async (
     repo_name: 'demo'
   })
 
-  assert.strictEqual(declaration, null)
+  expect(declaration).toBe(null)
 })
 
 test('readSetupDeclaration treats a whitespace-only declaration as absent', async () => {
@@ -110,7 +109,7 @@ test('readSetupDeclaration treats a whitespace-only declaration as absent', asyn
     repo_name: 'demo'
   })
 
-  assert.strictEqual(declaration, null)
+  expect(declaration).toBe(null)
 })
 
 test('readSetupDeclaration rejects an invalid declaration with repository context', async () => {
@@ -122,31 +121,29 @@ test('readSetupDeclaration rejects an invalid declaration with repository contex
     '.sec-review/setup.yml': 'setup:\n  - uses: actions/checkout@v4\n'
   })
 
-  await assert.rejects(
-    () =>
-      readSetupDeclaration({
-        octokit,
-        default_sha: sha,
-        owner_login: 'octo',
-        repo_name: 'demo'
-      }),
-    (error: unknown) => {
-      const e = error as {
-        name?: string
-        owner_login?: string
-        repo_name?: string
-        ref?: string
-        path?: string
-      }
-      return (
-        e.name === 'SetupDeclarationError' &&
-        e.owner_login === 'octo' &&
-        e.repo_name === 'demo' &&
-        e.ref === sha &&
-        e.path === '.sec-review/setup.yml'
-      )
+  await expect(
+    readSetupDeclaration({
+      octokit,
+      default_sha: sha,
+      owner_login: 'octo',
+      repo_name: 'demo'
+    })
+  ).rejects.toSatisfy((error: unknown) => {
+    const e = error as {
+      name?: string
+      owner_login?: string
+      repo_name?: string
+      ref?: string
+      path?: string
     }
-  )
+    return (
+      e.name === 'SetupDeclarationError' &&
+      e.owner_login === 'octo' &&
+      e.repo_name === 'demo' &&
+      e.ref === sha &&
+      e.path === '.sec-review/setup.yml'
+    )
+  })
 })
 
 test('readSetupDeclaration propagates a non-404 read failure instead of skipping', async () => {
@@ -159,16 +156,14 @@ test('readSetupDeclaration propagates a non-404 read failure instead of skipping
     githubJson({ message: 'Forbidden' }, 403)
   ).octokit
 
-  await assert.rejects(
-    () =>
-      readSetupDeclaration({
-        octokit,
-        default_sha: 'e'.repeat(40),
-        owner_login: 'octo',
-        repo_name: 'demo'
-      }),
-    /Forbidden/
-  )
+  await expect(
+    readSetupDeclaration({
+      octokit,
+      default_sha: 'e'.repeat(40),
+      owner_login: 'octo',
+      repo_name: 'demo'
+    })
+  ).rejects.toThrow(/Forbidden/)
 })
 
 for (const [name, parentMode, parentType, fileMode, fileType] of [
@@ -196,29 +191,27 @@ for (const [name, parentMode, parentType, fileMode, fileType] of [
       }
       return githubFile('setup:\n  - run: echo hi\n', '.sec-review/setup.yml')
     })
-    assert.strictEqual(
+    expect(
       await readSetupDeclaration({
         octokit,
         default_sha: 'f'.repeat(40),
         owner_login: 'octo',
         repo_name: 'demo'
-      }),
-      null
-    )
-    assert.ok(requests.every(({ url }) => !url.includes('/contents/')))
+      })
+    ).toBe(null)
+    expect.assert(requests.every(({ url }) => !url.includes('/contents/')))
   })
 }
 
 test('readSetupDeclaration returns null when the setup directory exists without a declaration', async () => {
-  assert.strictEqual(
+  expect(
     await readSetupDeclaration({
       octokit: octokitForContent({ '.sec-review/other.yml': 'x' }),
       default_sha: 'a'.repeat(40),
       owner_login: 'octo',
       repo_name: 'demo'
-    }),
-    null
-  )
+    })
+  ).toBe(null)
 })
 
 for (const failingPath of [
@@ -243,15 +236,14 @@ for (const failingPath of [
         ]
       })
     }).octokit
-    await assert.rejects(
+    await expect(
       readSetupDeclaration({
         octokit,
         default_sha: 'a'.repeat(40),
         owner_login: 'octo',
         repo_name: 'demo'
-      }),
-      /Forbidden/
-    )
+      })
+    ).rejects.toThrow(/Forbidden/)
   })
 }
 
@@ -259,15 +251,14 @@ test('readSetupDeclaration fails on a truncated tree instead of assuming absence
   const octokit = fakeGitHub(() =>
     githubJson({ tree: [], truncated: true })
   ).octokit
-  await assert.rejects(
+  await expect(
     readSetupDeclaration({
       octokit,
       default_sha: 'f'.repeat(40),
       owner_login: 'octo',
       repo_name: 'demo'
-    }),
-    /truncated/i
-  )
+    })
+  ).rejects.toThrow(/truncated/i)
 })
 
 test('readSetupDeclaration accepts executable files and checks trees at pinned SHAs', async () => {
@@ -295,21 +286,20 @@ test('readSetupDeclaration accepts executable files and checks trees at pinned S
         ]
       })
     if (pathname.endsWith('/contents/.sec-review/setup.yml')) {
-      assert.strictEqual(new URL(url).searchParams.get('ref'), sha)
+      expect(new URL(url).searchParams.get('ref')).toBe(sha)
       return githubFile('setup:\n  - run: echo hi\n', '.sec-review/setup.yml')
     }
     throw new Error(`Unexpected GitHub request: ${url}`)
   })
-  assert.strictEqual(
+  expect(
     await readSetupDeclaration({
       octokit,
       default_sha: sha,
       owner_login: 'octo',
       repo_name: 'demo'
-    }),
-    'setup:\n  - run: echo hi\n'
-  )
-  assert.strictEqual(requests.length, 3)
+    })
+  ).toBe('setup:\n  - run: echo hi\n')
+  expect(requests).toHaveLength(3)
 })
 
 test('assertWorkflowInputFits rejects an input past the contract byte limit', () => {
@@ -326,12 +316,11 @@ test('assertWorkflowInputFits rejects an input past the contract byte limit', ()
       }))
     }
   }
-  assert.ok(
+  expect.assert(
     Buffer.byteLength(JSON.stringify(oversized), 'utf8') >
       MAX_WORKFLOW_INPUT_BYTES
   )
-  assert.throws(
-    () => assertWorkflowInputFits(oversized, 'repository review'),
+  expect(() => assertWorkflowInputFits(oversized, 'repository review')).toThrow(
     /exceeds the workflow input limit/
   )
 })
@@ -346,7 +335,7 @@ test('assertWorkflowInputFits allows an input whose entry count is near the limi
       }))
     }
   }
-  assert.ok(
+  expect.assert(
     Buffer.byteLength(JSON.stringify(fits), 'utf8') < MAX_WORKFLOW_INPUT_BYTES
   )
   assertWorkflowInputFits(fits, 'repository review')
@@ -391,10 +380,9 @@ test('archiveInputBundle reproduces bytes for the same logical tree', async () =
     })
     archivePaths.push(new URL(first.uri).pathname, new URL(second.uri).pathname)
 
-    assert.strictEqual(first.digest, second.digest)
-    assert.strictEqual(first.size_bytes, second.size_bytes)
-    assert.deepStrictEqual(
-      await fs.readFile(new URL(first.uri)),
+    expect(first.digest).toBe(second.digest)
+    expect(first.size_bytes).toBe(second.size_bytes)
+    expect(await fs.readFile(new URL(first.uri))).toStrictEqual(
       await fs.readFile(new URL(second.uri))
     )
   } finally {
@@ -418,17 +406,16 @@ test('archiveInputBundleAndBuildInput returns a local intent for the claim owner
       workflow: 'test',
       build_input: (reference) => ({ input_bundle: reference })
     })
-    assert.match(result.input.input_bundle.uri, /^file:/)
-    assert.deepStrictEqual(result.input.input_bundle, result.input_bundle)
-    await assert.rejects(
+    expect(result.input.input_bundle.uri).toMatch(/^file:/)
+    expect(result.input.input_bundle).toStrictEqual(result.input_bundle)
+    await expect(
       archiveInputBundleAndBuildInput({
         input_bundle_root: root,
         include_incremental_window: false,
         workflow: 'test',
         build_input: () => 'x'.repeat(MAX_WORKFLOW_INPUT_BYTES + 1)
-      }),
-      /exceeds the workflow input limit/
-    )
+      })
+    ).rejects.toThrow(/exceeds the workflow input limit/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
     await fs.rm(`${root}.tar.zst`, { force: true })

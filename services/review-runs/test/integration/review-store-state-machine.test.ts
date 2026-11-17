@@ -1,8 +1,7 @@
 // Exercises the PostgreSQL-backed coordination state machines, including their
 // claim fencing and cross-connector ownership rules.
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, afterEach, test } from 'vitest'
 import { Pool } from 'pg'
 
 import {
@@ -35,7 +34,7 @@ function connectorId(): string {
   return id
 }
 
-test.afterEach(async () => {
+afterEach(async () => {
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     await assertPublicationAxesFollowSteps(pool, connectorIds.splice(0))
@@ -115,7 +114,7 @@ async function createQueuedRun(
     run_id: runId,
     publish_context: context
   })
-  assert.ok(admission.preparation_token)
+  expect.assert(admission.preparation_token)
   await store.submissionTransitions.markQueued(
     runId,
     admission.preparation_token,
@@ -129,14 +128,13 @@ async function createSuccessfulRun(
   runId = `run-${randomUUID()}`
 ): Promise<string> {
   await createQueuedRun(store, runId)
-  assert.strictEqual(
+  expect(
     await store.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
-    ),
-    true
-  )
+    )
+  ).toBe(true)
   return runId
 }
 
@@ -149,30 +147,29 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
   try {
     await createQueuedRun(first, runId)
 
-    assert.strictEqual((await first.queries.getRun(runId))?.run_id, runId)
+    expect((await first.queries.getRun(runId))?.run_id).toBe(runId)
     // run_id is currently a global primary key, while connector_id fences
     // reads and claims. A second connector must not create or see the first
     // connector's run under that identity.
-    await assert.rejects(
-      createQueuedRun(second, runId),
+    await expect(createQueuedRun(second, runId)).rejects.toThrow(
       /duplicate key value violates unique constraint/
     )
-    assert.strictEqual(await second.queries.getRun(runId), null)
-    assert.strictEqual((await first.queries.listActiveRuns()).runs.length, 1)
-    assert.strictEqual((await second.queries.listActiveRuns()).runs.length, 0)
-    assert.strictEqual(await first.publicationClaims.claim(runId), null)
+    expect(await second.queries.getRun(runId)).toBe(null)
+    expect((await first.queries.listActiveRuns()).runs).toHaveLength(1)
+    expect((await second.queries.listActiveRuns()).runs).toHaveLength(0)
+    expect(await first.publicationClaims.claim(runId)).toBe(null)
     await first.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
     )
-    assert.notStrictEqual(await first.publicationClaims.claim(runId), null)
-    assert.strictEqual(await second.publicationClaims.claim(runId), null)
+    expect(await first.publicationClaims.claim(runId)).not.toBe(null)
+    expect(await second.publicationClaims.claim(runId)).toBe(null)
     // The event log is fenced by the same connector as every other read. A second connector
     // reading the identity it cannot own must get an empty list, not another tenant's
     // transitions, so the history view can never cross a connector boundary.
-    assert.ok((await first.queries.listEvents(runId)).length > 0)
-    assert.deepStrictEqual(await second.queries.listEvents(runId), [])
+    expect.assert((await first.queries.listEvents(runId)).length > 0)
+    expect(await second.queries.listEvents(runId)).toStrictEqual([])
   } finally {
     await first.close()
     await second.close()
@@ -200,12 +197,11 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       publish_context: {}
     })
     const queued = await store.queries.getRun(queuedId)
-    assert.strictEqual(queued?.execution.status, 'queued')
-    assert.deepStrictEqual(queued?.artifact_storage, artifactStorage)
-    assert.deepStrictEqual(
-      (await store.queries.listActiveRuns()).runs.map((entry) => entry.run_id),
-      [queuedId]
-    )
+    expect(queued?.execution.status).toBe('queued')
+    expect(queued?.artifact_storage).toStrictEqual(artifactStorage)
+    expect(
+      (await store.queries.listActiveRuns()).runs.map((entry) => entry.run_id)
+    ).toStrictEqual([queuedId])
   } finally {
     await store.close()
   }
@@ -220,13 +216,10 @@ test('execution.started_at marks the instant execution began and does not move a
       publish_context: {}
     })
     const runId = admission.record.run_id
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
 
     // Before submission the run is still preparing: there is no execution start to report.
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.execution.started_at,
-      null
-    )
+    expect((await store.queries.getRun(runId))?.execution.started_at).toBe(null)
 
     await store.submissionTransitions.markQueued(
       runId,
@@ -234,7 +227,7 @@ test('execution.started_at marks the instant execution began and does not move a
       {}
     )
     const queued = await store.queries.getRun(runId)
-    assert.ok(queued?.execution.started_at)
+    expect.assert(queued?.execution.started_at)
     const submittedAt = queued?.execution.started_at
 
     // A later, non-transitional write (the artifact mtime) must not move the start.
@@ -242,8 +235,8 @@ test('execution.started_at marks the instant execution began and does not move a
       status: 'unavailable'
     })
     const after = await store.queries.getRun(runId)
-    assert.strictEqual(after?.execution.started_at, submittedAt)
-    assert.ok(
+    expect(after?.execution.started_at).toBe(submittedAt)
+    expect.assert(
       Date.parse(after!.execution.updated_at) >= Date.parse(submittedAt!),
       'the row mtime moves past the immutable execution start'
     )
@@ -260,47 +253,43 @@ test('execution termination events name the state they came from', async () => {
     // at that point.
     const succeededId = await createQueuedRun(store)
     await store.executions.markRunning(succeededId)
-    assert.strictEqual(
+    expect(
       await store.executions.recordExecutionSuccess(
         succeededId,
         { run_id: succeededId },
         undefined
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const succeededEvents = (
       await store.queries.listEvents(succeededId)
     ).filter((event) => event.axis === 'execution')
-    assert.deepStrictEqual(
-      succeededEvents.map((event) => [event.from_status, event.to_status]),
-      [
-        [null, 'pending'],
-        ['pending', 'queued'],
-        ['queued', 'running'],
-        ['running', 'succeeded']
-      ]
-    )
+    expect(
+      succeededEvents.map((event) => [event.from_status, event.to_status])
+    ).toStrictEqual([
+      [null, 'pending'],
+      ['pending', 'queued'],
+      ['queued', 'running'],
+      ['running', 'succeeded']
+    ])
 
     // queued -> failed likewise records the real origin.
     const failedId = await createQueuedRun(store)
-    assert.strictEqual(
+    expect(
       await store.failExecution(failedId, {
         code: 'EXECUTION_FAILED',
         message: 'boom'
-      }),
-      true
-    )
+      })
+    ).toBe(true)
     const failedEvents = (await store.queries.listEvents(failedId)).filter(
       (event) => event.axis === 'execution'
     )
-    assert.deepStrictEqual(
-      failedEvents.map((event) => [event.from_status, event.to_status]),
-      [
-        [null, 'pending'],
-        ['pending', 'queued'],
-        ['queued', 'failed']
-      ]
-    )
+    expect(
+      failedEvents.map((event) => [event.from_status, event.to_status])
+    ).toStrictEqual([
+      [null, 'pending'],
+      ['pending', 'queued'],
+      ['queued', 'failed']
+    ])
   } finally {
     await store.close()
   }
@@ -314,20 +303,16 @@ test('the coordination event log records each transition once, oldest first', as
     // and the pending->queued + preparing->submitted transitions must be present.
     const events = await store.queries.listEvents(runId)
     const axes = events.map((event) => `${event.axis}:${event.to_status}`)
-    assert.ok(axes.includes('execution:pending'))
-    assert.ok(axes.includes('preparation:preparing'))
-    assert.ok(axes.includes('publication:pending'))
-    assert.ok(axes.includes('execution:queued'))
-    assert.ok(axes.includes('preparation:submitted'))
+    expect(axes).toContain('execution:pending')
+    expect(axes).toContain('preparation:preparing')
+    expect(axes).toContain('publication:pending')
+    expect(axes).toContain('execution:queued')
+    expect(axes).toContain('preparation:submitted')
 
     // Oldest first, and each transition appears exactly once.
     const times = events.map((event) => Date.parse(event.occurred_at))
-    assert.deepStrictEqual(
-      times,
-      [...times].sort((a, b) => a - b)
-    )
-    assert.strictEqual(
-      new Set(events.map((event) => event.event_id)).size,
+    expect(times).toStrictEqual([...times].sort((a, b) => a - b))
+    expect(new Set(events.map((event) => event.event_id)).size).toBe(
       events.length
     )
   } finally {
@@ -337,16 +322,20 @@ test('the coordination event log records each transition once, oldest first', as
 
 test('touchObservation advances the row mtime without changing state', async () => {
   const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = await createQueuedRun(store)
+    // Place the prior observation in the past using PostgreSQL's own clock.
+    await pool.query(
+      `UPDATE executions SET observed_at=clock_timestamp()-interval '1 second' WHERE run_id=$1`,
+      [runId]
+    )
     const before = await store.queries.getRun(runId)
-    assert.strictEqual(before?.execution.status, 'queued')
-    // The heartbeat must move the mtime forward even though the status is unchanged.
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(before?.execution.status).toBe('queued')
     await store.executions.touchObservation(runId)
     const after = await store.queries.getRun(runId)
-    assert.strictEqual(after?.execution.status, 'queued', 'state is unchanged')
-    assert.ok(
+    expect(after?.execution.status, 'state is unchanged').toBe('queued')
+    expect.assert(
       Date.parse(after!.execution.updated_at) >
         Date.parse(before!.execution.updated_at),
       'the row mtime moved forward'
@@ -359,25 +348,24 @@ test('touchObservation advances the row mtime without changing state', async () 
     })
     const preparingBefore = admitted.record.execution.updated_at
     await store.executions.touchObservation(admitted.record.run_id)
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(admitted.record.run_id))?.execution
         .updated_at,
-      preparingBefore,
       'a pending run is not touched'
-    )
+    ).toBe(preparingBefore)
   } finally {
+    await pool.end()
     await store.close()
   }
 })
 
 test('heartbeats do not refresh an expired recovery lease', async () => {
-  // The precise invariant a zero timeout cannot express: with a real timeout, keep heartbeating
-  // past the lease deadline and the claim must STILL be reclaimable. This fails if the lease is
-  // ever computed from observed_at (which the heartbeat moves) instead of claimed_at.
+  // An expired claimed_at and a fresh observed_at must still allow recovery takeover.
   const store = await createStore({
     connectorId: `lease-live:${randomUUID()}`,
-    claimTimeoutMs: 300
+    claimTimeoutMs: 30_000
   })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = `run-lease-live-${randomUUID()}`
     const admission = await store.admissions.create({
@@ -385,8 +373,8 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
-    await assert.rejects(
+    expect.assert(admission.preparation_token)
+    await expect(
       submitPreparedRun(
         store,
         {
@@ -403,37 +391,31 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
         }
-      ),
-      ExecutionSubmissionUncertainError
-    )
+      )
+    ).rejects.toThrow(ExecutionSubmissionUncertainError)
     const first = await store.executions.claimSubmissionRecovery(
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(first)
+    expect.assert(first)
 
-    // Heartbeat repeatedly past the 300ms lease. If the lease were observed_at-based, these
-    // heartbeats would keep the claim alive and the reclaim below would return null.
-    const deadline = Date.now() + 600
-    while (Date.now() < deadline) {
-      await store.executions.touchObservation(runId)
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    }
+    await pool.query(
+      `UPDATE executions SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
+    await store.executions.touchObservation(runId)
 
     const second = await store.executions.claimSubmissionRecovery(
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(
+    expect.assert(
       second,
       'the expired recovery claim is reclaimable despite heartbeats'
     )
-    assert.notStrictEqual(
-      second,
-      first,
-      'reclaiming issues a new fencing token'
-    )
+    expect(second, 'reclaiming issues a new fencing token').not.toBe(first)
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -454,8 +436,8 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
-    await assert.rejects(
+    expect.assert(admission.preparation_token)
+    await expect(
       submitPreparedRun(
         store,
         {
@@ -472,11 +454,9 @@ test('an observation heartbeat never extends the recovery lease', async () => {
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
         }
-      ),
-      ExecutionSubmissionUncertainError
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.execution.status,
+      )
+    ).rejects.toThrow(ExecutionSubmissionUncertainError)
+    expect((await store.queries.getRun(runId))?.execution.status).toBe(
       'uncertain'
     )
 
@@ -484,7 +464,7 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(first)
+    expect.assert(first)
     // Heartbeats would, under a shared updated_at lease, refresh the recovery lease. With
     // observed_at separate they must not; a zero timeout lets us observe that directly.
     await store.executions.touchObservation(runId)
@@ -492,12 +472,8 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(second, 'the expired recovery claim is reclaimable')
-    assert.notStrictEqual(
-      second,
-      first,
-      'reclaiming issues a new fencing token'
-    )
+    expect.assert(second, 'the expired recovery claim is reclaimable')
+    expect(second, 'reclaiming issues a new fencing token').not.toBe(first)
   } finally {
     await store.close()
   }
@@ -515,14 +491,14 @@ test('a failure notice reports the reason captured when it was created', async (
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.preparations.fail(runId, admission.preparation_token, {
       code: 'REVIEW_START_FAILED',
       message: 'preparation could not start'
     })
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
-    assert.strictEqual(notice.reason_code, 'REVIEW_START_FAILED')
+    expect.assert(notice)
+    expect(notice.reason_code).toBe('REVIEW_START_FAILED')
 
     // Rewriting the preparation row must not change what the notice reports.
     const pool = new Pool({ connectionString: requireTestDatabase() })
@@ -535,12 +511,11 @@ test('a failure notice reports the reason captured when it was created', async (
       await pool.end()
     }
     const stillReported = await store.queries.getRun(runId)
-    assert.strictEqual(
+    expect(
       (stillReported?.preparation as { failure_code: string | null })
         .failure_code,
-      null,
       'the preparation row really lost its code'
-    )
+    ).toBe(null)
     // The notice already claimed above keeps its own copy; a fresh claim after the lease expires
     // must also report it rather than the now-null preparation field.
     const pool2 = new Pool({ connectionString: requireTestDatabase() })
@@ -554,12 +529,11 @@ test('a failure notice reports the reason captured when it was created', async (
       await pool2.end()
     }
     const reclaimed = await store.notices.claimNext()
-    assert.ok(reclaimed)
-    assert.strictEqual(
+    expect.assert(reclaimed)
+    expect(
       reclaimed.reason_code,
-      'REVIEW_START_FAILED',
       "the notice carries its own reason, not the preparation row's current value"
-    )
+    ).toBe('REVIEW_START_FAILED')
   } finally {
     await store.close()
   }
@@ -575,17 +549,17 @@ test('ReviewRunStore turns an expired preparation uncertain without failing its 
       publish_context: {}
     })
 
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 1)
+    expect((await store.preparations.expireStale()).concluded).toBe(1)
     const run = await store.queries.getRun(runId)
-    assert.strictEqual(run?.execution.status, 'pending')
-    assert.strictEqual(run?.failure_code, null)
+    expect(run?.execution.status).toBe('pending')
+    expect(run?.failure_code).toBe(null)
     // The lease lapsed, so nobody knows how far the preparer got: that is uncertainty, not a
     // return to "never started".
-    assert.strictEqual(run?.preparation?.status, 'uncertain')
-    assert.strictEqual(run?.preparation?.attempt_count, 1)
-    assert.deepStrictEqual(run?.notices, [])
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 0)
+    expect(run?.preparation?.status).toBe('uncertain')
+    expect(run?.preparation?.attempt_count).toBe(1)
+    expect(run?.notices).toStrictEqual([])
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
+    expect((await store.preparations.expireStale()).concluded).toBe(0)
   } finally {
     await store.close()
   }
@@ -606,38 +580,34 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 1)
+    expect((await store.preparations.expireStale()).concluded).toBe(1)
     const run = await store.queries.getRun(runId)
-    assert.strictEqual(run?.execution.status, 'skipped')
-    assert.strictEqual(run?.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
-    assert.deepStrictEqual(
-      {
-        status: run?.preparation?.status,
-        attempt_count: run?.preparation?.attempt_count,
-        failure_code: run?.preparation?.failure_code,
-        notice_status: run?.notices?.[0]?.status,
-        notice_axis: run?.notices?.[0]?.axis
-      },
-      {
-        status: 'failed',
-        attempt_count: 8,
-        failure_code: 'PREPARATION_RETRY_EXHAUSTED',
-        notice_status: 'pending',
-        notice_axis: 'preparation'
-      }
-    )
-    assert.strictEqual(await store.preparations.claimNext(), null)
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
+    expect(run?.execution.status).toBe('skipped')
+    expect(run?.failure_code).toBe('PREPARATION_RETRY_EXHAUSTED')
+    expect({
+      status: run?.preparation?.status,
+      attempt_count: run?.preparation?.attempt_count,
+      failure_code: run?.preparation?.failure_code,
+      notice_status: run?.notices?.[0]?.status,
+      notice_axis: run?.notices?.[0]?.axis
+    }).toStrictEqual({
+      status: 'failed',
+      attempt_count: 8,
+      failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+      notice_status: 'pending',
+      notice_axis: 'preparation'
+    })
+    expect(await store.preparations.claimNext()).toBe(null)
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
-    assert.strictEqual(notice.run_id, runId)
-    assert.deepStrictEqual(notice.input, {})
-    assert.strictEqual(notice.reason_code, 'PREPARATION_RETRY_EXHAUSTED')
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.notices?.[0]?.status,
+    expect.assert(notice)
+    expect(notice.run_id).toBe(runId)
+    expect(notice.input).toStrictEqual({})
+    expect(notice.reason_code).toBe('PREPARATION_RETRY_EXHAUSTED')
+    expect((await store.queries.getRun(runId))?.notices?.[0]?.status).toBe(
       'delivering'
     )
-    assert.strictEqual(
+    expect(
       // A stale claim is rejected, not thrown at: the delivery is well-formed, it simply no
       // longer owns the notice.
       await store.notices.complete(
@@ -645,23 +615,20 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
         randomUUID(),
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
-      ),
-      false
-    )
-    assert.strictEqual(
+      )
+    ).toBe(false)
+    expect(
       await store.notices.complete(
         notice.notice_id,
         notice.claim_token,
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
-      ),
-      true
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.notices?.[0]?.status,
+      )
+    ).toBe(true)
+    expect((await store.queries.getRun(runId))?.notices?.[0]?.status).toBe(
       'delivered'
     )
-    assert.strictEqual(await store.notices.claimNext(), null)
+    expect(await store.notices.claimNext()).toBe(null)
   } finally {
     await observer.end()
     await store.close()
@@ -692,13 +659,13 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual((await producer.preparations.expireStale()).concluded, 1)
+    expect((await producer.preparations.expireStale()).concluded).toBe(1)
 
     const claims = await Promise.all([
       first.notices.claimNext(),
       second.notices.claimNext()
     ])
-    assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await Promise.all([
       observer.end(),
@@ -720,7 +687,7 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
       preparation_input_version: 'v1',
       preparation_input: { kind: 'connector_issue_review', issue_number: 12 }
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.preparations.checkpointInput(
       runId,
       admission.preparation_token,
@@ -730,12 +697,12 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
         resolved: true
       }
     )
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 1)
+    expect((await store.preparations.expireStale()).concluded).toBe(1)
 
     const claimed = await store.preparations.claimNext()
-    assert.ok(claimed)
+    expect.assert(claimed)
     const token = claimed.claim_token
-    assert.deepStrictEqual(claimed, {
+    expect(claimed).toStrictEqual({
       run_id: runId,
       workflow: 'issue-review',
       input_version: 'v1',
@@ -747,12 +714,11 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
       claim_token: token,
       attempt_count: 2
     })
-    assert.notStrictEqual(token, admission.preparation_token)
-    assert.strictEqual(
-      await store.preparations.renewClaim(runId, admission.preparation_token),
-      false
-    )
-    assert.strictEqual(await store.preparations.renewClaim(runId, token), false)
+    expect(token).not.toBe(admission.preparation_token)
+    expect(
+      await store.preparations.renewClaim(runId, admission.preparation_token)
+    ).toBe(false)
+    expect(await store.preparations.renewClaim(runId, token)).toBe(false)
   } finally {
     await store.close()
   }
@@ -779,14 +745,14 @@ test('concurrent preparation consumers cannot own the same recovered work', asyn
       preparation_input_version: 'v1',
       preparation_input: { kind: 'connector_issue_review' }
     })
-    assert.ok(admission.preparation_token)
-    assert.strictEqual((await first.preparations.expireStale()).concluded, 1)
+    expect.assert(admission.preparation_token)
+    expect((await first.preparations.expireStale()).concluded).toBe(1)
 
     const claims = await Promise.all([
       first.preparations.claimNext(),
       second.preparations.claimNext()
     ])
-    assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -805,16 +771,15 @@ test('ReviewRunStore does not let ingress replay bypass preparation backoff', as
       preparation_input_version: 'v1',
       preparation_input: { kind: 'test' }
     })
-    assert.ok(admission.preparation_token)
-    assert.deepStrictEqual(
+    expect.assert(admission.preparation_token)
+    expect(
       await store.preparations.fail(
         runId,
         admission.preparation_token,
         { message: 'temporary' },
         { retry: true, retryAfterMs: 60_000 }
-      ),
-      { retry_scheduled: true }
-    )
+      )
+    ).toStrictEqual({ retry_scheduled: true })
     const replay = await store.admissions.admit({
       workflow: 'issue-review',
       run_id: `other-${runId}`,
@@ -824,9 +789,9 @@ test('ReviewRunStore does not let ingress replay bypass preparation backoff', as
       preparation_input_version: 'v1',
       preparation_input: { kind: 'test' }
     })
-    assert.strictEqual(replay.created, false)
-    assert.strictEqual(replay.preparation_token, null)
-    assert.strictEqual(await store.preparations.claimNext(), null)
+    expect(replay.created).toBe(false)
+    expect(replay.preparation_token).toBe(null)
+    expect(await store.preparations.claimNext()).toBe(null)
   } finally {
     await store.close()
   }
@@ -837,39 +802,34 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
   const runId = `run-renewed-preparation-${randomUUID()}`
   const observer = new Pool({ connectionString: requireTestDatabase() })
   try {
-    assert.strictEqual(store.preparations.heartbeatIntervalMs(), 333)
+    expect(store.preparations.heartbeatIntervalMs()).toBe(333)
     const admission = await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await observer.query(
       `UPDATE preparations SET claimed_at=clock_timestamp()-interval '100 milliseconds'
        WHERE run_id=$1`,
       [runId]
     )
 
-    assert.strictEqual(
-      await store.preparations.renewClaim(runId, admission.preparation_token),
-      true
-    )
-    assert.strictEqual(
-      await store.preparations.renewClaim(runId, randomUUID()),
-      false
-    )
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 0)
+    expect(
+      await store.preparations.renewClaim(runId, admission.preparation_token)
+    ).toBe(true)
+    expect(await store.preparations.renewClaim(runId, randomUUID())).toBe(false)
+    expect((await store.preparations.expireStale()).concluded).toBe(0)
 
     await observer.query(
       `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(
-      await store.preparations.renewClaim(runId, admission.preparation_token),
-      false
-    )
-    assert.strictEqual((await store.preparations.expireStale()).concluded, 1)
+    expect(
+      await store.preparations.renewClaim(runId, admission.preparation_token)
+    ).toBe(false)
+    expect((await store.preparations.expireStale()).concluded).toBe(1)
   } finally {
     await observer.end()
     await store.close()
@@ -888,7 +848,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
       ingress_kind: 'github_webhook',
       ingress_key: ingressKey
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
 
     // Input preparation happens after durable admission. Its failure must keep
     // the original run and ingress identity available for diagnosis/replay.
@@ -898,13 +858,13 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     })
 
     const failed = await store.queries.getRun(runId)
-    assert.strictEqual(failed?.execution.status, 'skipped')
-    assert.strictEqual(failed?.ingress_kind, 'github_webhook')
-    assert.strictEqual(failed?.ingress_key, ingressKey)
-    assert.strictEqual(failed?.failure_code, 'REVIEW_START_FAILED')
-    assert.strictEqual(failed?.failure_message, 'input bundle upload failed')
-    assert.deepStrictEqual((await store.queries.listActiveRuns()).runs, [])
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
+    expect(failed?.execution.status).toBe('skipped')
+    expect(failed?.ingress_kind).toBe('github_webhook')
+    expect(failed?.ingress_key).toBe(ingressKey)
+    expect(failed?.failure_code).toBe('REVIEW_START_FAILED')
+    expect(failed?.failure_message).toBe('input bundle upload failed')
+    expect((await store.queries.listActiveRuns()).runs).toStrictEqual([])
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
 
     const replay = await store.admissions.admit({
       workflow: 'pull-request-review',
@@ -913,8 +873,8 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
       ingress_kind: 'github_webhook',
       ingress_key: ingressKey
     })
-    assert.strictEqual(replay.created, false)
-    assert.strictEqual(replay.record.run_id, runId)
+    expect(replay.created).toBe(false)
+    expect(replay.record.run_id).toBe(runId)
   } finally {
     await store.close()
   }
@@ -938,12 +898,11 @@ test('ReviewRunStore records one immutable schema version across concurrent init
       )
     ).rows
     await observer.end()
-    assert.deepStrictEqual(
-      versions.map((item) => [item.version, item.name]),
-      [[1, 'initial_coordination_schema']]
-    )
+    expect(versions.map((item) => [item.version, item.name])).toStrictEqual([
+      [1, 'initial_coordination_schema']
+    ])
     for (const version of versions)
-      assert.match(version.checksum, /^[a-f0-9]{64}$/)
+      expect(version.checksum).toMatch(/^[a-f0-9]{64}$/)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -963,8 +922,8 @@ test('ReviewRunStore initialization does not steal another replica preparation',
   const restarted = await createStore({ connectorId: sharedConnector })
   try {
     const record = await restarted.queries.getRun(runId)
-    assert.strictEqual(record?.execution.status, 'pending')
-    assert.strictEqual(record?.failure_code, null)
+    expect(record?.execution.status).toBe('pending')
+    expect(record?.failure_code).toBe(null)
   } finally {
     await restarted.close()
   }
@@ -985,11 +944,8 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
       first.admissions.admit({ ...ingress, run_id: `run-${randomUUID()}` }),
       second.admissions.admit({ ...ingress, run_id: `run-${randomUUID()}` })
     ])
-    assert.strictEqual(admissions.filter((item) => item.created).length, 1)
-    assert.strictEqual(
-      new Set(admissions.map((item) => item.record.run_id)).size,
-      1
-    )
+    expect(admissions.filter((item) => item.created)).toHaveLength(1)
+    expect(new Set(admissions.map((item) => item.record.run_id)).size).toBe(1)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -1007,14 +963,15 @@ test('admission does not mistake a duplicate run id for an ingress replay race',
       ingress_key: `delivery-${randomUUID()}`
     })
 
-    await assert.rejects(
+    await expect(
       store.admissions.admit({
         workflow: 'issue-review',
         run_id: runId,
         publish_context: {},
         ingress_kind: 'github_webhook',
         ingress_key: `delivery-${randomUUID()}`
-      }),
+      })
+    ).rejects.toSatisfy(
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
@@ -1053,43 +1010,40 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
       ...ingress,
       run_id: `run-${randomUUID()}`
     })
-    assert.ok(first.preparation_token)
-    assert.strictEqual(replay.created, false)
-    assert.strictEqual(replay.preparation_token, null)
-    assert.strictEqual(replay.record.run_id, first.record.run_id)
+    expect.assert(first.preparation_token)
+    expect(replay.created).toBe(false)
+    expect(replay.preparation_token).toBe(null)
+    expect(replay.record.run_id).toBe(first.record.run_id)
 
-    assert.strictEqual((await ownerB.preparations.expireStale()).concluded, 1)
+    expect((await ownerB.preparations.expireStale()).concluded).toBe(1)
     const takeover = await ownerB.preparations.claimNext()
-    assert.ok(takeover)
-    assert.strictEqual(takeover.run_id, first.record.run_id)
-    assert.notStrictEqual(takeover.claim_token, first.preparation_token)
+    expect.assert(takeover)
+    expect(takeover.run_id).toBe(first.record.run_id)
+    expect(takeover.claim_token).not.toBe(first.preparation_token)
 
-    await assert.rejects(
+    await expect(
       ownerA.preparations.checkpointInput(
         first.record.run_id,
         first.preparation_token,
         { stale: true }
-      ),
-      /claim was lost before checkpointing input/
-    )
-    await assert.rejects(
+      )
+    ).rejects.toThrow(/claim was lost before checkpointing input/)
+    await expect(
       ownerA.submissionTransitions.savePreparedSubmission(
         first.record.run_id,
         first.preparation_token,
         {},
         {}
-      ),
-      /Preparation claim was lost/
-    )
-    await assert.rejects(
+      )
+    ).rejects.toThrow(/Preparation claim was lost/)
+    await expect(
       ownerA.submissionTransitions.markQueued(
         first.record.run_id,
         first.preparation_token,
         {}
-      ),
-      /cannot transition/
-    )
-    assert.deepStrictEqual(
+      )
+    ).rejects.toThrow(/cannot transition/)
+    expect(
       await ownerA.preparations.fail(
         first.record.run_id,
         first.preparation_token,
@@ -1097,18 +1051,16 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
           message: 'late failure'
         }
       ),
-      { retry_scheduled: false },
       'a stale owner must not turn a fenced no-op into an error'
-    )
+    ).toStrictEqual({ retry_scheduled: false })
     await ownerB.submissionTransitions.markQueued(
       takeover.run_id,
       takeover.claim_token,
       {}
     )
-    assert.strictEqual(
-      (await ownerA.queries.getRun(first.record.run_id))?.execution.status,
-      'queued'
-    )
+    expect(
+      (await ownerA.queries.getRun(first.record.run_id))?.execution.status
+    ).toBe('queued')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
   }
@@ -1123,7 +1075,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.submissionTransitions.savePreparedSubmission(
       runId,
       admission.preparation_token,
@@ -1147,40 +1099,37 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(staleToken)
-    assert.ok(currentToken)
-    assert.notStrictEqual(staleToken, currentToken)
-    assert.strictEqual(
+    expect.assert(staleToken)
+    expect.assert(currentToken)
+    expect(staleToken).not.toBe(currentToken)
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         runId,
         staleToken
-      ),
-      false
-    )
-    assert.strictEqual(
+      )
+    ).toBe(false)
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         runId,
         currentToken
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const recovered = await store.queries.getRun(runId)
-    assert.strictEqual(recovered?.execution.status, 'queued')
+    expect(recovered?.execution.status).toBe('queued')
     // An accepted replay proves the Execution did take the submission, so the execution phase
     // began then. `uncertain` deliberately left `started_at` NULL (acceptance was unknown);
     // resolving it without filling the start would leave a `queued` run with no beginning,
     // which no other path can produce and which silently breaks phase timing.
-    assert.ok(
+    expect.assert(
       recovered?.execution.started_at,
       'an accepted replay records when execution began'
     )
-    assert.strictEqual(recovered?.execution.finished_at, null)
-    assert.strictEqual(
+    expect(recovered?.execution.finished_at).toBe(null)
+    expect(
       (await store.queries.listActiveRuns()).runs.some(
         (entry) => entry.run_id === runId
-      ),
-      true
-    )
+      )
+    ).toBe(true)
   } finally {
     await store.close()
   }
@@ -1197,8 +1146,8 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
-    await assert.rejects(
+    expect.assert(admission.preparation_token)
+    await expect(
       submitPreparedRun(
         owner,
         {
@@ -1215,13 +1164,11 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
         }
-      ),
-      ExecutionSubmissionUncertainError
-    )
+      )
+    ).rejects.toThrow(ExecutionSubmissionUncertainError)
     // An uncertain submission may have reached the Execution, so execution is `uncertain` (a
     // later recovery replays it) rather than skipped or failed.
-    assert.strictEqual(
-      (await owner.queries.getRun(runId))?.execution.status,
+    expect((await owner.queries.getRun(runId))?.execution.status).toBe(
       'uncertain'
     )
   } finally {
@@ -1254,11 +1201,10 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
       }
     })
 
-    assert.deepStrictEqual(submissions, [
+    expect(submissions).toStrictEqual([
       { workflow: 'issue-review', run_id: runId, input }
     ])
-    assert.strictEqual(
-      (await restarted.queries.getRun(runId))?.execution.status,
+    expect((await restarted.queries.getRun(runId))?.execution.status).toBe(
       'queued'
     )
   } finally {
@@ -1280,28 +1226,23 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
   try {
     const staleToken = await ownerA.publicationClaims.claim(runId)
     const currentToken = await ownerB.publicationClaims.claim(runId)
-    assert.ok(staleToken)
-    assert.ok(currentToken)
-    assert.notStrictEqual(staleToken, currentToken)
-    assert.strictEqual(
-      await ownerA.publications.complete(runId, staleToken),
-      false
-    )
-    assert.strictEqual(
+    expect.assert(staleToken)
+    expect.assert(currentToken)
+    expect(staleToken).not.toBe(currentToken)
+    expect(await ownerA.publications.renewClaim(runId, staleToken)).toBe(false)
+    expect(await ownerB.publications.renewClaim(runId, currentToken)).toBe(true)
+    expect(await ownerA.publications.complete(runId, staleToken)).toBe(false)
+    expect(
       await ownerA.publications.fail(
         runId,
         staleToken,
         { message: 'late failure' },
         { retry: true }
-      ),
-      false
-    )
-    assert.strictEqual(
-      await ownerB.publications.complete(runId, currentToken),
-      true
-    )
+      )
+    ).toBe(false)
+    expect(await ownerB.publications.complete(runId, currentToken)).toBe(true)
     const record = await ownerA.queries.getRun(runId)
-    assert.strictEqual(record?.publication.status, 'published')
+    expect(record?.publication.status).toBe('published')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
   }
@@ -1312,15 +1253,14 @@ test('ReviewRunStore does not publish while a required step is incomplete', asyn
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [
       'issue:summary-comment'
     ])
     const [step] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(step?.attempt_count, 0)
-    assert.strictEqual(await store.publications.complete(runId, token), false)
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect(step?.attempt_count).toBe(0)
+    expect(await store.publications.complete(runId, token)).toBe(false)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'publishing'
     )
   } finally {
@@ -1333,39 +1273,36 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     const claimed = await store.queries.getRun(runId)
-    assert.strictEqual(claimed?.publication.status, 'publishing')
+    expect(claimed?.publication.status).toBe('publishing')
     const publicationStart = claimed?.publication.started_at
-    assert.ok(publicationStart, 'the claim starts the publication phase')
-    assert.strictEqual(claimed?.publication.finished_at, null)
+    expect.assert(publicationStart, 'the claim starts the publication phase')
+    expect(claimed?.publication.finished_at).toBe(null)
 
-    assert.strictEqual(
+    expect(
       await store.publications.fail(
         runId,
         token,
         { code: 'HTTP_503', message: 'unavailable' },
         { retry: true }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const record = await store.queries.getRun(runId)
-    assert.strictEqual(record?.execution.status, 'succeeded')
+    expect(record?.execution.status).toBe('succeeded')
     // A retryable failure returns the row to pending, so the phase has not ended. `finished_at`
     // is the one timestamp that is cleared rather than only ever set: leaving it behind would
     // report a still-running publication as completed. The start, by contrast, must not move.
-    assert.strictEqual(record?.publication.status, 'pending')
-    assert.strictEqual(
+    expect(record?.publication.status).toBe('pending')
+    expect(
       record?.publication.finished_at,
-      null,
       'a retryable failure must not leave a phase end behind'
-    )
-    assert.strictEqual(
+    ).toBe(null)
+    expect(
       record?.publication.started_at,
-      publicationStart,
       'a retry keeps the original publication start'
-    )
-    assert.deepStrictEqual((await store.queries.listActiveRuns()).runs, [])
+    ).toBe(publicationStart)
+    expect((await store.queries.listActiveRuns()).runs).toStrictEqual([])
   } finally {
     await store.close()
   }
@@ -1382,7 +1319,7 @@ test('the publication axis records an event only when its derived status actuall
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [
       'issue:summary-comment',
       'issue:draft-pr'
@@ -1408,13 +1345,11 @@ test('the publication axis records an event only when its derived status actuall
       { message: 'retryable' },
       { retry: true }
     )
-    assert.strictEqual(
-      (await publicationEvents()).length,
-      beforeRetry,
+    expect(
+      await publicationEvents(),
       'an unchanged derived status must not be audited as a transition'
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    ).toHaveLength(beforeRetry)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'publishing'
     )
 
@@ -1434,11 +1369,10 @@ test('the publication axis records an event only when its derived status actuall
       { code: 'GITHUB_REJECTED', message: 'rejected' },
       { retry: false }
     )
-    assert.strictEqual(
-      (await publicationEvents()).length,
-      before,
+    expect(
+      await publicationEvents(),
       'a terminal step failure does not move the axis'
-    )
+    ).toHaveLength(before)
     const axisBefore = (await store.queries.getRun(runId))?.publication.status
     await store.publications.fail(
       runId,
@@ -1447,8 +1381,8 @@ test('the publication axis records an event only when its derived status actuall
       { retry: false }
     )
     const last = (await publicationEvents()).at(-1)
-    assert.strictEqual(last?.to_status, 'failed')
-    assert.strictEqual(last?.from_status, axisBefore)
+    expect(last?.to_status).toBe('failed')
+    expect(last?.from_status).toBe(axisBefore)
   } finally {
     await store.close()
   }
@@ -1469,7 +1403,7 @@ test('a publication left uncertain by a dead publisher is reclaimed once its lea
   const sibling = await createStore({ connectorId: ownerConnector })
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [
       'issue:summary-comment'
     ])
@@ -1504,20 +1438,18 @@ test('a publication left uncertain by a dead publisher is reclaimed once its lea
           () => true
         )
     }
-    assert.ok(stepParked, 'the step must run out of attempts')
-    assert.strictEqual(
-      (await store.publications.listPublicationSteps(runId))[0]?.status,
-      'uncertain'
-    )
+    expect.assert(stepParked, 'the step must run out of attempts')
+    expect(
+      (await store.publications.listPublicationSteps(runId))[0]?.status
+    ).toBe('uncertain')
     // The axis reports its strongest step, and the owner is alive, so it is `uncertain` too.
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'uncertain'
     )
 
     // A live lease is not stolen, by either claim path.
-    assert.strictEqual(await sibling.publicationClaims.claim(runId), null)
-    assert.strictEqual(await sibling.publicationClaims.claimNext(0), null)
+    expect(await sibling.publicationClaims.claim(runId)).toBe(null)
+    expect(await sibling.publicationClaims.claimNext(0)).toBe(null)
 
     // The owner died. Its lease is moved past the default claim timeout (ten minutes), so the
     // only thing that can admit the reclaim is the fence being expired.
@@ -1533,24 +1465,23 @@ test('a publication left uncertain by a dead publisher is reclaimed once its lea
          FROM publications WHERE run_id=$1`,
         [runId, 10 * 60 * 1000]
       )
-      assert.strictEqual(expired.rows[0]?.expired, true)
+      expect(expired.rows[0]?.expired).toBe(true)
     } finally {
       await clock.end()
     }
 
     const reclaimed = await sibling.publicationClaims.claim(runId)
-    assert.ok(reclaimed, 'an expired uncertain lease must be reclaimable')
-    assert.notStrictEqual(reclaimed, token)
-    assert.equal(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect.assert(reclaimed, 'an expired uncertain lease must be reclaimable')
+    expect(reclaimed).not.toBe(token)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'uncertain'
     )
     const event = (await store.queries.listEvents(runId))
       .filter((item) => item.axis === 'publication' && item.step_key === null)
       .at(-1)
-    assert.strictEqual(event?.from_status, 'uncertain')
-    assert.strictEqual(event?.to_status, 'uncertain')
-    assert.strictEqual(event?.reason_code, 'PUBLICATION_LEASE_EXPIRED')
+    expect(event?.from_status).toBe('uncertain')
+    expect(event?.to_status).toBe('uncertain')
+    expect(event?.reason_code).toBe('PUBLICATION_LEASE_EXPIRED')
   } finally {
     await sibling.close()
     await store.close()
@@ -1562,7 +1493,7 @@ test('ReviewRunStore fences publication step commits with the current publicatio
   const runId = await createSuccessfulRun(store)
   try {
     const staleToken = await store.publicationClaims.claim(runId)
-    assert.ok(staleToken)
+    expect.assert(staleToken)
     await store.publications.initializePublicationSteps(runId, staleToken, [
       'repository:summary-issue'
     ])
@@ -1573,8 +1504,8 @@ test('ReviewRunStore fences publication step commits with the current publicatio
     )
 
     const currentToken = await store.publicationClaims.claim(runId)
-    assert.ok(currentToken)
-    assert.strictEqual(
+    expect.assert(currentToken)
+    expect(
       await store.publications.completePublicationStep(
         runId,
         staleToken,
@@ -1582,10 +1513,9 @@ test('ReviewRunStore fences publication step commits with the current publicatio
         {
           id: '7'
         }
-      ),
-      false
-    )
-    assert.strictEqual(
+      )
+    ).toBe(false)
+    expect(
       await store.publications.failPublicationStep(
         runId,
         staleToken,
@@ -1593,9 +1523,8 @@ test('ReviewRunStore fences publication step commits with the current publicatio
         {
           message: 'late failure'
         }
-      ),
-      false
-    )
+      )
+    ).toBe(false)
   } finally {
     await store.close()
   }
@@ -1607,7 +1536,7 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
   try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.publicationClaims.claim(runId)
-      assert.ok(token)
+      expect.assert(token)
       if (attempt === 0)
         await store.publications.initializePublicationSteps(runId, token, [
           'issue:summary-comment'
@@ -1617,7 +1546,7 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
         token,
         'issue:summary-comment'
       )
-      assert.strictEqual(
+      expect(
         await store.publications.failPublicationStep(
           runId,
           token,
@@ -1625,33 +1554,30 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
           {
             message: 'temporary failure'
           }
-        ),
-        true
-      )
-      assert.strictEqual(
-        (await store.publications.listPublicationSteps(runId))[0]
-          ?.attempt_count,
-        attempt + 1
-      )
-      assert.strictEqual(
+        )
+      ).toBe(true)
+      expect(
+        (await store.publications.listPublicationSteps(runId))[0]?.attempt_count
+      ).toBe(attempt + 1)
+      expect(
         await store.publications.fail(
           runId,
           token,
           { message: 'temporary failure' },
           { retry: true }
-        ),
-        true
-      )
+        )
+      ).toBe(true)
     }
 
     const finalToken = await store.publicationClaims.claim(runId)
-    assert.ok(finalToken)
-    await assert.rejects(
+    expect.assert(finalToken)
+    await expect(
       store.publications.requirePublicationStepClaim(
         runId,
         finalToken,
         'issue:summary-comment'
-      ),
+      )
+    ).rejects.toSatisfy(
       (error: unknown) =>
         error instanceof Error &&
         'code' in error &&
@@ -1661,22 +1587,21 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
     // remotely before its response was lost, and Review Runs cannot see GitHub, so the step is
     // left for the connector to reconcile.
     const [exhaustedStep] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(exhaustedStep?.status, 'uncertain')
-    assert.strictEqual(exhaustedStep?.attempt_count, 3)
+    expect(exhaustedStep?.status).toBe('uncertain')
+    expect(exhaustedStep?.attempt_count).toBe(3)
 
     // A reconciliation that confirms nothing was published is what makes it terminal.
-    assert.strictEqual(
+    expect(
       await store.publications.settleExhaustedPublicationStep(
         runId,
         finalToken,
         'issue:summary-comment',
         { found: false }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const [step] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(step?.status, 'terminal_failed')
-    assert.strictEqual(step?.attempt_count, 3)
+    expect(step?.status).toBe('terminal_failed')
+    expect(step?.attempt_count).toBe(3)
   } finally {
     await store.close()
   }
@@ -1691,7 +1616,7 @@ test('a reconciliation that finds the side effect completes an exhausted step', 
   try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.publicationClaims.claim(runId)
-      assert.ok(token)
+      expect.assert(token)
       if (attempt === 0)
         await store.publications.initializePublicationSteps(runId, token, [
           'issue:summary-comment'
@@ -1718,15 +1643,15 @@ test('a reconciliation that finds the side effect completes an exhausted step', 
     }
 
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
-    await assert.rejects(
+    expect.assert(token)
+    await expect(
       store.publications.requirePublicationStepClaim(
         runId,
         token,
         'issue:summary-comment'
       )
-    )
-    assert.strictEqual(
+    ).rejects.toSatisfy(() => true)
+    expect(
       await store.publications.settleExhaustedPublicationStep(
         runId,
         token,
@@ -1738,16 +1663,14 @@ test('a reconciliation that finds the side effect completes an exhausted step', 
             url: 'https://github.com/octo/example/issues/1#c'
           }
         }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const [step] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(step?.status, 'succeeded')
-    assert.strictEqual(step?.remote_object_id, '4242')
+    expect(step?.status).toBe('succeeded')
+    expect(step?.remote_object_id).toBe('4242')
     // The publication can now finish: the run is not failed for work that was done.
-    assert.strictEqual(await store.publications.complete(runId, token), true)
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect(await store.publications.complete(runId, token)).toBe(true)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'published'
     )
   } finally {
@@ -1759,35 +1682,33 @@ test('ReviewRunStore records execution failure without publication failure', asy
   const store = await createStore()
   const runId = await createQueuedRun(store)
   try {
-    assert.strictEqual(
+    expect(
       await store.failExecution(runId, {
         code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
-      }),
-      true
-    )
+      })
+    ).toBe(true)
     const record = await store.queries.getRun(runId)
-    assert.strictEqual(record?.execution.status, 'failed')
-    assert.strictEqual(record?.failure_code, 'EXECUTION_FAILED')
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
+    expect(record?.execution.status).toBe('failed')
+    expect(record?.failure_code).toBe('EXECUTION_FAILED')
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
 
     // An execution failure ends the run, so the requester has to be told. The notice names the
     // axis that failed, because the reply says the review started but could not finish rather
     // than claiming it never started.
     const notice = await store.notices.claimNext()
-    assert.notStrictEqual(notice, null)
-    assert.strictEqual(notice?.run_id, runId)
-    assert.strictEqual(notice?.axis, 'execution')
-    assert.strictEqual(notice?.reason_code, 'EXECUTION_FAILED')
-    assert.strictEqual(
+    expect(notice).not.toBe(null)
+    expect(notice?.run_id).toBe(runId)
+    expect(notice?.axis).toBe('execution')
+    expect(notice?.reason_code).toBe('EXECUTION_FAILED')
+    expect(
       await store.notices.complete(
         notice?.notice_id ?? '',
         notice?.claim_token ?? '',
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
-      ),
-      true
-    )
+      )
+    ).toBe(true)
   } finally {
     await store.close()
   }
@@ -1799,34 +1720,30 @@ test('ReviewRunStore stores the comment a delivered notice points at', async () 
   const commentUrl =
     'https://github.com/example/example/issues/1#issuecomment-99'
   try {
-    assert.strictEqual(
+    expect(
       await store.failExecution(runId, {
         code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
-      }),
-      true
-    )
+      })
+    ).toBe(true)
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
+    expect.assert(notice)
 
     // A delivery has to name where the requester can read it. Storing `delivered` with no URL
     // would claim someone was told while giving no way to check.
-    await assert.rejects(
-      store.notices.complete(notice.notice_id, notice.claim_token, true),
-      /cannot be delivered without a comment_url/
-    )
+    await expect(
+      store.notices.complete(notice.notice_id, notice.claim_token, true)
+    ).rejects.toThrow(/cannot be delivered without a comment_url/)
 
-    assert.strictEqual(
+    expect(
       await store.notices.complete(
         notice.notice_id,
         notice.claim_token,
         true,
         commentUrl
-      ),
-      true
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.notices?.[0]?.comment_url,
+      )
+    ).toBe(true)
+    expect((await store.queries.getRun(runId))?.notices?.[0]?.comment_url).toBe(
       commentUrl
     )
   } finally {
@@ -1838,29 +1755,26 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = await createQueuedRun(store)
   try {
-    assert.strictEqual(
+    expect(
       await store.failExecution(runId, {
         code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
-      }),
-      true
-    )
+      })
+    ).toBe(true)
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
+    expect.assert(notice)
     // The connector could not reach the provider. That is a failed delivery, not a decision to
     // skip one, and the two must not share a state: an operator reading `skipped` would think
     // nothing was attempted.
-    assert.strictEqual(
-      await store.notices.complete(notice.notice_id, notice.claim_token, false),
-      true
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.notices?.[0]?.status,
+    expect(
+      await store.notices.complete(notice.notice_id, notice.claim_token, false)
+    ).toBe(true)
+    expect((await store.queries.getRun(runId))?.notices?.[0]?.status).toBe(
       'failed'
     )
     // The notice stays terminal: nothing retries it, by design. Reaching the provider is an
     // operator problem, not one this loop can solve by trying again.
-    assert.strictEqual(await store.notices.claimNext(), null)
+    expect(await store.notices.claimNext()).toBe(null)
   } finally {
     await store.close()
   }
@@ -1876,11 +1790,10 @@ test('every terminal path that concludes a run queues a failure notice', async (
 
   const noticeFor = async (runId: string): Promise<string | null> => {
     const run = await store.queries.getRun(runId)
-    assert.strictEqual(
+    expect(
       run?.notices?.[0]?.status,
-      'pending',
       `${runId} ended without queueing a notice`
-    )
+    ).toBe('pending')
     return run?.notices?.[0]?.axis ?? null
   }
 
@@ -1892,45 +1805,43 @@ test('every terminal path that concludes a run queues a failure notice', async (
       run_id: preparationRun,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.preparations.fail(
       preparationRun,
       admission.preparation_token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    assert.strictEqual(await noticeFor(preparationRun), 'preparation')
+    expect(await noticeFor(preparationRun)).toBe('preparation')
 
     // execution failure
     const executionRun = await createQueuedRun(store)
-    assert.strictEqual(
+    expect(
       await store.failExecution(executionRun, {
         code: 'EXECUTION_FAILED',
         message: 'boom'
-      }),
-      true
-    )
-    assert.strictEqual(await noticeFor(executionRun), 'execution')
+      })
+    ).toBe(true)
+    expect(await noticeFor(executionRun)).toBe('execution')
 
     // publication failure concluded by the coordinator, not by a terminal step
     const publicationRun = await createSuccessfulRun(store)
     const publicationToken = await store.publicationClaims.claim(publicationRun)
-    assert.ok(publicationToken)
+    expect.assert(publicationToken)
     await store.publications.initializePublicationSteps(
       publicationRun,
       publicationToken,
       ['issue:summary-comment']
     )
-    assert.strictEqual(
+    expect(
       await store.publications.fail(
         publicationRun,
         publicationToken,
         { code: 'PUBLICATION_STEPS_INCOMPLETE', message: 'steps missing' },
         { retry: false }
-      ),
-      true
-    )
-    assert.strictEqual(await noticeFor(publicationRun), 'publication')
+      )
+    ).toBe(true)
+    expect(await noticeFor(publicationRun)).toBe('publication')
 
     // an operator's decision to abandon a blocked run
     const blockedRun = `run-${randomUUID()}`
@@ -1939,7 +1850,7 @@ test('every terminal path that concludes a run queues a failure notice', async (
       run_id: blockedRun,
       publish_context: {}
     })
-    assert.ok(blockedAdmission.preparation_token)
+    expect.assert(blockedAdmission.preparation_token)
     const observer = new Pool({ connectionString: requireTestDatabase() })
     try {
       await observer.query(
@@ -1956,26 +1867,25 @@ test('every terminal path that concludes a run queues a failure notice', async (
       await observer.end()
     }
     const expiry = await store.preparations.expireStale()
-    assert.strictEqual(expiry.blocked.length, 1)
+    expect(expiry.blocked).toHaveLength(1)
     // Disconnecting is a conclusion about automation, not about the run: it asks a person to
     // look, so it queues an attention notice rather than reporting a failure.
     const disconnectedNotice = (await store.queries.getRun(blockedRun))?.notices
-    assert.deepStrictEqual(
+    expect(
       disconnectedNotice?.map((notice) => [notice.kind, notice.axis]),
-      [['attention', 'preparation']],
       'disconnecting queues an attention notice, never a failure report'
-    )
+    ).toStrictEqual([['attention', 'preparation']])
     await store.operatorDecisions.abandonBlockedPreparation(
       blockedRun,
       'operator decision'
     )
-    assert.strictEqual(await noticeFor(blockedRun), 'preparation')
+    expect(await noticeFor(blockedRun)).toBe('preparation')
     // The execution this run had already advanced is concluded with it. Leaving it `running`
     // let a later observation record `succeeded` with publication `skipped`, an outcome that
     // looks normal while the notice says the run failed.
     const concluded = await store.queries.getRun(blockedRun)
-    assert.strictEqual(concluded?.execution.status, 'succeeded')
-    assert.strictEqual(concluded?.publication.status, 'skipped')
+    expect(concluded?.execution.status).toBe('succeeded')
+    expect(concluded?.publication.status).toBe('skipped')
   } finally {
     await store.close()
   }
@@ -2010,31 +1920,26 @@ test('abandoning a blocked run concludes an execution that is still in flight', 
          WHERE run_id=$1`,
         [runId, status]
       )
-      assert.strictEqual(
-        (await store.preparations.expireStale()).blocked.length,
-        1
-      )
+      expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
       const abandoned = await store.operatorDecisions.abandonBlockedPreparation(
         runId,
         'operator'
       )
-      assert.strictEqual(
+      expect(
         abandoned.execution.status,
-        status === 'running' ? 'failed' : 'succeeded',
         `an execution that was ${status} is ${
           status === 'running' ? 'failed' : 'left as the real result'
         }`
-      )
-      assert.strictEqual(abandoned.publication.status, 'skipped')
+      ).toBe(status === 'running' ? 'failed' : 'succeeded')
+      expect(abandoned.publication.status).toBe('skipped')
       // Nothing can move it afterwards, whichever way it was concluded.
-      assert.strictEqual(
+      expect(
         await store.executions.recordExecutionSuccess(
           runId,
           { run_id: runId },
           { status: 'unavailable' }
-        ),
-        false
-      )
+        )
+      ).toBe(false)
     }
   } finally {
     await observer.end()
@@ -2047,7 +1952,7 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [
       'issue:summary-comment'
     ])
@@ -2058,68 +1963,62 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
     )
     // A step that will be retried is not yet news for the requester: announcing it would post a
     // reply per attempt for a run that may still succeed.
-    assert.strictEqual(
+    expect(
       await store.publications.failPublicationStep(
         runId,
         token,
         'issue:summary-comment',
         { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
         { retry: true }
-      ),
-      true
-    )
-    assert.strictEqual(
+      )
+    ).toBe(true)
+    expect(
       await store.publications.fail(
         runId,
         token,
         { message: 'slow down' },
         { retry: true }
-      ),
-      true
-    )
-    assert.strictEqual(
+      )
+    ).toBe(true)
+    expect(
       await store.notices.claimNext(),
-      null,
       'a retryable step failure must not produce a notice'
-    )
+    ).toBe(null)
 
     // The same step failing for a reason that cannot be retried ends only the step; the
     // publication failure that ends the run is what is announced.
     const terminalToken = await store.publicationClaims.claim(runId)
-    assert.ok(terminalToken)
+    expect.assert(terminalToken)
     await store.publications.requirePublicationStepClaim(
       runId,
       terminalToken,
       'issue:summary-comment'
     )
-    assert.strictEqual(
+    expect(
       await store.publications.failPublicationStep(
         runId,
         terminalToken,
         'issue:summary-comment',
         { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
         { retry: false }
-      ),
-      true
-    )
-    assert.strictEqual(
+      )
+    ).toBe(true)
+    expect(
       await store.notices.claimNext(),
-      null,
       'a terminal step failure alone does not end the run'
-    )
-    assert.strictEqual(
+    ).toBe(null)
+    expect(
       await store.publications.fail(
         runId,
         terminalToken,
         { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
         { retry: false }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const notice = await store.notices.claimNext()
-    assert.strictEqual(notice?.run_id, runId)
-    assert.strictEqual(notice?.axis, 'publication')
-    assert.strictEqual(notice?.reason_code, 'GITHUB_VALIDATION_REJECTED')
+    expect(notice?.run_id).toBe(runId)
+    expect(notice?.axis).toBe('publication')
+    expect(notice?.reason_code).toBe('GITHUB_VALIDATION_REJECTED')
   } finally {
     await store.close()
   }
@@ -2139,13 +2038,13 @@ test('ReviewRunStore renews a publication claim before another owner can take it
   const observer = new Pool({ connectionString: requireTestDatabase() })
   try {
     const token = await ownerA.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await observer.query(
       "UPDATE publications SET claimed_at=clock_timestamp()-interval '2 seconds' WHERE run_id=$1 AND connector_id=$2",
       [runId, sharedConnector]
     )
-    assert.strictEqual(await ownerA.publications.renewClaim(runId, token), true)
-    assert.strictEqual(await ownerB.publicationClaims.claim(runId), null)
+    expect(await ownerA.publications.renewClaim(runId, token)).toBe(true)
+    expect(await ownerB.publicationClaims.claim(runId)).toBe(null)
   } finally {
     await observer.end()
     await Promise.all([ownerA.close(), ownerB.close()])
@@ -2168,24 +2067,23 @@ test('ReviewRunStore accepts an identical publication step set under a case-inse
   ]
   try {
     const firstToken = await store.publicationClaims.claim(runId)
-    assert.ok(firstToken)
+    expect.assert(firstToken)
     await store.publications.initializePublicationSteps(
       runId,
       firstToken,
       stepKeys
     )
-    assert.strictEqual(
+    expect(
       await store.publications.fail(
         runId,
         firstToken,
         { message: 'temporary failure' },
         { retry: true }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     const secondToken = await store.publicationClaims.claim(runId)
-    assert.ok(secondToken)
+    expect.assert(secondToken)
     await store.publications.initializePublicationSteps(
       runId,
       secondToken,
@@ -2195,7 +2093,7 @@ test('ReviewRunStore accepts an identical publication step set under a case-inse
     const persisted = (
       await store.publications.listPublicationSteps(runId)
     ).map((step) => step.step_key)
-    assert.deepStrictEqual(persisted.sort(), [...stepKeys].sort())
+    expect(persisted.sort()).toStrictEqual([...stepKeys].sort())
   } finally {
     await store.close()
   }
@@ -2206,12 +2104,13 @@ test('ReviewRunStore reports a duplicate publication step set as deterministic',
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
-    await assert.rejects(
+    expect.assert(token)
+    await expect(
       store.publications.initializePublicationSteps(runId, token, [
         'repository:summary-issue',
         'repository:summary-issue'
-      ]),
+      ])
+    ).rejects.toSatisfy(
       (error: unknown) =>
         error instanceof Error &&
         'code' in error &&
@@ -2229,27 +2128,27 @@ test('ReviewRunStore reports a changed publication step set as deterministic', a
   const runId = await createSuccessfulRun(store)
   try {
     const firstToken = await store.publicationClaims.claim(runId)
-    assert.ok(firstToken)
+    expect.assert(firstToken)
     await store.publications.initializePublicationSteps(runId, firstToken, [
       'repository:summary-issue'
     ])
-    assert.strictEqual(
+    expect(
       await store.publications.fail(
         runId,
         firstToken,
         { message: 'temporary failure' },
         { retry: true }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     const secondToken = await store.publicationClaims.claim(runId)
-    assert.ok(secondToken)
-    await assert.rejects(
+    expect.assert(secondToken)
+    await expect(
       store.publications.initializePublicationSteps(runId, secondToken, [
         'repository:summary-issue',
         'repository:summary-comment'
-      ]),
+      ])
+    ).rejects.toSatisfy(
       (error: unknown) =>
         error instanceof Error &&
         'code' in error &&
@@ -2273,7 +2172,7 @@ test('claimNextPublication returns the persisted result, context, and artifact',
     run_id: runId,
     publish_context: context
   })
-  assert.ok(admission.preparation_token)
+  expect.assert(admission.preparation_token)
   await store.submissionTransitions.markQueued(
     runId,
     admission.preparation_token,
@@ -2283,19 +2182,18 @@ test('claimNextPublication returns the persisted result, context, and artifact',
     run_id: runId,
     review_record: { analysis: { verdict: 'no-findings' } }
   }
-  assert.strictEqual(
+  expect(
     await store.executions.recordExecutionSuccess(runId, workflowResult, {
       status: 'unavailable'
-    }),
-    true
-  )
+    })
+  ).toBe(true)
   try {
     const work = await store.publicationClaims.claimNext()
-    assert.strictEqual(work?.run_id, runId)
-    assert.strictEqual(work?.claim_token.length, 36)
-    assert.deepStrictEqual(work?.artifact_storage, { status: 'unavailable' })
-    assert.deepStrictEqual(work?.workflow_result, workflowResult)
-    assert.deepStrictEqual(work?.publish_context, context)
+    expect(work?.run_id).toBe(runId)
+    expect(work?.claim_token).toHaveLength(36)
+    expect(work?.artifact_storage).toStrictEqual({ status: 'unavailable' })
+    expect(work?.workflow_result).toStrictEqual(workflowResult)
+    expect(work?.publish_context).toStrictEqual(context)
   } finally {
     await store.close()
   }
@@ -2314,8 +2212,8 @@ test('a restarted publisher can claim persisted publication work', async () => {
   const restarted = await createStore({ connectorId: sharedConnector })
   try {
     const work = await restarted.publicationClaims.claimNext()
-    assert.strictEqual(work?.run_id, runId)
-    assert.ok(work?.claim_token)
+    expect(work?.run_id).toBe(runId)
+    expect.assert(work?.claim_token)
   } finally {
     await restarted.close()
   }
@@ -2334,7 +2232,7 @@ test('concurrent claimNextPublication consumers cannot own the same ready run', 
       first.publicationClaims.claimNext(),
       second.publicationClaims.claimNext()
     ])
-    assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1)
   } finally {
     await first.close()
     await second.close()
@@ -2355,13 +2253,11 @@ test('claimNextPublication does not treat an execution that left succeeded as pu
       `UPDATE executions SET status='failed' WHERE run_id=$1 AND connector_id=$2`,
       [runId, connectorId]
     )
-    assert.strictEqual(
+    expect(
       await store.publicationClaims.claimNext(),
-      null,
       'an execution that is not succeeded is not publishable'
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    ).toBe(null)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'pending'
     )
   } finally {
@@ -2378,20 +2274,16 @@ test('a retryable publication failure makes the run claimable again', async () =
   const runId = await createSuccessfulRun(store)
   try {
     const work = await store.publicationClaims.claimNext()
-    assert.ok(work)
-    assert.strictEqual(
+    expect.assert(work)
+    expect(
       await store.publications.fail(
         runId,
         work.claim_token,
         { message: 'GitHub unavailable' },
         { retry: true }
-      ),
-      true
-    )
-    assert.strictEqual(
-      (await store.publicationClaims.claimNext())?.run_id,
-      runId
-    )
+      )
+    ).toBe(true)
+    expect((await store.publicationClaims.claimNext())?.run_id).toBe(runId)
   } finally {
     await store.close()
   }
@@ -2405,33 +2297,25 @@ test('the write path refuses an artifact storage value the contract forbids', as
   const store = await createStore()
   const runId = await createQueuedRun(store)
   try {
-    await assert.rejects(
-      store.executions.recordArtifactStorage(runId, { status: 'available' }),
+    await expect(
+      store.executions.recordArtifactStorage(runId, { status: 'available' })
+    ).rejects.toThrow(
       new RegExp(
         `run ${runId} is an available artifact storage record without its artifact`
       )
     )
-    await assert.rejects(
+    await expect(
       store.executions.recordExecutionSuccess(
         runId,
         { run_id: runId },
         { status: 'available' }
-      ),
-      /without its artifact reference/
-    )
-    await assert.rejects(
-      store.failExecution(
-        runId,
-        { message: 'failed' },
-        { status: 'available' }
-      ),
-      /without its artifact reference/
-    )
+      )
+    ).rejects.toThrow(/without its artifact reference/)
+    await expect(
+      store.failExecution(runId, { message: 'failed' }, { status: 'available' })
+    ).rejects.toThrow(/without its artifact reference/)
     // Nothing was written: the run is still exactly as it was queued.
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.artifact_storage,
-      null
-    )
+    expect((await store.queries.getRun(runId))?.artifact_storage).toBe(null)
   } finally {
     await store.close()
   }
@@ -2451,22 +2335,21 @@ test('every publication transition writes exactly one audit event', async () => 
   try {
     // Terminal execution failure skips publication.
     const failedRun = await createQueuedRun(store)
-    assert.strictEqual(
+    expect(
       await store.failExecution(failedRun, {
         code: 'EXECUTION_FAILED',
         message: 'boom'
-      }),
-      true
-    )
-    assert.deepStrictEqual(await publicationEvents(failedRun), [
+      })
+    ).toBe(true)
+    expect(await publicationEvents(failedRun)).toStrictEqual([
       'null->pending',
       'pending->skipped'
     ])
 
     // Claiming publishable work starts publishing.
     const claimedRun = await createSuccessfulRun(store)
-    assert.ok(await store.publicationClaims.claim(claimedRun))
-    assert.deepStrictEqual(await publicationEvents(claimedRun), [
+    expect.assert(await store.publicationClaims.claim(claimedRun))
+    expect(await publicationEvents(claimedRun)).toStrictEqual([
       'null->pending',
       'pending->publishing'
     ])
@@ -2479,31 +2362,29 @@ test('every publication transition writes exactly one audit event', async () => 
       run_id: recoveredRun,
       publish_context: {}
     })
-    assert.ok(admitted.preparation_token)
+    expect.assert(admitted.preparation_token)
     await store.preparations.fail(
       recoveredRun,
       admitted.preparation_token,
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(recoveredRun))?.publication.status,
-      'pending',
       'an uncertain submission must not skip publication'
-    )
+    ).toBe('pending')
     const recoveryToken = await store.executions.claimSubmissionRecovery(
       recoveredRun,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(recoveryToken)
-    assert.strictEqual(
+    expect.assert(recoveryToken)
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         recoveredRun,
         recoveryToken
-      ),
-      true
-    )
-    assert.deepStrictEqual(await publicationEvents(recoveredRun), [
+      )
+    ).toBe(true)
+    expect(await publicationEvents(recoveredRun)).toStrictEqual([
       'null->pending'
     ])
 
@@ -2514,7 +2395,7 @@ test('every publication transition writes exactly one audit event', async () => 
       run_id: rejectedRun,
       publish_context: {}
     })
-    assert.ok(rejectedAdmission.preparation_token)
+    expect.assert(rejectedAdmission.preparation_token)
     await store.preparations.fail(
       rejectedRun,
       rejectedAdmission.preparation_token,
@@ -2525,8 +2406,8 @@ test('every publication transition writes exactly one audit event', async () => 
       rejectedRun,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(rejectedToken)
-    assert.strictEqual(
+    expect.assert(rejectedToken)
+    expect(
       await store.submissionTransitions.failSubmissionRecovery(
         rejectedRun,
         rejectedToken,
@@ -2534,10 +2415,9 @@ test('every publication transition writes exactly one audit event', async () => 
           code: 'SUBMISSION_FAILED',
           message: 'no'
         }
-      ),
-      true
-    )
-    assert.deepStrictEqual(await publicationEvents(rejectedRun), [
+      )
+    ).toBe(true)
+    expect(await publicationEvents(rejectedRun)).toStrictEqual([
       'null->pending',
       'pending->skipped'
     ])
@@ -2560,20 +2440,19 @@ test('each lifecycle axis records an immutable start and end', async () => {
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
 
     // Admitted but not claimed again: the preparation claim taken at admission started the
     // phase, and nothing has ended yet.
     const admitted = await store.queries.getRun(runId)
-    assert.ok(admitted?.preparation?.started_at, 'admission starts preparation')
-    assert.strictEqual(admitted?.preparation?.finished_at, null)
-    assert.strictEqual(
-      admitted?.execution.started_at,
-      null,
-      'execution has not begun'
+    expect.assert(
+      admitted?.preparation?.started_at,
+      'admission starts preparation'
     )
-    assert.strictEqual(admitted?.execution.finished_at, null)
-    assert.strictEqual(admitted?.publication.started_at, null)
+    expect(admitted?.preparation?.finished_at).toBe(null)
+    expect(admitted?.execution.started_at, 'execution has not begun').toBe(null)
+    expect(admitted?.execution.finished_at).toBe(null)
+    expect(admitted?.publication.started_at).toBe(null)
 
     // Preparation ends when the input is handed over; execution starts at the same moment.
     await store.submissionTransitions.markQueued(
@@ -2582,76 +2461,72 @@ test('each lifecycle axis records an immutable start and end', async () => {
       {}
     )
     const queued = await store.queries.getRun(runId)
-    assert.strictEqual(queued?.preparation?.status, 'submitted')
-    assert.ok(queued?.preparation?.finished_at, 'submission ends preparation')
-    assert.ok(queued?.execution.started_at, 'submission starts execution')
-    assert.strictEqual(
-      queued?.execution.finished_at,
-      null,
-      'execution still in flight'
+    expect(queued?.preparation?.status).toBe('submitted')
+    expect.assert(
+      queued?.preparation?.finished_at,
+      'submission ends preparation'
+    )
+    expect.assert(queued?.execution.started_at, 'submission starts execution')
+    expect(queued?.execution.finished_at, 'execution still in flight').toBe(
+      null
     )
     const preparationStart = queued?.preparation?.started_at
     const preparationEnd = queued?.preparation?.finished_at
-    assert.ok(
+    expect.assert(
       Date.parse(preparationEnd!) >= Date.parse(preparationStart!),
       'preparation end is not before its start'
     )
 
     // Execution ends on the terminal result; publication has not started, so it has no start.
-    assert.strictEqual(
+    expect(
       await store.executions.recordExecutionSuccess(
         runId,
         { run_id: runId },
         { status: 'unavailable' }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const succeeded = await store.queries.getRun(runId)
-    assert.ok(succeeded?.execution.finished_at, 'success ends execution')
-    assert.strictEqual(succeeded?.publication.started_at, null)
+    expect.assert(succeeded?.execution.finished_at, 'success ends execution')
+    expect(succeeded?.publication.started_at).toBe(null)
     // `observed_at` and `finished_at` are written in the same UPDATE, so the end of the phase
     // and the last observation agree at this instant.
-    assert.strictEqual(
-      succeeded?.execution.finished_at,
+    expect(succeeded?.execution.finished_at).toBe(
       succeeded?.execution.updated_at
     )
 
     // Publication starts on the first claim, and a retryable failure that re-pends the row and
     // claims it again must not move the start.
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     const publishing = await store.queries.getRun(runId)
-    assert.strictEqual(publishing?.publication.status, 'publishing')
+    expect(publishing?.publication.status).toBe('publishing')
     const publicationStart = publishing?.publication.started_at
-    assert.ok(publicationStart, 'first claim starts publication')
+    expect.assert(publicationStart, 'first claim starts publication')
 
     await store.publications.initializePublicationSteps(runId, token, [
       'repository:comment'
     ])
-    assert.strictEqual(
+    expect(
       await store.publications.fail(
         runId,
         token,
         { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
         { retry: true }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const retried = await store.queries.getRun(runId)
-    assert.strictEqual(retried?.publication.status, 'pending')
-    assert.strictEqual(
+    expect(retried?.publication.status).toBe('pending')
+    expect(
       retried?.publication.started_at,
-      publicationStart,
       'a retryable failure keeps the original publication start'
-    )
+    ).toBe(publicationStart)
 
     const secondToken = await store.publicationClaims.claim(runId)
-    assert.ok(secondToken)
-    assert.strictEqual(
+    expect.assert(secondToken)
+    expect(
       (await store.queries.getRun(runId))?.publication.started_at,
-      publicationStart,
       're-claiming keeps the original publication start'
-    )
+    ).toBe(publicationStart)
 
     // The end of each phase is stable across later writes.
     const before = await store.queries.getRun(runId)
@@ -2660,18 +2535,11 @@ test('each lifecycle axis records an immutable start and end', async () => {
       status: 'unavailable'
     })
     const after = await store.queries.getRun(runId)
-    assert.strictEqual(
-      after?.execution.finished_at,
-      before?.execution.finished_at
-    )
-    assert.strictEqual(
-      after?.preparation?.finished_at,
+    expect(after?.execution.finished_at).toBe(before?.execution.finished_at)
+    expect(after?.preparation?.finished_at).toBe(
       before?.preparation?.finished_at
     )
-    assert.strictEqual(
-      after?.publication.started_at,
-      before?.publication.started_at
-    )
+    expect(after?.publication.started_at).toBe(before?.publication.started_at)
   } finally {
     await store.close()
   }
@@ -2689,9 +2557,9 @@ test('a preparation retry does not move the phase start', async () => {
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     const started = (await store.queries.getRun(runId))?.preparation?.started_at
-    assert.ok(started)
+    expect.assert(started)
 
     // A retryable failure returns the row to pending for another attempt.
     const result = await store.preparations.fail(
@@ -2700,20 +2568,18 @@ test('a preparation retry does not move the phase start', async () => {
       { code: 'PREPARATION_TRANSIENT', message: 'try again' },
       { retry: true, retryAfterMs: 0 }
     )
-    assert.deepStrictEqual(result, { retry_scheduled: true })
-    assert.strictEqual(
+    expect(result).toStrictEqual({ retry_scheduled: true })
+    expect(
       (await store.queries.getRun(runId))?.preparation?.started_at,
-      started,
       'a re-pend keeps the original start'
-    )
+    ).toBe(started)
 
     const next = await store.preparations.claimNext()
-    assert.ok(next)
-    assert.strictEqual(
+    expect.assert(next)
+    expect(
       (await store.queries.getRun(runId))?.preparation?.started_at,
-      started,
       'claiming again keeps the original start'
-    )
+    ).toBe(started)
   } finally {
     await store.close()
   }
@@ -2735,7 +2601,7 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.preparations.fail(
       runId,
       admission.preparation_token,
@@ -2745,7 +2611,7 @@ test('an exhausted preparation keeps the last real failure reason instead of the
 
     // The coordinator claims the retry. This is the step that erases `failure_code`.
     const work = await store.preparations.claimNext()
-    assert.strictEqual(work?.run_id, runId)
+    expect(work?.run_id).toBe(runId)
     const afterClaim = await pool.query<{
       failure_code: string | null
       last_failure_code: string | null
@@ -2753,16 +2619,14 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       'SELECT failure_code, last_failure_code FROM preparations WHERE run_id=$1',
       [runId]
     )
-    assert.strictEqual(
+    expect(
       afterClaim.rows[0]?.failure_code,
-      null,
       'a new attempt starts without a current failure'
-    )
-    assert.strictEqual(
+    ).toBe(null)
+    expect(
       afterClaim.rows[0]?.last_failure_code,
-      'GITHUB_RATE_LIMITED',
       'the durable reason must survive the claim that clears failure_code'
-    )
+    ).toBe('GITHUB_RATE_LIMITED')
 
     // That attempt dies on its final allowed lease.
     await pool.query(
@@ -2781,13 +2645,12 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       'SELECT status, failure_code, failure_message FROM preparations WHERE run_id=$1',
       [runId]
     )
-    assert.strictEqual(preparation.rows[0]?.status, 'failed')
-    assert.strictEqual(
+    expect(preparation.rows[0]?.status).toBe('failed')
+    expect(
       preparation.rows[0]?.failure_code,
-      'GITHUB_RATE_LIMITED',
       'the real failure reason must survive the lease expiry'
-    )
-    assert.strictEqual(preparation.rows[0]?.failure_message, 'rate limited')
+    ).toBe('GITHUB_RATE_LIMITED')
+    expect(preparation.rows[0]?.failure_message).toBe('rate limited')
 
     // The publication axis moved in the same pass, and its event names the state it actually
     // left. On this path that is always `pending`: a publication only reaches `publishing` after
@@ -2800,14 +2663,14 @@ test('an exhausted preparation keeps the last real failure reason instead of the
         (event) => event.axis === 'publication' && event.step_key === null
       )
       .map((event) => `${event.from_status}->${event.to_status}`)
-    assert.deepStrictEqual(publicationEvents, [
+    expect(publicationEvents).toStrictEqual([
       'null->pending',
       'pending->skipped'
     ])
 
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
-    assert.strictEqual(notice.reason_code, 'GITHUB_RATE_LIMITED')
+    expect.assert(notice)
+    expect(notice.reason_code).toBe('GITHUB_RATE_LIMITED')
   } finally {
     await pool.end()
     await store.close()
@@ -2835,8 +2698,8 @@ test('a preparation failure with no recorded reason still reports the exhaustion
     await store.preparations.expireStale()
 
     const notice = await store.notices.claimNext()
-    assert.ok(notice)
-    assert.strictEqual(notice.reason_code, 'PREPARATION_RETRY_EXHAUSTED')
+    expect.assert(notice)
+    expect(notice.reason_code).toBe('PREPARATION_RETRY_EXHAUSTED')
   } finally {
     await pool.end()
     await store.close()
@@ -2852,7 +2715,7 @@ test('a terminal execution failure converges an in-flight publication', async ()
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
 
     // Force execution back to a non-terminal-but-failable state, then fail it.
     const pool = new Pool({ connectionString: requireTestDatabase() })
@@ -2864,22 +2727,20 @@ test('a terminal execution failure converges an in-flight publication', async ()
     } finally {
       await pool.end()
     }
-    assert.strictEqual(
+    expect(
       await store.failExecution(runId, {
         code: 'EXECUTION_LOST',
         message: 'expected output'
-      }),
-      true
-    )
+      })
+    ).toBe(true)
 
     const record = await store.queries.getRun(runId)
-    assert.strictEqual(record?.execution.status, 'failed')
-    assert.strictEqual(
+    expect(record?.execution.status).toBe('failed')
+    expect(
       record?.publication.status,
-      'skipped',
       'a publication in flight must not be stranded when execution fails'
-    )
-    assert.strictEqual(record?.publication.finished_at !== null, true)
+    ).toBe('skipped')
+    expect(record?.publication.finished_at !== null).toBe(true)
 
     const events = await store.queries.listEvents(runId)
     const abandoned = events.find(
@@ -2889,8 +2750,8 @@ test('a terminal execution failure converges an in-flight publication', async ()
         event.from_status === 'publishing' &&
         event.to_status === 'skipped'
     )
-    assert.ok(abandoned, 'the abandonment must be audited')
-    assert.strictEqual(abandoned.reason_code, 'PUBLICATION_ABANDONED')
+    expect.assert(abandoned, 'the abandonment must be audited')
+    expect(abandoned.reason_code).toBe('PUBLICATION_ABANDONED')
   } finally {
     await store.close()
   }
@@ -2901,7 +2762,7 @@ test('a rejected submission replay converges an in-flight publication', async ()
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
 
     const pool = new Pool({ connectionString: requireTestDatabase() })
     try {
@@ -2921,8 +2782,8 @@ test('a rejected submission replay converges an in-flight publication', async ()
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.notStrictEqual(claimToken, null)
-    assert.strictEqual(
+    expect(claimToken).not.toBe(null)
+    expect(
       await store.submissionTransitions.failSubmissionRecovery(
         runId,
         claimToken as string,
@@ -2930,13 +2791,12 @@ test('a rejected submission replay converges an in-flight publication', async ()
           code: 'SUBMISSION_REJECTED',
           message: 'replay rejected'
         }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     const record = await store.queries.getRun(runId)
-    assert.strictEqual(record?.execution.status, 'failed')
-    assert.strictEqual(record?.publication.status, 'skipped')
+    expect(record?.execution.status).toBe('failed')
+    expect(record?.publication.status).toBe('skipped')
   } finally {
     await store.close()
   }
@@ -2951,19 +2811,18 @@ test('a failed publication reports its own reason, never another axis', async ()
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
-    assert.strictEqual(
+    expect(token).not.toBe(null)
+    expect(
       await store.publications.fail(
         runId,
         token as string,
         { code: null, message: 'no code' },
         { retry: false }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const noCode = await store.queries.getRun(runId)
-    assert.strictEqual(noCode?.publication.status, 'failed')
-    assert.strictEqual(noCode?.failure_code, null)
+    expect(noCode?.publication.status).toBe('failed')
+    expect(noCode?.failure_code).toBe(null)
   } finally {
     await store.close()
   }
@@ -2972,7 +2831,7 @@ test('a failed publication reports its own reason, never another axis', async ()
   const secondRunId = await createSuccessfulRun(second)
   try {
     const token = await second.publicationClaims.claim(secondRunId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await second.publications.fail(
       secondRunId,
       token as string,
@@ -2980,7 +2839,7 @@ test('a failed publication reports its own reason, never another axis', async ()
       { retry: false }
     )
     const record = await second.queries.getRun(secondRunId)
-    assert.strictEqual(record?.failure_code, 'GITHUB_FORBIDDEN')
+    expect(record?.failure_code).toBe('GITHUB_FORBIDDEN')
   } finally {
     await second.close()
   }
@@ -3001,7 +2860,7 @@ test('an accepted replay refuses to queue an execution whose publication already
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admitted.preparation_token)
+    expect.assert(admitted.preparation_token)
     await store.preparations.fail(
       runId,
       admitted.preparation_token,
@@ -3020,21 +2879,19 @@ test('an accepted replay refuses to queue an execution whose publication already
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(token)
-    assert.strictEqual(
+    expect.assert(token)
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         runId,
         token
       ),
-      false,
       'an accepted replay must not queue an execution whose publication is gone'
-    )
+    ).toBe(false)
     const record = await store.queries.getRun(runId)
-    assert.strictEqual(
+    expect(
       record?.execution.status,
-      'uncertain',
       'a refused replay must leave the execution axis untouched'
-    )
+    ).toBe('uncertain')
   } finally {
     await pool.end()
     await store.close()
@@ -3057,14 +2914,13 @@ test('markQueued refuses to submit into a publication that already ended', async
       run_id: admitted,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await store.submissionTransitions.markQueued(
       admitted,
       admission.preparation_token,
       {}
     )
-    assert.strictEqual(
-      (await store.queries.getRun(admitted))?.execution.status,
+    expect((await store.queries.getRun(admitted))?.execution.status).toBe(
       'queued'
     )
 
@@ -3075,32 +2931,29 @@ test('markQueued refuses to submit into a publication that already ended', async
       run_id: refused,
       publish_context: {}
     })
-    assert.ok(refusedAdmission.preparation_token)
+    expect.assert(refusedAdmission.preparation_token)
     await pool.query(
       `UPDATE publications SET status='skipped', finished_at=clock_timestamp()
        WHERE run_id=$1`,
       [refused]
     )
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.markQueued(
         refused,
         refusedAdmission.preparation_token,
         {}
       ),
-      /cannot transition from pending to queued/,
       'a concluded publication must reject the submission'
-    )
+    ).rejects.toThrow(/cannot transition from pending to queued/)
     const record = await store.queries.getRun(refused)
-    assert.strictEqual(
+    expect(
       record?.execution.status,
-      'pending',
       'the refused submission must leave the execution unqueued'
-    )
-    assert.strictEqual(
+    ).toBe('pending')
+    expect(
       record?.preparation.status,
-      'preparing',
       'the refused submission must leave the preparation claim intact'
-    )
+    ).toBe('preparing')
   } finally {
     await pool.end()
     await store.close()
@@ -3126,7 +2979,7 @@ test('a preparation failure becomes a no-op when its claim is fenced mid-transac
       run_id: runId,
       publish_context: {}
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     await pool.query(`
       CREATE OR REPLACE FUNCTION test_steal_preparation_claim() RETURNS trigger AS $$
       BEGIN
@@ -3146,32 +2999,33 @@ test('a preparation failure becomes a no-op when its claim is fenced mid-transac
       FOR EACH ROW EXECUTE FUNCTION test_steal_preparation_claim();
     `)
     try {
-      assert.deepStrictEqual(
+      expect(
         await store.preparations.fail(
           runId,
           admission.preparation_token,
           { code: 'PREPARATION_INPUT_INVALID', message: 'cannot build input' },
           { retry: false }
         ),
-        { retry_scheduled: false },
         'a fenced owner must report that it scheduled no retry'
-      )
+      ).toStrictEqual({ retry_scheduled: false })
       // The preparation keeps the state the competing writer left, and no audit event claims a
       // transition this invocation did not make.
       const record = await store.queries.getRun(runId)
-      assert.strictEqual(
+      expect(
         record?.preparation.status,
-        'preparing',
         'a lost claim must not be recorded as a terminal failure'
-      )
-      assert.strictEqual(record?.execution.status, 'pending')
-      assert.deepStrictEqual(
+      ).toBe('preparing')
+      expect(record?.execution.status).toBe('pending')
+      expect(
         (await store.queries.listEvents(runId)).map(
           (event) => `${event.axis}:${event.to_status}`
         ),
-        ['execution:pending', 'preparation:preparing', 'publication:pending'],
         'the refused failure must not append a misleading event'
-      )
+      ).toStrictEqual([
+        'execution:pending',
+        'preparation:preparing',
+        'publication:pending'
+      ])
     } finally {
       await pool.query(
         'DROP TRIGGER IF EXISTS test_steal_preparation_claim_trigger ON preparations'
@@ -3200,7 +3054,7 @@ test('savePreparedSubmission rolls the publication write back when the execution
       run_id: runId,
       publish_context: { target: 'original' }
     })
-    assert.ok(admission.preparation_token)
+    expect.assert(admission.preparation_token)
     // Make the execution arm miss while the publication arm still matches: the preparation is no
     // longer `preparing`, so its EXISTS is false, but the run trunk still authorizes the update.
     await pool.query(
@@ -3215,26 +3069,24 @@ test('savePreparedSubmission rolls the publication write back when the execution
       [runId]
     )
 
-    await assert.rejects(
+    await expect(
       store.submissionTransitions.savePreparedSubmission(
         runId,
         admission.preparation_token,
         { target: 'overwritten' },
         { api_version: 'v1' }
       ),
-      /Preparation claim was lost/,
       'a missed execution arm must reject the save'
-    )
+    ).rejects.toThrow(/Preparation claim was lost/)
 
     const after = await pool.query<{ input: Record<string, unknown> }>(
       'SELECT input FROM publications WHERE run_id=$1',
       [runId]
     )
-    assert.deepStrictEqual(
+    expect(
       after.rows[0]?.input,
-      before.rows[0]?.input,
       'the rejected save must not leave the publication input half-written'
-    )
+    ).toStrictEqual(before.rows[0]?.input)
   } finally {
     await pool.end()
     await store.close()
@@ -3246,27 +3098,28 @@ test('a publisher that died mid-publication is taken over once its lease expires
   // `claimed_at` is claimable again, which is the only reason the claim token exists. This pins
   // that self-healing path - including the takeover event and the stale owner being fenced out -
   // because it is what makes an operator repair unnecessary in the common case.
-  const store = await createStore({ claimTimeoutMs: 50 })
+  const store = await createStore({ claimTimeoutMs: 30_000 })
   const runId = await createSuccessfulRun(store)
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const firstToken = await store.publicationClaims.claim(runId)
-    assert.ok(firstToken)
+    expect.assert(firstToken)
     // The lease is still fresh, so nobody else may take it.
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
 
-    await new Promise((resolve) => setTimeout(resolve, 120))
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
     const secondToken = await store.publicationClaims.claim(runId)
-    assert.ok(secondToken, 'an expired lease must be reclaimable')
-    assert.notStrictEqual(secondToken, firstToken)
+    expect.assert(secondToken, 'an expired lease must be reclaimable')
+    expect(secondToken).not.toBe(firstToken)
 
     // The old owner is fenced out at every write.
-    assert.strictEqual(
-      await store.publications.complete(runId, firstToken),
-      false
-    )
-    await assert.rejects(
+    expect(await store.publications.complete(runId, firstToken)).toBe(false)
+    await expect(
       store.publications.requirePublicationStepClaim(runId, firstToken, 'x')
-    )
+    ).rejects.toSatisfy(() => true)
 
     // The new owner finishes the publication.
     await store.publications.initializePublicationSteps(runId, secondToken, [
@@ -3278,12 +3131,8 @@ test('a publisher that died mid-publication is taken over once its lease expires
       'x'
     )
     await store.publications.completePublicationStep(runId, secondToken, 'x')
-    assert.strictEqual(
-      await store.publications.complete(runId, secondToken),
-      true
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect(await store.publications.complete(runId, secondToken)).toBe(true)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'published'
     )
 
@@ -3293,13 +3142,14 @@ test('a publisher that died mid-publication is taken over once its lease expires
         (event) => event.axis === 'publication' && event.step_key === null
       )
       .map((event) => `${event.from_status}->${event.to_status}`)
-    assert.deepStrictEqual(publicationEvents, [
+    expect(publicationEvents).toStrictEqual([
       'null->pending',
       'pending->publishing',
       'publishing->publishing',
       'publishing->published'
     ])
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -3309,20 +3159,19 @@ test('reclaiming a running publication step records that another attempt started
   // cannot know whether the side effect happened, so it must not let a reclaim look like a first
   // attempt: `attempt_count` and `last_attempt_at` are what let the connector treat a reclaim as
   // a retry and reconcile against the remote object instead of repeating the call blindly.
-  const store = await createStore({ claimTimeoutMs: 50 })
+  const store = await createStore({ claimTimeoutMs: 30_000 })
   const runId = await createSuccessfulRun(store)
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [
       'comment'
     ])
-    assert.strictEqual(
+    expect(
       (await store.publications.listPublicationSteps(runId))[0]?.attempt_count,
-      0,
       'an untouched step has never been attempted'
-    )
+    ).toBe(0)
 
     await store.publications.requirePublicationStepClaim(
       runId,
@@ -3330,30 +3179,32 @@ test('reclaiming a running publication step records that another attempt started
       'comment'
     )
     const first = (await store.publications.listPublicationSteps(runId))[0]
-    assert.strictEqual(first?.attempt_count, 1)
-    assert.ok(
+    expect(first?.attempt_count).toBe(1)
+    expect.assert(
       first?.last_attempt_at,
       'the first attempt records when it started'
     )
 
     // The publisher "dies" here: the step stays `running`. A new owner reclaims it once the
     // publication lease expires.
-    await new Promise((resolve) => setTimeout(resolve, 120))
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
     const secondToken = await store.publicationClaims.claim(runId)
-    assert.ok(secondToken)
+    expect.assert(secondToken)
     await store.publications.requirePublicationStepClaim(
       runId,
       secondToken,
       'comment'
     )
     const second = (await store.publications.listPublicationSteps(runId))[0]
-    assert.strictEqual(
+    expect(
       second?.attempt_count,
-      2,
       'a reclaim must be visible as a second attempt, not a first one'
-    )
-    assert.strictEqual(second?.status, 'running')
-    assert.notStrictEqual(second?.last_attempt_at, null)
+    ).toBe(2)
+    expect(second?.status).toBe('running')
+    expect(second?.last_attempt_at).not.toBe(null)
   } finally {
     await pool.end()
     await store.close()
@@ -3401,33 +3252,32 @@ test('an unreconcilable expiry blocks one run instead of aborting the pass forev
     )
 
     const first = await store.preparations.expireStale()
-    assert.strictEqual(first.concluded, 1, 'the healthy run is still concluded')
-    assert.deepStrictEqual(first.blocked, [
+    expect(first.concluded, 'the healthy run is still concluded').toBe(1)
+    expect(first.blocked).toStrictEqual([
       { run_id: corruptRunId, reason: 'EXECUTION_ALREADY_ADVANCED' }
     ])
 
     // The healthy run is fully concluded even though a sibling failed.
     const healthy = await store.queries.getRun(healthyRunId)
-    assert.strictEqual(healthy?.preparation?.status, 'failed')
-    assert.strictEqual(healthy?.execution.status, 'skipped')
-    assert.strictEqual(healthy?.publication.status, 'skipped')
+    expect(healthy?.preparation?.status).toBe('failed')
+    expect(healthy?.execution.status).toBe('skipped')
+    expect(healthy?.publication.status).toBe('skipped')
 
     // The corrupt run becomes `disconnected` and nothing else about it is rewritten: the
     // contradiction stays visible, and the state itself is what tells an operator to look.
     const corrupt = await store.queries.getRun(corruptRunId)
-    assert.strictEqual(corrupt?.preparation?.status, 'disconnected')
-    assert.strictEqual(
-      corrupt?.preparation?.disconnect_reason,
+    expect(corrupt?.preparation?.status).toBe('disconnected')
+    expect(corrupt?.preparation?.disconnect_reason).toBe(
       'EXECUTION_ALREADY_ADVANCED'
     )
-    assert.strictEqual(corrupt?.execution.status, 'succeeded')
-    assert.strictEqual(corrupt?.publication.status, 'publishing')
+    expect(corrupt?.execution.status).toBe('succeeded')
+    expect(corrupt?.publication.status).toBe('publishing')
 
     // The block is durable: a later pass neither retries nor re-reports the same row. Without
     // this, every tick would repeat the failing transition forever.
     const second = await store.preparations.expireStale()
-    assert.strictEqual(second.concluded, 0)
-    assert.deepStrictEqual(second.blocked, [])
+    expect(second.concluded).toBe(0)
+    expect(second.blocked).toStrictEqual([])
 
     const marker = await pool.query<{
       status: string
@@ -3435,11 +3285,8 @@ test('an unreconcilable expiry blocks one run instead of aborting the pass forev
     }>(`SELECT status, disconnect_reason FROM preparations WHERE run_id=$1`, [
       corruptRunId
     ])
-    assert.strictEqual(marker.rows[0]?.status, 'disconnected')
-    assert.strictEqual(
-      marker.rows[0]?.disconnect_reason,
-      'EXECUTION_ALREADY_ADVANCED'
-    )
+    expect(marker.rows[0]?.status).toBe('disconnected')
+    expect(marker.rows[0]?.disconnect_reason).toBe('EXECUTION_ALREADY_ADVANCED')
   } finally {
     await pool.end()
     await store.close()
@@ -3506,14 +3353,13 @@ test('a blocked expiry does not stop the rest of the coordination pass', async (
       }
     })
 
-    assert.deepStrictEqual(blocked, [
+    expect(blocked).toStrictEqual([
       `${corruptRunId}:EXECUTION_ALREADY_ADVANCED`
     ])
-    assert.deepStrictEqual(
+    expect(
       observed,
-      [activeRunId],
       'the pass still observes active runs after a blocked expiry'
-    )
+    ).toStrictEqual([activeRunId])
   } finally {
     await pool.end()
     await store.close()
@@ -3557,66 +3403,62 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
       [runId, randomUUID()]
     )
     const expiry = await store.preparations.expireStale()
-    assert.deepStrictEqual(expiry.blocked, [
+    expect(expiry.blocked).toStrictEqual([
       { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
     ])
     const parked = await store.queries.listParkedRuns()
-    assert.strictEqual(parked.length, 1)
-    assert.strictEqual(parked[0]?.run_id, runId)
-    assert.strictEqual(parked[0]?.axis, 'preparation')
-    assert.strictEqual(parked[0]?.reason, 'EXECUTION_ALREADY_ADVANCED')
+    expect(parked).toHaveLength(1)
+    expect(parked[0]?.run_id).toBe(runId)
+    expect(parked[0]?.axis).toBe('preparation')
+    expect(parked[0]?.reason).toBe('EXECUTION_ALREADY_ADVANCED')
     const disconnectEvent = (await store.queries.listEvents(runId)).find(
       (event) =>
         event.axis === 'preparation' && event.to_status === 'disconnected'
     )
-    assert.ok(disconnectEvent, 'the park must leave a transition event')
-    assert.strictEqual(
+    expect.assert(disconnectEvent, 'the park must leave a transition event')
+    expect(
       parked[0]?.parked_at,
-      new Date(disconnectEvent.occurred_at).toISOString(),
       'parked_at must be the transition instant, not a later activity timestamp'
-    )
+    ).toBe(new Date(disconnectEvent.occurred_at).toISOString())
 
     // A blank reason is refused: an abandonment must always say why it happened.
-    await assert.rejects(
-      store.operatorDecisions.abandonBlockedPreparation(runId, '   '),
-      /reason is required/
-    )
+    await expect(
+      store.operatorDecisions.abandonBlockedPreparation(runId, '   ')
+    ).rejects.toThrow(/reason is required/)
     // A run that is not blocked cannot be abandoned through this path, which is what keeps it
     // from becoming a general state-jumping endpoint.
-    await assert.rejects(
+    await expect(
       store.operatorDecisions.abandonBlockedPreparation(
         `run-${randomUUID()}`,
         'not blocked'
-      ),
-      /is not a disconnected preparation/
-    )
+      )
+    ).rejects.toThrow(/is not a disconnected preparation/)
 
     const abandoned = await store.operatorDecisions.abandonBlockedPreparation(
       runId,
       'execution result will not be delivered'
     )
-    assert.strictEqual(abandoned.preparation.status, 'failed')
+    expect(abandoned.preparation.status).toBe('failed')
     // The abandonment is recorded as the operator's decision, not as the contradiction that
     // parked the row, so the audit log tells the two apart.
-    assert.strictEqual(
-      abandoned.preparation.failure_code,
+    expect(abandoned.preparation.failure_code).toBe(
       'PREPARATION_ABANDONED_BY_OPERATOR'
     )
-    assert.strictEqual(abandoned.publication.status, 'skipped')
+    expect(abandoned.publication.status).toBe('skipped')
     // The execution result is evidence, not an error to clear.
-    assert.strictEqual(abandoned.execution.status, 'succeeded')
+    expect(abandoned.execution.status).toBe('succeeded')
 
     const stored = await pool.query<{ workflow_result: unknown }>(
       'SELECT workflow_result FROM executions WHERE run_id=$1',
       [runId]
     )
-    assert.deepStrictEqual(stored.rows[0]?.workflow_result, { keep: true })
+    expect(stored.rows[0]?.workflow_result).toStrictEqual({ keep: true })
 
     // The block marker is gone, so coordination no longer skips the run, and the abandonment is
     // on the record with its reason.
-    assert.deepStrictEqual(await store.queries.listParkedRuns(), [])
+    expect(await store.queries.listParkedRuns()).toStrictEqual([])
     const events = await store.queries.listEvents(runId)
-    assert.ok(
+    expect.assert(
       events.some(
         (event) =>
           event.axis === 'preparation' &&
@@ -3624,7 +3466,7 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
           event.reason_code === 'PREPARATION_ABANDONED_BY_OPERATOR'
       )
     )
-    assert.ok(
+    expect.assert(
       events.some(
         (event) =>
           event.axis === 'publication' &&
@@ -3644,9 +3486,9 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
       ingress_kind: ingress.kind,
       ingress_key: ingress.key
     })
-    assert.strictEqual(replay.created, false)
-    assert.strictEqual(replay.record.run_id, runId)
-    assert.strictEqual(replay.record.preparation.status, 'failed')
+    expect(replay.created).toBe(false)
+    expect(replay.record.run_id).toBe(runId)
+    expect(replay.record.preparation.status).toBe('failed')
   } finally {
     await pool.end()
     await store.close()
@@ -3679,36 +3521,31 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(
-      (await store.preparations.expireStale()).blocked.length,
-      1
-    )
+    expect((await store.preparations.expireStale()).blocked).toHaveLength(1)
     const attention = await store.notices.claimNext()
-    assert.ok(attention)
-    assert.strictEqual(attention.run_id, runId)
-    assert.strictEqual(attention.axis, 'preparation')
-    assert.strictEqual(attention.kind, 'attention')
+    expect.assert(attention)
+    expect(attention.run_id).toBe(runId)
+    expect(attention.axis).toBe('preparation')
+    expect(attention.kind).toBe('attention')
 
     // A run that never disconnected is refused the same way abandonment refuses one.
-    await assert.rejects(
+    await expect(
       store.operatorDecisions.resumeDisconnectedPreparation(
         `run-${randomUUID()}`
-      ),
-      (error: unknown) => {
-        assert.strictEqual((error as { statusCode?: number }).statusCode, 409)
-        return true
-      }
-    )
+      )
+    ).rejects.toSatisfy((error: unknown) => {
+      expect((error as { statusCode?: number }).statusCode).toBe(409)
+      return true
+    })
 
     const resumed =
       await store.operatorDecisions.resumeDisconnectedPreparation(runId)
-    assert.strictEqual(resumed.preparation.status, 'uncertain')
-    assert.strictEqual(resumed.preparation.disconnect_reason, null)
-    assert.strictEqual(
+    expect(resumed.preparation.status).toBe('uncertain')
+    expect(resumed.preparation.disconnect_reason).toBe(null)
+    expect(
       resumed.preparation.attempt_count,
-      0,
       'a resumed row must get a budget it can actually act on'
-    )
+    ).toBe(0)
     const superseded = await pool.query<{
       status: string
       claim_token: string | null
@@ -3718,32 +3555,30 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
        WHERE notice_id=$1 AND run_id=$2`,
       [attention.notice_id, runId]
     )
-    assert.deepStrictEqual(superseded.rows[0], {
+    expect(superseded.rows[0]).toStrictEqual({
       status: 'superseded',
       claim_token: null,
       claimed_at: null
     })
-    assert.strictEqual(
+    expect(
       await store.notices.renewClaim(
         attention.notice_id,
         attention.claim_token
       ),
-      false,
       'resuming fences the connector that claimed the old attention notice'
-    )
-    assert.strictEqual(
+    ).toBe(false)
+    expect(
       await store.notices.complete(
         attention.notice_id,
         attention.claim_token,
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
-      ),
-      false
-    )
+      )
+    ).toBe(false)
     // The run left the operator queue, and the decision is on the record.
-    assert.deepStrictEqual(await store.queries.listParkedRuns(), [])
+    expect(await store.queries.listParkedRuns()).toStrictEqual([])
     const events = await store.queries.listEvents(runId)
-    assert.ok(
+    expect.assert(
       events.some(
         (event) =>
           event.axis === 'preparation' &&
@@ -3781,43 +3616,38 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
         message: 'unknown'
       }
     )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.execution.status,
+    expect((await store.queries.getRun(runId))?.execution.status).toBe(
       'uncertain'
     )
 
     // A budget that has not been spent leaves the run to normal replay; only a spent budget
     // disconnects it.
-    assert.strictEqual(
+    expect(
       await store.executions.disconnectExhaustedSubmissionRecovery(runId, 8),
-      false,
       'a run that has not spent its budget is not disconnected'
-    )
-    assert.strictEqual(
+    ).toBe(false)
+    expect(
       await store.executions.disconnectExhaustedSubmissionRecovery(runId, 0),
-      true,
       'a spent budget disconnects the run'
-    )
+    ).toBe(true)
     const attention = await store.notices.claimNext()
-    assert.ok(attention)
-    assert.strictEqual(attention.run_id, runId)
-    assert.strictEqual(attention.axis, 'execution')
-    assert.strictEqual(attention.kind, 'attention')
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.execution.status,
+    expect.assert(attention)
+    expect(attention.run_id).toBe(runId)
+    expect(attention.axis).toBe('execution')
+    expect(attention.kind).toBe('attention')
+    expect((await store.queries.getRun(runId))?.execution.status).toBe(
       'disconnected'
     )
-    assert.strictEqual(
+    expect(
       await store.executions.claimSubmissionRecovery(
         runId,
         MAX_UNRESOLVED_SUBMISSION_RECOVERIES
       ),
-      null,
       'a disconnected execution is not claimable by automatic recovery'
-    )
+    ).toBe(null)
 
     const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
-    assert.strictEqual(resumed.execution.status, 'uncertain')
+    expect(resumed.execution.status).toBe('uncertain')
     const superseded = await pool.query<{
       status: string
       claim_token: string | null
@@ -3827,38 +3657,32 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
        WHERE notice_id=$1 AND run_id=$2`,
       [attention.notice_id, runId]
     )
-    assert.deepStrictEqual(superseded.rows[0], {
+    expect(superseded.rows[0]).toStrictEqual({
       status: 'superseded',
       claim_token: null,
       claimed_at: null
     })
-    assert.strictEqual(
-      await store.notices.renewClaim(
-        attention.notice_id,
-        attention.claim_token
-      ),
-      false
-    )
-    assert.strictEqual(
+    expect(
+      await store.notices.renewClaim(attention.notice_id, attention.claim_token)
+    ).toBe(false)
+    expect(
       (
         await pool.query<{ unresolved_recovery_count: number }>(
           'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
           [runId]
         )
       ).rows[0]?.unresolved_recovery_count,
-      0,
       'resuming grants a replay budget the run can act on'
-    )
-    assert.notStrictEqual(
+    ).toBe(0)
+    expect(
       await store.executions.claimSubmissionRecovery(
         runId,
         MAX_UNRESOLVED_SUBMISSION_RECOVERIES
       ),
-      null,
       'the resumed run is claimable again'
-    )
+    ).not.toBe(null)
     const events = await store.queries.listEvents(runId)
-    assert.ok(
+    expect.assert(
       events.some(
         (event) =>
           event.axis === 'execution' &&
@@ -3894,45 +3718,41 @@ test('giving up on a disconnected execution stops waiting without claiming it ne
         message: 'unknown'
       }
     )
-    assert.strictEqual(
-      await store.executions.disconnectExhaustedSubmissionRecovery(runId, 0),
-      true
-    )
+    expect(
+      await store.executions.disconnectExhaustedSubmissionRecovery(runId, 0)
+    ).toBe(true)
 
-    await assert.rejects(
-      store.operatorDecisions.giveUpDisconnectedRun(runId, '   '),
-      (error: unknown) => {
-        assert.strictEqual((error as { statusCode?: number }).statusCode, 400)
-        return true
-      }
-    )
+    await expect(
+      store.operatorDecisions.giveUpDisconnectedRun(runId, '   ')
+    ).rejects.toSatisfy((error: unknown) => {
+      expect((error as { statusCode?: number }).statusCode).toBe(400)
+      return true
+    })
 
     const givenUp = await store.operatorDecisions.giveUpDisconnectedRun(
       runId,
       'operator stopped'
     )
-    assert.strictEqual(givenUp.execution.status, 'failed')
-    assert.strictEqual(
+    expect(givenUp.execution.status).toBe('failed')
+    expect(
       givenUp.failure_code,
-      'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR',
       'the code names the decision, not an unproven "never ran"'
-    )
-    assert.strictEqual(givenUp.publication.status, 'skipped')
+    ).toBe('SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR')
+    expect(givenUp.publication.status).toBe('skipped')
     // A failure notice is queued so the requester learns the outcome was abandoned, and it is a
     // failure (not an attention notice): the run is over.
-    assert.ok(
+    expect.assert(
       givenUp.notices.some(
         (notice) => notice.axis === 'execution' && notice.kind === 'failure'
       )
     )
     // The decision is final: neither resuming nor giving up again applies.
-    await assert.rejects(
-      store.operatorDecisions.resumeDisconnectedRun(runId),
-      (error: unknown) => {
-        assert.strictEqual((error as { statusCode?: number }).statusCode, 409)
-        return true
-      }
-    )
+    await expect(
+      store.operatorDecisions.resumeDisconnectedRun(runId)
+    ).rejects.toSatisfy((error: unknown) => {
+      expect((error as { statusCode?: number }).statusCode).toBe(409)
+      return true
+    })
   } finally {
     await store.close()
   }
@@ -3983,8 +3803,7 @@ test('giving up on a disconnected publication fails rather than skipping', async
       if (status === 'disconnected') break
       await claim()
     }
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'disconnected'
     )
 
@@ -3992,17 +3811,16 @@ test('giving up on a disconnected publication fails rather than skipping', async
       runId,
       'operator stopped'
     )
-    assert.strictEqual(givenUp.publication.status, 'failed')
-    assert.strictEqual(givenUp.failure_code, 'PUBLICATION_GIVEN_UP_BY_OPERATOR')
+    expect(givenUp.publication.status).toBe('failed')
+    expect(givenUp.failure_code).toBe('PUBLICATION_GIVEN_UP_BY_OPERATOR')
     // The step is untouched: it is the record of which side effect could not be confirmed.
-    assert.strictEqual(
+    expect(
       (
         (await store.publications.listPublicationSteps(runId))[0] as {
           status: string
         }
-      ).status,
-      'disconnected'
-    )
+      ).status
+    ).toBe('disconnected')
     await pool.end()
   } finally {
     await store.close()
@@ -4025,7 +3843,7 @@ test('an operator resume publishes the parked steps again instead of only reconc
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       token as string,
@@ -4055,47 +3873,43 @@ test('an operator resume publishes the parked steps again instead of only reconc
         [runId]
       )
     ).rows[0]
-    assert.strictEqual(
+    expect(
       revived?.status,
-      'pending',
       'the parked step is attemptable again, not merely reconcilable'
-    )
-    assert.strictEqual(
+    ).toBe('pending')
+    expect(
       revived?.attempt_count,
-      0,
       'the operator decision returns the attempt budget, so the step may be published again'
-    )
+    ).toBe(0)
     const resumedAxis = (
       await pool.query<{ status: string }>(
         `SELECT status FROM publications WHERE run_id=$1`,
         [runId]
       )
     ).rows[0]?.status
-    assert.strictEqual(
+    expect(
       resumedAxis,
-      'pending',
       'the axis returns to the normal claim queue without inventing an owner'
-    )
+    ).toBe('pending')
 
     // The normal selector gives the real publisher the claim token it needs. The resume route
     // itself returns no credential and therefore must not leave a hidden live lease behind.
     const resumedToken = await store.publicationClaims.claim(runId)
-    assert.ok(resumedToken)
+    expect.assert(resumedToken)
     await store.publications.requirePublicationStepClaim(
       runId,
       resumedToken,
       'issue:summary-comment'
     )
-    assert.strictEqual(
+    expect(
       (
         await pool.query<{ status: string }>(
           `SELECT status FROM publication_steps WHERE run_id=$1`,
           [runId]
         )
       ).rows[0]?.status,
-      'running',
       'the resumed run publishes again instead of only reconciling'
-    )
+    ).toBe('running')
 
     // The operator's authority is not capped: parking the run again lets them hand it back again,
     // and each decision is recorded as its own event rather than being refused in advance.
@@ -4111,15 +3925,14 @@ test('an operator resume publishes the parked steps again instead of only reconc
     )
     await store.operatorDecisions.resumeDisconnectedRun(runId)
     const resumedTwice = await store.queries.listEvents(runId)
-    assert.strictEqual(
+    expect(
       resumedTwice.filter(
         (event) =>
           event.step_key === null &&
           event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
-      ).length,
-      2,
+      ),
       'each operator decision is on the record'
-    )
+    ).toHaveLength(2)
   } finally {
     await pool.end()
     await store.close()
@@ -4136,7 +3949,7 @@ test('a takeover settles a step its predecessor left uncertain instead of failin
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       token as string,
@@ -4163,31 +3976,29 @@ test('a takeover settles a step its predecessor left uncertain instead of failin
     )
 
     const takeover = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(takeover, null, 'an expired lease is taken over')
+    expect(takeover, 'an expired lease is taken over').not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       takeover as string,
       ['issue:summary-comment']
     )
 
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(
         runId,
         takeover as string,
         'issue:summary-comment'
-      ),
-      (error: unknown) => {
-        assert.strictEqual(
-          (error as { code?: string }).code,
-          'PUBLICATION_STEP_RETRY_EXHAUSTED',
-          'a spent step is offered for reconciliation'
-        )
-        return true
-      }
-    )
+      )
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(
+        (error as { code?: string }).code,
+        'a spent step is offered for reconciliation'
+      ).toBe('PUBLICATION_STEP_RETRY_EXHAUSTED')
+      return true
+    })
 
     // The connector looked and found the comment: the step succeeded after all.
-    assert.strictEqual(
+    expect(
       await store.publications.settleExhaustedPublicationStep(
         runId,
         takeover as string,
@@ -4196,17 +4007,15 @@ test('a takeover settles a step its predecessor left uncertain instead of failin
           found: true,
           remote: { id: '42', url: 'https://example.test/c/42' }
         }
-      ),
-      true
-    )
-    assert.strictEqual(
+      )
+    ).toBe(true)
+    expect(
       await store.publications.complete(runId, takeover as string),
-      true,
       'the publication still finishes once its only step is settled'
-    )
+    ).toBe(true)
     const finalRun = await store.queries.getRun(runId)
-    assert.strictEqual(finalRun?.publication.status, 'published')
-    assert.strictEqual(finalRun?.failure_code, null, 'no failure was recorded')
+    expect(finalRun?.publication.status).toBe('published')
+    expect(finalRun?.failure_code, 'no failure was recorded').toBe(null)
   } finally {
     await pool.end()
     await store.close()
@@ -4234,7 +4043,7 @@ test('an operator resume completes on a pool that has exactly one connection', a
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       token as string,
@@ -4251,22 +4060,15 @@ test('an operator resume completes on a pool that has exactly one connection', a
       [runId]
     )
 
-    // A hang is the failure this test exists for, so bound it rather than waiting forever.
-    const resumed = await Promise.race([
-      store.operatorDecisions.resumeDisconnectedRun(runId),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('resume did not return')), 5_000)
-      )
-    ])
-    assert.strictEqual(
-      (resumed as { publication: { status: string } }).publication.status,
-      'pending',
+    const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
+    expect(
+      resumed.publication.status,
       'the operator decision took effect'
-    )
+    ).toBe('pending')
   } finally {
     await store.close()
   }
-})
+}, 5_000)
 
 test('a second step parking later does not move the publication parked_at', async () => {
   // Step events share the publication axis. The axis parks when its first step does; a later step
@@ -4278,7 +4080,7 @@ test('a second step parking later does not move the publication parked_at', asyn
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, steps)
     const park = async (step: string): Promise<void> => {
       for (let round = 0; round < 20; round += 1) {
@@ -4301,30 +4103,29 @@ test('a second step parking later does not move the publication parked_at', asyn
           .requirePublicationStepClaim(runId, token, step)
           .catch(() => undefined)
       }
-      assert.fail(`${step} did not park`)
+      expect.unreachable(`${step} did not park`)
     }
     await park('issue:first')
     const axisParkedAt = (await store.queries.listParkedRuns()).find(
       (item) => item.run_id === runId
     )?.parked_at
-    assert.ok(axisParkedAt)
+    expect.assert(axisParkedAt)
     await park('issue:second')
     const events = await store.queries.listEvents(runId)
     const secondParkedAt = events.find(
       (event) =>
         event.step_key === 'issue:second' && event.to_status === 'disconnected'
     )?.occurred_at
-    assert.ok(secondParkedAt)
-    assert.ok(
+    expect.assert(secondParkedAt)
+    expect.assert(
       Date.parse(secondParkedAt) > Date.parse(axisParkedAt),
       'the second step must park after the axis did for this test to mean anything'
     )
-    assert.strictEqual(
+    expect(
       (await store.queries.listParkedRuns()).find(
         (item) => item.run_id === runId
-      )?.parked_at,
-      axisParkedAt
-    )
+      )?.parked_at
+    ).toBe(axisParkedAt)
   } finally {
     await pool.end()
     await store.close()
@@ -4359,7 +4160,7 @@ async function parkStep(
       .requirePublicationStepClaim(runId, token, step)
       .catch(() => undefined)
   }
-  assert.fail(`${step} did not park`)
+  expect.unreachable(`${step} did not park`)
 }
 
 test('a reconciliation that keeps failing across passes parks the step instead of looping', async () => {
@@ -4372,7 +4173,7 @@ test('a reconciliation that keeps failing across passes parks the step instead o
     const runId = await createSuccessfulRun(store)
     const step = 'repository:delivery:gone'
     let token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [step])
     for (let attempt = 0; attempt < 3; attempt += 1) {
       await store.publications.requirePublicationStepClaim(runId, token, step)
@@ -4392,9 +4193,9 @@ test('a reconciliation that keeps failing across passes parks the step instead o
       if (status === 'disconnected') break
       // One connector pass: the claim is refused as exhausted, the lookup fails, the failure is
       // recorded as a retryable reconciliation failure, and the publication is retried.
-      await assert.rejects(
+      await expect(
         store.publications.requirePublicationStepClaim(runId, token, step)
-      )
+      ).rejects.toSatisfy(() => true)
       await store.publications.failPublicationStep(
         runId,
         token,
@@ -4411,20 +4212,21 @@ test('a reconciliation that keeps failing across passes parks the step instead o
         )
       ) {
         token = await store.publicationClaims.claim(runId)
-        assert.ok(token, 'a retried publication is claimed again')
+        expect.assert(token, 'a retried publication is claimed again')
       }
     }
 
-    assert.ok(passes <= 3, `parked after ${passes} passes, within the budget`)
-    assert.strictEqual(
-      (await store.publications.listPublicationSteps(runId))[0]?.status,
+    expect.assert(
+      passes <= 3,
+      `parked after ${passes} passes, within the budget`
+    )
+    expect(
+      (await store.publications.listPublicationSteps(runId))[0]?.status
+    ).toBe('disconnected')
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'disconnected'
     )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
-      'disconnected'
-    )
-    assert.ok(
+    expect.assert(
       (await store.queries.listParkedRuns()).some(
         (parked) => parked.run_id === runId
       ),
@@ -4444,7 +4246,7 @@ test('a terminal step failure leaves the publication to its owner, so later step
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     const [a, b] = ['repository:delivery:a', 'repository:delivery:b']
     await store.publications.initializePublicationSteps(runId, token, [a, b])
 
@@ -4456,45 +4258,40 @@ test('a terminal step failure leaves the publication to its owner, so later step
       { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
       { retry: false }
     )
-    assert.strictEqual(
+    expect(
       (await store.queries.getRun(runId))?.publication.status,
-      'publishing',
       'the publication still belongs to its owner'
-    )
+    ).toBe('publishing')
 
     await store.publications.requirePublicationStepClaim(runId, token, b)
-    assert.strictEqual(
+    expect(
       await store.publications.completePublicationStep(runId, token, b, {
         id: '2'
       }),
-      true,
       'a later step still publishes'
-    )
+    ).toBe(true)
 
     // The owner then concludes: complete is refused while a step has not succeeded, and the
     // publication fails as incomplete, naming nothing it did not record.
-    assert.strictEqual(await store.publications.complete(runId, token), false)
-    assert.strictEqual(
+    expect(await store.publications.complete(runId, token)).toBe(false)
+    expect(
       await store.publications.fail(
         runId,
         token,
         { code: 'PUBLICATION_STEPS_INCOMPLETE', message: 'incomplete' },
         { retry: false }
-      ),
-      true
-    )
-    assert.deepStrictEqual(
+      )
+    ).toBe(true)
+    expect(
       (await store.publications.listPublicationSteps(runId)).map((step) => [
         step.step_key,
         step.status
-      ]),
-      [
-        [a, 'terminal_failed'],
-        [b, 'succeeded']
-      ]
-    )
-    assert.strictEqual(
-      (await store.queries.getRun(runId))?.publication.status,
+      ])
+    ).toStrictEqual([
+      [a, 'terminal_failed'],
+      [b, 'succeeded']
+    ])
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'failed'
     )
   } finally {
@@ -4514,27 +4311,25 @@ test('an owner cannot conclude a publication an operator has to decide on', asyn
     for (const conclude of ['fail', 'terminal-step'] as const) {
       const runId = await createSuccessfulRun(store)
       const token = await store.publicationClaims.claim(runId)
-      assert.ok(token)
+      expect.assert(token)
       await store.publications.initializePublicationSteps(runId, token, [
         'issue:draft-pr',
         'issue:summary-comment'
       ])
       await parkStep(store, runId, token, 'issue:draft-pr')
-      assert.strictEqual(
-        (await store.queries.getRun(runId))?.publication.status,
+      expect((await store.queries.getRun(runId))?.publication.status).toBe(
         'disconnected'
       )
 
       if (conclude === 'fail') {
-        assert.strictEqual(
+        expect(
           await store.publications.fail(
             runId,
             token,
             { code: 'GITHUB_TIMEOUT', message: 'reconciliation failed' },
             { retry: true }
-          ),
-          false
-        )
+          )
+        ).toBe(false)
       } else {
         // A different step of the same run fails terminally while the axis is parked. Its own
         // failure is recorded; the publication is not concluded on top of it.
@@ -4543,30 +4338,27 @@ test('an owner cannot conclude a publication an operator has to decide on', asyn
           token,
           'issue:summary-comment'
         )
-        assert.strictEqual(
+        expect(
           await store.publications.failPublicationStep(
             runId,
             token,
             'issue:summary-comment',
             { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
             { retry: false }
-          ),
-          true
-        )
-        assert.strictEqual(
+          )
+        ).toBe(true)
+        expect(
           (await store.publications.listPublicationSteps(runId)).find(
             (step) => step.step_key === 'issue:summary-comment'
-          )?.status,
-          'terminal_failed'
-        )
+          )?.status
+        ).toBe('terminal_failed')
       }
 
-      assert.strictEqual(
+      expect(
         (await store.queries.getRun(runId))?.publication.status,
-        'disconnected',
         `${conclude}: the publication stays parked`
-      )
-      assert.ok(
+      ).toBe('disconnected')
+      expect.assert(
         (await store.queries.listParkedRuns()).some(
           (parked) => parked.run_id === runId && parked.axis === 'publication'
         ),
@@ -4588,7 +4380,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       token as string,
@@ -4645,41 +4437,39 @@ test('a disconnected publication is parked until an operator resumes it', async 
     )[0] as {
       status: string
     }
-    assert.strictEqual(parkedStep.status, 'disconnected')
-    assert.strictEqual(
+    expect(parkedStep.status).toBe('disconnected')
+    expect(
       (await store.queries.getRun(runId))?.publication.status,
-      'disconnected',
       'the axis reports the step uncertainty so the run surfaces for an operator'
-    )
+    ).toBe('disconnected')
     const attention = await store.notices.claimNext()
-    assert.ok(attention)
-    assert.strictEqual(attention.run_id, runId)
-    assert.strictEqual(attention.axis, 'publication')
-    assert.strictEqual(attention.kind, 'attention')
+    expect.assert(attention)
+    expect(attention.run_id).toBe(runId)
+    expect(attention.axis).toBe('publication')
+    expect(attention.kind).toBe('attention')
     // The axis records that it parked; the step event beside it records which step did.
     const parkEvents = (await store.queries.listEvents(runId)).filter(
       (event) => event.to_status === 'disconnected'
     )
-    assert.deepStrictEqual(
-      parkEvents.map((event) => [event.axis, event.step_key]).sort(),
-      [
-        ['publication', null],
-        ['publication', 'issue:summary-comment']
-      ]
-    )
+    expect(
+      parkEvents.map((event) => [event.axis, event.step_key]).sort()
+    ).toStrictEqual([
+      ['publication', null],
+      ['publication', 'issue:summary-comment']
+    ])
     // Like an axis' admission, each step's history starts at its creation, so the log accounts
     // for a step even before anything attempted it.
     const firstStepEvent = (await store.queries.listEvents(runId)).find(
       (event) => event.step_key === 'issue:summary-comment'
     )
-    assert.deepStrictEqual(
-      [firstStepEvent?.from_status, firstStepEvent?.to_status],
-      [null, 'pending']
-    )
+    expect([
+      firstStepEvent?.from_status,
+      firstStepEvent?.to_status
+    ]).toStrictEqual([null, 'pending'])
     // Automation must not pick it up: no selector claims a run whose step is parked, and the
     // internal single-run claim refuses it too. Without a way out, the run would be stuck with
     // no owner and no writer - which is exactly why the operator resume exists.
-    assert.strictEqual(await store.publicationClaims.claim(runId), null)
+    expect(await store.publicationClaims.claim(runId)).toBe(null)
 
     // The operator resume hands the parked work back to automatic recovery, which is what the
     // contract promises ("published again"): the parked step becomes attemptable again and both
@@ -4708,11 +4498,10 @@ test('a disconnected publication is parked until an operator resumes it', async 
         unresolved_recovery_count: number
       }
     const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
-    assert.strictEqual(
+    expect(
       resumed.publication.status,
-      'pending',
       'the axis is immediately claimable by the normal publisher'
-    )
+    ).toBe('pending')
     const superseded = await pool.query<{
       status: string
       claim_token: string | null
@@ -4722,49 +4511,42 @@ test('a disconnected publication is parked until an operator resumes it', async 
        WHERE notice_id=$1 AND run_id=$2`,
       [attention.notice_id, runId]
     )
-    assert.deepStrictEqual(superseded.rows[0], {
+    expect(superseded.rows[0]).toStrictEqual({
       status: 'superseded',
       claim_token: null,
       claimed_at: null
     })
-    assert.strictEqual(
-      await store.notices.renewClaim(
-        attention.notice_id,
-        attention.claim_token
-      ),
-      false
-    )
+    expect(
+      await store.notices.renewClaim(attention.notice_id, attention.claim_token)
+    ).toBe(false)
     const revived = await readStep()
-    assert.strictEqual(
+    expect(
       revived.status,
-      'pending',
       'the parked step is attemptable again, not merely reconcilable'
-    )
-    assert.strictEqual(
+    ).toBe('pending')
+    expect(
       revived.unresolved_recovery_count,
-      0,
       'the operator decision refreshes the reconciliation budget'
-    )
-    assert.strictEqual(
+    ).toBe(0)
+    expect(
       revived.attempt_count,
-      0,
       'and the attempt budget, so the side effect can be published again'
-    )
+    ).toBe(0)
 
     // The resumed run publishes instead of only looking: the claim its spent budget refused is
     // granted now, which is the difference between "published again" and "keep publishing".
     const resumedToken = await store.publicationClaims.claim(runId)
-    assert.ok(resumedToken)
+    expect.assert(resumedToken)
     await store.publications.requirePublicationStepClaim(
       runId,
       resumedToken,
       'issue:summary-comment'
     )
-    assert.strictEqual(await readStep().then((step) => step.status), 'running')
+    expect(await readStep().then((step) => step.status)).toBe('running')
 
     // The resume is on the record.
     const events = await store.queries.listEvents(runId)
-    assert.ok(
+    expect.assert(
       events.some(
         (event) =>
           event.axis === 'publication' &&
@@ -4778,24 +4560,19 @@ test('a disconnected publication is parked until an operator resumes it', async 
     // The resumed attempt finishes the way a first attempt would: recording its result ends the
     // step and lets the publication conclude, so a resumed run reaches a real outcome rather
     // than stopping at reconciliation.
-    assert.strictEqual(
+    expect(
       await store.publications.completePublicationStep(
         runId,
         resumedToken,
         'issue:summary-comment',
         { id: '7', url: 'https://example.test/c/7' }
-      ),
-      true
-    )
-    assert.strictEqual(
-      await store.publications.complete(runId, resumedToken),
-      true
-    )
-    assert.strictEqual(
+      )
+    ).toBe(true)
+    expect(await store.publications.complete(runId, resumedToken)).toBe(true)
+    expect(
       (await store.queries.getRun(runId))?.publication.status,
-      'published',
       'the resumed publication finishes'
-    )
+    ).toBe('published')
   } finally {
     await pool.end()
     await store.close()
@@ -4813,7 +4590,7 @@ test('a takeover must re-derive the exact step set its predecessor stored', asyn
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(token, null)
+    expect(token).not.toBe(null)
     await store.publications.initializePublicationSteps(
       runId,
       token as string,
@@ -4828,7 +4605,7 @@ test('a takeover must re-derive the exact step set its predecessor stored', asyn
       [runId, 600_000]
     )
     const takeover = await store.publicationClaims.claim(runId)
-    assert.notStrictEqual(takeover, null, 'an expired lease is taken over')
+    expect(takeover, 'an expired lease is taken over').not.toBe(null)
 
     // The new owner re-runs the same derivation its predecessor did.
     await store.publications.initializePublicationSteps(
@@ -4839,18 +4616,16 @@ test('a takeover must re-derive the exact step set its predecessor stored', asyn
 
     // Omitting an existing step is a contract change, not compatibility. Accepting it would leave
     // stored work that this publisher never attempts and make completion impossible.
-    await assert.rejects(
+    await expect(
       store.publications.initializePublicationSteps(runId, takeover as string, [
         'issue:summary-comment'
-      ]),
-      (error: unknown) => {
-        assert.strictEqual(
-          (error as { code?: string }).code,
-          'PUBLICATION_STEP_SET_CHANGED'
-        )
-        return true
-      }
-    )
+      ])
+    ).rejects.toSatisfy((error: unknown) => {
+      expect((error as { code?: string }).code).toBe(
+        'PUBLICATION_STEP_SET_CHANGED'
+      )
+      return true
+    })
   } finally {
     await pool.end()
     await store.close()
@@ -4879,26 +4654,24 @@ test('abandoning a run that is no longer disconnected answers 409, not an opaque
        WHERE run_id=$1`,
       [runId]
     )
-    await assert.rejects(
+    await expect(
       store.operatorDecisions.abandonBlockedPreparation(
         runId,
         'operator decision'
-      ),
-      (error: unknown) => {
-        assert.strictEqual(
-          (error as { statusCode?: number }).statusCode,
-          409,
-          'a contradiction the endpoint cannot act on is a client-visible conflict'
-        )
-        return true
-      }
-    )
+      )
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(
+        (error as { statusCode?: number }).statusCode,
+        'a contradiction the endpoint cannot act on is a client-visible conflict'
+      ).toBe(409)
+      return true
+    })
     // Nothing was written on the refused path.
     const stored = await pool.query<{ status: string; reason: string | null }>(
       'SELECT status, disconnect_reason AS reason FROM preparations WHERE run_id=$1',
       [runId]
     )
-    assert.deepStrictEqual(stored.rows[0], {
+    expect(stored.rows[0]).toStrictEqual({
       status: 'failed',
       reason: null
     })
@@ -4952,39 +4725,34 @@ test('an execution failure and an in-flight step commit converge on one outcome'
 
         if (executorFirst) {
           await failExecution()
-          assert.strictEqual(
+          expect(
             await complete(),
-            false,
             'a step commit after the publication was abandoned is refused'
-          )
+          ).toBe(false)
         } else {
-          assert.strictEqual(await complete(), true)
+          expect(await complete()).toBe(true)
           await failExecution()
         }
 
         const stored = await store.queries.getRun(runId)
-        assert.strictEqual(
+        expect(
           stored?.execution.status,
-          'failed',
           'the execution conclusion is the run outcome in both orders'
-        )
-        assert.strictEqual(
+        ).toBe('failed')
+        expect(
           stored?.publication.status,
-          'skipped',
           'a publication whose execution failed is never left publishing'
-        )
+        ).toBe('skipped')
         const steps = await store.publications.listPublicationSteps(runId)
-        assert.strictEqual(
+        expect(
           steps[0]?.status,
-          executorFirst ? 'running' : 'succeeded',
           'the step records whether its side effect had already been committed'
-        )
+        ).toBe(executorFirst ? 'running' : 'succeeded')
         // Whatever the order produced, a further commit can no longer attach to the run.
-        assert.strictEqual(
+        expect(
           await complete(),
-          false,
           'a step commit after the run concluded is refused, not recorded'
-        )
+        ).toBe(false)
       } finally {
         await store.close()
       }
@@ -5000,44 +4768,70 @@ test('a step claim is refused once another path has concluded the publication', 
   // between, and the step would still be claimed `running` on a concluded publication. The
   // claim now locks the publication row first, so it either observes the conclusion or the
   // conclusion waits for it - never a `running` step left behind.
-  const store = await createStore()
+  const applicationName = `step-claim:${randomUUID()}`
+  const claimantPool = new Pool({
+    connectionString: requireTestDatabase(),
+    application_name: applicationName
+  })
+  const store = new ReviewRunStore({
+    pool: claimantPool,
+    connectorId: connectorId()
+  })
+  await store.initialize()
   const pool = new Pool({ connectionString: requireTestDatabase() })
   const blocker = await pool.connect()
+  let holding = false
+  let claim: Promise<unknown> | undefined
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, ['s'])
 
     // A separate transaction concludes the publication without committing yet. The claim must
     // wait for it rather than read the pre-conclusion snapshot.
     await blocker.query('BEGIN')
+    holding = true
     await blocker.query(
       `UPDATE publications SET status='skipped', claim_token=NULL, claimed_at=NULL,
          finished_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2`,
       [runId, store.connectorId]
     )
-    const claim = store.publications.requirePublicationStepClaim(
-      runId,
-      token,
-      's'
+    claim = store.publications.requirePublicationStepClaim(runId, token, 's')
+    const holder = await blocker.query<{ pid: number }>(
+      'SELECT pg_backend_pid() AS pid'
     )
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect.assert(holder.rows[0])
+    const holderPid = holder.rows[0].pid
+    await expect
+      .poll(
+        async () => {
+          const waiting = await pool.query(
+            `SELECT 1 FROM pg_stat_activity WHERE application_name=$1
+         AND $2=ANY(pg_blocking_pids(pid))`,
+            [applicationName, holderPid]
+          )
+          return waiting.rowCount
+        },
+        { timeout: 5_000, interval: 20 }
+      )
+      .toBeGreaterThan(0)
     await blocker.query('COMMIT')
+    holding = false
 
-    await assert.rejects(
+    await expect(
       claim,
-      /not claimable/,
       'a claim against a publication concluded by another path is refused'
-    )
+    ).rejects.toThrow(/not claimable/)
     const steps = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(
+    expect(
       steps[0]?.status,
-      'pending',
       'the refused claim must not leave a running step behind'
-    )
+    ).toBe('pending')
   } finally {
+    if (holding) await blocker.query('ROLLBACK')
+    await claim?.catch(() => undefined)
     blocker.release()
     await pool.end()
     await store.close()
@@ -5053,35 +4847,33 @@ test('a step failure records its code and message on the right fields', async ()
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, ['s'])
     await store.publications.requirePublicationStepClaim(runId, token, 's')
-    assert.strictEqual(
+    expect(
       await store.publications.failPublicationStep(
         runId,
         token,
         's',
         { code: 'SOME_CODE', message: 'some message' },
         { retry: true }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const [step] = await store.publications.listPublicationSteps(runId)
-    assert.deepStrictEqual(
+    expect(
       {
         status: step?.status,
         code: step?.failure_code,
         message: step?.failure_message,
         attempt_count: step?.attempt_count
       },
-      {
-        status: 'failed',
-        code: 'SOME_CODE',
-        message: 'some message',
-        attempt_count: 1
-      },
       'the code and message must land in their own columns, not each other'
-    )
+    ).toStrictEqual({
+      status: 'failed',
+      code: 'SOME_CODE',
+      message: 'some message',
+      attempt_count: 1
+    })
   } finally {
     await store.close()
   }
@@ -5097,24 +4889,21 @@ test('an owner cannot claim a publication step it already holds', async () => {
   const runId = await createSuccessfulRun(store)
   try {
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, ['s'])
 
     await store.publications.requirePublicationStepClaim(runId, token, 's')
-    assert.strictEqual(
-      (await store.publications.listPublicationSteps(runId))[0]?.attempt_count,
-      1
-    )
-    await assert.rejects(
+    expect(
+      (await store.publications.listPublicationSteps(runId))[0]?.attempt_count
+    ).toBe(1)
+    await expect(
       store.publications.requirePublicationStepClaim(runId, token, 's'),
-      /not claimable/,
       'the holder must not start a second attempt on its own running step'
-    )
-    assert.strictEqual(
+    ).rejects.toThrow(/not claimable/)
+    expect(
       (await store.publications.listPublicationSteps(runId))[0]?.attempt_count,
-      1,
       'the refused claim must not touch the attempt count'
-    )
+    ).toBe(1)
   } finally {
     await store.close()
   }
@@ -5152,39 +4941,35 @@ test('an uncertain submission queues no notice until the run is conclusively fai
     )
 
     const uncertain = await store.queries.getRun(runId)
-    assert.strictEqual(uncertain?.execution.status, 'uncertain')
-    assert.deepStrictEqual(
+    expect(uncertain?.execution.status).toBe('uncertain')
+    expect(
       uncertain?.notices,
-      [],
       'an unknown outcome must not be announced as a failure'
-    )
-    assert.strictEqual(
+    ).toStrictEqual([])
+    expect(
       await store.notices.claimNext(),
-      null,
       'nothing may be deliverable while the run can still succeed'
-    )
+    ).toBe(null)
 
     // The replay is accepted: the run proceeds normally and was never announced as failed.
     const recoveryToken = await store.executions.claimSubmissionRecovery(
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(recoveryToken)
-    assert.strictEqual(
+    expect.assert(recoveryToken)
+    expect(
       await store.submissionTransitions.completeSubmissionRecovery(
         runId,
         recoveryToken
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const recovered = await store.queries.getRun(runId)
-    assert.strictEqual(recovered?.execution.status, 'queued')
-    assert.deepStrictEqual(
+    expect(recovered?.execution.status).toBe('queued')
+    expect(
       recovered?.notices,
-      [],
       'a recovered run must not carry a failure notice'
-    )
-    assert.strictEqual(await store.notices.claimNext(), null)
+    ).toStrictEqual([])
+    expect(await store.notices.claimNext()).toBe(null)
   } finally {
     await store.close()
   }
@@ -5222,8 +5007,8 @@ test('a rejected replay announces the failure that actually happened', async () 
       runId,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-    assert.ok(recoveryToken)
-    assert.strictEqual(
+    expect.assert(recoveryToken)
+    expect(
       await store.submissionTransitions.failSubmissionRecovery(
         runId,
         recoveryToken,
@@ -5231,14 +5016,13 @@ test('a rejected replay announces the failure that actually happened', async () 
           code: 'EXECUTION_REJECTED',
           message: 'the Execution refused the replayed submission'
         }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
 
     const run = await store.queries.getRun(runId)
-    assert.strictEqual(run?.execution.status, 'failed')
-    assert.strictEqual(run?.publication.status, 'skipped')
-    assert.deepStrictEqual(run?.notices, [
+    expect(run?.execution.status).toBe('failed')
+    expect(run?.publication.status).toBe('skipped')
+    expect(run?.notices).toStrictEqual([
       {
         notice_id: run?.notices[0]?.notice_id,
         kind: 'failure',
@@ -5283,25 +5067,24 @@ test('an uncertain submission that never resolves is concluded once its budget i
     )
 
     const recovering = await store.queries.getRun(runId)
-    assert.ok(recovering)
+    expect.assert(recovering)
     // Taking and replacing claims alone do not spend the unresolved-result budget.
     for (let claim = 0; claim < 2; claim += 1) {
-      assert.ok(
+      expect.assert(
         await store.executions.claimSubmissionRecovery(
           runId,
           MAX_UNRESOLVED_SUBMISSION_RECOVERIES
         )
       )
     }
-    assert.equal(
+    expect(
       (
         await pool.query<{ unresolved_recovery_count: number }>(
           'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
           [runId]
         )
-      ).rows[0]?.unresolved_recovery_count,
-      0
-    )
+      ).rows[0]?.unresolved_recovery_count
+    ).toBe(0)
     const lostResponse = new Error('response lost')
     let submissions = 0
     const dependencies = {
@@ -5316,45 +5099,40 @@ test('an uncertain submission that never resolves is concluded once its budget i
       replay < MAX_UNRESOLVED_SUBMISSION_RECOVERIES;
       replay += 1
     ) {
-      assert.deepEqual(
-        await recoverReviewRunSubmission(store, recovering, dependencies),
-        { outcome: 'deferred', error: lostResponse }
-      )
+      expect(
+        await recoverReviewRunSubmission(store, recovering, dependencies)
+      ).toStrictEqual({ outcome: 'deferred', error: lostResponse })
     }
-    assert.equal(
+    expect(
       (
         await pool.query<{ unresolved_recovery_count: number }>(
           'SELECT unresolved_recovery_count FROM executions WHERE run_id=$1',
           [runId]
         )
-      ).rows[0]?.unresolved_recovery_count,
-      MAX_UNRESOLVED_SUBMISSION_RECOVERIES
-    )
-    assert.equal(
+      ).rows[0]?.unresolved_recovery_count
+    ).toBe(MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
+    expect(
       await store.executions.claimSubmissionRecovery(
         runId,
         MAX_UNRESOLVED_SUBMISSION_RECOVERIES
-      ),
-      null
-    )
-    assert.deepStrictEqual(
+      )
+    ).toBe(null)
+    expect(
       (await store.queries.getRun(runId))?.notices,
-      [],
       'replaying an unknown outcome is not yet a conclusion'
-    )
+    ).toStrictEqual([])
 
     const exhaustedRun = await store.queries.getRun(runId)
-    assert.ok(exhaustedRun)
-    assert.deepStrictEqual(
-      await recoverReviewRunSubmission(store, exhaustedRun, dependencies),
-      { outcome: 'disconnected' }
-    )
-    assert.equal(submissions, MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
+    expect.assert(exhaustedRun)
+    expect(
+      await recoverReviewRunSubmission(store, exhaustedRun, dependencies)
+    ).toStrictEqual({ outcome: 'disconnected' })
+    expect(submissions).toBe(MAX_UNRESOLVED_SUBMISSION_RECOVERIES)
     const run = await store.queries.getRun(runId)
-    assert.strictEqual(run?.execution.status, 'disconnected')
-    assert.strictEqual(run?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
-    assert.strictEqual(run?.publication.status, 'pending')
-    assert.deepStrictEqual(run?.notices, [
+    expect(run?.execution.status).toBe('disconnected')
+    expect(run?.failure_code).toBe('SUBMISSION_STATE_UNCERTAIN')
+    expect(run?.publication.status).toBe('pending')
+    expect(run?.notices).toStrictEqual([
       {
         notice_id: run?.notices[0]?.notice_id,
         kind: 'attention',
@@ -5365,13 +5143,12 @@ test('an uncertain submission that never resolves is concluded once its budget i
       }
     ])
     // The budget is spent, so a later pass does not replay this run again.
-    assert.strictEqual(
+    expect(
       await store.executions.claimSubmissionRecovery(
         runId,
         MAX_UNRESOLVED_SUBMISSION_RECOVERIES
-      ),
-      null
-    )
+      )
+    ).toBe(null)
   } finally {
     await pool.end()
     await store.close()
@@ -5388,34 +5165,32 @@ test('a step whose owners kept dying exhausts the budget and is concluded', asyn
   const runId = await createSuccessfulRun(store)
   try {
     const first = await store.publicationClaims.claim(runId)
-    assert.ok(first)
+    expect.assert(first)
     await store.publications.initializePublicationSteps(runId, first, ['s'])
     await store.publications.requirePublicationStepClaim(runId, first, 's')
 
     // Attempts 2 and 3 are taken over by new owners that also die without reporting.
     for (let attempt = 2; attempt <= 3; attempt += 1) {
       const takeover = await store.publicationClaims.claim(runId)
-      assert.ok(
+      expect.assert(
         takeover,
         `attempt ${attempt} should claim a new publication owner`
       )
       await store.publications.requirePublicationStepClaim(runId, takeover, 's')
-      assert.strictEqual(
-        (await store.publications.listPublicationSteps(runId))[0]
-          ?.attempt_count,
-        attempt
-      )
+      expect(
+        (await store.publications.listPublicationSteps(runId))[0]?.attempt_count
+      ).toBe(attempt)
     }
-    assert.strictEqual(
+    expect(
       (await store.publications.listPublicationSteps(runId))[0]?.status,
-      'running',
       'no failure was ever recorded, yet the budget is spent'
-    )
+    ).toBe('running')
 
     const last = await store.publicationClaims.claim(runId)
-    assert.ok(last)
-    await assert.rejects(
-      store.publications.requirePublicationStepClaim(runId, last, 's'),
+    expect.assert(last)
+    await expect(
+      store.publications.requirePublicationStepClaim(runId, last, 's')
+    ).rejects.toSatisfy(
       (error: unknown) =>
         error instanceof Error &&
         'code' in error &&
@@ -5424,12 +5199,12 @@ test('a step whose owners kept dying exhausts the budget and is concluded', asyn
     // Now `uncertain`, not concluded: every one of those owners may have finished the side
     // effect before dying, so the step must be reconciled rather than declared failed.
     const [exhausted] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(exhausted?.status, 'uncertain')
-    assert.strictEqual(exhausted?.attempt_count, 3)
+    expect(exhausted?.status).toBe('uncertain')
+    expect(exhausted?.attempt_count).toBe(3)
 
     // Only a reconciliation that confirms absence concludes it, and it releases the claim: a
     // concluded row that still names an owner would read as work someone is holding.
-    assert.strictEqual(
+    expect(
       await store.publications.settleExhaustedPublicationStep(
         runId,
         last,
@@ -5437,19 +5212,18 @@ test('a step whose owners kept dying exhausts the budget and is concluded', asyn
         {
           found: false
         }
-      ),
-      true
-    )
+      )
+    ).toBe(true)
     const [step] = await store.publications.listPublicationSteps(runId)
-    assert.strictEqual(step?.status, 'terminal_failed')
-    assert.strictEqual(step?.attempt_count, 3)
+    expect(step?.status).toBe('terminal_failed')
+    expect(step?.attempt_count).toBe(3)
     const observer = new Pool({ connectionString: requireTestDatabase() })
     try {
       const owner = await observer.query<{ claimed_by: string | null }>(
         `SELECT claimed_by FROM publication_steps WHERE run_id=$1`,
         [runId]
       )
-      assert.strictEqual(owner.rows[0]?.claimed_by, null)
+      expect(owner.rows[0]?.claimed_by).toBe(null)
     } finally {
       await observer.end()
     }
@@ -5469,7 +5243,7 @@ test('a reconciliation failure reported twice against one count spends the budge
     const runId = await createSuccessfulRun(store)
     const step = 'repository:delivery:retry'
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, [step])
     for (let attempt = 0; attempt < 3; attempt += 1) {
       await store.publications.requirePublicationStepClaim(runId, token, step)
@@ -5481,9 +5255,9 @@ test('a reconciliation failure reported twice against one count spends the budge
         { retry: true }
       )
     }
-    await assert.rejects(
+    await expect(
       store.publications.requirePublicationStepClaim(runId, token, step)
-    )
+    ).rejects.toSatisfy(() => true)
     const recoveryCount = async () =>
       (await store.publications.listPublicationSteps(runId))[0]
         ?.unresolved_recovery_count
@@ -5496,22 +5270,20 @@ test('a reconciliation failure reported twice against one count spends the budge
         { retry: true, expectedUnresolvedRecoveryCount: expected }
       )
 
-    assert.strictEqual(await report(0), true)
-    assert.strictEqual(await report(0), true, 'the repeat is acknowledged')
-    assert.strictEqual(await recoveryCount(), 1, 'and counted once')
+    expect(await report(0)).toBe(true)
+    expect(await report(0), 'the repeat is acknowledged').toBe(true)
+    expect(await recoveryCount(), 'and counted once').toBe(1)
 
-    assert.strictEqual(await report(1), true)
-    assert.strictEqual(await report(2), true)
-    assert.strictEqual(
-      (await store.publications.listPublicationSteps(runId))[0]?.status,
-      'disconnected'
-    )
-    assert.strictEqual(
+    expect(await report(1)).toBe(true)
+    expect(await report(2)).toBe(true)
+    expect(
+      (await store.publications.listPublicationSteps(runId))[0]?.status
+    ).toBe('disconnected')
+    expect(
       await report(2),
-      true,
       'a repeat of the failure that parked the step is still acknowledged'
-    )
-    assert.strictEqual(await recoveryCount(), 3)
+    ).toBe(true)
+    expect(await recoveryCount()).toBe(3)
   } finally {
     await store.close()
   }
@@ -5525,7 +5297,7 @@ for (const selector of ['claim', 'claimNext'] as const) {
       try {
         const runId = await createSuccessfulRun(store)
         const token = await store.publicationClaims.claim(runId)
-        assert.ok(token)
+        expect.assert(token)
         const keys = ['unresolved', 'other']
         await store.publications.initializePublicationSteps(runId, token, keys)
         for (let n = 0; n < 3; n++) {
@@ -5542,23 +5314,22 @@ for (const selector of ['claim', 'claimNext'] as const) {
             { retry: true }
           )
         }
-        await assert.rejects(
+        await expect(
           store.publications.requirePublicationStepClaim(
             runId,
             token,
             'unresolved'
           )
-        )
+        ).rejects.toSatisfy(() => true)
         if (fromStatus === 'pending')
-          assert.equal(
+          expect(
             await store.publications.fail(
               runId,
               token,
               { message: 'retry' },
               { retry: true }
-            ),
-            true
-          )
+            )
+          ).toBe(true)
         const unresolved = (
           await store.publications.listPublicationSteps(runId)
         ).find((s) => s.step_key === 'unresolved')
@@ -5575,41 +5346,38 @@ for (const selector of ['claim', 'claimNext'] as const) {
           selector === 'claim'
             ? await store.publicationClaims.claim(runId)
             : work?.claim_token
-        assert.ok(claimed)
-        assert.notEqual(claimed, token)
+        expect.assert(claimed)
+        expect(claimed).not.toBe(token)
         if (work !== null) {
-          assert.equal(work.run_id, runId)
-          assert.equal(work.publication.status, 'uncertain')
+          expect(work.run_id).toBe(runId)
+          expect(work.publication.status).toBe('uncertain')
         }
         const expectUncertain = async () => {
-          assert.equal(
-            (await store.queries.getRun(runId))?.publication.status,
+          expect((await store.queries.getRun(runId))?.publication.status).toBe(
             'uncertain'
           )
-          assert.deepEqual(
+          expect(
             (await store.publications.listPublicationSteps(runId)).find(
               (s) => s.step_key === 'unresolved'
-            ),
-            unresolved
-          )
+            )
+          ).toStrictEqual(unresolved)
         }
         await expectUncertain()
-        assert.deepEqual(
+        expect(
           (await events()).slice(before).map((e) => ({
             from: e.from_status,
             to: e.to_status,
             reason: e.reason_code
-          })),
-          [
-            {
-              from: fromStatus,
-              to: 'uncertain',
-              reason:
-                fromStatus === 'uncertain' ? 'PUBLICATION_LEASE_EXPIRED' : null
-            }
-          ]
-        )
-        assert.equal(await store.publications.renewClaim(runId, token), false)
+          }))
+        ).toStrictEqual([
+          {
+            from: fromStatus,
+            to: 'uncertain',
+            reason:
+              fromStatus === 'uncertain' ? 'PUBLICATION_LEASE_EXPIRED' : null
+          }
+        ])
+        expect(await store.publications.renewClaim(runId, token)).toBe(false)
         await store.publications.initializePublicationSteps(
           runId,
           claimed,
@@ -5621,45 +5389,41 @@ for (const selector of ['claim', 'claimNext'] as const) {
           claimed,
           'other'
         )
-        assert.equal(
+        expect(
           await store.publications.completePublicationStep(
             runId,
             token,
             'other'
-          ),
-          false
-        )
-        assert.equal(
+          )
+        ).toBe(false)
+        expect(
           await store.publications.completePublicationStep(
             runId,
             claimed,
             'other'
-          ),
-          true
-        )
+          )
+        ).toBe(true)
         await expectUncertain()
-        assert.equal((await events()).length, before + 1)
-        await assert.rejects(
+        expect(await events()).toHaveLength(before + 1)
+        await expect(
           store.publications.requirePublicationStepClaim(
             runId,
             claimed,
             'unresolved'
           )
-        )
-        assert.equal(
+        ).rejects.toSatisfy(() => true)
+        expect(
           await store.publications.settleExhaustedPublicationStep(
             runId,
             claimed,
             'unresolved',
             { found: true, remote: { id: 'remote' } }
-          ),
-          true
-        )
-        assert.equal(
-          (await store.queries.getRun(runId))?.publication.status,
+          )
+        ).toBe(true)
+        expect((await store.queries.getRun(runId))?.publication.status).toBe(
           'publishing'
         )
-        assert.equal(await store.publications.complete(runId, claimed), true)
+        expect(await store.publications.complete(runId, claimed)).toBe(true)
       } finally {
         await store.close()
       }
@@ -5686,7 +5450,7 @@ test('a waiting publication claim reads step uncertainty committed by the lock h
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
-    assert.ok(token)
+    expect.assert(token)
     await store.publications.initializePublicationSteps(runId, token, ['step'])
     for (let n = 0; n < 3; n++) {
       await store.publications.requirePublicationStepClaim(runId, token, 'step')
@@ -5714,36 +5478,33 @@ test('a waiting publication claim reads step uncertainty committed by the lock h
       [runId]
     )
     pending = store.publicationClaims.claim(runId)
-    let waiting = false
-    const deadline = Date.now() + 5000
-    while (Date.now() < deadline) {
-      const activity = await observer.query(
-        `SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`,
-        [applicationName]
+    await expect
+      .poll(
+        async () => {
+          const activity = await observer.query(
+            `SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`,
+            [applicationName]
+          )
+          return activity.rowCount
+        },
+        {
+          timeout: 5_000,
+          interval: 20,
+          message: 'the claimant must be waiting before the holder commits'
+        }
       )
-      if (activity.rowCount) {
-        waiting = true
-        break
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20))
-    }
-    assert.equal(
-      waiting,
-      true,
-      'the claimant must be waiting before the holder commits'
-    )
+      .toBeGreaterThan(0)
     await holder.query('COMMIT')
     holding = false
     const claimed = await pending
-    assert.ok(claimed)
-    assert.equal(
-      (await store.queries.getRun(runId))?.publication.status,
+    expect.assert(claimed)
+    expect((await store.queries.getRun(runId))?.publication.status).toBe(
       'uncertain'
     )
     const event = (await store.queries.listEvents(runId)).at(-1)
-    assert.equal(event?.from_status, 'uncertain')
-    assert.equal(event?.to_status, 'uncertain')
-    assert.equal(event?.reason_code, 'PUBLICATION_LEASE_EXPIRED')
+    expect(event?.from_status).toBe('uncertain')
+    expect(event?.to_status).toBe('uncertain')
+    expect(event?.reason_code).toBe('PUBLICATION_LEASE_EXPIRED')
   } finally {
     if (holding) await holder.query('ROLLBACK')
     await pending?.catch(() => undefined)
@@ -5760,7 +5521,7 @@ for (const outcome of ['complete', 'retry', 'fail'] as const) {
     try {
       const runId = await createSuccessfulRun(store)
       const token = await store.publicationClaims.claim(runId)
-      assert.ok(token)
+      expect.assert(token)
       const before = (await store.queries.getRun(runId))?.publication.started_at
       const changed =
         outcome === 'complete'
@@ -5771,14 +5532,14 @@ for (const outcome of ['complete', 'retry', 'fail'] as const) {
               { message: 'publication failed' },
               { retry: outcome === 'retry' }
             )
-      assert.equal(changed, true)
+      expect(changed).toBe(true)
       const row = (
         await pool.query(
           'SELECT status, claim_token, claimed_at FROM publications WHERE run_id=$1',
           [runId]
         )
       ).rows[0]
-      assert.deepEqual(row, {
+      expect(row).toStrictEqual({
         status:
           outcome === 'complete'
             ? 'published'
@@ -5788,20 +5549,16 @@ for (const outcome of ['complete', 'retry', 'fail'] as const) {
         claim_token: null,
         claimed_at: null
       })
-      assert.equal(
-        (await store.queries.getRun(runId))?.publication.started_at,
+      expect((await store.queries.getRun(runId))?.publication.started_at).toBe(
         before
       )
-      assert.equal(await store.publications.renewClaim(runId, token), false)
+      expect(await store.publications.renewClaim(runId, token)).toBe(false)
       if (outcome === 'retry') {
         const replacement = await store.publicationClaims.claim(runId)
-        assert.ok(replacement)
-        assert.notEqual(replacement, token)
-        assert.equal(await store.publications.complete(runId, token), false)
-        assert.equal(
-          await store.publications.complete(runId, replacement),
-          true
-        )
+        expect.assert(replacement)
+        expect(replacement).not.toBe(token)
+        expect(await store.publications.complete(runId, token)).toBe(false)
+        expect(await store.publications.complete(runId, replacement)).toBe(true)
       }
     } finally {
       await pool.end()
@@ -5846,8 +5603,7 @@ test('publication ownership constraints reject missing, partial and unexpected l
             )
             if (hasToken === owned && hasLease === owned) await update
             else
-              await assert.rejects(
-                update,
+              await expect(update).rejects.toSatisfy(
                 (error: unknown) =>
                   error instanceof Error &&
                   'code' in error &&

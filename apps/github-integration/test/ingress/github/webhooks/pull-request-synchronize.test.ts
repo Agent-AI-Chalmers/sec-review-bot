@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handlePullRequestSynchronizeWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-synchronize.js'
 import { unusedGitHub } from '../../../github-client.js'
@@ -68,8 +67,8 @@ test('skip automatic review for fork PRs before fetching config or starting a re
     }
   )
 
-  assert.strictEqual(configFetched, false)
-  assert.strictEqual(reviewStarted, false)
+  expect(configFetched).toBe(false)
+  expect(reviewStarted).toBe(false)
 })
 
 test('reads trigger config from the trusted default branch resolved by the API', async () => {
@@ -100,7 +99,7 @@ test('reads trigger config from the trusted default branch resolved by the API',
     }
   )
 
-  assert.deepStrictEqual(fetchedIdentity, {
+  expect(fetchedIdentity).toStrictEqual({
     owner_login: 'octo',
     repo_name: 'example-repo'
   })
@@ -135,5 +134,5 @@ test('starts a review for same-repo PRs when automatic mode is enabled', async (
     }
   )
 
-  assert.strictEqual(reviewStarted, true)
+  expect(reviewStarted).toBe(true)
 })

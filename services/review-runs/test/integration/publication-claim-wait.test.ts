@@ -1,6 +1,6 @@
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
+import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
@@ -30,20 +30,19 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
     run_id: runId,
     publish_context: {}
   })
-  assert.ok(admission.preparation_token)
+  expect.assert(admission.preparation_token)
   await store.submissionTransitions.markQueued(
     runId,
     admission.preparation_token,
     {}
   )
-  assert.strictEqual(
+  expect(
     await store.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
-    ),
-    true
-  )
+    )
+  ).toBe(true)
   return runId
 }
 
@@ -51,19 +50,26 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
   // The wait exists so a run that becomes publishable mid-interval is picked up then,
   // rather than at the next poll. A claim that ignored its wait argument and answered
   // immediately would find nothing here and fail this test.
-  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const store = new ReviewRunStore({
+    pool,
+    connectorId: `test:${randomUUID()}`
+  })
+  await store.initialize()
   try {
     const started = Date.now()
+    const firstAttempt = Promise.withResolvers<void>()
+    // This pool belongs only to the claimant until its first transaction releases the client.
+    pool.once('release', () => firstAttempt.resolve())
     const pending = store.publicationClaims.claimNext(5_000)
-    // Let the first attempt run and find nothing before any work exists.
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await firstAttempt.promise
     const runId = await createPublishableRun(store)
 
     const work = await pending
     const elapsed = Date.now() - started
 
-    assert.strictEqual(work?.run_id, runId)
-    assert.ok(
+    expect(work?.run_id).toBe(runId)
+    expect.assert(
       elapsed < 5_000,
       `the claim should have returned early, took ${elapsed}ms`
     )
@@ -81,8 +87,11 @@ test('a waiting claim gives up when its wait elapses', async () => {
     const work = await store.publicationClaims.claimNext(800)
     const elapsed = Date.now() - started
 
-    assert.strictEqual(work, null)
-    assert.ok(elapsed >= 700, `the claim should have waited, took ${elapsed}ms`)
+    expect(work).toBe(null)
+    expect.assert(
+      elapsed >= 700,
+      `the claim should have waited, took ${elapsed}ms`
+    )
   } finally {
     await store.close()
   }

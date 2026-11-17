@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, beforeEach, beforeAll, test } from 'vitest'
 import { pathToFileURL } from 'node:url'
 
 import {
@@ -15,13 +14,13 @@ import { mockClient } from 'aws-sdk-client-mock'
 
 const s3 = mockClient(S3Client)
 
-test.before(() => {
+beforeAll(() => {
   process.env['SEC_REVIEW_ARTIFACT_STORE'] = 's3'
   process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET'] = 'sec-review'
   process.env['AWS_REGION'] = 'us-east-1'
 })
 
-test.beforeEach(() => {
+beforeEach(() => {
   s3.reset()
   s3.on(ListObjectsV2Command).resolves({ Contents: [] })
 })
@@ -50,13 +49,11 @@ test('uploads an immutable input bundle to its deterministic run key', async () 
 
   const published = await publishInputBundle(await reference(), 'run-123')
 
-  assert.strictEqual(
-    published.uri,
+  expect(published.uri).toBe(
     `s3://sec-review/runs/run-123/input/${'a'.repeat(64)}/input-bundle.v1.tar.zst`
   )
-  assert.strictEqual(s3.commandCalls(PutObjectCommand).length, 1)
-  assert.strictEqual(
-    s3.commandCalls(PutObjectCommand)[0]?.args[0].input.IfNoneMatch,
+  expect(s3.commandCalls(PutObjectCommand)).toHaveLength(1)
+  expect(s3.commandCalls(PutObjectCommand)[0]?.args[0].input.IfNoneMatch).toBe(
     '*'
   )
 })
@@ -75,8 +72,8 @@ test('reuses an existing object only when immutable metadata matches', async () 
 
   const published = await publishInputBundle(input, 'run-123')
 
-  assert.match(published.uri, /^s3:/)
-  assert.strictEqual(s3.commandCalls(PutObjectCommand).length, 0)
+  expect(published.uri).toMatch(/^s3:/)
+  expect(s3.commandCalls(PutObjectCommand)).toHaveLength(0)
 })
 
 test('rejects conflicting content at the immutable run key', async () => {
@@ -84,10 +81,9 @@ test('rejects conflicting content at the immutable run key', async () => {
   const { publishInputBundle } =
     await import('../../src/artifacts/input-storage.js')
 
-  await assert.rejects(
-    publishInputBundle(await reference(), 'run-123'),
-    /conflicts with existing content/
-  )
+  await expect(
+    publishInputBundle(await reference(), 'run-123')
+  ).rejects.toThrow(/conflicts with existing content/)
 })
 
 test('a concurrent identical conditional write is recovered after a 412', async () => {
@@ -114,8 +110,8 @@ test('a concurrent identical conditional write is recovered after a 412', async 
   const { publishInputBundle } =
     await import('../../src/artifacts/input-storage.js')
   const result = await publishInputBundle(input, 'run')
-  assert.match(result.uri, /^s3:/)
-  assert.equal(heads, 2)
+  expect(result.uri).toMatch(/^s3:/)
+  expect(heads).toBe(2)
 })
 
 for (const status of [403, 404]) {
@@ -133,15 +129,17 @@ for (const status of [403, 404]) {
     s3.on(ListObjectsV2Command).resolves({
       Contents: [{ Key: key + '.other' }]
     })
-    assert.equal(await inputBundleExists(published), false)
-    assert.deepEqual(s3.commandCalls(ListObjectsV2Command)[0]?.args[0].input, {
+    expect(await inputBundleExists(published)).toBe(false)
+    expect(
+      s3.commandCalls(ListObjectsV2Command)[0]?.args[0].input
+    ).toStrictEqual({
       Bucket: 'sec-review',
       Prefix: key,
       MaxKeys: 1
     })
     s3.on(ListObjectsV2Command).resolves({ Contents: [{ Key: key }] })
-    await assert.rejects(inputBundleExists(published), /ambiguous HEAD/)
+    await expect(inputBundleExists(published)).rejects.toThrow(/ambiguous HEAD/)
     s3.on(ListObjectsV2Command).rejects(new Error('listing denied'))
-    await assert.rejects(inputBundleExists(published), /listing denied/)
+    await expect(inputBundleExists(published)).rejects.toThrow(/listing denied/)
   })
 }

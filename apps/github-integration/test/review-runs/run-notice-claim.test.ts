@@ -1,12 +1,13 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   RunNoticeClaimLostError,
   startRunNoticeClaimHeartbeat
 } from '../../src/review-runs/run-notice-claim.js'
 
-test('run notice heartbeat renews the claim while delivery remains active', async () => {
+test('run notice heartbeat renews the claim while delivery remains active', async ({
+  onTestFinished
+}) => {
   let renewals = 0
   const heartbeat = await startRunNoticeClaimHeartbeat(
     {
@@ -20,16 +21,18 @@ test('run notice heartbeat renews the claim while delivery remains active', asyn
     'claim-1'
   )
 
-  const deadline = Date.now() + 500
-  while (renewals < 2 && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-  assert.strictEqual(await heartbeat.stop(), true)
-  assert.ok(renewals >= 2)
+  onTestFinished(async () => {
+    await heartbeat.stop()
+  })
+  await expect
+    .poll(() => renewals, { timeout: 500, interval: 10 })
+    .toBeGreaterThanOrEqual(2)
+  expect(await heartbeat.stop()).toBe(true)
+  expect.assert(renewals >= 2)
 })
 
 test('run notice heartbeat rejects a claim superseded before delivery starts', async () => {
-  await assert.rejects(
+  await expect(
     startRunNoticeClaimHeartbeat(
       {
         renewRunNoticeClaim: async () => false,
@@ -37,9 +40,8 @@ test('run notice heartbeat rejects a claim superseded before delivery starts', a
       },
       'notice-1',
       'stale-claim'
-    ),
-    RunNoticeClaimLostError
-  )
+    )
+  ).rejects.toThrow(RunNoticeClaimLostError)
 })
 
 test('an unconfirmed run notice renewal revokes permission to write', async () => {
@@ -57,6 +59,6 @@ test('an unconfirmed run notice renewal revokes permission to write', async () =
   )
 
   reachable = false
-  await assert.rejects(heartbeat.assertOwned(), RunNoticeClaimLostError)
-  assert.strictEqual(await heartbeat.stop(), false)
+  await expect(heartbeat.assertOwned()).rejects.toThrow(RunNoticeClaimLostError)
+  expect(await heartbeat.stop()).toBe(false)
 })

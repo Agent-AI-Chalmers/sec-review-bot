@@ -1,10 +1,9 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { splitRepoFullName } from '../../src/github/repository-service.js'
 
 test('splitRepoFullName accepts a valid owner and repository pair', () => {
-  assert.deepStrictEqual(splitRepoFullName('octo/example.repo'), {
+  expect(splitRepoFullName('octo/example.repo')).toStrictEqual({
     owner_login: 'octo',
     repo_name: 'example.repo'
   })
@@ -20,8 +19,7 @@ test('splitRepoFullName rejects ambiguous or malformed repository names', () => 
     'octo-/example',
     'octo/.'
   ]) {
-    assert.throws(
-      () => splitRepoFullName(value),
+    expect(() => splitRepoFullName(value)).toThrow(
       /Invalid repository full name/
     )
   }

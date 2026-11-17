@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, beforeEach, test } from 'vitest'
 
 import {
   createIssueCommentUnlessMarkerExists,
@@ -25,7 +24,7 @@ function countingGitHub(respond: Parameters<typeof fakeGitHub>[0]) {
 
 const assertPublicationClaim = async (): Promise<void> => {}
 
-test.beforeEach(() => {
+beforeEach(() => {
   setGitHubAppMetadata({ slug: 'sec-review-bot' })
 })
 
@@ -52,9 +51,9 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.strictEqual(result.id, 123)
-  assert.strictEqual(result.reused, true)
-  assert.strictEqual(counts.createComment, 0)
+  expect(result.id).toBe(123)
+  expect(result.reused).toBe(true)
+  expect(counts.createComment).toBe(0)
 })
 
 test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', async () => {
@@ -81,9 +80,9 @@ test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', a
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.strictEqual(result.id, 456)
-  assert.strictEqual(result.reused, false)
-  assert.strictEqual(counts.createComment, 1)
+  expect(result.id).toBe(456)
+  expect(result.reused).toBe(false)
+  expect(counts.createComment).toBe(1)
 })
 
 test('createIssueCommentUnlessMarkerExists creates when marker is absent', async () => {
@@ -102,9 +101,9 @@ test('createIssueCommentUnlessMarkerExists creates when marker is absent', async
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.strictEqual(result.id, 456)
-  assert.strictEqual(result.reused, false)
-  assert.strictEqual(counts.createComment, 1)
+  expect(result.id).toBe(456)
+  expect(result.reused).toBe(false)
+  expect(counts.createComment).toBe(1)
 })
 
 test('issue comment creation stops after marker lookup when publication claim is lost', async () => {
@@ -114,7 +113,7 @@ test('issue comment creation stops after marker lookup when publication claim is
       : githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
   )
 
-  await assert.rejects(
+  await expect(
     createIssueCommentUnlessMarkerExists(octokit, {
       owner_login: 'octo',
       repo_name: 'example',
@@ -124,10 +123,9 @@ test('issue comment creation stops after marker lookup when publication claim is
       assert_publication_claim: async () => {
         throw new PublicationClaimLostError('run-1')
       }
-    }),
-    PublicationClaimLostError
-  )
-  assert.strictEqual(counts.createComment, 0)
+    })
+  ).rejects.toThrow(PublicationClaimLostError)
+  expect(counts.createComment).toBe(0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', async () => {
@@ -158,13 +156,13 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.deepStrictEqual(result, {
+  expect(result).toStrictEqual({
     id: 123,
     html_url: 'https://example.test/review/123',
     state: 'CHANGES_REQUESTED',
     reused: true
   })
-  assert.strictEqual(counts.createReview, 0)
+  expect(counts.createReview).toBe(0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', async () => {
@@ -191,9 +189,9 @@ test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', 
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.strictEqual(result.id, 456)
-  assert.strictEqual(result.reused, false)
-  assert.strictEqual(counts.createReview, 1)
+  expect(result.id).toBe(456)
+  expect(result.reused).toBe(false)
+  expect(counts.createReview).toBe(1)
 })
 
 test('approval fallback rechecks publication ownership before creating a comment review', async () => {
@@ -231,6 +229,6 @@ test('approval fallback rechecks publication ownership before creating a comment
     }
   })
 
-  assert.strictEqual(counts.createReview, 2)
-  assert.strictEqual(ownershipChecks, 2)
+  expect(counts.createReview).toBe(2)
+  expect(ownershipChecks).toBe(2)
 })

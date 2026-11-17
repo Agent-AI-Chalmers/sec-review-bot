@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   contractFixture,
@@ -58,16 +57,16 @@ function validReviewRecord(): ReviewRecordFixture {
 test('parseReviewRecord accepts a complete v1 review_record', () => {
   const record = parseReviewRecord(validReviewRecord())
 
-  assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.deepStrictEqual(record.mitigation.file_changes, [])
+  expect(record.analysis.verdict).toBe('confirmed-vulnerability')
+  expect(record.mitigation.file_changes).toStrictEqual([])
 })
 
 test('parseReviewRecord accepts the shared v1 review_record fixture', () => {
   const record = parseReviewRecord(contractFixture('review-record.json'))
 
-  assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.strictEqual(record.verification.coverage, 'full')
-  assert.strictEqual(record.cvss?.severity, 'medium')
+  expect(record.analysis.verdict).toBe('confirmed-vulnerability')
+  expect(record.verification.coverage).toBe('full')
+  expect(record.cvss?.severity).toBe('medium')
 })
 
 test('parseReviewRecord accepts the shared v1 deleted-file review_record fixture', () => {
@@ -75,17 +74,17 @@ test('parseReviewRecord accepts the shared v1 deleted-file review_record fixture
     contractFixture('review-record-deleted-file.json')
   )
 
-  assert.strictEqual(record.analysis.verdict, 'confirmed-defect')
-  assert.strictEqual(record.mitigation.file_changes.at(0)?.status, 'deleted')
-  assert.strictEqual(record.cvss?.outcome, 'not-scored')
+  expect(record.analysis.verdict).toBe('confirmed-defect')
+  expect(record.mitigation.file_changes.at(0)?.status).toBe('deleted')
+  expect(record.cvss?.outcome).toBe('not-scored')
 })
 
 test('parseReviewRecord accepts every shared v1 review_record schema fixture', () => {
   for (const fixtureName of reviewRecordFixtureNames()) {
-    assert.doesNotThrow(
+    expect(
       () => parseReviewRecord(contractFixture(fixtureName)),
       fixtureName
-    )
+    ).not.toThrow()
   }
 })
 
@@ -101,8 +100,7 @@ test('parseReviewRecord accepts schema-valid upsert file changes', () => {
     }
   ]
 
-  assert.strictEqual(
-    parseReviewRecord(record).mitigation.file_changes.at(0)?.status,
+  expect(parseReviewRecord(record).mitigation.file_changes.at(0)?.status).toBe(
     'upsert'
   )
 })
@@ -117,8 +115,7 @@ test('parseReviewRecord rejects deleted file changes with content', () => {
     }
   ]
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -133,8 +130,7 @@ test('parseReviewRecord rejects upsert file changes without content encoding', (
     }
   ]
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -151,8 +147,7 @@ test('parseReviewRecord rejects file changes with unsupported fields', () => {
     }
   ]
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -166,8 +161,7 @@ test('parseReviewRecord rejects unsafe file change paths', () => {
     }
   ]
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -181,8 +175,7 @@ test('parseReviewRecord rejects file change paths with surrounding whitespace', 
     }
   ]
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -191,8 +184,7 @@ test('parseReviewRecord rejects unsupported public fields', () => {
   const record = validReviewRecord()
   record.analysis.status = 'error'
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
@@ -208,32 +200,28 @@ test('parseReviewRecord rejects invalid cvss field types', () => {
     not_scored_reason: null
   }
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })
 
 test('parseReviewRecord rejects malformed v1 review_record', () => {
-  assert.throws(
-    () =>
-      parseReviewRecord({
-        analysis: {
-          verdict: 'confirmed-vulnerability',
-          overview: 'Unsafe path handling.',
-          narratives: []
-        }
-      }),
-    /review_record does not match API v1/
-  )
+  expect(() =>
+    parseReviewRecord({
+      analysis: {
+        verdict: 'confirmed-vulnerability',
+        overview: 'Unsafe path handling.',
+        narratives: []
+      }
+    })
+  ).toThrow(/review_record does not match API v1/)
 })
 
 test('parseReviewRecord rejects unknown public enum values', () => {
   const record = validReviewRecord()
   record.verification.coverage = 'future-coverage'
 
-  assert.throws(
-    () => parseReviewRecord(record),
+  expect(() => parseReviewRecord(record)).toThrow(
     /review_record does not match API v1/
   )
 })

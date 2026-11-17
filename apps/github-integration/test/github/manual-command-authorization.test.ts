@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   authorizeManualCommentCommand,
@@ -13,9 +12,9 @@ function octokitWithPermission(permission: string): Octokit {
 }
 
 test('normalizes unknown repository permissions conservatively', () => {
-  assert.strictEqual(normalizeRepositoryPermission('write'), 'write')
-  assert.strictEqual(normalizeRepositoryPermission('owner'), 'unknown')
-  assert.strictEqual(normalizeRepositoryPermission(undefined), 'unknown')
+  expect(normalizeRepositoryPermission('write')).toBe('write')
+  expect(normalizeRepositoryPermission('owner')).toBe('unknown')
+  expect(normalizeRepositoryPermission(undefined)).toBe('unknown')
 })
 
 test('manual comment authorization allows write permission', async () => {
@@ -26,9 +25,9 @@ test('manual comment authorization allows write permission', async () => {
     sender_login: 'alice'
   })
 
-  assert.strictEqual(decision.allowed, true)
-  assert.strictEqual(decision.permission, 'write')
-  assert.strictEqual(decision.reason, 'allowed')
+  expect(decision.allowed).toBe(true)
+  expect(decision.permission).toBe('write')
+  expect(decision.reason).toBe('allowed')
 })
 
 test('manual comment authorization allows maintain and admin permissions', async () => {
@@ -40,9 +39,9 @@ test('manual comment authorization allows maintain and admin permissions', async
       sender_login: 'alice'
     })
 
-    assert.strictEqual(decision.allowed, true)
-    assert.strictEqual(decision.permission, permission)
-    assert.strictEqual(decision.reason, 'allowed')
+    expect(decision.allowed).toBe(true)
+    expect(decision.permission).toBe(permission)
+    expect(decision.reason).toBe('allowed')
   }
 })
 
@@ -54,9 +53,9 @@ test('manual comment authorization denies triage permission', async () => {
     sender_login: 'alice'
   })
 
-  assert.strictEqual(decision.allowed, false)
-  assert.strictEqual(decision.permission, 'triage')
-  assert.strictEqual(decision.reason, 'insufficient-permission')
+  expect(decision.allowed).toBe(false)
+  expect(decision.permission).toBe('triage')
+  expect(decision.reason).toBe('insufficient-permission')
 })
 
 test('manual comment authorization denies missing sender without GitHub lookup', async () => {
@@ -71,10 +70,10 @@ test('manual comment authorization denies missing sender without GitHub lookup',
     sender_login: undefined
   })
 
-  assert.strictEqual(decision.allowed, false)
-  assert.strictEqual(decision.permission, 'unknown')
-  assert.strictEqual(decision.reason, 'missing-sender')
-  assert.strictEqual(requests.length, 0, 'no GitHub request may be made')
+  expect(decision.allowed).toBe(false)
+  expect(decision.permission).toBe('unknown')
+  expect(decision.reason).toBe('missing-sender')
+  expect(requests, 'no GitHub request may be made').toHaveLength(0)
 })
 
 test('manual comment authorization denies when permission lookup fails', async () => {
@@ -90,7 +89,7 @@ test('manual comment authorization denies when permission lookup fails', async (
     sender_login: 'alice'
   })
 
-  assert.strictEqual(decision.allowed, false)
-  assert.strictEqual(decision.permission, 'unknown')
-  assert.strictEqual(decision.reason, 'permission-lookup-failed')
+  expect(decision.allowed).toBe(false)
+  expect(decision.permission).toBe('unknown')
+  expect(decision.reason).toBe('permission-lookup-failed')
 })

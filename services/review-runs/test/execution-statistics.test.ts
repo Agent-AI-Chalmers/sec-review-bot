@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test, { mock } from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import { aggregateExecutionStatistics } from '../src/statistics/execution-statistics.js'
 
@@ -56,10 +55,10 @@ test('execution statistics aggregate native provider/model usage by review agent
     excludedNonReviewRootCount: 1
   })
 
-  assert.strictEqual(snapshot.observedCallCount, 2)
-  assert.strictEqual(snapshot.usageReportedCallCount, 2)
-  assert.strictEqual(snapshot.usageCoverage, 'complete_for_observed_calls')
-  assert.deepStrictEqual(snapshot.tokenUsage, {
+  expect(snapshot.observedCallCount).toBe(2)
+  expect(snapshot.usageReportedCallCount).toBe(2)
+  expect(snapshot.usageCoverage).toBe('complete_for_observed_calls')
+  expect(snapshot.tokenUsage).toStrictEqual({
     input_tokens: 15,
     output_tokens: 4,
     total_tokens: 19,
@@ -67,7 +66,7 @@ test('execution statistics aggregate native provider/model usage by review agent
     cache_creation_input_tokens: 1,
     reasoning_tokens: 1
   })
-  assert.deepStrictEqual(snapshot.groups, [
+  expect(snapshot.groups).toStrictEqual([
     {
       agentName: 'issue-analyzer',
       caseId: null,
@@ -111,11 +110,11 @@ test('execution statistics aggregate native provider/model usage by review agent
       }
     }
   ])
-  assert.match(snapshot.observationSetHash, /^[a-f0-9]{64}$/)
+  expect(snapshot.observationSetHash).toMatch(/^[a-f0-9]{64}$/)
 })
 
 test('the total is derived from normalized tokens and a disagreeing source total is reported', () => {
-  const warn = mock.method(console, 'warn', () => undefined)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   try {
     const snapshot = aggregateExecutionStatistics({
       roots: [],
@@ -152,7 +151,7 @@ test('the total is derived from normalized tokens and a disagreeing source total
       excludedNonReviewRootCount: 0
     })
 
-    assert.deepStrictEqual(snapshot.tokenUsage, {
+    expect(snapshot.tokenUsage).toStrictEqual({
       input_tokens: 12,
       output_tokens: 3,
       total_tokens: 15,
@@ -161,17 +160,15 @@ test('the total is derived from normalized tokens and a disagreeing source total
       cache_creation_input_tokens: null,
       reasoning_tokens: null
     })
-    assert.strictEqual(warn.mock.callCount(), 1)
-    const message = JSON.parse(
-      String(warn.mock.calls[0]?.arguments[0])
-    ) as Record<string, unknown>
-    assert.strictEqual(
-      message.event,
-      'execution_statistics_source_total_mismatch'
-    )
-    assert.strictEqual(message.mismatched_calls, 1)
+    expect(warn).toHaveBeenCalledTimes(1)
+    const message = JSON.parse(String(warn.mock.calls[0]?.[0])) as Record<
+      string,
+      unknown
+    >
+    expect(message.event).toBe('execution_statistics_source_total_mismatch')
+    expect(message.mismatched_calls).toBe(1)
   } finally {
-    warn.mock.restore()
+    warn.mockRestore()
   }
 })
 
@@ -182,10 +179,10 @@ test('an empty read reports no observed calls without deciding ingestion', () =>
     excludedNonReviewRootCount: 0
   })
 
-  assert.strictEqual(snapshot.observedCallCount, 0)
-  assert.strictEqual(snapshot.usageReportedCallCount, 0)
-  assert.strictEqual(snapshot.usageCoverage, 'complete_for_observed_calls')
-  assert.deepStrictEqual(snapshot.groups, [])
+  expect(snapshot.observedCallCount).toBe(0)
+  expect(snapshot.usageReportedCallCount).toBe(0)
+  expect(snapshot.usageCoverage).toBe('complete_for_observed_calls')
+  expect(snapshot.groups).toStrictEqual([])
 })
 
 test('task phases and feedback retries remain separate regardless of observation order', () => {
@@ -214,43 +211,40 @@ test('task phases and feedback retries remain separate regardless of observation
   }))
   const read = { roots: [], generations, excludedNonReviewRootCount: 0 }
   const snapshot = aggregateExecutionStatistics(read)
-  assert.equal(snapshot.observedCallCount, 7)
-  assert.equal(snapshot.groups.length, 7)
-  assert.equal(snapshot.tokenUsage.total_tokens, 14)
+  expect(snapshot.observedCallCount).toBe(7)
+  expect(snapshot.groups).toHaveLength(7)
+  expect(snapshot.tokenUsage.total_tokens).toBe(14)
   for (const agent of ['repository-triager', 'repository-delivery-planner']) {
-    assert.deepEqual(
+    expect(
       snapshot.groups
         .filter((group) => group.agentName === agent)
         .map((group) => [
           group.agentPhase,
           group.feedbackRetryIndex,
           group.modelCallCount
-        ]),
-      [
-        ['draft', null, 1],
-        ['refinement', null, 1]
-      ]
-    )
+        ])
+    ).toStrictEqual([
+      ['draft', null, 1],
+      ['refinement', null, 1]
+    ])
   }
-  assert.deepEqual(
+  expect(
     snapshot.groups
       .filter((group) => group.agentName === 'issue-mitigator')
       .map((group) => [
         group.agentPhase,
         group.feedbackRetryIndex,
         group.modelCallCount
-      ]),
-    [
-      ['initial', null, 1],
-      ['feedback', 1, 1],
-      ['feedback', 2, 1]
-    ]
-  )
-  assert.deepEqual(
+      ])
+  ).toStrictEqual([
+    ['initial', null, 1],
+    ['feedback', 1, 1],
+    ['feedback', 2, 1]
+  ])
+  expect(
     aggregateExecutionStatistics({
       ...read,
       generations: [...generations].reverse()
-    }),
-    snapshot
-  )
+    })
+  ).toStrictEqual(snapshot)
 })

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { ExecutionSubmissionUncertainError } from '../src/execution-client.js'
 import { submitPreparedRun } from '../src/runtime/prepared-submission.js'
@@ -58,7 +57,7 @@ test('prepared submission persists input before crossing the Execution boundary'
       },
       preparations: {
         async fail() {
-          assert.fail('successful submission must not fail')
+          expect.unreachable('successful submission must not fail')
         }
       }
     },
@@ -70,11 +69,11 @@ test('prepared submission persists input before crossing the Execution boundary'
     },
     async (request) => {
       events.push('submit')
-      assert.strictEqual(request.run_id, 'run-1')
+      expect(request.run_id).toBe('run-1')
     }
   )
-  assert.deepStrictEqual(events, ['persist', 'submit', 'queued'])
-  assert.deepStrictEqual(result, {
+  expect(events).toStrictEqual(['persist', 'submit', 'queued'])
+  expect(result).toStrictEqual({
     run_id: 'run-1',
     workflow: 'issue-review',
     status: 'queued'
@@ -84,7 +83,7 @@ test('prepared submission persists input before crossing the Execution boundary'
 test('uncertain Execution submission is persisted for recovery', async () => {
   let failure: unknown
   const error = new ExecutionSubmissionUncertainError('response lost')
-  await assert.rejects(
+  await expect(
     submitPreparedRun(
       {
         queries: {
@@ -95,7 +94,7 @@ test('uncertain Execution submission is persisted for recovery', async () => {
         submissionTransitions: {
           async savePreparedSubmission() {},
           async markQueued() {
-            assert.fail('uncertain submission must not queue')
+            expect.unreachable('uncertain submission must not queue')
           }
         },
         preparations: {
@@ -114,10 +113,13 @@ test('uncertain Execution submission is persisted for recovery', async () => {
       async () => {
         throw error
       }
-    ),
-    error
-  )
-  assert.deepStrictEqual(failure, {
+    )
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
+  expect(failure).toStrictEqual({
     code: 'SUBMISSION_STATE_UNCERTAIN',
     message: 'response lost'
   })
@@ -125,7 +127,7 @@ test('uncertain Execution submission is persisted for recovery', async () => {
 
 test('a queued-state write failure after Execution accepts is recoverable uncertainty', async () => {
   let failure: unknown
-  await assert.rejects(
+  await expect(
     submitPreparedRun(
       {
         queries: {
@@ -153,10 +155,9 @@ test('a queued-state write failure after Execution accepts is recoverable uncert
         input: { api_version: 'v1' }
       },
       async () => {}
-    ),
-    /database unavailable/
-  )
-  assert.deepStrictEqual(failure, {
+    )
+  ).rejects.toThrow(/database unavailable/)
+  expect(failure).toStrictEqual({
     code: 'SUBMISSION_STATE_UNCERTAIN',
     message: 'database unavailable'
   })

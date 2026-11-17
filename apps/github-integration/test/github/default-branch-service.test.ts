@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   resolveTrustedDefaultBranch,
@@ -80,12 +79,12 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
       repo_name: 'example'
     }
   )
-  assert.deepStrictEqual(result, {
+  expect(result).toStrictEqual({
     default_branch: 'trunk',
     head_sha: 'trunk-sha'
   })
-  assert.deepStrictEqual(calls.repoGet, [{ owner: 'octo', repo: 'example' }])
-  assert.deepStrictEqual(calls.branchGet, [
+  expect(calls.repoGet).toStrictEqual([{ owner: 'octo', repo: 'example' }])
+  expect(calls.branchGet).toStrictEqual([
     { owner: 'octo', repo: 'example', branch: 'trunk' }
   ])
 })
@@ -93,49 +92,42 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
 // Invariant 4: API failure -> explicit failure, no fallback.
 test('resolveTrustedDefaultBranch throws when the repository API call fails', async () => {
   const { octokit } = makeOctokit({ getStatus: 403 })
-  await assert.rejects(
-    () =>
-      resolveTrustedDefaultBranch(octokit, {
-        owner_login: 'octo',
-        repo_name: 'example'
-      }),
-    (e: { status?: number }) => e.status === 403
-  )
+  await expect(
+    resolveTrustedDefaultBranch(octokit, {
+      owner_login: 'octo',
+      repo_name: 'example'
+    })
+  ).rejects.toSatisfy((e: { status?: number }) => e.status === 403)
 })
 
 test('resolveTrustedDefaultBranch throws when the branch API call fails', async () => {
   const { octokit } = makeOctokit({ branchStatus: 404 })
-  await assert.rejects(
-    () =>
-      resolveTrustedDefaultBranch(octokit, {
-        owner_login: 'octo',
-        repo_name: 'example'
-      }),
-    (e: { status?: number }) => e.status === 404
-  )
+  await expect(
+    resolveTrustedDefaultBranch(octokit, {
+      owner_login: 'octo',
+      repo_name: 'example'
+    })
+  ).rejects.toSatisfy((e: { status?: number }) => e.status === 404)
 })
 
 test('resolveTrustedDefaultBranch rejects an empty default branch', async () => {
   const { octokit } = makeOctokit({ default_branch: '' })
-  await assert.rejects(
-    () =>
-      resolveTrustedDefaultBranch(octokit, {
-        owner_login: 'octo',
-        repo_name: 'example'
-      }),
-    /empty default branch/
-  )
+  await expect(
+    resolveTrustedDefaultBranch(octokit, {
+      owner_login: 'octo',
+      repo_name: 'example'
+    })
+  ).rejects.toThrow(/empty default branch/)
 })
 
 // Invariant 2: recipe source repository == base repo; never the head/fork.
 test('resolveTrustedRepositoryIdentity prefers base repo identity over head/fork', () => {
-  assert.deepStrictEqual(
+  expect(
     resolveTrustedRepositoryIdentity({
       repo_full_name: 'octo/example',
       base_repo_full_name: 'octo/example'
-    }),
-    { owner_login: 'octo', repo_name: 'example' }
-  )
+    })
+  ).toStrictEqual({ owner_login: 'octo', repo_name: 'example' })
 })
 
 test('resolveTrustedRepositoryIdentity never uses the head repo for a fork PR', () => {
@@ -144,17 +136,16 @@ test('resolveTrustedRepositoryIdentity never uses the head repo for a fork PR', 
     repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example'
   })
-  assert.notStrictEqual(identity.owner_login, 'mallory')
+  expect(identity.owner_login).not.toBe('mallory')
 })
 
 test('resolveTrustedRepositoryIdentity falls back to repo_full_name when base is missing', () => {
-  assert.deepStrictEqual(
+  expect(
     resolveTrustedRepositoryIdentity({
       repo_full_name: 'octo/example',
       base_repo_full_name: null
-    }),
-    { owner_login: 'octo', repo_name: 'example' }
-  )
+    })
+  ).toStrictEqual({ owner_login: 'octo', repo_name: 'example' })
 })
 
 // Wiring: a fork PR's trusted identity (base repo) drives which repository the
@@ -176,14 +167,14 @@ test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not th
   )
 
   for (const call of calls.repoGet) {
-    assert.strictEqual(call.owner, 'octo')
-    assert.strictEqual(call.repo, 'example')
-    assert.notStrictEqual(call.owner, 'mallory')
+    expect(call.owner).toBe('octo')
+    expect(call.repo).toBe('example')
+    expect(call.owner).not.toBe('mallory')
   }
-  assert.ok(calls.repoGet.length >= 1)
-  assert.ok(calls.branchGet.length >= 1)
+  expect.assert(calls.repoGet.length >= 1)
+  expect.assert(calls.branchGet.length >= 1)
   for (const call of calls.branchGet) {
-    assert.strictEqual(call.owner, 'octo')
-    assert.notStrictEqual(call.owner, 'mallory')
+    expect(call.owner).toBe('octo')
+    expect(call.owner).not.toBe('mallory')
   }
 })

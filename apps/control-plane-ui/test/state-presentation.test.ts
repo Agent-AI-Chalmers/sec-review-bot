@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   STATE_MACHINES,
@@ -29,13 +28,13 @@ test('filters and visual tones cover exactly the contract state machines', () =>
     publication: PUBLICATION_STATUSES
   }
   for (const machine of STATE_MACHINES) {
-    assert.deepEqual(filters[machine.axis], machine.states)
+    expect(filters[machine.axis]).toStrictEqual(machine.states)
     for (const [body, tones] of [
       [machine, STATE_TONES[machine.axis]],
       [machine.step, STATE_TONES.publication_step]
     ] as const) {
       if (body === undefined) continue
-      assert.deepEqual(Object.keys(tones).sort(), [...body.states].sort())
+      expect(Object.keys(tones).sort()).toStrictEqual([...body.states].sort())
     }
   }
 })
@@ -50,9 +49,8 @@ test('summaries, filters, diagrams, and event history use the same localized sta
     for (const machine of STATE_MACHINES_BY_LANGUAGE[language]) {
       for (const state of machine.states) {
         const expected = machine.details[state]?.label
-        assert.ok(expected)
-        assert.equal(
-          stateLabel(stateMachine(machine.axis, language), state),
+        expect.assert(expected)
+        expect(stateLabel(stateMachine(machine.axis, language), state)).toBe(
           expected
         )
         // Each axis-specific function accepts only that axis's status union.
@@ -60,20 +58,19 @@ test('summaries, filters, diagrams, and event history use the same localized sta
           status: string,
           language: Language
         ) => string
-        assert.equal(label(state, language), expected)
+        expect(label(state, language)).toBe(expected)
       }
       if (machine.step === undefined) continue
       for (const state of machine.step.states) {
         const event = { axis: machine.axis, step_key: 'delivery' } as RunEvent
         const labelled = machineForEvent(event, language)
-        assert.ok(labelled)
-        assert.equal(
+        expect.assert(labelled)
+        expect(
           publicationStatusLabel(
             state as Parameters<typeof publicationStatusLabel>[0],
             language
-          ),
-          stateLabel(labelled, state)
-        )
+          )
+        ).toBe(stateLabel(labelled, state))
       }
     }
   }
@@ -82,14 +79,14 @@ test('summaries, filters, diagrams, and event history use the same localized sta
 test('the Chinese console shows the overlay text, not the contract English', () => {
   // The overlay must actually reach the console: a state labelled identically in both languages
   // would mean the Chinese text was dropped somewhere between the overlay and the screen.
-  assert.equal(executionStatusLabel('uncertain', 'en'), 'Uncertain')
-  assert.equal(executionStatusLabel('uncertain', 'zh'), '待确认')
+  expect(executionStatusLabel('uncertain', 'en')).toBe('Uncertain')
+  expect(executionStatusLabel('uncertain', 'zh')).toBe('待确认')
 })
 
 test('retryable publication step failures remain visually distinct from terminal failure', () => {
-  assert.equal(publicationStatusColor('failed'), 'yellow')
-  assert.equal(publicationStatusColor('terminal_failed'), 'red')
-  assert.equal(publicationStatusColor('succeeded'), 'green')
+  expect(publicationStatusColor('failed')).toBe('yellow')
+  expect(publicationStatusColor('terminal_failed')).toBe('red')
+  expect(publicationStatusColor('succeeded')).toBe('green')
 })
 
 test('publication attempt failure and terminal failure have distinct labels in both languages', () => {
@@ -97,7 +94,7 @@ test('publication attempt failure and terminal failure have distinct labels in b
     ['en', 'Attempt failed', 'Terminal failure'],
     ['zh', '尝试失败', '最终失败']
   ] as const) {
-    assert.equal(publicationStatusLabel('failed', language), attempt)
-    assert.equal(publicationStatusLabel('terminal_failed', language), terminal)
+    expect(publicationStatusLabel('failed', language)).toBe(attempt)
+    expect(publicationStatusLabel('terminal_failed', language)).toBe(terminal)
   }
 })

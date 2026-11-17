@@ -3,8 +3,7 @@
 // The SDK types `auth()` as returning `unknown`, so a thrown token field or a non-object result is
 // representable and must not escape as an empty git credential. These cases pin the guard that
 // turns each into a single, explicit error.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import type { Octokit } from 'octokit'
 
@@ -23,26 +22,24 @@ test('returns the trimmed installation token', async () => {
   const token = await getInstallationAccessToken(
     octokitReturning({ token: '  ghs_abc123  ' })
   )
-  assert.strictEqual(token, 'ghs_abc123')
+  expect(token).toBe('ghs_abc123')
 })
 
 test('rejects a non-object auth result', async () => {
   // `auth()` is typed `unknown`; a string (or null) here must fail rather than be used as a token.
   for (const result of ['ghs_raw_string', null, undefined, 42]) {
-    await assert.rejects(
-      () => getInstallationAccessToken(octokitReturning(result)),
-      /Unable to resolve GitHub App installation token/,
+    await expect(
+      getInstallationAccessToken(octokitReturning(result)),
       `${JSON.stringify(result)} must be rejected`
-    )
+    ).rejects.toThrow(/Unable to resolve GitHub App installation token/)
   }
 })
 
 test('rejects an object with a missing, empty or non-string token', async () => {
   for (const result of [{}, { token: '' }, { token: '   ' }, { token: 7 }]) {
-    await assert.rejects(
-      () => getInstallationAccessToken(octokitReturning(result)),
-      /Unable to resolve GitHub App installation token/,
+    await expect(
+      getInstallationAccessToken(octokitReturning(result)),
       `${JSON.stringify(result)} must be rejected`
-    )
+    ).rejects.toThrow(/Unable to resolve GitHub App installation token/)
   }
 })

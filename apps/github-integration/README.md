@@ -22,15 +22,19 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
+pnpm run typecheck
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. The integration suite uses the Review Runs test database for publisher boundary tests:
+<!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
 
-```bash
-TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-pnpm run test:integration
-```
+`pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.
+
+`pnpm run test:types` reports compile-time contract checks for client requests and responses. These tests do not execute requests.
+
+`pnpm test` runs tests that do not require external services. Keep the launcher when selecting a file, for example `pnpm test test/artifacts/git-workspace.test.ts`: it isolates inherited Git configuration before running tests.
+
+`pnpm run test:integration` runs the opt-in S3 upload test. Set `SEC_REVIEW_TEST_S3_ENDPOINT`, `SEC_REVIEW_TEST_S3_BUCKET`, and AWS credentials for a disposable bucket; the test skips when the endpoint or bucket is unset. For a local S3-compatible service, set `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`. Integration-to-Review-Runs HTTP tests belong to the repository [system tests](../../system-tests/README.md).
 
 ## Local Receiver
 

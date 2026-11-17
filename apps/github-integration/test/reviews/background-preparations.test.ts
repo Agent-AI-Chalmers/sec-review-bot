@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { BackgroundPreparations } from '../../src/reviews/background-preparations.js'
 
@@ -17,10 +16,10 @@ test('BackgroundPreparations waits for admitted preparation work during shutdown
   })
   await Promise.resolve()
 
-  assert.strictEqual(stopped, false)
+  expect(stopped).toBe(false)
   finish?.()
   await stopping
-  assert.strictEqual(stopped, true)
+  expect(stopped).toBe(true)
 })
 
 test('BackgroundPreparations logs failures with ingress context', async () => {
@@ -35,11 +34,11 @@ test('BackgroundPreparations logs failures with ingress context', async () => {
   })
   await preparations.stop()
 
-  assert.strictEqual(logs.length, 1)
-  assert.strictEqual(logs[0]?.event, 'review_background_preparation_failed')
-  assert.strictEqual(logs[0]?.fields.ingress, 'issues.opened')
-  assert.strictEqual(logs[0]?.fields.repo, 'octo/example')
-  assert.strictEqual(logs[0]?.fields.error_message, 'workspace failed')
+  expect(logs).toHaveLength(1)
+  expect(logs[0]?.event).toBe('review_background_preparation_failed')
+  expect(logs[0]?.fields.ingress).toBe('issues.opened')
+  expect(logs[0]?.fields.repo).toBe('octo/example')
+  expect(logs[0]?.fields.error_message).toBe('workspace failed')
 })
 
 test('admission releases the handler while shutdown still waits for preparation', async () => {
@@ -65,17 +64,17 @@ test('admission releases the handler while shutdown still waits for preparation'
     stopped = true
   })
   await Promise.resolve()
-  assert.equal(acknowledged, false)
-  assert.equal(stopped, false)
-  assert.ok(admit)
+  expect(acknowledged).toBe(false)
+  expect(stopped).toBe(false)
+  expect.assert(admit)
   admit()
   await acknowledgement
-  assert.equal(acknowledged, true)
-  assert.equal(stopped, false)
-  assert.ok(finish)
+  expect(acknowledged).toBe(true)
+  expect(stopped).toBe(false)
+  expect.assert(finish)
   finish()
   await stopping
-  assert.equal(stopped, true)
+  expect(stopped).toBe(true)
 })
 
 test('failure before admission rejects the handler and records its ingress context', async () => {
@@ -84,19 +83,22 @@ test('failure before admission rejects the handler and records its ingress conte
     logs.push(fields)
   })
   const error = new Error('admission unavailable')
-  await assert.rejects(
+  await expect(
     preparations.startAndWaitForAdmission(
       async () => {
         throw error
       },
       { ingress: 'issues.opened' }
-    ),
-    error
-  )
+    )
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
   await preparations.stop()
-  assert.equal(logs.length, 1)
-  assert.equal(logs[0]?.error, error)
-  assert.equal(logs[0]?.ingress, 'issues.opened')
+  expect(logs).toHaveLength(1)
+  expect(logs[0]?.error).toBe(error)
+  expect(logs[0]?.ingress).toBe('issues.opened')
 })
 
 test('failure after admission stays owned by the background tracker', async () => {
@@ -116,13 +118,13 @@ test('failure after admission stays owned by the background tracker', async () =
     },
     { repo: 'octo/example' }
   )
-  assert.equal(logs.length, 0)
-  assert.ok(fail)
+  expect(logs).toHaveLength(0)
+  expect.assert(fail)
   fail(error)
   await preparations.stop()
-  assert.equal(logs.length, 1)
-  assert.equal(logs[0]?.error, error)
-  assert.equal(logs[0]?.repo, 'octo/example')
+  expect(logs).toHaveLength(1)
+  expect(logs[0]?.error).toBe(error)
+  expect(logs[0]?.repo).toBe('octo/example')
 })
 
 test('command completion without an admission notification also releases the handler', async () => {
@@ -139,13 +141,16 @@ test('a synchronous command error is tracked and rejects the handler', async () 
     logs.push(fields)
   })
   const error = new Error('synchronous start failure')
-  await assert.rejects(
+  await expect(
     preparations.startAndWaitForAdmission(() => {
       throw error
-    }),
-    error
-  )
+    })
+  ).rejects.toMatchObject({
+    ...error,
+    name: error.name,
+    message: error.message
+  })
   await preparations.stop()
-  assert.equal(logs.length, 1)
-  assert.equal(logs[0]?.error, error)
+  expect(logs).toHaveLength(1)
+  expect(logs[0]?.error).toBe(error)
 })

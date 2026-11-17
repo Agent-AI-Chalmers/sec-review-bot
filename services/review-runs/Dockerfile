@@ -18,12 +18,8 @@ RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
 WORKDIR /repo/services/review-runs
 
 COPY . ./
-# `copy:spec` reads the hand-written contract to place it (with its digest) beside the
-# compiled server, so the builder needs it too. The build resolves the spec at
-# `<review-runs root>/../../contracts/review-runs-api/v1/openapi.yaml`, so compose supplies the
-# contract as a separate named context and this copies only that one file — not the whole
-# tree. The running image does not need it at all: the contract already travels in
-# `dist/openapi.yaml` with its digest.
+# The build copies the contract beside the compiled server. The runtime image carries
+# dist/openapi.yaml, so only the builder needs the canonical contract as a named context.
 COPY --from=contracts review-runs-api/v1/openapi.yaml /repo/contracts/review-runs-api/v1/openapi.yaml
 RUN pnpm run build
 # Deploy only this service and its production dependencies.

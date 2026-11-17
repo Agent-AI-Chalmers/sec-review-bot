@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { validateIconContract } from '../scripts/icon-contract.js'
 
@@ -12,11 +11,8 @@ test('icon imports and rendered sizes follow the shared contract', () => {
     `
   })
 
-  assert.deepEqual(
-    issues.map((issue) => issue.message),
-    [
-      'IconAlertTriangle must come from @tabler/icons-react',
-      'IconAlertTriangle size must use ICON_SIZE'
-    ]
-  )
+  expect(issues.map((issue) => issue.message)).toStrictEqual([
+    'IconAlertTriangle must come from @tabler/icons-react',
+    'IconAlertTriangle size must use ICON_SIZE'
+  ])
 })

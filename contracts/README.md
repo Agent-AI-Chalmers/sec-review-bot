@@ -20,6 +20,8 @@ pnpm --filter "./contracts/**" test
 pnpm --filter @sec-review-bot/execution-api-tools run generate
 ```
 
+To run related tests during development, append a file path to the package test command, for example `pnpm --dir contracts/codegen test test/response-types.test.ts` from the repository root.
+
 Package-local commands remain available after installation. CI installs from the repository root and runs checks in each matrix package. Dependency changes should update the root `pnpm-lock.yaml`.
 
 ## Layout

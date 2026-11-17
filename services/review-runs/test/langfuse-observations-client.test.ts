@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { ReadableStream } from 'node:stream/web'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   LangfuseObservationsClient,
@@ -55,7 +54,7 @@ test('Langfuse observations are read by session without one request per root', a
       { status: 200, headers: { 'content-type': 'application/json' } }
     )
   }
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = originalFetch
   })
 
@@ -71,26 +70,19 @@ test('Langfuse observations are read by session without one request per root', a
     toStartTime: '2026-01-01T00:10:00.000Z'
   })
 
-  assert.strictEqual(requested.length, 2)
-  assert.deepStrictEqual(
+  expect(requested).toHaveLength(2)
+  expect(
     requested.map((url) => [
       url.searchParams.get('sessionId'),
       url.searchParams.get('type')
-    ]),
-    [
-      ['run-1', null],
-      ['run-1', 'GENERATION']
-    ]
-  )
-  assert.deepStrictEqual(
-    result.roots.map(({ id }) => id),
-    ['root-review']
-  )
-  assert.deepStrictEqual(
-    result.generations.map(({ id }) => id),
-    ['generation-1']
-  )
-  assert.strictEqual(result.excludedNonReviewRootCount, 1)
+    ])
+  ).toStrictEqual([
+    ['run-1', null],
+    ['run-1', 'GENERATION']
+  ])
+  expect(result.roots.map(({ id }) => id)).toStrictEqual(['root-review'])
+  expect(result.generations.map(({ id }) => id)).toStrictEqual(['generation-1'])
+  expect(result.excludedNonReviewRootCount).toBe(1)
 })
 
 test('invalid observations fail the whole read instead of silently undercounting', async (t) => {
@@ -103,7 +95,7 @@ test('invalid observations fail the whole read instead of silently undercounting
       }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     )
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = originalFetch
   })
 
@@ -113,14 +105,13 @@ test('invalid observations fail the whole read instead of silently undercounting
     'secret',
     1_000
   )
-  await assert.rejects(
+  await expect(
     client.readRun({
       runId: 'run-1',
       fromStartTime: '2026-01-01T00:00:00.000Z',
       toStartTime: '2026-01-01T00:10:00.000Z'
-    }),
-    /root-without-trace has no traceId/
-  )
+    })
+  ).rejects.toThrow(/root-without-trace has no traceId/)
 })
 
 test('Langfuse observation pages have a bounded response body', async (t) => {
@@ -138,7 +129,7 @@ test('Langfuse observation pages have a bounded response body', async (t) => {
         headers: { 'content-length': String(16 * 1024 * 1024 + 1) }
       }
     )
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = originalFetch
   })
 
@@ -148,15 +139,14 @@ test('Langfuse observation pages have a bounded response body', async (t) => {
     'secret',
     1_000
   )
-  await assert.rejects(
+  await expect(
     client.readRun({
       runId: 'run-1',
       fromStartTime: '2026-01-01T00:00:00.000Z',
       toStartTime: '2026-01-01T00:10:00.000Z'
-    }),
-    /larger than the page budget/
-  )
-  assert.strictEqual(bodyCancelled, true)
+    })
+  ).rejects.toThrow(/larger than the page budget/)
+  expect(bodyCancelled).toBe(true)
 })
 
 test('provider SDK generations fail reconciliation instead of being silently excluded', async (t) => {
@@ -189,7 +179,7 @@ test('provider SDK generations fail reconciliation instead of being silently exc
       { status: 200, headers: { 'content-type': 'application/json' } }
     )
   }
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = originalFetch
   })
 
@@ -199,12 +189,13 @@ test('provider SDK generations fail reconciliation instead of being silently exc
     'secret',
     1_000
   )
-  await assert.rejects(
+  await expect(
     client.readRun({
       runId: 'run-1',
       fromStartTime: '2026-01-01T00:00:00.000Z',
       toStartTime: '2026-01-01T00:10:00.000Z'
-    }),
+    })
+  ).rejects.toThrow(
     /generation-provider-sdk has unexpected instrumentation scope/
   )
 })
@@ -213,7 +204,7 @@ test('rate limits preserve Retry-After for the coordinator', async (t) => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () =>
     new Response(null, { status: 429, headers: { 'retry-after': '7' } })
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = originalFetch
   })
 
@@ -223,12 +214,13 @@ test('rate limits preserve Retry-After for the coordinator', async (t) => {
     'secret',
     1_000
   )
-  await assert.rejects(
+  await expect(
     client.readRun({
       runId: 'run-1',
       fromStartTime: '2026-01-01T00:00:00.000Z',
       toStartTime: '2026-01-01T00:10:00.000Z'
-    }),
+    })
+  ).rejects.toSatisfy(
     (error: unknown) =>
       error instanceof LangfuseRateLimitError && error.retryAfterMs === 7_000
   )

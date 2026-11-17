@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { reconcileExecutionStatisticsPass } from '../src/statistics/execution-statistics-coordinator.js'
 import type { ExecutionStatisticsWork } from '../src/statistics/execution-statistics-store.js'
@@ -54,17 +53,14 @@ test('a statistics pass drains several due runs up to its bound', async () => {
     }
   })
 
-  assert.strictEqual(processed, 2)
-  assert.deepStrictEqual(recorded, ['run-1', 'run-2'])
-  assert.deepStrictEqual(
-    queue.map((item) => item.runId),
-    ['run-3']
-  )
+  expect(processed).toBe(2)
+  expect(recorded).toStrictEqual(['run-1', 'run-2'])
+  expect(queue.map((item) => item.runId)).toStrictEqual(['run-3'])
 })
 
 test('a persistence failure does not spend the Langfuse failure budget', async () => {
   let failureRecorded = false
-  await assert.rejects(
+  await expect(
     reconcileExecutionStatisticsPass({
       maxItems: 1,
       store: {
@@ -94,10 +90,9 @@ test('a persistence failure does not spend the Langfuse failure budget', async (
       onError() {
         throw new Error('Langfuse succeeded, so this must not run')
       }
-    }),
-    /database unavailable/
-  )
-  assert.strictEqual(failureRecorded, false)
+    })
+  ).rejects.toThrow(/database unavailable/)
+  expect(failureRecorded).toBe(false)
 })
 
 test('rate limiting defers work without spending the failure budget', async () => {
@@ -138,10 +133,10 @@ test('rate limiting defers work without spending the failure budget', async () =
     }
   })
 
-  assert.strictEqual(processed, 1)
-  assert.strictEqual(deferredFor, 12_000)
-  assert.strictEqual(failureRecorded, false)
-  assert.deepStrictEqual(results, ['pending'])
+  expect(processed).toBe(1)
+  expect(deferredFor).toBe(12_000)
+  expect(failureRecorded).toBe(false)
+  expect(results).toStrictEqual(['pending'])
 })
 
 test('rate limiting reports unavailable once the settlement window is exhausted', async () => {
@@ -178,5 +173,5 @@ test('rate limiting reports unavailable once the settlement window is exhausted'
     }
   })
 
-  assert.deepStrictEqual(results, ['unavailable'])
+  expect(results).toStrictEqual(['unavailable'])
 })

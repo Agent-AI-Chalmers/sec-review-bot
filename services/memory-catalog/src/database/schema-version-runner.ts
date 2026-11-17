@@ -8,8 +8,8 @@ const SCHEMA_VERSIONS = [
   {
     version: 1,
     name: 'initial_catalog',
-    file: 'schema-versions/001_initial_catalog.sql',
-  },
+    file: 'schema-versions/001_initial_catalog.sql'
+  }
 ] as const
 
 interface AppliedSchemaVersion {
@@ -20,7 +20,7 @@ interface AppliedSchemaVersion {
 
 async function transaction<T>(
   pool: Pool,
-  operation: (client: PoolClient) => Promise<T>,
+  operation: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect()
   try {
@@ -37,12 +37,12 @@ async function transaction<T>(
 }
 
 async function loadSchemaVersion(
-  file: string,
+  file: string
 ): Promise<{ sql: string; checksum: string }> {
   const sql = await readFile(new URL(file, import.meta.url), 'utf8')
   return {
     sql,
-    checksum: crypto.createHash('sha256').update(sql).digest('hex'),
+    checksum: crypto.createHash('sha256').update(sql).digest('hex')
   }
 }
 
@@ -57,21 +57,21 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
     )`)
 
     const applied = await client.query<AppliedSchemaVersion>(
-      'select version,name,checksum from schema_versions order by version',
+      'select version,name,checksum from schema_versions order by version'
     )
     const knownVersions = new Set<number>(
-      SCHEMA_VERSIONS.map(({ version }) => version),
+      SCHEMA_VERSIONS.map(({ version }) => version)
     )
     const unknown = applied.rows.find(
-      ({ version }) => !knownVersions.has(version),
+      ({ version }) => !knownVersions.has(version)
     )
     if (unknown !== undefined) {
       throw new Error(
-        `Memory Catalog schema version ${unknown.version} is newer than this application understands.`,
+        `Memory Catalog schema version ${unknown.version} is newer than this application understands.`
       )
     }
     const appliedByVersion = new Map(
-      applied.rows.map((item) => [item.version, item]),
+      applied.rows.map((item) => [item.version, item])
     )
 
     for (const schemaVersion of SCHEMA_VERSIONS) {
@@ -83,7 +83,7 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
           existing.checksum !== source.checksum
         ) {
           throw new Error(
-            `Applied Memory Catalog schema version ${schemaVersion.version} no longer matches its checked-in SQL file.`,
+            `Applied Memory Catalog schema version ${schemaVersion.version} no longer matches its checked-in SQL file.`
           )
         }
         continue
@@ -92,7 +92,7 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
       await client.query(source.sql)
       await client.query(
         'insert into schema_versions (version,name,checksum) values ($1,$2,$3)',
-        [schemaVersion.version, schemaVersion.name, source.checksum],
+        [schemaVersion.version, schemaVersion.name, source.checksum]
       )
     }
   })

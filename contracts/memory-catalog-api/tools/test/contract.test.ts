@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse } from 'yaml'
 
@@ -12,8 +11,8 @@ test('the HTTP contract is a hand-maintained YAML source, not a service projecti
     readFileSync(path.join(CONTRACT_ROOT, 'v1', 'openapi.yaml'), 'utf8')
   ) as { openapi?: unknown; 'x-contract-source'?: unknown }
 
-  assert.equal(contract.openapi, '3.1.0')
-  assert.equal(contract['x-contract-source'], 'hand-maintained')
+  expect(contract.openapi).toBe('3.1.0')
+  expect(contract['x-contract-source']).toBe('hand-maintained')
 })
 
 test('the generated artifact manifest covers the generator output and CI filter', async () => {
@@ -31,11 +30,8 @@ test('the generated artifact manifest covers the generator output and CI filter'
       outputs: string[]
     }>
   }
-  assert.equal(manifest.family, 'memory-catalog-api')
-  assert.deepEqual(
-    manifest.generators.map(({ name }) => name),
-    ['types']
-  )
+  expect(manifest.family).toBe('memory-catalog-api')
+  expect(manifest.generators.map(({ name }) => name)).toStrictEqual(['types'])
   const outputs = manifest.generators.flatMap(({ outputs }) =>
     outputs.map((output) => path.join(REPO_ROOT, output))
   )
@@ -45,15 +41,15 @@ test('the generated artifact manifest covers the generator output and CI filter'
       ...generator.inputs,
       ...generator.outputs
     ]) {
-      assert.doesNotThrow(
+      expect(
         () => readFileSync(path.join(REPO_ROOT, declaredPath)),
         `${declaredPath} is listed in the manifest but cannot be read`
-      )
+      ).not.toThrow()
     }
   }
   const generatedModule = await import('../src/generate.js')
 
-  assert.deepEqual(outputs, generatedModule.outputPaths.map(path.normalize))
+  expect(outputs).toStrictEqual(generatedModule.outputPaths.map(path.normalize))
 
   const filters = parse(
     readFileSync(
@@ -63,10 +59,10 @@ test('the generated artifact manifest covers the generator output and CI filter'
   ) as Record<string, string[]>
   for (const outputPath of generatedModule.outputPaths) {
     const relativeOutput = path.relative(REPO_ROOT, outputPath)
-    assert.ok(
-      (filters['contract-tools'] ?? []).includes(relativeOutput),
+    expect(
+      filters['contract-tools'] ?? [],
       `contract-tools CI filter does not cover ${relativeOutput}`
-    )
+    ).toContain(relativeOutput)
   }
 })
 
@@ -85,19 +81,16 @@ test('the shared fixture manifest covers every schema and fixture exactly once',
     ...Object.keys(manifest.schema_fixtures),
     ...Object.keys(manifest.invalid_schema_fixtures)
   ]
-  assert.equal(names.length, new Set(names).size)
-  assert.deepEqual(
-    names.sort(),
+  expect(names).toHaveLength(new Set(names).size)
+  expect(names.sort()).toStrictEqual(
     readdirSync(root)
       .filter((name) => name.endsWith('.json') && name !== 'manifest.json')
       .sort()
   )
-  assert.deepEqual(
-    [...new Set(Object.values(manifest.schema_fixtures))].sort(),
-    Object.keys(spec.components.schemas).sort()
-  )
-  assert.deepEqual(
-    [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort(),
-    Object.keys(spec.components.schemas).sort()
-  )
+  expect(
+    [...new Set(Object.values(manifest.schema_fixtures))].sort()
+  ).toStrictEqual(Object.keys(spec.components.schemas).sort())
+  expect(
+    [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort()
+  ).toStrictEqual(Object.keys(spec.components.schemas).sort())
 })

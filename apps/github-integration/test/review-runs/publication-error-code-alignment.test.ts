@@ -6,10 +6,9 @@
 // same stored run forever. Read the codes from Review Runs's contract — the shared,
 // single source both packages derive from — rather than from its source tree, so this test
 // does not couple the two packages' source layouts.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { parse as parseYaml } from 'yaml'
 
@@ -48,11 +47,11 @@ function publicationStepCodesFromContract(): string[] {
 
 test('every Review Runs publication-step code is known and terminal when refused', () => {
   const codes = publicationStepCodesFromContract()
-  assert.ok(codes.length > 0, 'expected publication-step codes')
+  expect.assert(codes.length > 0, 'expected publication-step codes')
 
   const known = new Set<string>(Object.values(EXECUTION_PUBLISH_ERROR_CODES))
   for (const code of codes) {
-    assert.ok(
+    expect.assert(
       known.has(code),
       `${code} is missing from EXECUTION_PUBLISH_ERROR_CODES`
     )
@@ -60,11 +59,10 @@ test('every Review Runs publication-step code is known and terminal when refused
     // `DeterministicReviewRunError` to 409), and a stored run re-enters the same condition on
     // every claim. A missing classification would resolve to `retry: true` and loop forever, so
     // this asserts the exact shape the client produces for that refusal.
-    assert.strictEqual(
+    expect(
       classifyPublicationFailure({ code, status: 409 }).retry,
-      false,
       `${code} must be classified as terminal (retry: false)`
-    )
+    ).toBe(false)
   }
 
   // The exhaustion signal is the one code whose meaning depends on who answered: a proxy in front
@@ -72,12 +70,11 @@ test('every Review Runs publication-step code is known and terminal when refused
   // whose steps were never refused must not be ended by that. The step-set codes above are
   // deliberately status-blind instead — retrying a changed step set re-derives the same set
   // forever — so this exception is about exhaustion alone, not a general rule for the enum.
-  assert.strictEqual(
+  expect(
     classifyPublicationFailure({
       code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
       status: 503
     }).retry,
-    true,
     'an exhaustion signal relayed by a proxy says nothing about the step budget'
-  )
+  ).toBe(true)
 })

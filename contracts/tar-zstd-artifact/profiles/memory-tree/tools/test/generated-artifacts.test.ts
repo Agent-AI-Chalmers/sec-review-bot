@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import generatedArtifacts from '../generated-artifacts.json' with { type: 'json' }
 import { corpusCaseDefinitions } from '../src/corpus.js'
@@ -16,15 +15,13 @@ test('the generated artifact manifest exactly covers fixture outputs', () => {
         `contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/${file}`
     )
   ]
-  assert.equal(
-    generatedArtifacts.family,
+  expect(generatedArtifacts.family).toBe(
     'tar-zstd-artifact/profiles/memory-tree'
   )
-  assert.deepEqual(
-    generatedArtifacts.generators.map(({ name }) => name),
-    ['corpus']
-  )
-  assert.deepEqual(generatedArtifacts.generators[0]?.outputs, expected)
+  expect(generatedArtifacts.generators.map(({ name }) => name)).toStrictEqual([
+    'corpus'
+  ])
+  expect(generatedArtifacts.generators[0]?.outputs).toStrictEqual(expected)
 })
 
 test('every generated artifact identifies an existing committed file', () => {
@@ -35,10 +32,10 @@ test('every generated artifact identifies an existing committed file', () => {
       ...generator.inputs,
       ...generator.outputs
     ]) {
-      assert.doesNotThrow(
+      expect(
         () => readFileSync(path.join(REPO_ROOT, declaredPath)),
         `${declaredPath} is listed in the manifest but cannot be read`
-      )
+      ).not.toThrow()
     }
   }
 })

@@ -9,7 +9,7 @@ import openapiGlue from '@platformatic/fastify-openapi-glue'
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
-  type FastifyRequest,
+  type FastifyRequest
 } from 'fastify'
 
 import { supportedWorkflows } from './execution-api-validation.js'
@@ -18,7 +18,7 @@ import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
 import {
   executionError,
-  TemporalExecutionClient,
+  TemporalExecutionClient
 } from './temporal-execution-client.js'
 
 function specPath(): string {
@@ -37,7 +37,7 @@ function tokenMatches(header: string | undefined, expected: string): boolean {
 
 function response(record: ExecutionRecord): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(record).filter(([, value]) => value !== undefined),
+    Object.entries(record).filter(([, value]) => value !== undefined)
   )
 }
 
@@ -45,7 +45,7 @@ function semanticError(
   code: string,
   category: ExecutionError['category'],
   message: string,
-  details: Record<string, unknown> = {},
+  details: Record<string, unknown> = {}
 ): ExecutionError {
   return { category, code, message, retryable: false, details }
 }
@@ -55,12 +55,12 @@ export async function registerExecutionGatewayRoutes(
   options: {
     client: Pick<TemporalExecutionClient, 'start' | 'get'>
     token?: string
-  },
+  }
 ): Promise<void> {
   const { client, token } = options
   const workflowTimeoutSeconds = integerEnv(
     'TEMPORAL_WORKFLOW_TIMEOUT_SECONDS',
-    10_800,
+    10_800
   )
   await app.register(openapiGlue, {
     specification: specPath(),
@@ -76,15 +76,15 @@ export async function registerExecutionGatewayRoutes(
             error: semanticError(
               'EXECUTION_WORKFLOW_UNSUPPORTED',
               'workflow',
-              `Unsupported workflow: ${workflow}`,
-            ),
+              `Unsupported workflow: ${workflow}`
+            )
           })
         }
         const submission = {
           workflow,
           run_id: body.run_id,
           input: body.input,
-          timeout_seconds: workflowTimeoutSeconds,
+          timeout_seconds: workflowTimeoutSeconds
         }
         try {
           validateExecutionSubmission(submission)
@@ -95,8 +95,8 @@ export async function registerExecutionGatewayRoutes(
             error: semanticError(
               'EXECUTION_REQUEST_INVALID',
               'input',
-              error instanceof Error ? error.message : String(error),
-            ),
+              error instanceof Error ? error.message : String(error)
+            )
           })
         }
         try {
@@ -112,8 +112,8 @@ export async function registerExecutionGatewayRoutes(
                 'EXECUTION_RUN_CONFLICT',
                 'input',
                 error.message,
-                { existing_workflow: error.existingWorkflow ?? null },
-              ),
+                { existing_workflow: error.existingWorkflow ?? null }
+              )
             })
           }
           throw error
@@ -128,32 +128,32 @@ export async function registerExecutionGatewayRoutes(
           error: semanticError(
             'EXECUTION_RUN_NOT_FOUND',
             'runtime',
-            'Execution run not found.',
-          ),
+            'Execution run not found.'
+          )
         })
       },
       getRunStatuses: async (request: FastifyRequest) => {
         const body = request.body as RequestBody<'getRunStatuses'>
         const records = await Promise.all(
           [...new Set(body.run_ids)].map(
-            async (runId) => [runId, await client.get(runId)] as const,
-          ),
+            async (runId) => [runId, await client.get(runId)] as const
+          )
         )
         return {
           runs: records
             .filter(
               (entry): entry is readonly [string, ExecutionRecord] =>
-                entry[1] !== undefined,
+                entry[1] !== undefined
             )
             .map(([runId, record]) => ({
               run_id: runId,
-              status: record.status,
+              status: record.status
             })),
           missing: records
             .filter(([, record]) => !record)
-            .map(([runId]) => runId),
+            .map(([runId]) => runId)
         }
-      },
+      }
     },
     securityHandlers: {
       HTTPBearer: (request: FastifyRequest) => {
@@ -161,12 +161,12 @@ export async function registerExecutionGatewayRoutes(
           throw Object.assign(
             new Error('Missing or invalid execution gateway token.'),
             {
-              statusCode: 401,
-            },
+              statusCode: 401
+            }
           )
         }
-      },
-    },
+      }
+    }
   })
 }
 
@@ -175,7 +175,7 @@ export async function createApp(options: {
   token?: string
 }): Promise<FastifyInstance> {
   const app = Fastify({
-    ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
+    ajv: { customOptions: { removeAdditional: false, coerceTypes: false } }
   })
   app.setErrorHandler((error: unknown, _request, reply) => {
     const statusCode =
@@ -189,8 +189,8 @@ export async function createApp(options: {
     void reply.status(statusCode).send({
       error: executionError(
         statusCode === 401 ? 'UNAUTHORIZED' : 'EXECUTION_FAILED',
-        statusCode === 500 ? 'Internal server error.' : message,
-      ),
+        statusCode === 500 ? 'Internal server error.' : message
+      )
     })
   })
   await registerExecutionGatewayRoutes(app, options)
@@ -210,7 +210,7 @@ export async function startExecutionGateway(): Promise<{
     host !== '::1'
   ) {
     throw new Error(
-      'EXECUTION_GATEWAY_TOKEN is required for a non-loopback host.',
+      'EXECUTION_GATEWAY_TOKEN is required for a non-loopback host.'
     )
   }
   await using resources = new AsyncDisposableStack()
@@ -220,7 +220,7 @@ export async function startExecutionGateway(): Promise<{
   resources.defer(() => app.close())
   await app.listen({
     host,
-    port,
+    port
   })
   const running = resources.move()
   return { close: () => running.disposeAsync() }

@@ -22,6 +22,8 @@ pnpm --filter "./contracts/**" test
 pnpm --filter @sec-review-bot/execution-api-tools run generate
 ```
 
+开发时可在测试命令后追加文件路径，只运行相关测试。例如，在仓库根目录运行 `pnpm --dir contracts/codegen test test/response-types.test.ts`。
+
 安装完成后，也可以进入各工具目录运行命令。CI 在仓库根目录安装依赖，再分别检查各个包。修改依赖时，应同步更新根目录的 `pnpm-lock.yaml`。
 
 ## 布局

@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -130,24 +129,20 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
     review_record: reviewRecordWithPatchDiff(workspacePatchSample())
   })
 
-  assert.strictEqual(manifest.candidates.length, 4)
-  assert.deepStrictEqual(
+  expect(manifest.candidates).toHaveLength(4)
+  expect(
     manifest.candidates.map((candidate) => ({
       start_line: candidate.start_line,
       line: candidate.line
-    })),
-    [
-      { start_line: 15, line: 15 },
-      { start_line: 152, line: 152 },
-      { start_line: 155, line: 157 },
-      { start_line: 161, line: 161 }
-    ]
-  )
-  assert.match(manifest.candidates[0]?.body ?? '', /^```suggestion\n/)
-  assert.doesNotMatch(
-    manifest.candidates[0]?.body ?? '',
-    /Mitigation candidate/
-  )
+    }))
+  ).toStrictEqual([
+    { start_line: 15, line: 15 },
+    { start_line: 152, line: 152 },
+    { start_line: 155, line: 157 },
+    { start_line: 161, line: 161 }
+  ])
+  expect(manifest.candidates[0]?.body ?? '').toMatch(/^```suggestion\n/)
+  expect(manifest.candidates[0]?.body ?? '').not.toMatch(/Mitigation candidate/)
 })
 
 test('suggestion candidates split a hunk into minimal contiguous +/- change blocks', async () => {
@@ -165,19 +160,18 @@ test('suggestion candidates split a hunk into minimal contiguous +/- change bloc
     )
   })
 
-  assert.deepStrictEqual(
+  expect(
     manifest.candidates.map((candidate) => ({
       start_line: candidate.start_line,
       line: candidate.line
-    })),
-    [
-      { start_line: 15, line: 15 },
-      { start_line: 150, line: 150 },
-      { start_line: 152, line: 152 },
-      { start_line: 155, line: 156 },
-      { start_line: 161, line: 161 }
-    ]
-  )
+    }))
+  ).toStrictEqual([
+    { start_line: 15, line: 15 },
+    { start_line: 150, line: 150 },
+    { start_line: 152, line: 152 },
+    { start_line: 155, line: 156 },
+    { start_line: 161, line: 161 }
+  ])
 })
 
 test('suggestion candidates accept repository-relative workspace patch paths', async () => {
@@ -191,8 +185,8 @@ test('suggestion candidates accept repository-relative workspace patch paths', a
     review_record: reviewRecordWithPatchDiff(workspacePatchSample())
   })
 
-  assert.strictEqual(manifest.skipped_reason, null)
-  assert.strictEqual(manifest.candidates.length, 4)
+  expect(manifest.skipped_reason).toBe(null)
+  expect(manifest.candidates).toHaveLength(4)
 })
 
 for (const filename of [
@@ -241,12 +235,11 @@ for (const filename of [
         files,
         review_record: reviewRecordWithPatchDiff(patch)
       })
-      assert.deepStrictEqual(
-        manifest.candidates.map((item) => item.path),
-        [filename]
-      )
-      assert.strictEqual(manifest.candidates[0]?.replacement, 'fixed')
-      assert.deepStrictEqual(manifest.unmapped_changes, [])
+      expect(manifest.candidates.map((item) => item.path)).toStrictEqual([
+        filename
+      ])
+      expect(manifest.candidates[0]?.replacement).toBe('fixed')
+      expect(manifest.unmapped_changes).toStrictEqual([])
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -267,9 +260,9 @@ for (const destination of ['"b/bad\\q"', '"b/unterminated', '"b/\\377"']) {
       files: [],
       review_record: reviewRecordWithPatchDiff(patch)
     })
-    assert.deepStrictEqual(manifest.candidates, [])
-    assert.strictEqual(manifest.unmapped_changes.length, 1)
-    assert.ok(manifest.unmapped_changes[0]?.reason)
-    assert.ok(manifest.skipped_reason)
+    expect(manifest.candidates).toStrictEqual([])
+    expect(manifest.unmapped_changes).toHaveLength(1)
+    expect.assert(manifest.unmapped_changes[0]?.reason)
+    expect.assert(manifest.skipped_reason)
   })
 }

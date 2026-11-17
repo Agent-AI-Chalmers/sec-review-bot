@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { normalizeArtifactStorage } from '../src/shapes.js'
 
@@ -12,13 +11,12 @@ test('an available artifact storage record keeps its artifact reference', () => 
     size_bytes: 42
   }
 
-  assert.deepStrictEqual(
-    normalizeArtifactStorage({ status: 'available', artifact }),
-    {
-      status: 'available',
-      artifact
-    }
-  )
+  expect(
+    normalizeArtifactStorage({ status: 'available', artifact })
+  ).toStrictEqual({
+    status: 'available',
+    artifact
+  })
 })
 
 test('normalizeArtifactStorage rejects an available record with no artifact', () => {
@@ -32,10 +30,11 @@ test('normalizeArtifactStorage rejects an available record with no artifact', ()
     { status: 'available' as const },
     { status: 'available' as const, artifact: null }
   ]) {
-    assert.throws(
+    expect(
       () => normalizeArtifactStorage(storage, 'run r-1'),
-      /run r-1 is an available artifact storage record without its artifact reference/,
       `${JSON.stringify(storage)} must be rejected`
+    ).toThrow(
+      /run r-1 is an available artifact storage record without its artifact reference/
     )
   }
 })
@@ -43,33 +42,30 @@ test('normalizeArtifactStorage rejects an available record with no artifact', ()
 test('the normalization context names the offending record', () => {
   // The message has to identify *which* record is corrupt, or the resulting 500 is
   // undiagnosable. `rowToRecord` passes the run id, so assert the label shows up.
-  assert.throws(
-    () => normalizeArtifactStorage({ status: 'available' }, 'run 8c1f'),
-    /run 8c1f/
-  )
-  assert.throws(
+  expect(() =>
+    normalizeArtifactStorage({ status: 'available' }, 'run 8c1f')
+  ).toThrow(/run 8c1f/)
+  expect(
     () => normalizeArtifactStorage({ status: 'available' }),
-    /artifact_storage/,
     'the default context is still a usable label'
-  )
+  ).toThrow(/artifact_storage/)
 })
 
 test('unavailable and failed records carry their reason without an artifact', () => {
-  assert.deepStrictEqual(normalizeArtifactStorage({ status: 'unavailable' }), {
+  expect(normalizeArtifactStorage({ status: 'unavailable' })).toStrictEqual({
     status: 'unavailable'
   })
-  assert.deepStrictEqual(
+  expect(
     normalizeArtifactStorage({
       status: 'failed',
       error_code: 'ARTIFACT_UPLOAD_FAILED',
       message: 'Unable to store terminal run artifacts.'
-    }),
-    {
-      status: 'failed',
-      error_code: 'ARTIFACT_UPLOAD_FAILED',
-      message: 'Unable to store terminal run artifacts.'
-    }
-  )
+    })
+  ).toStrictEqual({
+    status: 'failed',
+    error_code: 'ARTIFACT_UPLOAD_FAILED',
+    message: 'Unable to store terminal run artifacts.'
+  })
   // Null storage (Execution never attached metadata) stays null rather than becoming absent.
-  assert.strictEqual(normalizeArtifactStorage(null), null)
+  expect(normalizeArtifactStorage(null)).toBe(null)
 })

@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 test('isolated Git behavior', () => {
   fs.mkdirSync('repo')
@@ -10,13 +9,11 @@ test('isolated Git behavior', () => {
   git('init', '-q')
   git('config', 'user.name', 'Test')
   git('config', 'user.email', 'test@example.com')
-  assert.equal(
-    git('check-attr', 'eol', '--', 'sample.txt'),
+  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe(
     'sample.txt: eol: unspecified'
   )
   fs.writeFileSync('repo/.gitattributes', '*.txt text eol=lf\n')
-  assert.equal(
-    git('check-attr', 'eol', '--', 'sample.txt'),
+  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe(
     'sample.txt: eol: lf'
   )
   fs.writeFileSync('repo/sample.txt', 'hello\n')
@@ -24,5 +21,5 @@ test('isolated Git behavior', () => {
   git('commit', '-qm', 'fixture')
   fs.unlinkSync('repo/sample.txt')
   git('checkout', '--', 'sample.txt')
-  assert.equal(fs.readFileSync('repo/sample.txt', 'utf8'), 'hello\n')
+  expect(fs.readFileSync('repo/sample.txt', 'utf8')).toBe('hello\n')
 })

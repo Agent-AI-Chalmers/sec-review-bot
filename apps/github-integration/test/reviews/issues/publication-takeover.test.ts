@@ -1,7 +1,6 @@
 import { contractFixture } from '../../contract-fixtures.js'
-import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
@@ -22,7 +21,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
     } = {
       initializePublicationSteps: async (_runId, token, keys) => {
         if (token !== owner) throw new PublicationClaimLostError('run')
-        assert.deepEqual(keys, ['issue:summary-comment'])
+        expect(keys).toStrictEqual(['issue:summary-comment'])
         step ??= {
           step_key: keys[0]!,
           status: 'pending',
@@ -41,15 +40,15 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       },
       completePublicationStep: async (_runId, token, _key, remote) => {
         if (token !== owner) return false
-        assert(step)
+        expect.assert(step)
         step.status = 'succeeded'
-        assert(remote)
+        expect.assert(remote)
         step.remote_object_id = String(remote.id)
         return true
       },
       failPublicationStep: async (_runId, token) => {
         if (token !== owner) return false
-        assert(step)
+        expect.assert(step)
         step.status = 'failed'
         return true
       },
@@ -91,7 +90,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       user: { login: string; type: string }
     }> = []
     const { octokit } = fakeGitHub(async ({ method, url, body }) => {
-      assert(
+      expect.assert(
         new URL(url).pathname.endsWith('/comments'),
         `unexpected GitHub request: ${method} ${url}`
       )
@@ -104,9 +103,9 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
         }
         return githubJson(snapshot)
       }
-      assert.equal(method, 'POST')
+      expect(method).toBe('POST')
       posts += 1
-      assert(
+      expect.assert(
         body &&
           typeof body === 'object' &&
           'body' in body &&
@@ -140,8 +139,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
         installation_octokit_for_repo: async () => octokit
       })
     const oldAttempt = publish(firstToken)
-    const oldRejected = assert.rejects(
-      oldAttempt,
+    const oldRejected = expect(oldAttempt).rejects.toThrow(
       pauseAt === 'comment lookup' ? PublicationClaimLostError : /response lost/
     )
     try {
@@ -156,14 +154,13 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       await publish(nextToken)
       release.resolve()
       await oldRejected
-      assert.equal(
-        await reviewRunsClient.renewPublicationClaim(runId, firstToken),
-        false
-      )
-      assert.equal(posts, 1)
-      assert.equal(comments.length, 1)
-      assert.equal(step?.status, 'succeeded')
-      assert.equal(step?.remote_object_id, String(comments[0]?.id))
+      expect(
+        await reviewRunsClient.renewPublicationClaim(runId, firstToken)
+      ).toBe(false)
+      expect(posts).toBe(1)
+      expect(comments).toHaveLength(1)
+      expect(step?.status).toBe('succeeded')
+      expect(step?.remote_object_id).toBe(String(comments[0]?.id))
     } finally {
       release.resolve()
       await oldRejected

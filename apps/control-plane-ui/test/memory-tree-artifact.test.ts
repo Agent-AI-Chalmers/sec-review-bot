@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { test } from 'node:test'
+import { expect, test } from 'vitest'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
@@ -56,7 +55,7 @@ async function memoryTreeArchive(
   return zstdCompressSync(Buffer.concat(chunks))
 }
 
-await test('TypeScript memory tree artifacts round trip deterministically', async () => {
+test('TypeScript memory tree artifacts round trip deterministically', async () => {
   const content = new Map<string, string>([
     ['topics/parsing.md', '# Parsing\n'],
     ['MEMORY.md', '# Index\n']
@@ -66,41 +65,40 @@ await test('TypeScript memory tree artifacts round trip deterministically', asyn
   const second = await buildMemoryTreeArtifact(content)
   const restored = await readMemoryTreeArtifact(first.bytes)
 
-  assert.deepEqual(first.bytes, second.bytes)
-  assert.equal(first.digest, second.digest)
-  assert.equal(first.objectKey, memoryTreeObjectKey(first.digest))
-  assert.equal(restored.get('MEMORY.md')?.toString('utf8'), '# Index\n')
-  assert.equal(
-    restored.get('topics/parsing.md')?.toString('utf8'),
+  expect(first.bytes).toStrictEqual(second.bytes)
+  expect(first.digest).toBe(second.digest)
+  expect(first.objectKey).toBe(memoryTreeObjectKey(first.digest))
+  expect(restored.get('MEMORY.md')?.toString('utf8')).toBe('# Index\n')
+  expect(restored.get('topics/parsing.md')?.toString('utf8')).toBe(
     '# Parsing\n'
   )
 })
 
-await test('TypeScript memory tree builder rejects content outside the contract', async () => {
-  await assert.rejects(
+test('TypeScript memory tree builder rejects content outside the contract', async () => {
+  await expect(
     buildMemoryTreeArtifact(
       new Map([
         ['MEMORY.md', '# Index\n'],
         ['topics/data.bin', 'not markdown']
       ])
-    ),
-    /Invalid memory tree content path/
-  )
-  await assert.rejects(
-    buildMemoryTreeArtifact(new Map([['topics/topic.md', '# Topic\n']])),
-    /requires MEMORY.md/
-  )
+    )
+  ).rejects.toThrow(/Invalid memory tree content path/)
+  await expect(
+    buildMemoryTreeArtifact(new Map([['topics/topic.md', '# Topic\n']]))
+  ).rejects.toThrow(/requires MEMORY.md/)
 })
 
-await test('TypeScript memory tree entry limit includes parent directories', async () => {
+test('TypeScript memory tree entry limit includes parent directories', async () => {
   const content = new Map<string, string>([['MEMORY.md', '# Index\n']])
   for (let index = 0; index < 4999; index += 1)
     content.set(`topics/group-${index}/topic.md`, '# Topic\n')
 
-  await assert.rejects(buildMemoryTreeArtifact(content), /entry count limit/)
+  await expect(buildMemoryTreeArtifact(content)).rejects.toThrow(
+    /entry count limit/
+  )
 })
 
-await test('TypeScript memory tree builder uses PAX for long paths', async () => {
+test('TypeScript memory tree builder uses PAX for long paths', async () => {
   const path = `topics/${'a'.repeat(101)}.md`
   const artifact = await buildMemoryTreeArtifact(
     new Map([
@@ -109,11 +107,11 @@ await test('TypeScript memory tree builder uses PAX for long paths', async () =>
     ])
   )
   const content = await readMemoryTreeArtifact(artifact.bytes)
-  assert.equal(content.get(path)?.toString(), '# Topic\n')
+  expect(content.get(path)?.toString()).toBe('# Topic\n')
 })
 
-await test('TypeScript memory tree reader rejects duplicate directory paths', async () => {
-  await assert.rejects(
+test('TypeScript memory tree reader rejects duplicate directory paths', async () => {
+  await expect(
     readMemoryTreeArtifact(
       await memoryTreeArchive([
         { name: 'manifest.json', body: '{"version":1}\n' },
@@ -122,12 +120,11 @@ await test('TypeScript memory tree reader rejects duplicate directory paths', as
         { name: 'memory/MEMORY.md', body: '# Index\n' },
         { name: 'memory/topics/', type: 'directory' }
       ])
-    ),
-    /duplicate entry: memory\//
-  )
+    )
+  ).rejects.toThrow(/duplicate entry: memory\//)
 })
 
-await test('TypeScript reader matches the shared memory tree corpus', async () => {
+test('TypeScript reader matches the shared memory tree corpus', async () => {
   const fixtureRoot = path.join(
     repositoryRoot,
     'contracts',
@@ -146,7 +143,7 @@ await test('TypeScript reader matches the shared memory tree corpus', async () =
     if (fixture.expected === 'valid') {
       await readMemoryTreeArtifact(bytes)
     } else {
-      await assert.rejects(readMemoryTreeArtifact(bytes))
+      await expect(readMemoryTreeArtifact(bytes)).rejects.toSatisfy(() => true)
     }
   }
 })

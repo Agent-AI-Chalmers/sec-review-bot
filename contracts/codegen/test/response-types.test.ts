@@ -1,8 +1,7 @@
-import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import ts from 'typescript'
 
@@ -111,13 +110,13 @@ test('response indexing preserves Kubb success selection and error-only fallback
       ts.ScriptTarget.Latest,
       true
     )
-    assert.ok(
+    expect(
       !file.statements.some(
         (node) =>
           ts.isTypeAliasDeclaration(node) &&
           /Status[0-9]+$/.test(node.name.text)
       )
-    )
+    ).toBeTruthy()
     const aliases = new Map(
       file.statements
         .filter(ts.isTypeAliasDeclaration)
@@ -129,19 +128,18 @@ test('response indexing preserves Kubb success selection and error-only fallback
       ['SingleSuccessResponseBody', ['200']]
     ] as const) {
       const type = aliases.get(name)
-      assert.ok(type && ts.isIndexedAccessTypeNode(type))
+      expect.assert(type && ts.isIndexedAccessTypeNode(type))
       const indices = ts.isUnionTypeNode(type.indexType)
         ? type.indexType.types
         : [type.indexType]
-      assert.deepEqual(
+      expect(
         indices.map((member) => {
-          assert.ok(
+          expect.assert(
             ts.isLiteralTypeNode(member) && ts.isStringLiteral(member.literal)
           )
           return member.literal.text
-        }),
-        expected
-      )
+        })
+      ).toStrictEqual(expected)
     }
 
     const output = path.join(directory, 'types.ts')
@@ -154,12 +152,11 @@ test('response indexing preserves Kubb success selection and error-only fallback
       target: ts.ScriptTarget.ESNext
     })
     const diagnostics = ts.getPreEmitDiagnostics(program)
-    assert.deepEqual(
+    expect(
       diagnostics.map((diagnostic) =>
         ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-      ),
-      []
-    )
+      )
+    ).toStrictEqual([])
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

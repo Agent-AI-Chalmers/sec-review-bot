@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { renderAnalysisSummaryCommentFromReviewRecord } from '../../../src/reviews/pull-requests/renderer.js'
 
@@ -40,14 +39,13 @@ test('pull request renderer preserves inline code in review prose', () => {
     cvss: null
   })
 
-  assert.match(
-    body,
+  expect(body).toMatch(
     /`agents\/src\/sec_review_agents\/resources\/prompts\/memory\/extract-system\.md`/
   )
-  assert.match(body, /`MemoryObservationOutput` remains unchanged\./)
-  assert.match(body, /`load_prompt_resource`/)
-  assert.match(body, /`agents\/tests\/memory\/test_memory\.py`/)
-  assert.doesNotMatch(body, /\\`agents\/src/)
+  expect(body).toMatch(/`MemoryObservationOutput` remains unchanged\./)
+  expect(body).toMatch(/`load_prompt_resource`/)
+  expect(body).toMatch(/`agents\/tests\/memory\/test_memory\.py`/)
+  expect(body).not.toMatch(/\\`agents\/src/)
 })
 
 test('pull request renderer summarizes each review stage without implying PR file count or test coverage', () => {
@@ -76,15 +74,14 @@ test('pull request renderer summarizes each review stage without implying PR fil
     cvss: null
   })
 
-  assert.match(body, /- Analysis: `no actionable security finding`/)
-  assert.match(body, /- Mitigation: `not needed`/)
-  assert.match(
-    body,
+  expect(body).toMatch(/- Analysis: `no actionable security finding`/)
+  expect(body).toMatch(/- Mitigation: `not needed`/)
+  expect(body).toMatch(
     /- Verification: `full coverage; static review; checks not run`/
   )
-  assert.doesNotMatch(body, /- Tests:/)
-  assert.doesNotMatch(body, /Changed files: `0`/)
-  assert.doesNotMatch(body, /Next step: `none`/)
+  expect(body).not.toMatch(/- Tests:/)
+  expect(body).not.toMatch(/Changed files: `0`/)
+  expect(body).not.toMatch(/Next step: `none`/)
 })
 
 test('pull request renderer reports mitigation file count only when a patch exists', () => {
@@ -116,12 +113,11 @@ test('pull request renderer reports mitigation file count only when a patch exis
     cvss: null
   })
 
-  assert.match(body, /- Analysis: `confirmed security vulnerability`/)
-  assert.match(body, /- Mitigation: `patch proposed, 2 files changed`/)
-  assert.match(
-    body,
+  expect(body).toMatch(/- Analysis: `confirmed security vulnerability`/)
+  expect(body).toMatch(/- Mitigation: `patch proposed, 2 files changed`/)
+  expect(body).toMatch(
     /- Verification: `partial coverage; partial runtime validation; checks failed`/
   )
-  assert.doesNotMatch(body, /- Tests:/)
-  assert.match(body, /- Next step: `manual-review`/)
+  expect(body).not.toMatch(/- Tests:/)
+  expect(body).toMatch(/- Next step: `manual-review`/)
 })

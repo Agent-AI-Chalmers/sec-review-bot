@@ -4,10 +4,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
-const profileRoot = path.resolve(import.meta.dirname, '..')
+const profileRoot = path.resolve(import.meta.dirname, '../..')
 const corpusRoot = path.join(profileRoot, 'v1', 'corpus')
 
-function writeOctal(header, offset, length, value) {
+function writeOctal(
+  header: Buffer,
+  offset: number,
+  length: number,
+  value: number
+) {
   header.write(
     `${value.toString(8).padStart(length - 1, '0')}\0`,
     offset,
@@ -16,13 +21,21 @@ function writeOctal(header, offset, length, value) {
   )
 }
 
+type EntrySpec = {
+  name: string
+  type?: string
+  body?: Buffer
+  mode?: number
+  mtime?: number
+}
+
 function rawEntry({
   name,
   type = '0',
   body = Buffer.alloc(0),
   mode = type === '5' ? 0o755 : 0o644,
   mtime = 0
-}) {
+}: EntrySpec): Buffer {
   const header = Buffer.alloc(512)
   header.write(name, 0, 100, 'utf8')
   writeOctal(header, 100, 8, mode)
@@ -44,7 +57,7 @@ function rawEntry({
   ])
 }
 
-function json(value) {
+function json(value: unknown): Buffer {
   return Buffer.from(`${JSON.stringify(value)}\n`)
 }
 
@@ -55,14 +68,19 @@ const manifest = (incremental = false) => ({
   ...(incremental ? { incremental_window: { path: 'incremental-window' } } : {})
 })
 
-const minimal = () => [
+const snapshot = (): EntrySpec => ({
+  name: 'workspace.snapshot.tar',
+  body: Buffer.alloc(1024)
+})
+
+const minimal = (): EntrySpec[] => [
   { name: 'manifest.json', body: json(manifest()) },
   { name: 'history/', type: '5' },
   { name: 'history/review.json', body: json({ kind: 'review' }) },
-  { name: 'workspace.snapshot.tar', body: Buffer.alloc(1024) }
+  snapshot()
 ]
 
-function archive(entries) {
+function archive(entries: EntrySpec[]): Buffer {
   return zstdCompressSync(
     Buffer.concat([...entries.map(rawEntry), Buffer.alloc(1024)])
   )
@@ -115,7 +133,7 @@ const definitions = [
     bytes: archive([
       ...minimal().slice(0, -1),
       { name: 'private.json', body: json({ secret: true }) },
-      minimal().at(-1)
+      snapshot()
     ])
   },
   {
@@ -124,7 +142,7 @@ const definitions = [
     bytes: archive([
       ...minimal().slice(0, -1),
       { name: 'history/link', type: '2' },
-      minimal().at(-1)
+      snapshot()
     ])
   }
 ]

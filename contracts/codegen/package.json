@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@kubb/core": "5.15.3",
@@ -31,7 +31,8 @@
     "globals": "^17.14.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.1",
+    "vitest": "5.1.0"
   },
   "exports": {
     ".": {

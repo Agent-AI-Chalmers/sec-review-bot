@@ -10,16 +10,17 @@
   "scripts": {
     "clean": "rm -rf dist",
     "copy:schema": "mkdir -p dist/database && cp -R src/database/schema-versions dist/database/",
-    "copy:spec": "node --import tsx scripts/copy-contract.ts",
+    "copy:spec": "cp ../../contracts/review-runs-api/v1/openapi.yaml dist/openapi.yaml",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
-    "test": "pnpm run build && node --import tsx --test test/*.test.ts",
+    "test": "pnpm run build && vitest run --project unit",
     "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm run test:types",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:types": "vitest run --project types"
   },
   "dependencies": {
     "@platformatic/fastify-openapi-glue": "^5.2.0",
@@ -39,6 +40,7 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
+    "vitest": "5.1.0",
     "yaml": "^2.9.1"
   }
 }

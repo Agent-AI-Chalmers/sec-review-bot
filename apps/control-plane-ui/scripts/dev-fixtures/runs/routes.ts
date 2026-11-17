@@ -14,7 +14,7 @@ import {
   decodeCursor,
   eventsFor,
   parkedIndexes,
-  runs,
+  runs as initialRuns,
   stepsByRun,
   type FixtureRun
 } from './generate.js'
@@ -25,6 +25,7 @@ export function createRunsHandler(): (
   request: IncomingMessage,
   response: ServerResponse
 ) => Promise<void> {
+  const runs = structuredClone(initialRuns)
   // Runs the operator abandoned while this dev server has been running. Remembering them is
   // what makes the abandon button actually work locally: the queue shrinks and the detail
   // page stops offering the decision, instead of the button being permanently inert.

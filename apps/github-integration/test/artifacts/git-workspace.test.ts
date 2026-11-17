@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { promisify } from 'node:util'
 
 import {
@@ -39,26 +38,25 @@ test('retryGitFetch retries with exponential delays and then succeeds', async ()
     }
   )
 
-  assert.strictEqual(attempts, 3)
-  assert.deepStrictEqual(delays, [1000, 2000])
+  expect(attempts).toBe(3)
+  expect(delays).toStrictEqual([1000, 2000])
 })
 
 test('retryGitFetch preserves the final fetch error', async () => {
   const failure = new Error('permanent fetch failure')
   let attempts = 0
 
-  await assert.rejects(
+  await expect(
     retryGitFetch(
       async () => {
         attempts += 1
         throw failure
       },
       async () => {}
-    ),
-    (error) => error === failure
-  )
+    )
+  ).rejects.toSatisfy((error) => error === failure)
 
-  assert.strictEqual(attempts, 3)
+  expect(attempts).toBe(3)
 })
 
 test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy', () => {
@@ -67,8 +65,8 @@ test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.strictEqual(withConfiguredGitFetchProxy(options, ''), options)
-  assert.strictEqual(withConfiguredGitFetchProxy(options, '  '), options)
+  expect(withConfiguredGitFetchProxy(options, '')).toBe(options)
+  expect(withConfiguredGitFetchProxy(options, '  ')).toBe(options)
 })
 
 test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
@@ -77,17 +75,16 @@ test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.deepStrictEqual(
-    withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '),
-    {
-      config: ['credential.helper='],
-      env: {
-        GIT_TERMINAL_PROMPT: '0',
-        http_proxy: 'http://host.docker.internal:7897',
-        https_proxy: 'http://host.docker.internal:7897'
-      }
+  expect(
+    withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 ')
+  ).toStrictEqual({
+    config: ['credential.helper='],
+    env: {
+      GIT_TERMINAL_PROMPT: '0',
+      http_proxy: 'http://host.docker.internal:7897',
+      https_proxy: 'http://host.docker.internal:7897'
     }
-  )
+  })
 })
 
 test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch metadata', async () => {
@@ -116,25 +113,26 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
       window_base_sha: base_sha
     })
 
-    assert.strictEqual(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.strictEqual(
-      await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]),
-      'README.md'
-    )
+    expect(await git(workspace, ['rev-parse', 'HEAD'])).toBe(head_sha)
+    expect(
+      await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`])
+    ).toBe('README.md')
     // The pinned refs are the only thing keeping base reachable after sanitize, so
     // they must name their role: a caller (or an agent reading the workspace) has to
     // be able to tell which commit is the window start without knowing the array order.
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', 'refs/sec-review/base']),
+    expect(await git(workspace, ['rev-parse', 'refs/sec-review/base'])).toBe(
       base_sha
     )
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', 'refs/sec-review/head']),
+    expect(await git(workspace, ['rev-parse', 'refs/sec-review/head'])).toBe(
       head_sha
     )
-    assert.strictEqual(await git(workspace, ['remote']), '')
-    await assert.rejects(fs.stat(path.join(workspace, '.git', 'FETCH_HEAD')))
-    await assert.rejects(fs.stat(path.join(workspace, '.git', 'logs')))
+    expect(await git(workspace, ['remote'])).toBe('')
+    await expect(
+      fs.stat(path.join(workspace, '.git', 'FETCH_HEAD'))
+    ).rejects.toSatisfy(() => true)
+    await expect(
+      fs.stat(path.join(workspace, '.git', 'logs'))
+    ).rejects.toSatisfy(() => true)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -172,20 +170,17 @@ test('materializeWorkspaceWithCommitHistory names the window base, not the first
       window_base_sha
     })
 
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', 'refs/sec-review/base']),
+    expect(await git(workspace, ['rev-parse', 'refs/sec-review/base'])).toBe(
       window_base_sha
     )
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', 'refs/sec-review/head']),
+    expect(await git(workspace, ['rev-parse', 'refs/sec-review/head'])).toBe(
       head_sha
     )
     // The pull request's own base is still pinned, so its commit survives sanitize; it just
     // does not claim to be the window base.
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', 'refs/sec-review/pinned-0']),
-      pr_base_sha
-    )
+    expect(
+      await git(workspace, ['rev-parse', 'refs/sec-review/pinned-0'])
+    ).toBe(pr_base_sha)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -198,15 +193,14 @@ test('materializeWorkspaceWithCommitHistory rejects a window base outside refs',
     path.join(os.tmpdir(), 'sec-review-git-window-base-reject-test-')
   )
   try {
-    await assert.rejects(
+    await expect(
       materializeWorkspaceWithCommitHistory({
         workspace_path: path.join(root, 'workspace'),
         git_remote_url: path.join(root, 'source'),
         refs: ['a'.repeat(40)],
         window_base_sha: 'b'.repeat(40)
-      }),
-      /window_base_sha must be one of refs/
-    )
+      })
+    ).rejects.toThrow(/window_base_sha must be one of refs/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -237,32 +231,27 @@ test('materializeWorkspaceWithCommitHistory uses a shallow workspace for single-
       refs: [head_sha]
     })
 
-    assert.strictEqual(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.strictEqual(
-      await git(workspace, ['rev-list', '--count', 'HEAD']),
-      '1'
-    )
-    assert.strictEqual(
-      await git(workspace, ['rev-parse', '--is-shallow-repository']),
+    expect(await git(workspace, ['rev-parse', 'HEAD'])).toBe(head_sha)
+    expect(await git(workspace, ['rev-list', '--count', 'HEAD'])).toBe('1')
+    expect(await git(workspace, ['rev-parse', '--is-shallow-repository'])).toBe(
       'true'
     )
-    await assert.rejects(
+    await expect(
       git(workspace, ['cat-file', '-e', `${base_sha}^{commit}`])
-    )
+    ).rejects.toSatisfy(() => true)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
 })
 
 test('materializeWorkspaceWithCommitHistory rejects refs that look like git options', async () => {
-  await assert.rejects(
+  await expect(
     materializeWorkspaceWithCommitHistory({
       workspace_path: path.join(os.tmpdir(), 'sec-review-unused-workspace'),
       git_remote_url: '/tmp/sec-review-unused-source',
       refs: ['--upload-pack=sh']
-    }),
-    /refs must not start/
-  )
+    })
+  ).rejects.toThrow(/refs must not start/)
 })
 
 test('createWorkspaceSnapshotTar compacts git objects before archiving', async () => {
@@ -281,7 +270,7 @@ test('createWorkspaceSnapshotTar compacts git objects before archiving', async (
     await git(workspace, ['commit', '-m', 'init'])
 
     const before = await git(workspace, ['count-objects', '-v'])
-    assert.match(before, /count: [1-9]/)
+    expect(before).toMatch(/count: [1-9]/)
 
     await createWorkspaceSnapshotTar({
       workspace_path: workspace,
@@ -289,7 +278,7 @@ test('createWorkspaceSnapshotTar compacts git objects before archiving', async (
     })
 
     const after = await git(workspace, ['count-objects', '-v'])
-    assert.match(after, /count: 0/)
+    expect(after).toMatch(/count: 0/)
     await fs.stat(tar_path)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
@@ -326,46 +315,41 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
     await execFileAsync('tar', ['-xf', tar_path, '-C', restoredParent])
 
     await git(restoredWorkspace, ['fsck', '--strict'])
-    assert.strictEqual(
-      await git(restoredWorkspace, ['rev-parse', 'HEAD']),
-      head_sha
-    )
-    assert.strictEqual(
+    expect(await git(restoredWorkspace, ['rev-parse', 'HEAD'])).toBe(head_sha)
+    expect(
       await git(restoredWorkspace, [
         'diff',
         '--name-only',
         `${base_sha}..${head_sha}`
-      ]),
-      'README.md'
-    )
+      ])
+    ).toBe('README.md')
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
 })
 test('configuredGitTimeoutMs defaults and reads a validated override', (t) => {
   const previous = process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previous === undefined)
       delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
     else process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = previous
   })
   delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
-  assert.strictEqual(configuredGitTimeoutMs(), 600_000)
+  expect(configuredGitTimeoutMs()).toBe(600_000)
   process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = '1500'
-  assert.strictEqual(configuredGitTimeoutMs(), 1500)
+  expect(configuredGitTimeoutMs()).toBe(1500)
 })
 
 test('configuredGitTimeoutMs rejects a non-positive or malformed override', (t) => {
   const previous = process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
-  t.after(() => {
+  t.onTestFinished(() => {
     if (previous === undefined)
       delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
     else process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = previous
   })
   for (const value of ['', '0', '-1', 'abc', '1.5', '10s']) {
     process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = value
-    assert.throws(
-      () => configuredGitTimeoutMs(),
+    expect(() => configuredGitTimeoutMs()).toThrow(
       /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/
     )
   }
@@ -379,14 +363,14 @@ test('a git command that exceeds the timeout is killed, not left running', async
   process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = '1'
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-timeout-test-'))
   try {
-    await assert.rejects(() =>
+    await expect(
       materializeWorkspaceWithCommitHistory({
         workspace_path: path.join(root, 'workspace'),
         refs: ['main'],
         // An unroutable address: without the timeout this would hang.
         git_remote_url: 'http://10.255.255.1:9/octo/demo.git'
       })
-    )
+    ).rejects.toSatisfy(() => true)
   } finally {
     if (previous === undefined) {
       delete process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
@@ -448,12 +432,12 @@ test('exportWorkspaceDiff returns changes the files API omits its patch for', as
     // Both changes survive, and the large file's content is neither truncated
     // nor cut short by an execFile output-buffer limit: every rewritten line of
     // big.html must appear.
-    assert.match(diff, /rename from old-name\.md/)
-    assert.match(diff, /rename to new-name\.md/)
-    assert.match(diff, /b\/big\.html/)
+    expect(diff).toMatch(/rename from old-name\.md/)
+    expect(diff).toMatch(/rename to new-name\.md/)
+    expect(diff).toMatch(/b\/big\.html/)
     const changed_lines = diff.match(/^\+changed line$/gm) ?? []
-    assert.strictEqual(changed_lines.length, 20_000)
-    assert.match(diff, /changed line\n\+changed line\n/)
+    expect(changed_lines).toHaveLength(20_000)
+    expect(diff).toMatch(/changed line\n\+changed line\n/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -468,9 +452,9 @@ test('exportWorkspaceDiff rejects refs that are empty or look like options', asy
       ['HEAD', ''],
       ['--output=/tmp/x', 'HEAD']
     ] as const) {
-      await assert.rejects(() =>
+      await expect(
         exportWorkspaceDiff({ workspace_path: root, base_sha, head_sha })
-      )
+      ).rejects.toSatisfy(() => true)
     }
   } finally {
     await fs.rm(root, { recursive: true, force: true })
@@ -541,15 +525,15 @@ test('exportWorkspaceDiff ignores an external diff command injected through the 
           cwd: workspace
         }
       )
-      assert.match(injected.stdout, /INJECTED-EXTERNAL-DIFF/)
+      expect(injected.stdout).toMatch(/INJECTED-EXTERNAL-DIFF/)
 
       const diff = await exportWorkspaceDiff({
         workspace_path: workspace,
         base_sha,
         head_sha
       })
-      assert.doesNotMatch(diff, /INJECTED-EXTERNAL-DIFF/)
-      assert.match(diff, /Binary files .* differ/)
+      expect(diff).not.toMatch(/INJECTED-EXTERNAL-DIFF/)
+      expect(diff).toMatch(/Binary files .* differ/)
     } finally {
       for (const [name, value] of previous) {
         if (value === undefined) {
@@ -617,15 +601,15 @@ test('exportWorkspaceDiff ignores a repository diff driver that expands binary f
       '--no-color',
       `${base_sha}..${head_sha}`
     ])
-    assert.match(expanded, /TEXTCONV-EXPANDED/)
+    expect(expanded).toMatch(/TEXTCONV-EXPANDED/)
 
     const diff = await exportWorkspaceDiff({
       workspace_path: workspace,
       base_sha,
       head_sha
     })
-    assert.doesNotMatch(diff, /TEXTCONV-EXPANDED/)
-    assert.match(diff, /Binary files .* differ/)
+    expect(diff).not.toMatch(/TEXTCONV-EXPANDED/)
+    expect(diff).toMatch(/Binary files .* differ/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -688,8 +672,8 @@ test('exportWorkspaceDiff excludes changes that only landed on the base branch',
       base_sha,
       head_sha
     })
-    assert.match(diff, /\+pr-only line/)
-    assert.doesNotMatch(diff, /base-branch-only line/)
+    expect(diff).toMatch(/\+pr-only line/)
+    expect(diff).not.toMatch(/base-branch-only line/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -736,17 +720,16 @@ test('exportWorkspaceWindow keeps patches for paths git would quote', async () =
       head_sha
     })
 
-    assert.deepStrictEqual(
-      exported.files.map((file) => file.filename).sort(),
+    expect(exported.files.map((file) => file.filename).sort()).toStrictEqual(
       [...awkward].sort()
     )
     for (const file of exported.files) {
-      assert.ok(
+      expect.assert(
         file.patch !== null,
         `${file.filename} lost its patch; git quoted the path`
       )
-      assert.match(file.patch, /\+content/)
-      assert.match(file.patch, /^diff --git /)
+      expect(file.patch).toMatch(/\+content/)
+      expect(file.patch).toMatch(/^diff --git /)
     }
   } finally {
     await fs.rm(root, { recursive: true, force: true })
@@ -799,29 +782,20 @@ test('exportWorkspaceWindow reports line counts for ordinary, renamed, and delet
     })
     const by_name = new Map(exported.files.map((file) => [file.filename, file]))
 
-    assert.deepStrictEqual(
-      {
-        additions: by_name.get('plain.txt')?.additions,
-        deletions: by_name.get('plain.txt')?.deletions
-      },
-      { additions: 2, deletions: 0 }
-    )
-    assert.deepStrictEqual(
-      {
-        additions: by_name.get('gone.txt')?.additions,
-        deletions: by_name.get('gone.txt')?.deletions
-      },
-      { additions: 0, deletions: 3 }
-    )
+    expect({
+      additions: by_name.get('plain.txt')?.additions,
+      deletions: by_name.get('plain.txt')?.deletions
+    }).toStrictEqual({ additions: 2, deletions: 0 })
+    expect({
+      additions: by_name.get('gone.txt')?.additions,
+      deletions: by_name.get('gone.txt')?.deletions
+    }).toStrictEqual({ additions: 0, deletions: 3 })
     // A pure rename changes no lines, and it must still be listed.
-    assert.deepStrictEqual(
-      {
-        status: by_name.get('renamed.txt')?.status,
-        additions: by_name.get('renamed.txt')?.additions,
-        deletions: by_name.get('renamed.txt')?.deletions
-      },
-      { status: 'renamed', additions: 0, deletions: 0 }
-    )
+    expect({
+      status: by_name.get('renamed.txt')?.status,
+      additions: by_name.get('renamed.txt')?.additions,
+      deletions: by_name.get('renamed.txt')?.deletions
+    }).toStrictEqual({ status: 'renamed', additions: 0, deletions: 0 })
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -866,12 +840,15 @@ test('exportWorkspaceWindow keeps line counts for a path containing a tab', asyn
       head_sha
     })
     const entry = exported.files.find((file) => file.filename === tabbed)
-    assert.ok(entry !== undefined, 'the tab path is missing from the file list')
-    assert.deepStrictEqual(
-      { additions: entry.additions, deletions: entry.deletions },
-      { additions: 2, deletions: 0 }
+    expect.assert(
+      entry !== undefined,
+      'the tab path is missing from the file list'
     )
-    assert.match(entry.patch ?? '', /\+b/)
+    expect({
+      additions: entry.additions,
+      deletions: entry.deletions
+    }).toStrictEqual({ additions: 2, deletions: 0 })
+    expect(entry.patch ?? '').toMatch(/\+b/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -910,7 +887,7 @@ test('exportWorkspaceWindow lists every commit in the range, past the compare pa
     const expected = Number(
       await git(source, ['rev-list', '--count', `${base_sha}..${head_sha}`])
     )
-    assert.ok(expected > 250, `fixture only produced ${expected} commits`)
+    expect.assert(expected > 250, `fixture only produced ${expected} commits`)
 
     await materializeWorkspaceWithCommitHistory({
       workspace_path: workspace,
@@ -923,9 +900,9 @@ test('exportWorkspaceWindow lists every commit in the range, past the compare pa
       base_sha,
       head_sha
     })
-    assert.strictEqual(exported.commit_shas.length, expected)
+    expect(exported.commit_shas).toHaveLength(expected)
     // `--reverse` keeps the list in application order, ending at the head commit.
-    assert.strictEqual(exported.commit_shas.at(-1), head_sha)
+    expect(exported.commit_shas.at(-1)).toBe(head_sha)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

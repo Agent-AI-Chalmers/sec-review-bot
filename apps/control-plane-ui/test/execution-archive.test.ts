@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { test } from 'node:test'
+import { expect, test } from 'vitest'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
@@ -81,19 +80,17 @@ test('execution archive reader exposes text and marks binary files unpreviewable
     'run-1'
   )
 
-  assert.equal(view.files['result.json'], '{"status":"completed"}')
-  assert.equal(
-    view.files['artifact-tree/unit-1/review.jsonl'],
+  expect(view.files['result.json']).toBe('{"status":"completed"}')
+  expect(view.files['artifact-tree/unit-1/review.jsonl']).toBe(
     '{"event":"message"}\n'
   )
-  assert.deepEqual(
-    view.unpreviewableFiles['artifact-tree/unit-1/evidence.bin'],
-    { sizeBytes: 3 }
-  )
+  expect(
+    view.unpreviewableFiles['artifact-tree/unit-1/evidence.bin']
+  ).toStrictEqual({ sizeBytes: 3 })
 })
 
 test('execution archive reader rejects another run and unsafe archive paths', async () => {
-  await assert.rejects(
+  await expect(
     readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest('run-2') },
@@ -101,10 +98,9 @@ test('execution archive reader rejects another run and unsafe archive paths', as
         { name: 'artifact-tree/unit-1/review.jsonl', body: '' }
       ]),
       'run-1'
-    ),
-    /invalid_execution_archive/
-  )
-  await assert.rejects(
+    )
+  ).rejects.toThrow(/invalid_execution_archive/)
+  await expect(
     readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
@@ -113,13 +109,12 @@ test('execution archive reader rejects another run and unsafe archive paths', as
         { name: '../outside', body: 'no' }
       ]),
       'run-1'
-    ),
-    /invalid_execution_archive/
-  )
+    )
+  ).rejects.toThrow(/invalid_execution_archive/)
 })
 
 test('execution archive reader rejects links and missing manifest entries', async () => {
-  await assert.rejects(
+  await expect(
     readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
@@ -127,16 +122,14 @@ test('execution archive reader rejects links and missing manifest entries', asyn
         { name: 'artifact-tree/unit-1/review.jsonl', type: 'symlink' }
       ]),
       'run-1'
-    ),
-    /invalid_execution_archive/
-  )
-  await assert.rejects(
+    )
+  ).rejects.toThrow(/invalid_execution_archive/)
+  await expect(
     readExecutionArchive(
       await bundle([{ name: 'result.json', body: '{}' }]),
       'run-1'
-    ),
-    /invalid_execution_archive/
-  )
+    )
+  ).rejects.toThrow(/invalid_execution_archive/)
 })
 
 test('execution archive reader matches the shared profile corpus', async () => {
@@ -165,12 +158,13 @@ test('execution archive reader matches the shared profile corpus', async () => {
       item.runId
     )
     if (item.expected === 'valid') await read
-    else await assert.rejects(read, /invalid_execution_archive/, item.file)
+    else
+      await expect(read, item.file).rejects.toThrow(/invalid_execution_archive/)
   }
 })
 
 test('execution archive reader rejects duplicate directory paths', async () => {
-  await assert.rejects(
+  await expect(
     readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
@@ -180,7 +174,6 @@ test('execution archive reader rejects duplicate directory paths', async () => {
         { name: 'artifact-tree/unit-1/review.jsonl', body: '' }
       ]),
       'run-1'
-    ),
-    /invalid_execution_archive/
-  )
+    )
+  ).rejects.toThrow(/invalid_execution_archive/)
 })

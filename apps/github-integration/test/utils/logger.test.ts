@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { logError } from '../../src/utils/logger.js'
 
@@ -20,8 +19,8 @@ test('an error field is logged with its message, not as an empty object', () => 
   // passed as a field used to render as `error={}`: the line said something failed and nothing
   // about what.
   const line = captureError({ error: new Error('GitHub answered 502') })
-  assert.match(line, /GitHub answered 502/)
-  assert.doesNotMatch(line, /error=\{\}/)
+  expect(line).toMatch(/GitHub answered 502/)
+  expect(line).not.toMatch(/error=\{\}/)
 })
 
 test('an error field keeps its name, code, status, and cause', () => {
@@ -38,9 +37,9 @@ test('an error field keeps its name, code, status, and cause', () => {
     '502',
     'socket hang up'
   ])
-    assert.ok(line.includes(part), `${part} is missing from ${line}`)
+    expect(line, `${part} is missing from ${line}`).toContain(part)
 })
 
 test('a plain object field is still logged as JSON', () => {
-  assert.match(captureError({ detail: { a: 1 } }), /detail=\{"a":1\}/)
+  expect(captureError({ detail: { a: 1 } })).toMatch(/detail=\{"a":1\}/)
 })

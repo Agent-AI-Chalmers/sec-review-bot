@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import type { ServerResponse } from 'node:http'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { UpstreamRequestError } from '../server/upstream/request.js'
 import {
@@ -15,34 +14,31 @@ import {
  * only part of the answer that differs.
  */
 test('upstream failure codes name the upstream that failed', () => {
-  assert.deepStrictEqual(
-    upstreamFailure(new UpstreamRequestError('timeout'), 'review_runs'),
-    { status: 504, error: 'review_runs_timeout' }
-  )
-  assert.deepStrictEqual(
-    upstreamFailure(new UpstreamRequestError('timeout'), 'memory_catalog'),
-    { status: 504, error: 'memory_catalog_timeout' }
-  )
-  assert.deepStrictEqual(
-    upstreamFailure(new UpstreamRequestError('unavailable'), 'memory_catalog'),
-    { status: 502, error: 'memory_catalog_unavailable' }
-  )
+  expect(
+    upstreamFailure(new UpstreamRequestError('timeout'), 'review_runs')
+  ).toStrictEqual({ status: 504, error: 'review_runs_timeout' })
+  expect(
+    upstreamFailure(new UpstreamRequestError('timeout'), 'memory_catalog')
+  ).toStrictEqual({ status: 504, error: 'memory_catalog_timeout' })
+  expect(
+    upstreamFailure(new UpstreamRequestError('unavailable'), 'memory_catalog')
+  ).toStrictEqual({ status: 502, error: 'memory_catalog_unavailable' })
 })
 
 test('an oversized upstream body is not attributed to one upstream', () => {
   const oversized = new UpstreamRequestError('too_large')
-  assert.deepStrictEqual(upstreamFailure(oversized, 'review_runs'), {
+  expect(upstreamFailure(oversized, 'review_runs')).toStrictEqual({
     status: 502,
     error: 'upstream_response_too_large'
   })
-  assert.deepStrictEqual(upstreamFailure(oversized, 'memory_catalog'), {
+  expect(upstreamFailure(oversized, 'memory_catalog')).toStrictEqual({
     status: 502,
     error: 'upstream_response_too_large'
   })
 })
 
 test('an unclassified failure is the ordinary upstream failure', () => {
-  assert.deepStrictEqual(upstreamFailure(new Error('boom'), 'review_runs'), {
+  expect(upstreamFailure(new Error('boom'), 'review_runs')).toStrictEqual({
     status: 502,
     error: 'review_runs_unavailable'
   })
@@ -76,9 +72,9 @@ test('a relayed upstream response keeps its status and body', () => {
     status: 404,
     body: Buffer.from('{"error":"run_not_found"}')
   })
-  assert.strictEqual(written.status, 404)
-  assert.strictEqual(written.body, '{"error":"run_not_found"}')
-  assert.strictEqual(written.headers['cache-control'], undefined)
+  expect(written.status).toBe(404)
+  expect(written.body).toBe('{"error":"run_not_found"}')
+  expect(written.headers['cache-control']).toBe(undefined)
 })
 
 test('a relayed response can be marked uncacheable', () => {
@@ -88,7 +84,7 @@ test('a relayed response can be marked uncacheable', () => {
     { status: 200, body: Buffer.from('{}') },
     { cacheControl: 'no-store' }
   )
-  assert.strictEqual(written.headers['cache-control'], 'no-store')
+  expect(written.headers['cache-control']).toBe('no-store')
 })
 
 test('a failure is sent as the console reads it', () => {
@@ -98,8 +94,8 @@ test('a failure is sent as the console reads it', () => {
     'review_runs',
     new UpstreamRequestError('timeout')
   )
-  assert.strictEqual(written.status, 504)
-  assert.deepStrictEqual(JSON.parse(written.body), {
+  expect(written.status).toBe(504)
+  expect(JSON.parse(written.body)).toStrictEqual({
     error: 'review_runs_timeout'
   })
 })

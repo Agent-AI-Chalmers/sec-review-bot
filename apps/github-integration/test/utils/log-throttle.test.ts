@@ -1,6 +1,5 @@
 // Verifies the in-memory log throttle bounds both per-key frequency and total remembered keys.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { createLogThrottle } from '../../src/utils/log-throttle.js'
 
@@ -11,18 +10,16 @@ test('a key logs once per window and again after it elapses', () => {
     maxKeys: 10,
     now: () => clock
   })
-  assert.equal(allow('repo'), true, 'first sighting logs')
-  assert.equal(allow('repo'), false, 'within the window is suppressed')
+  expect(allow('repo'), 'first sighting logs').toBe(true)
+  expect(allow('repo'), 'within the window is suppressed').toBe(false)
   clock -= 50
-  assert.equal(
-    allow('repo'),
-    false,
-    'a backwards clock must not reopen the gate'
+  expect(allow('repo'), 'a backwards clock must not reopen the gate').toBe(
+    false
   )
   clock = 1_099
-  assert.equal(allow('repo'), false, 'still inside the window')
+  expect(allow('repo'), 'still inside the window').toBe(false)
   clock = 1_100
-  assert.equal(allow('repo'), true, 'a full window reopens the gate')
+  expect(allow('repo'), 'a full window reopens the gate').toBe(true)
 })
 
 test('different keys are throttled independently', () => {
@@ -31,10 +28,10 @@ test('different keys are throttled independently', () => {
     maxKeys: 10,
     now: () => 0
   })
-  assert.equal(allow('a'), true)
-  assert.equal(allow('b'), true)
-  assert.equal(allow('a'), false)
-  assert.equal(allow('b'), false)
+  expect(allow('a')).toBe(true)
+  expect(allow('b')).toBe(true)
+  expect(allow('a')).toBe(false)
+  expect(allow('b')).toBe(false)
 })
 
 test('the number of distinct keys is capped, so invented keys cannot grow the table', () => {
@@ -43,13 +40,11 @@ test('the number of distinct keys is capped, so invented keys cannot grow the ta
     maxKeys: 2,
     now: () => 0
   })
-  assert.equal(allow('a'), true)
-  assert.equal(allow('b'), true)
-  assert.equal(allow('c'), false, 'a key beyond the cap is refused')
-  assert.equal(
-    allow('a'),
-    false,
-    'existing keys are still governed by the interval'
+  expect(allow('a')).toBe(true)
+  expect(allow('b')).toBe(true)
+  expect(allow('c'), 'a key beyond the cap is refused').toBe(false)
+  expect(allow('a'), 'existing keys are still governed by the interval').toBe(
+    false
   )
 })
 
@@ -60,19 +55,17 @@ test('an elapsed interval frees a key but not the cap', () => {
     maxKeys: 1,
     now: () => clock
   })
-  assert.equal(allow('a'), true)
+  expect(allow('a')).toBe(true)
   clock = 100
-  assert.equal(allow('a'), true, 'the remembered key can log again')
-  assert.equal(allow('b'), false, 'the cap still refuses a new key')
+  expect(allow('a'), 'the remembered key can log again').toBe(true)
+  expect(allow('b'), 'the cap still refuses a new key').toBe(false)
 })
 
 test('invalid configuration is rejected up front', () => {
-  assert.throws(
-    () => createLogThrottle({ minIntervalMs: -1, maxKeys: 1 }),
+  expect(() => createLogThrottle({ minIntervalMs: -1, maxKeys: 1 })).toThrow(
     /minIntervalMs/
   )
-  assert.throws(
-    () => createLogThrottle({ minIntervalMs: 0, maxKeys: 0 }),
+  expect(() => createLogThrottle({ minIntervalMs: 0, maxKeys: 0 })).toThrow(
     /maxKeys/
   )
 })

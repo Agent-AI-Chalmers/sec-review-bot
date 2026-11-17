@@ -1,6 +1,5 @@
 import { trajectoryCorpus } from './contract-fixtures.js'
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 import { zstdCompressSync } from 'node:zlib'
 import { parseViewerInput } from '../browser/features/viewer/Viewer.js'
 import { readTrajectoryArtifact } from '../server/memory/trajectory-artifact.js'
@@ -29,12 +28,11 @@ test('memory artifact reader keeps messages and validates execution record order
       Buffer.from(items.map((item) => JSON.stringify(item)).join('\n'))
     )
   const events = readTrajectoryArtifact(encode(records))
-  assert.equal(events.length, 5)
-  assert.equal(events[2]?.source, 'summarization')
-  assert.throws(
-    () => readTrajectoryArtifact(encode([...records, records[0]])),
-    /invalid_trajectory_artifact/
-  )
+  expect(events).toHaveLength(5)
+  expect(events[2]?.source).toBe('summarization')
+  expect(() =>
+    readTrajectoryArtifact(encode([...records, records[0]]))
+  ).toThrow(/invalid_trajectory_artifact/)
 })
 
 test('parallel subagents with repeated tool IDs link to their own results', () => {
@@ -103,13 +101,13 @@ test('parallel subagents with repeated tool IDs link to their own results', () =
     event.seq = index + 1
   })
   const document = buildTrajectoryDocument(events)
-  assert.equal(document.totalUsage.total, 24)
+  expect(document.totalUsage.total).toBe(24)
   for (const branch of ['left', 'right']) {
     const message = document.messages.find(
       (message) => message.id === `${branch}-call`
     )
-    assert.equal(message?.toolCalls[0]?.resultMessageId, `${branch}-result`)
-    assert.equal(message?.agent, branch)
+    expect(message?.toolCalls[0]?.resultMessageId).toBe(`${branch}-result`)
+    expect(message?.agent).toBe(branch)
   }
 })
 
@@ -120,23 +118,21 @@ test('runtime fixtures preserve flat conversation order and identify subagents a
   ] as const) {
     const raw = trajectoryCorpus(`${name}.jsonl`)
     const events = readTrajectoryArtifact(zstdCompressSync(Buffer.from(raw)))
-    assert.deepEqual(parseViewerInput(raw), events)
+    expect(parseViewerInput(raw)).toStrictEqual(events)
     const document = buildTrajectoryDocument(events)
-    assert.deepEqual(
-      document.messages.slice(0, 2).map((message) => message.role),
-      ['system', 'human']
-    )
-    assert.equal(document.totalUsage.total, tokens)
+    expect(
+      document.messages.slice(0, 2).map((message) => message.role)
+    ).toStrictEqual(['system', 'human'])
+    expect(document.totalUsage.total).toBe(tokens)
     if (name === 'subagents') {
       for (const agent of ['source-reviewer', 'test-reviewer']) {
         const branch = document.messages.filter(
           (message) => message.agent === agent
         )
-        assert.deepEqual(
-          branch.slice(0, 2).map((message) => message.role),
+        expect(branch.slice(0, 2).map((message) => message.role)).toStrictEqual(
           ['system', 'human']
         )
-        assert.ok(
+        expect.assert(
           branch
             .flatMap((message) => message.toolCalls)
             .every((call) => call.resultMessageId)
@@ -146,11 +142,12 @@ test('runtime fixtures preserve flat conversation order and identify subagents a
       const summary = document.messages.filter(
         (message) => message.source === 'summarization'
       )
-      assert.deepEqual(
-        summary.map((message) => message.role),
-        ['human', 'assistant', 'human']
-      )
-      assert.match(summary[0]?.content ?? '', /src\/download.py/)
+      expect(summary.map((message) => message.role)).toStrictEqual([
+        'human',
+        'assistant',
+        'human'
+      ])
+      expect(summary[0]?.content ?? '').toMatch(/src\/download.py/)
     }
   }
 })
@@ -160,19 +157,17 @@ test('viewer and memory artifact readers enforce the trajectory contract corpus'
   const manifest = trajectoryManifest()
   for (const name of manifest.valid) {
     const input = trajectoryCorpus(name)
-    assert.deepEqual(
-      parseViewerInput(input),
-      readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))),
-      name
+    expect(parseViewerInput(input), name).toStrictEqual(
+      readTrajectoryArtifact(zstdCompressSync(Buffer.from(input)))
     )
   }
   for (const name of manifest.invalid) {
     const input = trajectoryCorpus(name)
-    assert.throws(() => parseViewerInput(input), name)
-    assert.throws(
+    expect(() => parseViewerInput(input), name).toThrow()
+    expect(
       () => readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))),
       name
-    )
+    ).toThrow()
   }
 })
 
@@ -211,11 +206,10 @@ for (const provenance of ['ancestry', 'agent', 'both'] as const) {
       }
     ])
     const left = document.messages[0]!
-    assert.equal(left.toolCalls[0]?.resultMessageId, undefined)
-    assert.equal(left.toolCalls[0]?.diff, undefined)
-    assert.doesNotMatch(left.searchable, /sibling-only-diff/)
-    assert.equal(
-      document.messages[1]?.toolCalls[0]?.resultMessageId,
+    expect(left.toolCalls[0]?.resultMessageId).toBe(undefined)
+    expect(left.toolCalls[0]?.diff).toBe(undefined)
+    expect(left.searchable).not.toMatch(/sibling-only-diff/)
+    expect(document.messages[1]?.toolCalls[0]?.resultMessageId).toBe(
       'right-result'
     )
   })
@@ -245,9 +239,9 @@ test('a result shared by indistinguishable requests remains unresolved', () => {
   })
   const document = buildTrajectoryDocument(events)
   for (const message of document.messages.slice(0, 2)) {
-    assert.equal(message.toolCalls[0]?.resultMessageId, undefined)
-    assert.equal(message.toolCalls[0]?.diff, undefined)
-    assert.doesNotMatch(message.searchable, /ambiguous-diff/)
+    expect(message.toolCalls[0]?.resultMessageId).toBe(undefined)
+    expect(message.toolCalls[0]?.diff).toBe(undefined)
+    expect(message.searchable).not.toMatch(/ambiguous-diff/)
   }
 })
 
@@ -281,8 +275,8 @@ for (const ended of [true, false]) {
       .map((record, index) => JSON.stringify({ seq: index + 1, ...record }))
       .join('\n')
     const document = buildTrajectoryDocument(parseViewerInput(input))
-    assert.equal(document.totalUsage.total, ended ? 13 : undefined)
-    assert.equal(document.messages.length, 2)
+    expect(document.totalUsage.total).toBe(ended ? 13 : undefined)
+    expect(document.messages).toHaveLength(2)
   })
 }
 
@@ -311,10 +305,9 @@ test('an interrupted call with one recorded response retains known usage', () =>
   ]
     .map((record) => JSON.stringify(record))
     .join('\n')
-  assert.equal(
-    buildTrajectoryDocument(parseViewerInput(input)).totalUsage.total,
-    12
-  )
+  expect(
+    buildTrajectoryDocument(parseViewerInput(input)).totalUsage.total
+  ).toBe(12)
 })
 
 test('a missing call usage keeps aggregate fields unknown independently', () => {
@@ -349,12 +342,12 @@ test('a missing call usage keeps aggregate fields unknown independently', () => 
       .join('\n')
   )
   const document = buildTrajectoryDocument(events)
-  assert.equal(document.messages[0]?.usage?.total, 12)
-  assert.equal(document.totalUsage.total, undefined)
-  assert.equal(document.totalUsage.input, undefined)
-  assert.equal(document.totalUsage.cacheRead, undefined)
+  expect(document.messages[0]?.usage?.total).toBe(12)
+  expect(document.totalUsage.total).toBe(undefined)
+  expect(document.totalUsage.input).toBe(undefined)
+  expect(document.totalUsage.cacheRead).toBe(undefined)
   const oneCall = buildTrajectoryDocument(events.slice(0, 4))
-  assert.equal(oneCall.totalUsage.total, 12)
-  assert.equal(oneCall.totalUsage.cacheRead, undefined)
-  assert.equal(oneCall.totalUsage.cacheCreation, 0)
+  expect(oneCall.totalUsage.total).toBe(12)
+  expect(oneCall.totalUsage.cacheRead).toBe(undefined)
+  expect(oneCall.totalUsage.cacheCreation).toBe(0)
 })

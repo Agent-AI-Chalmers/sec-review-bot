@@ -237,6 +237,14 @@ pnpm test
 pnpm run test:integration
 ```
 
+<!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
+
+`pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.
+
+`pnpm run test:types` reports compile-time contract checks for handler requests, results, and registry completeness. These tests do not start the server.
+
+`pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
+
 The contract itself is linted (Spectral) and its projections are freshness-checked by the family tools under [`contracts/review-runs-api/tools`](../../contracts/review-runs-api/tools/README.md).
 
 `pnpm run test:integration` uses `TEST_DATABASE_URL` or `DATABASE_URL` when one is supplied; it must point to a disposable PostgreSQL database. Without either variable, the command starts a short-lived local Docker container from the PostgreSQL image declared in the repository-root `compose.yaml`, then removes it after the tests. Docker pulls that image when it is not local, so this fallback requires both Docker and registry access; set `TEST_POSTGRES_IMAGE` to use another image explicitly.

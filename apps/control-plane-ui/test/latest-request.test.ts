@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { LatestRequestGuard } from '../browser/shared/latest-request.js'
 
@@ -32,11 +31,11 @@ test('only the latest request may commit data, error, or loading state', async (
   const currentDataCompletion = run(currentData.promise)
   staleData.resolve('stale')
   await staleDataCompletion
-  assert.deepStrictEqual(state, { loading: true, error: undefined })
+  expect(state).toStrictEqual({ loading: true, error: undefined })
 
   currentData.resolve('current')
   await currentDataCompletion
-  assert.deepStrictEqual(state, {
+  expect(state).toStrictEqual({
     data: 'current',
     loading: false,
     error: undefined
@@ -48,7 +47,7 @@ test('only the latest request may commit data, error, or loading state', async (
   const finalDataCompletion = run(finalData.promise)
   staleError.reject(new Error('stale failure'))
   await staleErrorCompletion
-  assert.deepStrictEqual(state, {
+  expect(state).toStrictEqual({
     data: 'current',
     loading: true,
     error: undefined
@@ -56,7 +55,7 @@ test('only the latest request may commit data, error, or loading state', async (
 
   finalData.resolve('final')
   await finalDataCompletion
-  assert.deepStrictEqual(state, {
+  expect(state).toStrictEqual({
     data: 'final',
     loading: false,
     error: undefined

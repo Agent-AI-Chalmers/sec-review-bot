@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 const browserDirectory = path.resolve(import.meta.dirname, '../browser')
 const stylesDirectory = path.join(browserDirectory, 'styles')
@@ -44,7 +43,7 @@ function matchingBrace(source: string, openingBrace: number): number {
     }
     if (character === '/' && next === '*') {
       const commentEnd = source.indexOf('*/', index + 2)
-      assert.notEqual(commentEnd, -1, 'CSS comment must be closed')
+      expect(commentEnd, 'CSS comment must be closed').not.toBe(-1)
       index = commentEnd + 1
       continue
     }
@@ -127,17 +126,16 @@ test('the stylesheet entry imports every domain file once without nested imports
     .filter((file) => file.endsWith('.css'))
     .sort()
 
-  assert.deepEqual(imports, expectedLoadOrder)
-  assert.deepEqual([...imports].sort(), files)
-  assert.equal(new Set(imports).size, imports.length)
+  expect(imports).toStrictEqual(expectedLoadOrder)
+  expect([...imports].sort()).toStrictEqual(files)
+  expect(new Set(imports).size).toBe(imports.length)
 
   for (const file of files) {
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
-    assert.equal(
+    expect(
       /@import\b/.test(source),
-      false,
       `${file} must not create a second stylesheet entry graph`
-    )
+    ).toBe(false)
   }
 })
 
@@ -151,11 +149,10 @@ test('domain styles do not redefine the same selector in different files', async
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     for (const selector of new Set(classSelectors(source))) {
       const existingOwner = owners.get(selector)
-      assert.equal(
+      expect(
         existingOwner,
-        undefined,
         `${selector} is defined in both ${existingOwner} and ${file}`
-      )
+      ).toBe(undefined)
       owners.set(selector, file)
     }
   }
@@ -169,12 +166,10 @@ test('responsive rules are isolated in the final stylesheet', async () => {
   for (const file of files) {
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     if (file === responsiveFile) {
-      assert.match(source, /@media\b/)
+      expect(source).toMatch(/@media\b/)
     } else {
-      assert.doesNotMatch(
-        source,
-        /@media\b/,
-        `${file} must not own media queries`
+      expect(source, `${file} must not own media queries`).not.toMatch(
+        /@media\b/
       )
     }
   }

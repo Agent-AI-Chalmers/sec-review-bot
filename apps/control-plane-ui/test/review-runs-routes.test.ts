@@ -1,6 +1,5 @@
-import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
 import { loginCookie } from './server-support.js'
@@ -16,7 +15,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -24,52 +23,49 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
-    assert.strictEqual((await fetch(`${base}/api/runs`)).status, 401)
+    expect((await fetch(`${base}/api/runs`)).status).toBe(401)
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: base },
       body: '{"token":"login-secret"}'
     })
-    assert.strictEqual(login.status, 204)
+    expect(login.status).toBe(204)
     const cookie = login.headers.get('set-cookie')
-    assert(cookie?.includes('HttpOnly'))
-    assert(cookie !== null)
+    expect.assert(cookie?.includes('HttpOnly'))
+    expect.assert(cookie !== null)
     const query = await fetch(`${base}/api/runs`, { headers: { cookie } })
-    assert.strictEqual(query.status, 200)
-    assert.strictEqual(authorization, 'Bearer read-secret')
-    assert.strictEqual(upstreamPath, '/v1/runs')
+    expect(query.status).toBe(200)
+    expect(authorization).toBe('Bearer read-secret')
+    expect(upstreamPath).toBe('/v1/runs')
     // The BFF forwards only the parameters Review Runs declares: UI state (`range`) and
     // anything else the browser adds (UTM, typos) are dropped rather than passed upstream.
     await fetch(`${base}/api/runs?range=1h&utm_source=twitter&limit=10`, {
       headers: { cookie }
     })
-    assert.strictEqual(upstreamPath, '/v1/runs?limit=10')
+    expect(upstreamPath).toBe('/v1/runs?limit=10')
     await fetch(
       `${base}/api/runs?workflow=issue-review&source_platform=github&range=7d&cursor=abc`,
       { headers: { cookie } }
     )
-    assert.strictEqual(
-      upstreamPath,
+    expect(upstreamPath).toBe(
       '/v1/runs?cursor=abc&source_platform=github&workflow=issue-review'
     )
-    assert.strictEqual(
+    expect(
       (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } }))
-        .status,
-      404
-    )
-    assert.strictEqual(
-      (await fetch(`${base}/api/store`, { headers: { cookie } })).status,
-      404
-    )
+        .status
+    ).toBe(404)
+    expect(
+      (await fetch(`${base}/api/store`, { headers: { cookie } })).status
+    ).toBe(404)
     // The run-id segment must be the contract's UUID shape. A catch-all would still be safe
     // today (Review Runs answers 400), but it would forward any future path shape upstream,
     // so the allow-list rejects a non-UUID id here instead of relaying it.
     const runUuid = '0123abcd-4567-89ef-0123-456789abcdef'
     await fetch(`${base}/api/runs/${runUuid}/events`, { headers: { cookie } })
-    assert.strictEqual(upstreamPath, `/v1/runs/${runUuid}/events`)
+    expect(upstreamPath).toBe(`/v1/runs/${runUuid}/events`)
     upstreamPath = ''
     // The allow-list matches the contract's run-id shape after percent-decoding. It is
     // deliberately shape-only, exactly like the contract's own `runId` pattern: rejecting a
@@ -87,23 +83,21 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       // A valid id with an encoded separator glued to it is not a sub-resource.
       '/api/runs/0123abcd-4567-89ef-0123-456789abcdef%2Fevents'
     ]) {
-      assert.strictEqual(
+      expect(
         (await fetch(`${base}${rejected}`, { headers: { cookie } })).status,
-        404,
         `${rejected} must not be proxied upstream`
-      )
+      ).toBe(404)
     }
-    assert.strictEqual(
+    expect(
       upstreamPath,
-      '',
       'a rejected path must never reach the upstream Review Runs'
-    )
+    ).toBe('')
     // The blocked-preparation queue is a fixed sub-resource of the run collection, not a run id,
     // so it must pass the allow-list before the UUID check rejects it.
     await fetch(`${base}/api/runs/parked`, {
       headers: { cookie }
     })
-    assert.strictEqual(upstreamPath, '/v1/runs/parked')
+    expect(upstreamPath).toBe('/v1/runs/parked')
 
     // The one write the console may proxy. The admin credential is supplied by the operator for
     // this request and forwarded as-is; the BFF holds no copy of its own.
@@ -114,7 +108,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: '{"reason":"r"}'
     })
-    assert.strictEqual(noToken.status, 401)
+    expect(noToken.status).toBe(401)
     const crossSite = await fetch(abandonUrl, {
       method: 'POST',
       headers: {
@@ -125,11 +119,10 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       },
       body: '{"reason":"r"}'
     })
-    assert.strictEqual(
+    expect(
       crossSite.status,
-      403,
       'a cross-site POST must not carry the session into an abandonment'
-    )
+    ).toBe(403)
     authorization = ''
     const abandon = await fetch(abandonUrl, {
       method: 'POST',
@@ -141,26 +134,25 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       },
       body: '{"reason":"r"}'
     })
-    assert.strictEqual(abandon.status, 200)
-    assert.strictEqual(upstreamPath, `/v1/admin/runs/${runUuid}/abandon`)
-    assert.strictEqual(
+    expect(abandon.status).toBe(200)
+    expect(upstreamPath).toBe(`/v1/admin/runs/${runUuid}/abandon`)
+    expect(
       authorization,
-      'Bearer admin-value',
       'the operator credential, not the read token, must authorise the abandonment'
-    )
+    ).toBe('Bearer admin-value')
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       headers: { origin: base },
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
     })
-    assert.strictEqual(oversizedLogin.status, 413)
+    expect(oversizedLogin.status).toBe(413)
     const unicodeLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       headers: { origin: base },
       body: JSON.stringify({ token: '\u00e9'.repeat('login-secret'.length) })
     })
-    assert.strictEqual(unicodeLogin.status, 401)
-    assert.strictEqual((await fetch(`${base}/healthz`)).status, 200)
+    expect(unicodeLogin.status).toBe(401)
+    expect((await fetch(`${base}/healthz`)).status).toBe(200)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -179,7 +171,7 @@ test('BFF rejects an upstream JSON body whose declared size exceeds its budget',
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -188,13 +180,13 @@ test('BFF rejects an upstream JSON body whose declared size exceeds its budget',
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/runs`, { headers: { cookie } })
-    assert.strictEqual(response.status, 502)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'upstream_response_too_large'
     })
   } finally {
@@ -213,7 +205,7 @@ test('BFF stops buffering a chunked upstream JSON body at its budget', async () 
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -222,13 +214,13 @@ test('BFF stops buffering a chunked upstream JSON body at its budget', async () 
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(`${base}/api/runs`, { headers: { cookie } })
-    assert.strictEqual(response.status, 502)
-    assert.deepStrictEqual(await response.json(), {
+    expect(response.status).toBe(502)
+    expect(await response.json()).toStrictEqual({
       error: 'upstream_response_too_large'
     })
   } finally {
@@ -247,7 +239,7 @@ test('BFF returns a gateway error when Review Runs is unavailable', async () => 
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
-  assert(address && typeof address === 'object')
+  expect.assert(address && typeof address === 'object')
   try {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
@@ -256,11 +248,11 @@ test('BFF returns a gateway error when Review Runs is unavailable', async () => 
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
-    assert.strictEqual(login.status, 204)
-    assert(cookie)
+    expect(login.status).toBe(204)
+    expect.assert(cookie)
     const query = await fetch(`${base}/api/runs`, { headers: { cookie } })
-    assert.strictEqual(query.status, 502)
-    assert.deepStrictEqual(await query.json(), {
+    expect(query.status).toBe(502)
+    expect(await query.json()).toStrictEqual({
       error: 'review_runs_unavailable'
     })
   } finally {
@@ -278,7 +270,7 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
   })
   await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const upstreamAddress = upstream.address()
-  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  expect.assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
     reviewRunsToken: 'read-secret',
@@ -286,7 +278,7 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const uiAddress = ui.address()
-  assert(uiAddress && typeof uiAddress === 'object')
+  expect.assert(uiAddress && typeof uiAddress === 'object')
   const base = `http://127.0.0.1:${uiAddress.port}`
   try {
     const login = await fetch(`${base}/api/session`, {
@@ -295,19 +287,17 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
       body: '{"token":"login-secret"}'
     })
     const cookie = login.headers.get('set-cookie')
-    assert(cookie !== null)
+    expect.assert(cookie !== null)
     const proxied = await fetch(`${base}/api/runs`, { headers: { cookie } })
-    assert.strictEqual(proxied.status, 200)
-    assert.strictEqual(
+    expect(proxied.status).toBe(200)
+    expect(
       proxied.headers.get('content-type'),
-      'application/json; charset=utf-8',
       'the upstream text/html must not be echoed'
-    )
-    assert.strictEqual(
+    ).toBe('application/json; charset=utf-8')
+    expect(
       proxied.headers.get('x-content-type-options'),
-      'nosniff',
       'nosniff is still set so the body cannot be reinterpreted'
-    )
+    ).toBe('nosniff')
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),

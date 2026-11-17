@@ -1,36 +1,63 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test, vi } from 'vitest'
 
 import { integerEnv } from '../src/env.js'
 
-test('integerEnv defaults only when the variable is unset', () => {
-  delete process.env.TEST_INTEGER_ENV
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7), 7)
+test('integerEnv defaults only when the variable is unset', ({
+  onTestFinished
+}) => {
+  onTestFinished(() => {
+    vi.unstubAllEnvs()
+  })
+  vi.stubEnv('TEST_INTEGER_ENV', undefined)
+  expect(integerEnv('TEST_INTEGER_ENV', 7)).toBe(7)
 })
 
-test('integerEnv accepts complete decimal integers within range', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
-  process.env.TEST_INTEGER_ENV = ' 12 '
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7), 12)
-  process.env.TEST_INTEGER_ENV = '0'
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7, 0), 0)
-  process.env.TEST_INTEGER_ENV = '12'
-  assert.strictEqual(integerEnv('TEST_INTEGER_ENV', 7, 1, 12), 12)
-})
+test.for([
+  {
+    name: 'surrounding whitespace',
+    value: ' 12 ',
+    minimum: 1,
+    maximum: undefined,
+    expected: 12
+  },
+  {
+    name: 'lower boundary',
+    value: '0',
+    minimum: 0,
+    maximum: undefined,
+    expected: 0
+  },
+  { name: 'upper boundary', value: '12', minimum: 1, maximum: 12, expected: 12 }
+])(
+  'integerEnv accepts $name',
+  ({ value, minimum, maximum, expected }, { onTestFinished }) => {
+    onTestFinished(() => {
+      vi.unstubAllEnvs()
+    })
+    vi.stubEnv('TEST_INTEGER_ENV', value)
+    expect(integerEnv('TEST_INTEGER_ENV', 7, minimum, maximum)).toBe(expected)
+  }
+)
 
-test('integerEnv rejects values above an explicit maximum', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
-  process.env.TEST_INTEGER_ENV = '13'
-  assert.throws(
-    () => integerEnv('TEST_INTEGER_ENV', 7, 1, 12),
+test('integerEnv rejects values above an explicit maximum', ({
+  onTestFinished
+}) => {
+  onTestFinished(() => {
+    vi.unstubAllEnvs()
+  })
+  vi.stubEnv('TEST_INTEGER_ENV', '13')
+  expect(() => integerEnv('TEST_INTEGER_ENV', 7, 1, 12)).toThrow(
     /TEST_INTEGER_ENV must be at most 12/
   )
 })
 
-test('integerEnv rejects malformed, unsafe, and out-of-range values', (t) => {
-  t.after(() => delete process.env.TEST_INTEGER_ENV)
-  for (const value of ['', '10ms', '1.5', '9007199254740992', '0']) {
-    process.env.TEST_INTEGER_ENV = value
-    assert.throws(() => integerEnv('TEST_INTEGER_ENV', 7), /TEST_INTEGER_ENV/)
+test.for(['', '10ms', '1.5', '9007199254740992', '0'])(
+  'integerEnv rejects invalid value %j',
+  (value, { onTestFinished }) => {
+    onTestFinished(() => {
+      vi.unstubAllEnvs()
+    })
+    vi.stubEnv('TEST_INTEGER_ENV', value)
+    expect(() => integerEnv('TEST_INTEGER_ENV', 7)).toThrow(/TEST_INTEGER_ENV/)
   }
-})
+)

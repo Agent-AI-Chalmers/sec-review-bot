@@ -3,9 +3,8 @@
 // the difference on the wire, so a row type that claims `string` for such a column type-checks
 // and passes HTTP tests while the in-process value is still a Date. This file reads each surface
 // through the store itself and checks the runtime value, which is where that drift shows up.
-import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool } from 'pg'
 
@@ -13,7 +12,7 @@ import { PostgresMemoryCatalogStore } from '../../src/catalog-store.js'
 import type {
   Actor,
   ArtifactReference,
-  ExtractionRegistration,
+  ExtractionRegistration
 } from '../../src/contract-types-generated.js'
 import { learningReport } from '../maintenance-report.js'
 
@@ -26,26 +25,25 @@ function artifact(name: string, digestCharacter: string): ArtifactReference {
     uri: `s3://sec-review/memory/${name}`,
     digest: `sha256:${digestCharacter.repeat(64)}`,
     media_type: 'application/zstd',
-    size_bytes: 42,
+    size_bytes: 42
   }
 }
 
 function assertIsoTimestamp(value: unknown, field: string): void {
-  assert.equal(typeof value, 'string', `${field} must be a string`)
-  assert.equal(
+  expect(typeof value, `${field} must be a string`).toBe('string')
+  expect(
     new Date(value as string).toISOString(),
-    value,
-    `${field} must be a canonical ISO date-time`,
-  )
+    `${field} must be a canonical ISO date-time`
+  ).toBe(value)
 }
 
-await test('store reads return contract timestamps as ISO strings, not Dates', async () => {
+test('store reads return contract timestamps as ISO strings, not Dates', async () => {
   const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
   const administrator = new Pool({ connectionString: databaseUrl })
   await administrator.query(`create schema ${schema}`)
   const pool = new Pool({
     connectionString: databaseUrl,
-    options: `-c search_path=${schema},public`,
+    options: `-c search_path=${schema},public`
   })
   const store = new PostgresMemoryCatalogStore('unused', pool)
   const extraction: ExtractionRegistration = {
@@ -56,11 +54,9 @@ await test('store reads return contract timestamps as ISO strings, not Dates', a
     execution_archive_digest: `sha256:${'d'.repeat(64)}`,
     trajectory_reference: artifact(
       'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
-      'c',
+      'c'
     ),
-    observations: [
-      { observation_id: 'extraction-1', body_markdown: 'A fact.' },
-    ],
+    observations: [{ observation_id: 'extraction-1', body_markdown: 'A fact.' }]
   }
   const actor: Actor = { kind: 'user', id: 'reviewer@example.com' }
 
@@ -75,19 +71,19 @@ await test('store reads return contract timestamps as ISO strings, not Dates', a
     const backlog = await store.queries.getObservationBacklog()
     assertIsoTimestamp(
       backlog.oldest_pending_created_at,
-      'backlog.oldest_pending_created_at',
+      'backlog.oldest_pending_created_at'
     )
     const stored = await store.queries.getExtraction(extraction.extraction_id)
     assertIsoTimestamp(stored?.created_at, 'extraction.created_at')
     const extractions = await store.queries.listExtractions(undefined, 10, {})
     assertIsoTimestamp(
       extractions.extractions[0]?.created_at,
-      'listExtractions.created_at',
+      'listExtractions.created_at'
     )
     const observations = await store.queries.listObservations(undefined, 10, {})
     assertIsoTimestamp(
       observations.observations[0]?.created_at,
-      'observation.created_at',
+      'observation.created_at'
     )
 
     const versionInput = {
@@ -99,28 +95,28 @@ await test('store reads return contract timestamps as ISO strings, not Dates', a
         observation_ids: [extraction.extraction_id],
         trajectory_reference: artifact(
           'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
-          'b',
+          'b'
         ),
-        maintenance_report: learningReport([extraction.extraction_id]),
-      },
+        maintenance_report: learningReport([extraction.extraction_id])
+      }
     }
     await store.reserveVersionPublication(versionInput)
     await store.confirmVersionPublication(versionInput)
     await store.createMemoryTreeVersion(versionInput)
     assertIsoTimestamp(
       (await store.queries.getMemoryTreeVersion(1))?.created_at,
-      'version.created_at',
+      'version.created_at'
     )
     const history = await store.queries.listMemoryTreeVersions(undefined, 10)
     assertIsoTimestamp(
       history.versions[0]?.created_at,
-      'listMemoryTreeVersions.created_at',
+      'listMemoryTreeVersions.created_at'
     )
 
     const paused = await store.changeMemoryTreeAutomation('paused', {
       operation_id: 'pause-automation',
       expected_version: 0,
-      actor,
+      actor
     })
     assertIsoTimestamp(paused.automation.changed_at, 'changed automation')
     const automation = await store.queries.getMemoryTreeAutomation()

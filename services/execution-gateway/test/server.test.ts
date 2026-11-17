@@ -1,12 +1,11 @@
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
-  type ExecutionWorkflowInput,
+  type ExecutionWorkflowInput
 } from '../src/execution.js'
 import { createApp } from '../src/server.js'
 
@@ -21,13 +20,13 @@ class FakeExecutionRunClient {
       throw new ExecutionRunConflictError(
         request.run_id,
         request.workflow,
-        'issue-review',
+        'issue-review'
       )
     }
     const record: ExecutionRecord = {
       run_id: request.run_id,
       workflow: request.workflow,
-      status: 'running',
+      status: 'running'
     }
     this.records.set(request.run_id, record)
     return Promise.resolve(record)
@@ -47,35 +46,38 @@ function fixture(name: string): Record<string, unknown> {
         'execution-api',
         'v1',
         'fixtures',
-        name,
+        name
       ),
-      'utf8',
-    ),
+      'utf8'
+    )
   ) as Record<string, unknown>
 }
 
-await test('health endpoint remains public when API authentication is configured', async () => {
+test('health endpoint remains public when API authentication is configured', async () => {
   const app = await createApp({
     client: new FakeExecutionRunClient(),
-    token: 'secret',
+    token: 'secret'
   })
   const response = await app.inject({ method: 'GET', url: '/healthz' })
-  assert.equal(response.statusCode, 200)
-  assert.deepEqual(response.json(), { status: 'ok' })
+  expect(response.statusCode).toBe(200)
+  expect(response.json()).toStrictEqual({ status: 'ok' })
   await app.close()
 })
 
-await test('invalid workflow timeout fails while creating the app', async (t) => {
+test('invalid workflow timeout fails while creating the app', async (t) => {
   process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS = '10800ms'
-  t.after(() => delete process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS)
+  t.onTestFinished(() => {
+    delete process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS
+  })
 
-  await assert.rejects(
-    createApp({ client: new FakeExecutionRunClient() }),
-    /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/,
+  await expect(
+    createApp({ client: new FakeExecutionRunClient() })
+  ).rejects.toThrow(
+    /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/
   )
 })
 
-await test('creates and reads an execution run', async () => {
+test('creates and reads an execution run', async () => {
   const client = new FakeExecutionRunClient()
   const app = await createApp({ client, token: 'secret' })
   const create = await app.inject({
@@ -84,97 +86,97 @@ await test('creates and reads an execution run', async () => {
     headers: { authorization: 'Bearer secret' },
     payload: {
       run_id: 'run-1',
-      input: fixture('issue-review-input.json'),
-    },
+      input: fixture('issue-review-input.json')
+    }
   })
-  assert.equal(create.statusCode, 202)
-  assert.match(create.body, /"status":"running"/)
+  expect(create.statusCode).toBe(202)
+  expect(create.body).toMatch(/"status":"running"/)
 
   const read = await app.inject({
     method: 'GET',
     url: '/v1/runs/run-1',
-    headers: { authorization: 'Bearer secret' },
+    headers: { authorization: 'Bearer secret' }
   })
-  assert.equal(read.statusCode, 200)
-  assert.match(read.body, /"run_id":"run-1"/)
+  expect(read.statusCode).toBe(200)
+  expect(read.body).toMatch(/"run_id":"run-1"/)
   await app.close()
 })
 
-await test('rejects requests that violate the workflow input contract', async () => {
+test('rejects requests that violate the workflow input contract', async () => {
   const app = await createApp({ client: new FakeExecutionRunClient() })
   const response = await app.inject({
     method: 'POST',
     url: '/v1/workflows/issue-review/runs',
-    payload: { run_id: 'run-invalid', input: {} },
+    payload: { run_id: 'run-invalid', input: {} }
   })
-  assert.equal(response.statusCode, 400)
+  expect(response.statusCode).toBe(400)
   const body = response.json<{
     run_id: string
     workflow: string
     error: Record<string, unknown>
   }>()
-  assert.deepEqual(
-    { ...body, error: { ...body.error, message: undefined } },
-    {
-      run_id: 'run-invalid',
-      workflow: 'issue-review',
-      error: {
-        category: 'input',
-        code: 'EXECUTION_REQUEST_INVALID',
-        message: undefined,
-        retryable: false,
-        details: {},
-      },
-    },
-  )
-  assert.equal(typeof body.error.message, 'string')
+  expect({
+    ...body,
+    error: { ...body.error, message: undefined }
+  }).toStrictEqual({
+    run_id: 'run-invalid',
+    workflow: 'issue-review',
+    error: {
+      category: 'input',
+      code: 'EXECUTION_REQUEST_INVALID',
+      message: undefined,
+      retryable: false,
+      details: {}
+    }
+  })
+  expect(typeof body.error.message).toBe('string')
   await app.close()
 })
 
-await test('requires the configured bearer token', async () => {
+test('requires the configured bearer token', async () => {
   const app = await createApp({
     client: new FakeExecutionRunClient(),
-    token: 'secret',
+    token: 'secret'
   })
   const response = await app.inject({
     method: 'GET',
-    url: '/v1/runs/run-1',
+    url: '/v1/runs/run-1'
   })
-  assert.equal(response.statusCode, 401)
-  assert.deepEqual(response.json(), {
+  expect(response.statusCode).toBe(401)
+  expect(response.json()).toStrictEqual({
     error: {
       category: 'runtime',
       code: 'UNAUTHORIZED',
       message:
         'None of the security schemes (HTTPBearer) successfully authenticated this request.',
       retryable: false,
-      details: {},
-    },
+      details: {}
+    }
   })
   await app.close()
 })
 
-await test('returns missing runs in the public error envelope', async () => {
+test('returns missing runs in the public error envelope', async () => {
   const app = await createApp({ client: new FakeExecutionRunClient() })
   const response = await app.inject({
     method: 'GET',
-    url: '/v1/runs/run-missing',
+    url: '/v1/runs/run-missing'
   })
-  assert.equal(response.statusCode, 404)
-  assert.deepEqual(response.json(), {
+  expect(response.statusCode).toBe(404)
+  expect(response.json()).toStrictEqual({
     run_id: 'run-missing',
     error: {
       category: 'runtime',
       code: 'EXECUTION_RUN_NOT_FOUND',
       message: 'Execution run not found.',
       retryable: false,
-      details: {},
-    },
+      details: {}
+    }
   })
   await app.close()
 })
 
-await test('reports Temporal submission failures as internal errors', async () => {
+test('reports Temporal submission failures as internal errors', async () => {
   const client = new FakeExecutionRunClient()
   client.startError = new Error('Temporal unavailable')
   const app = await createApp({ client })
@@ -183,16 +185,16 @@ await test('reports Temporal submission failures as internal errors', async () =
     url: '/v1/workflows/issue-review/runs',
     payload: {
       run_id: 'run-temporal-failure',
-      input: fixture('issue-review-input.json'),
-    },
+      input: fixture('issue-review-input.json')
+    }
   })
-  assert.equal(response.statusCode, 500)
-  assert.doesNotMatch(response.body, /Temporal unavailable/)
+  expect(response.statusCode).toBe(500)
+  expect(response.body).not.toMatch(/Temporal unavailable/)
   await app.close()
 })
 
 for (const runtime of [null, {}, { workspace_image: 'benchmark:latest' }]) {
-  await test(`HTTP submission rejects runtime ${JSON.stringify(runtime)}`, async () => {
+  test(`HTTP submission rejects runtime ${JSON.stringify(runtime)}`, async () => {
     const client = new FakeExecutionRunClient()
     const app = await createApp({ client })
     try {
@@ -202,11 +204,11 @@ for (const runtime of [null, {}, { workspace_image: 'benchmark:latest' }]) {
         payload: {
           run_id: 'run-invalid-runtime',
           input: fixture('issue-review-input.json'),
-          runtime,
-        },
+          runtime
+        }
       })
-      assert.equal(response.statusCode, 400)
-      assert.equal(client.records.size, 0)
+      expect(response.statusCode).toBe(400)
+      expect(client.records.size).toBe(0)
     } finally {
       await app.close()
     }

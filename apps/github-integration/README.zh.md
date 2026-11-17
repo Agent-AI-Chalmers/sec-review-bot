@@ -24,15 +24,19 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
+pnpm run typecheck
 pnpm test
 ```
 
-`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Review Runs 测试数据库验证发布组件边界：
+<!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
 
-```bash
-TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-pnpm run test:integration
-```
+`pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。
+
+`pnpm run test:types` 单独报告客户端请求和响应的编译期契约检查，不发送请求。
+
+`pnpm test` 运行不依赖外部服务的测试。选择单个文件时也应保留启动器，例如 `pnpm test test/artifacts/git-workspace.test.ts`：它会在运行测试前隔离继承的 Git 配置。
+
+`pnpm run test:integration` 运行按需启用的 S3 上传测试。请为可清空的测试桶设置 `SEC_REVIEW_TEST_S3_ENDPOINT`、`SEC_REVIEW_TEST_S3_BUCKET` 和 AWS 凭证；未设置端点或桶时，测试会跳过。本地 S3 兼容服务应设置 `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`。Integration 与 Review Runs 之间的 HTTP 测试由仓库级[系统测试](../../system-tests/README.zh.md)负责。
 
 ## 本地接收端
 

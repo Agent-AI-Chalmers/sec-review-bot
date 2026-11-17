@@ -1,7 +1,6 @@
 // Fan-out reads used to skip the `initialize()` guard that every other read has, so a
 // coordinator started before initialization would query tables that do not exist yet.
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import { Pool } from 'pg'
 
@@ -12,18 +11,16 @@ test('fan-out reads refuse to run before initialize()', async () => {
     connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused',
     connectorId: 'readiness'
   })
-  await assert.rejects(
-    () => store.queries.listSubmissionRecoveries(),
+  await expect(store.queries.listSubmissionRecoveries()).rejects.toThrow(
     /initialize/
   )
-  await assert.rejects(() => store.queries.listActiveRuns(), /initialize/)
+  await expect(store.queries.listActiveRuns()).rejects.toThrow(/initialize/)
   // Added later than the two above; every read that reaches the pool belongs to this guard, not
   // only the fan-out ones that originally motivated it.
-  await assert.rejects(() => store.queries.listParkedRuns(), /initialize/)
-  await assert.rejects(() => store.queries.listEvents('run-1'), /initialize/)
-  await assert.rejects(() => store.queries.runExists('run-1'), /initialize/)
-  await assert.rejects(
-    () => store.queries.getExecutionStatistics(['run-1']),
+  await expect(store.queries.listParkedRuns()).rejects.toThrow(/initialize/)
+  await expect(store.queries.listEvents('run-1')).rejects.toThrow(/initialize/)
+  await expect(store.queries.runExists('run-1')).rejects.toThrow(/initialize/)
+  await expect(store.queries.getExecutionStatistics(['run-1'])).rejects.toThrow(
     /initialize/
   )
 })
@@ -67,10 +64,10 @@ test('an idle-client pool error is reported instead of crashing the process', as
     console.error = originalError
   }
 
-  assert.equal(reported.length, 1)
-  assert.equal(reported[0] instanceof Array, true)
+  expect(reported).toHaveLength(1)
+  expect(reported[0] instanceof Array).toBe(true)
   const [event] = reported[0] as [string]
-  assert.equal(event, 'review_runs_pool_idle_client_error')
+  expect(event).toBe('review_runs_pool_idle_client_error')
 
   await store.close()
 })
