@@ -12,7 +12,7 @@ export function stateLabel(machine: MachineBody, state: string): string {
   return machine.details[state]?.label ?? state
 }
 
-export function stateDescription(machine: MachineBody, state: string): string {
+export function stateSummary(machine: MachineBody, state: string): string {
   return machine.details[state]?.summary ?? ''
 }
 
@@ -54,7 +54,7 @@ export function stateLabelForEvent(
 }
 
 /** What an audit event did, from the contract's transition: the one whose reason matches the
- * event, else the one without a reason, else the description of the state it reached. */
+ * event, else the one without a reason, else the summary of the state it reached. */
 export function transitionExplanation(
   event: RunEvent,
   language: Language
@@ -75,8 +75,8 @@ export function transitionExplanation(
   // No transition is identified (an unknown reason on a pair with only reason-specific
   // transitions, or a pair the contract does not declare): describe where the event landed
   // rather than guessing which decision it was.
-  const description = stateDescription(machine, event.to_status)
-  return description === '' ? null : description
+  const summary = stateSummary(machine, event.to_status)
+  return summary === '' ? null : summary
 }
 
 export function transitionDuration(

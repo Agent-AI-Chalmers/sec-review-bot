@@ -26,12 +26,12 @@ actions:
     update:
       label: '待确认'
       description: "准备进程尚未报告结果，认领就已过期，因此无法确认准备好的输入是否已送达 Review Runs。这不表示准备失败。任务可被重新领取，并使用同一运行标识重建、提交输入；重复提交是幂等的。"
-      summary: "准备任务的认领已过期，输入是否已保存尚不确定。恢复后可使用同一运行标识重新准备并提交输入。"
+      summary: "准备认领已过期，输入是否已保存待确认；可用同一运行标识重新提交。"
   - target: "$['x-state-machines'].preparation.states.disconnected"
     update:
       label: '失联'
       description: "已保存的运行状态不允许执行认领过期时应有的状态转换，因此自动处理已停止，尚无最终结论。系统不会自行重试；管理员可将其恢复为 `uncertain`、放弃等待或作废运行。"
-      summary: "准备记录与执行进度存在冲突，自动恢复已停止。需要人工核查，再决定恢复、放弃等待或作废运行。"
+      summary: "准备与执行记录冲突，自动恢复已停止，需人工核查。"
   - target: "$['x-state-machines'].preparation.states.submitted"
     update:
       label: '已提交'
@@ -41,7 +41,7 @@ actions:
     update:
       label: '失败'
       description: "准备阶段已结束，未得到可用结果。可能是准备永久失败（重试次数用尽或无法构建输入），此时输入从未提交给 Execution API 提供方，执行会被跳过；也可能是管理员对失联的准备任务选择放弃等待或作废运行，此时输入可能已经提交，任务可能仍在远端执行。"
-      summary: "准备已永久失败，或由管理员结束。永久失败会跳过执行；人工结束时，输入可能已提交，远端任务可能仍在执行。"
+      summary: "准备已永久失败或由人工结束。永久失败会跳过执行；人工结束后远端任务仍可能继续。"
   - target: "$['x-state-machines'].preparation.transitions[?@.from=='pending' && @.to=='preparing' && !@.reason]"
     update:
       label: '已领取'
@@ -89,7 +89,7 @@ actions:
     update:
       label: '执行中'
       description: "轮询结果表明，Execution API 提供方正在执行该任务。轮询期间出现临时网络错误时，系统会保留上次获取的状态并继续查询，因此显示的状态可能滞后。"
-      summary: "执行服务最近一次报告任务正在执行。查询暂时失败时，会保留这个状态，因此显示可能略有延迟。"
+      summary: "最近报告为执行中；查询暂时失败时保留原状态，显示可能滞后。"
   - target: "$['x-state-machines'].execution.states.succeeded"
     update:
       label: '执行成功'
@@ -104,17 +104,17 @@ actions:
     update:
       label: '待确认'
       description: "任务已提交，但未收到响应，无法确认 Execution API 提供方是否已接受任务。这不表示执行失败；系统会使用同一个 run_id 重新提交。"
-      summary: "提交结果未得到确认，执行服务可能已经接受任务。系统会使用同一运行标识重新提交，以确认结果。"
+      summary: "任务是否已被接受待确认；系统会用同一运行标识重新提交。"
   - target: "$['x-state-machines'].execution.states.disconnected"
     update:
       label: '失联'
       description: "自动恢复次数已用尽，Execution API 提供方仍未给出确定答复。该运行将等待管理员处理，不会被记为失败。"
-      summary: "自动恢复已用完重试次数，仍未确认提交结果，需要人工核查。这不代表执行已经失败。"
+      summary: "恢复次数已用尽，提交结果仍未知，需人工核查；不代表执行失败。"
   - target: "$['x-state-machines'].execution.states.failed"
     update:
       label: '失败'
       description: "该运行已停止跟踪执行状态。可能是轮询确认了失败（Execution API 提供方报告失败、找不到运行、未返回结果或响应违反协议），或重新提交时收到确定的失败答复；也可能是管理员对失联的执行选择放弃等待，或作废了准备阶段。管理员的这些操作不会发送取消请求，远端任务仍可能继续执行并成功。临时网络错误（超时、5xx、连接中断）不属于确定的失败。"
-      summary: "执行跟踪已结束：执行失败、返回结果不可用，或管理员停止等待。停止等待不会取消远端任务。"
+      summary: "因失败、结果不可用或人工决定而停止跟踪；停止等待不会取消远端任务。"
   - target: "$['x-state-machines'].execution.transitions[?@.from=='pending' && @.to=='queued' && !@.reason]"
     update:
       label: '输入已提交'
@@ -174,12 +174,12 @@ actions:
     update:
       label: '待确认'
       description: "某个发布步骤可能已在远端生效，系统正在核对结果。发布轴的状态由优先级最高的步骤状态决定。此状态不表示失败，其他步骤仍可继续发布。"
-      summary: "某个发布步骤可能已在远端生效，正在核对结果。其他步骤可以继续，这不是最终失败。"
+      summary: "某个步骤可能已生效，正在核对；其他步骤可继续，尚未判定失败。"
   - target: "$['x-state-machines'].publication.states.disconnected"
     update:
       label: '失联'
       description: "某个发布步骤的自动核对已停止，结果仍不确定，需要管理员核查远端情况。发布轴的状态由优先级最高的步骤状态决定。"
-      summary: "自动核对无法确认某个发布步骤的结果，需要人工检查远端的实际情况。"
+      summary: "自动核对已停止，某个步骤的远端结果仍待人工确认。"
   - target: "$['x-state-machines'].publication.states.published"
     update:
       label: '已发布'
@@ -189,7 +189,7 @@ actions:
     update:
       label: '失败'
       description: "发布已结束并记为失败：可能是负责发布的进程确认发布失败（例如发生不可重试的失败，或仍有步骤未成功），也可能是管理员放弃等待。可重试的失败会回到 `pending`。"
-      summary: "发布失败，或已由管理员停止。部分步骤可能已生效。可重试的失败会重新排队。"
+      summary: "发布失败或由人工停止，部分步骤可能已生效；可重试的失败会重新排队。"
   - target: "$['x-state-machines'].publication.states.skipped"
     update:
       label: '已跳过'
@@ -247,27 +247,27 @@ actions:
     update:
       label: '等待中'
       description: "该步骤尚未尝试，或已由管理员重新排队并重置允许尝试和核对的次数。"
-      summary: "该步骤尚未尝试，或已由管理员重新排队。重新排队会重置允许尝试和核对的次数。"
+      summary: "尚未尝试，或已由管理员重新排队并重置尝试与核对次数。"
   - target: "$['x-state-machines'].publication.step.states.running"
     update:
       label: '进行中'
       description: "一次发布尝试已开始。负责该步骤的进程可能仍在执行，也可能在远端操作生效后中断。后续进程领取任务时，必须考虑操作已生效的可能。"
-      summary: "一次发布尝试已开始。进程可能仍在执行，也可能在远端操作生效后中断；再次尝试前需考虑操作已生效的可能。"
+      summary: "尝试已开始；即使进程中断，远端操作也可能已生效。"
   - target: "$['x-state-machines'].publication.step.states.failed"
     update:
       label: '尝试失败'
       description: "上一次尝试失败。有剩余尝试次数时会重试；次数用尽后，须先核对远端结果，再确定最终状态。"
-      summary: "上次尝试失败。有剩余次数时可重试；次数用尽后，须先核对远端结果。"
+      summary: "上次尝试失败；有剩余次数可重试，否则须先核对远端结果。"
   - target: "$['x-state-machines'].publication.step.states.uncertain"
     update:
       label: '待确认'
       description: "尝试次数已用尽，之前的尝试可能已在远端生效。连接器必须先核对远端结果，才能结束该步骤。"
-      summary: "尝试次数已用尽，但之前的操作可能已经生效。必须先核对远端结果，才能结束该步骤。"
+      summary: "尝试次数已用尽，先前操作可能已生效；须核对远端结果后才能结束。"
   - target: "$['x-state-machines'].publication.step.states.disconnected"
     update:
       label: '失联'
       description: "核对次数已用尽，仍无法确认结果，需要管理员核查远端情况。"
-      summary: "自动核对次数已用尽，仍无法确认远端结果，需要人工核查。"
+      summary: "核对次数已用尽，远端结果仍待人工确认。"
   - target: "$['x-state-machines'].publication.step.states.succeeded"
     update:
       label: '发布成功'
@@ -277,7 +277,7 @@ actions:
     update:
       label: '最终失败'
       description: "该步骤不会再次尝试：某次尝试发生不可重试的失败，或核对已确认远端操作未生效。"
-      summary: "该步骤不会再次尝试：操作无法继续，或核对已确认远端操作未生效。"
+      summary: "不会再尝试：已发生不可重试的失败，或已确认远端操作未生效。"
   - target: "$['x-state-machines'].publication.step.transitions[?@.from=='pending' && @.to=='running' && !@.reason]"
     update:
       label: '开始尝试'

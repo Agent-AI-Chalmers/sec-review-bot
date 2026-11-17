@@ -76,14 +76,14 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         uncertain: {
           label: 'Uncertain',
           summary:
-            'Input preparation stopped reporting before its claim expired. It is unknown whether the input was saved. Recovery can rebuild and resubmit it under the same run identity.',
+            'Preparation claim expired; saved input is unconfirmed. Recovery can resubmit under the same run identity.',
           description:
             'The claim lapsed before the preparer reported, so it is unknown whether the prepared input reached Review Runs. This is not a failure: a claim may rebuild the input and resubmit it under the same identity, which is idempotent.'
         },
         disconnected: {
           label: 'Disconnected',
           summary:
-            'Preparation records conflict with execution progress, so automatic recovery has stopped. Manual review is needed before resuming, giving up, or abandoning the run.',
+            'Conflicting preparation and execution records stopped recovery. Manual review is required.',
           description:
             "Automatic work stopped without a conclusion, because the run's persisted state no longer admits the only transition expiry could make. Nothing retries this row on its own; an operator resumes it into `uncertain`, gives it up, or abandons it."
         },
@@ -96,7 +96,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         failed: {
           label: 'Failed',
           summary:
-            'Preparation ended because it failed permanently or was stopped manually. A preparation failure skips execution; after a manual decision, the input may already have been submitted and remote execution may continue.',
+            'Preparation failed permanently or was stopped manually. Failure skips execution; manual closure may leave a remote task running.',
           description:
             'Preparation ended without a usable result, in one of two ways: (1) it failed for good (retry budget exhausted, or the input could not be built), so the Execution API provider was never handed input and execution is skipped; (2) an operator gave up on or abandoned a disconnected preparation. After an operator decision the input may already have been submitted, and the task may still be running remotely.'
         }
@@ -193,7 +193,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         running: {
           label: 'Running',
           summary:
-            'The execution service last reported that the task was running. Temporary polling errors leave this last known state unchanged.',
+            'Last reported running. Temporary polling errors keep that status, which may be out of date.',
           description:
             'Polling observed that the Execution API provider is executing this run. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be slightly out of date.'
         },
@@ -214,21 +214,21 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         uncertain: {
           label: 'Uncertain',
           summary:
-            'Submission was not confirmed. The execution service may have accepted it; recovery resubmits the same run identity to find out.',
+            'Acceptance is unconfirmed. Recovery resubmits under the same run identity.',
           description:
             'The task was submitted, but no response arrived, so it is unknown whether the Execution API provider accepted it. This is not a failure: the submission is replayed under the same run_id.'
         },
         disconnected: {
           label: 'Disconnected',
           summary:
-            'Automatic recovery could not confirm the submission before its retries ran out. Manual investigation is needed; this does not establish that execution failed.',
+            'Recovery retries ran out; acceptance remains unknown. Manual review is required, not a failure conclusion.',
           description:
             'Automatic recovery used its budget without a conclusive Execution API provider answer. The run is visible for operator action and is not reported as failed.'
         },
         failed: {
           label: 'Failed',
           summary:
-            'Execution tracking has ended because execution failed, the returned result was unusable, or an operator stopped waiting. Stopping the wait does not cancel the remote task.',
+            'Tracking ended after failure, an unusable result, or an operator decision. Stopping the wait does not cancel remote work.',
           description:
             "This run no longer tracks the task, in one of two ways: (1) a definite failure, where polling produced a conclusive answer that the task cannot succeed (the Execution API provider reported it failed, or the run could not be found, returned no result, or the response broke the protocol) or a retried submission failed conclusively; (2) an operator gave up on a disconnected execution or abandoned the run's preparation. After an operator decision no cancellation is sent, so the task may still be running or may succeed remotely. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure."
         }
@@ -343,14 +343,14 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         uncertain: {
           label: 'Uncertain',
           summary:
-            'A publication step may already have taken effect remotely and is being checked. Other steps can continue; this is not a final failure.',
+            'A step may have taken effect and is being checked. Other steps can continue; failure is not established.',
           description:
             'A step may have completed its side effect remotely and is being reconciled. The axis reflects its strongest step; this is not a failure, and other steps keep publishing.'
         },
         disconnected: {
           label: 'Disconnected',
           summary:
-            'Automatic checks could not confirm a publication step. Manual investigation of the remote result is needed.',
+            'Automatic checks stopped without confirming a step. Manual review of the remote result is required.',
           description:
             'Automatic reconciliation of a step stopped without an answer, so an operator has to establish what is on the remote system. The axis reflects its strongest step.'
         },
@@ -363,7 +363,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         failed: {
           label: 'Failed',
           summary:
-            'Publication ended in failure or was stopped manually. Some steps may already have taken effect. Retryable failures return to the publication queue instead.',
+            'Publication failed or was stopped manually; some steps may have taken effect. Retryable failures requeue instead.',
           description:
             'Publishing ended in failure, either because its owner concluded it as failed (for example after a terminal failure or with steps that did not succeed) or because an operator gave up. A retryable failure returns to `pending` instead.'
         },
@@ -479,35 +479,35 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           pending: {
             label: 'Pending',
             summary:
-              'This step has not been attempted, or was manually returned to the queue with fresh retry and recovery budgets.',
+              'Not attempted, or manually requeued with retry and recovery limits reset.',
             description:
               'Not attempted yet, or returned to the queue with fresh budgets by an operator.'
           },
           running: {
             label: 'Running',
             summary:
-              'A publication attempt started. The process may still be working or may have stopped after making the remote change; a later attempt must account for that possibility.',
+              'An attempt started and may have taken effect, even if its process stopped.',
             description:
               'An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened.'
           },
           failed: {
             label: 'Attempt failed',
             summary:
-              'The last attempt failed. It can be retried while attempts remain; once they run out, the remote result must be checked before concluding.',
+              'The last attempt failed. Retry while attempts remain; otherwise check the remote result before concluding.',
             description:
               'The last attempt failed. The system retries while attempts remain; once they are exhausted, it checks the remote result before concluding.'
           },
           uncertain: {
             label: 'Uncertain',
             summary:
-              'No attempts remain, but an earlier attempt may have taken effect. The remote result must be checked before this step can conclude.',
+              'No attempts remain; an earlier one may have taken effect. Check the remote result before concluding.',
             description:
               'The attempt budget is spent, but any started attempt may have taken effect remotely, so the connector must reconcile against the remote system before the step can conclude.'
           },
           disconnected: {
             label: 'Disconnected',
             summary:
-              'Automatic checks ran out without confirming the remote result. Manual investigation is needed.',
+              'Checks ran out; the remote result needs manual confirmation.',
             description:
               'Reconciliation used its budget without an answer. An operator has to establish what is on the remote system.'
           },
@@ -521,7 +521,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           terminal_failed: {
             label: 'Terminal failure',
             summary:
-              'This step will not be retried: an attempt failed permanently, or a check confirmed that the remote change was absent.',
+              'No more retries: a permanent failure occurred, or the remote change was confirmed absent.',
             description:
               'The step will not be attempted again: an attempt failed terminally, or reconciliation confirmed that the side effect is absent.'
           }
@@ -632,14 +632,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         uncertain: {
           label: '待确认',
           summary:
-            '准备任务的认领已过期，输入是否已保存尚不确定。恢复后可使用同一运行标识重新准备并提交输入。',
+            '准备认领已过期，输入是否已保存待确认；可用同一运行标识重新提交。',
           description:
             '准备进程尚未报告结果，认领就已过期，因此无法确认准备好的输入是否已送达 Review Runs。这不表示准备失败。任务可被重新领取，并使用同一运行标识重建、提交输入；重复提交是幂等的。'
         },
         disconnected: {
           label: '失联',
-          summary:
-            '准备记录与执行进度存在冲突，自动恢复已停止。需要人工核查，再决定恢复、放弃等待或作废运行。',
+          summary: '准备与执行记录冲突，自动恢复已停止，需人工核查。',
           description:
             '已保存的运行状态不允许执行认领过期时应有的状态转换，因此自动处理已停止，尚无最终结论。系统不会自行重试；管理员可将其恢复为 `uncertain`、放弃等待或作废运行。'
         },
@@ -652,7 +651,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         failed: {
           label: '失败',
           summary:
-            '准备已永久失败，或由管理员结束。永久失败会跳过执行；人工结束时，输入可能已提交，远端任务可能仍在执行。',
+            '准备已永久失败或由人工结束。永久失败会跳过执行；人工结束后远端任务仍可能继续。',
           description:
             '准备阶段已结束，未得到可用结果。可能是准备永久失败（重试次数用尽或无法构建输入），此时输入从未提交给 Execution API 提供方，执行会被跳过；也可能是管理员对失联的准备任务选择放弃等待或作废运行，此时输入可能已经提交，任务可能仍在远端执行。'
         }
@@ -746,8 +745,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         running: {
           label: '执行中',
-          summary:
-            '执行服务最近一次报告任务正在执行。查询暂时失败时，会保留这个状态，因此显示可能略有延迟。',
+          summary: '最近报告为执行中；查询暂时失败时保留原状态，显示可能滞后。',
           description:
             '轮询结果表明，Execution API 提供方正在执行该任务。轮询期间出现临时网络错误时，系统会保留上次获取的状态并继续查询，因此显示的状态可能滞后。'
         },
@@ -764,22 +762,21 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         uncertain: {
           label: '待确认',
-          summary:
-            '提交结果未得到确认，执行服务可能已经接受任务。系统会使用同一运行标识重新提交，以确认结果。',
+          summary: '任务是否已被接受待确认；系统会用同一运行标识重新提交。',
           description:
             '任务已提交，但未收到响应，无法确认 Execution API 提供方是否已接受任务。这不表示执行失败；系统会使用同一个 run_id 重新提交。'
         },
         disconnected: {
           label: '失联',
           summary:
-            '自动恢复已用完重试次数，仍未确认提交结果，需要人工核查。这不代表执行已经失败。',
+            '恢复次数已用尽，提交结果仍未知，需人工核查；不代表执行失败。',
           description:
             '自动恢复次数已用尽，Execution API 提供方仍未给出确定答复。该运行将等待管理员处理，不会被记为失败。'
         },
         failed: {
           label: '失败',
           summary:
-            '执行跟踪已结束：执行失败、返回结果不可用，或管理员停止等待。停止等待不会取消远端任务。',
+            '因失败、结果不可用或人工决定而停止跟踪；停止等待不会取消远端任务。',
           description:
             '该运行已停止跟踪执行状态。可能是轮询确认了失败（Execution API 提供方报告失败、找不到运行、未返回结果或响应违反协议），或重新提交时收到确定的失败答复；也可能是管理员对失联的执行选择放弃等待，或作废了准备阶段。管理员的这些操作不会发送取消请求，远端任务仍可能继续执行并成功。临时网络错误（超时、5xx、连接中断）不属于确定的失败。'
         }
@@ -892,14 +889,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         uncertain: {
           label: '待确认',
           summary:
-            '某个发布步骤可能已在远端生效，正在核对结果。其他步骤可以继续，这不是最终失败。',
+            '某个步骤可能已生效，正在核对；其他步骤可继续，尚未判定失败。',
           description:
             '某个发布步骤可能已在远端生效，系统正在核对结果。发布轴的状态由优先级最高的步骤状态决定。此状态不表示失败，其他步骤仍可继续发布。'
         },
         disconnected: {
           label: '失联',
-          summary:
-            '自动核对无法确认某个发布步骤的结果，需要人工检查远端的实际情况。',
+          summary: '自动核对已停止，某个步骤的远端结果仍待人工确认。',
           description:
             '某个发布步骤的自动核对已停止，结果仍不确定，需要管理员核查远端情况。发布轴的状态由优先级最高的步骤状态决定。'
         },
@@ -911,7 +907,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         failed: {
           label: '失败',
           summary:
-            '发布失败，或已由管理员停止。部分步骤可能已生效。可重试的失败会重新排队。',
+            '发布失败或由人工停止，部分步骤可能已生效；可重试的失败会重新排队。',
           description:
             '发布已结束并记为失败：可能是负责发布的进程确认发布失败（例如发生不可重试的失败，或仍有步骤未成功），也可能是管理员放弃等待。可重试的失败会回到 `pending`。'
         },
@@ -1024,35 +1020,32 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         details: {
           pending: {
             label: '等待中',
-            summary:
-              '该步骤尚未尝试，或已由管理员重新排队。重新排队会重置允许尝试和核对的次数。',
+            summary: '尚未尝试，或已由管理员重新排队并重置尝试与核对次数。',
             description:
               '该步骤尚未尝试，或已由管理员重新排队并重置允许尝试和核对的次数。'
           },
           running: {
             label: '进行中',
-            summary:
-              '一次发布尝试已开始。进程可能仍在执行，也可能在远端操作生效后中断；再次尝试前需考虑操作已生效的可能。',
+            summary: '尝试已开始；即使进程中断，远端操作也可能已生效。',
             description:
               '一次发布尝试已开始。负责该步骤的进程可能仍在执行，也可能在远端操作生效后中断。后续进程领取任务时，必须考虑操作已生效的可能。'
           },
           failed: {
             label: '尝试失败',
-            summary:
-              '上次尝试失败。有剩余次数时可重试；次数用尽后，须先核对远端结果。',
+            summary: '上次尝试失败；有剩余次数可重试，否则须先核对远端结果。',
             description:
               '上一次尝试失败。有剩余尝试次数时会重试；次数用尽后，须先核对远端结果，再确定最终状态。'
           },
           uncertain: {
             label: '待确认',
             summary:
-              '尝试次数已用尽，但之前的操作可能已经生效。必须先核对远端结果，才能结束该步骤。',
+              '尝试次数已用尽，先前操作可能已生效；须核对远端结果后才能结束。',
             description:
               '尝试次数已用尽，之前的尝试可能已在远端生效。连接器必须先核对远端结果，才能结束该步骤。'
           },
           disconnected: {
             label: '失联',
-            summary: '自动核对次数已用尽，仍无法确认远端结果，需要人工核查。',
+            summary: '核对次数已用尽，远端结果仍待人工确认。',
             description:
               '核对次数已用尽，仍无法确认结果，需要管理员核查远端情况。'
           },
@@ -1065,7 +1058,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           terminal_failed: {
             label: '最终失败',
             summary:
-              '该步骤不会再次尝试：操作无法继续，或核对已确认远端操作未生效。',
+              '不会再尝试：已发生不可重试的失败，或已确认远端操作未生效。',
             description:
               '该步骤不会再次尝试：某次尝试发生不可重试的失败，或核对已确认远端操作未生效。'
           }

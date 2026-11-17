@@ -331,14 +331,14 @@ export const messages = {
       'The Execution Gateway never confirmed whether it accepted the task.',
     failureCodeSubmissionRecoveryExhausted:
       'Replays of the submission kept ending without an answer from the Execution Gateway, so its acceptance is still unknown.',
-    failureCodeSubmissionRecoveryAbandoned:
+    failureCodeSubmissionRecoveryGivenUp:
       'An operator stopped waiting for this outcome. Remote execution may still be continuing.',
     failureCodePreparationGivenUp:
       'An operator stopped waiting for this preparation.',
     failureCodePreparationAbandoned:
       'An operator abandoned this run because its records contradict each other. Remote execution may still be continuing.',
     failureCodePublicationGivenUp:
-      'An operator stopped publishing while a step could not be confirmed; that step may already have taken effect on GitHub.',
+      'An operator stopped publishing while a step could not be confirmed; that step may already have taken effect remotely.',
     failureCodeExecutionFailed:
       'The Execution Gateway reported that the task failed.',
     failureCodeExecutionResultMissing:
@@ -386,15 +386,15 @@ export const messages = {
       'Resuming resets the submission retry budget so the system can try again to confirm whether the task was accepted.',
     disconnectedPublicationTitle: 'This run needs your review',
     disconnectedPublicationBody:
-      'Publishing stopped on a step whose result could not be confirmed. Some of this run may already exist on GitHub, and nothing automatic will establish which, so the decision is yours.',
+      'Publishing stopped on a step whose result could not be confirmed. Some content may already have been published remotely. Automatic reconciliation has stopped, so check the remote outcome before deciding how to proceed.',
     disconnectedPublicationOutcomeResume:
       'Resume returns the publication to the normal queue with fresh attempt budgets. A publisher will claim it and issue the parked steps again.',
     disconnectedPublicationOutcomeGiveUp:
-      'Giving up stops publishing: the run is concluded as failed, and whatever already exists on GitHub stays there.',
+      'Giving up stops publishing: the run is concluded as failed, and content already published remotely is preserved.',
     giveUpRun: 'Give up',
     giveUpTitle: 'Stop waiting for this outcome',
     giveUpExplainer:
-      'This stops waiting, without claiming that nothing happened. Remote execution may still be continuing, or some publishing steps may already exist on GitHub. This run will not wait for the result any longer and will not publish anything more. Whatever already happened remotely stays there. This cannot be undone.',
+      'This stops waiting, without claiming that nothing happened. Remote execution may still be continuing, or some publishing steps may already have taken effect remotely. This run will not wait for the result any longer and will not publish anything more. Whatever already happened remotely stays there. This cannot be undone.',
     giveUpConfirm: 'Stop waiting',
     disconnectedExecutionOutcomeGiveUp:
       'Giving up stops waiting for the result: the task is recorded as failed with a reason naming this decision, and nothing is published. Remote execution may still be continuing.',
@@ -457,7 +457,7 @@ export const messages = {
     viewFailureNotice: 'View the failure notice',
     viewAttentionNotice: 'View the outcome-confirmation notice',
     failureNoticeNotDelivered:
-      'The requester could not be told: the notice never reached GitHub',
+      'The requester could not be told: the failure notice could not be delivered',
     failureNoticeDelivering: 'Telling the requester that this run failed',
     attentionNoticeDelivered:
       'The requester was told this outcome needs confirmation',
@@ -784,13 +784,13 @@ export const messages = {
     failureCodeSubmissionUncertain: '执行网关尚未确认是否已接受任务。',
     failureCodeSubmissionRecoveryExhausted:
       '多次重新提交后，执行网关仍未给出确定答复，无法确认任务是否已被接受。',
-    failureCodeSubmissionRecoveryAbandoned:
+    failureCodeSubmissionRecoveryGivenUp:
       '管理员已停止等待提交结果。远端执行可能仍在继续。',
     failureCodePreparationGivenUp: '管理员已停止等待输入准备完成。',
     failureCodePreparationAbandoned:
       '管理员因该运行的记录相互矛盾而将其作废。远端执行可能仍在继续。',
     failureCodePublicationGivenUp:
-      '管理员因某个步骤的结果无法确认而停止发布。该步骤可能已在 GitHub 上生效。',
+      '管理员因某个步骤的结果无法确认而停止发布。该步骤可能已在远端生效。',
     failureCodeExecutionFailed: '执行网关报告任务执行失败。',
     failureCodeExecutionResultMissing: '执行网关报告成功，但没有可用的结果。',
     failureCodePublicationAbandoned: '该运行不会产生结果，发布已停止。',
@@ -827,15 +827,15 @@ export const messages = {
       '恢复后，允许重新提交的次数会重置，系统将再次尝试确认任务是否已被接受。',
     disconnectedPublicationTitle: '发布结果需要人工确认',
     disconnectedPublicationBody:
-      '某个发布步骤的结果无法确认，自动核对已停止。部分内容可能已发布到 GitHub，请核查远端结果后决定如何处理。',
+      '某个发布步骤的结果无法确认，自动核对已停止。部分内容可能已在远端发布，请核查远端结果后决定如何处理。',
     disconnectedPublicationOutcomeResume:
       '恢复后，发布任务将重新排队，允许尝试的次数会重置。发布进程领取任务后，将重新执行暂停的步骤。',
     disconnectedPublicationOutcomeGiveUp:
-      '放弃等待后，发布将停止并记为失败，已发布到 GitHub 的内容会保留。',
+      '放弃等待后，发布将停止并记为失败，已在远端发布的内容会保留。',
     giveUpRun: '放弃等待',
     giveUpTitle: '放弃等待结果',
     giveUpExplainer:
-      '放弃等待后，该运行将停止等待结果，也不会再发布内容。远端任务可能仍在执行，部分发布步骤也可能已在 GitHub 上生效；此操作不会撤销这些远端操作。放弃等待不可撤销。',
+      '放弃等待后，该运行将停止等待结果，也不会再发布内容。远端任务可能仍在执行，部分发布步骤也可能已在远端生效；此操作不会撤销这些远端操作。放弃等待不可撤销。',
     giveUpConfirm: '确认放弃等待',
     disconnectedExecutionOutcomeGiveUp:
       '放弃等待后，该任务将记为失败，并记录本次决定作为原因，结果不会发布。远端执行可能仍在继续。',
@@ -897,7 +897,7 @@ export const messages = {
     failureNoticeDelivered: '已通知发起人：本次运行失败',
     viewFailureNotice: '查看失败通知',
     viewAttentionNotice: '查看待确认通知',
-    failureNoticeNotDelivered: '失败通知未能送达 GitHub，发起人尚未收到通知',
+    failureNoticeNotDelivered: '失败通知未能送达，发起人尚未收到通知',
     failureNoticeDelivering: '正在发送运行失败通知',
     attentionNoticeDelivered: '已通知发起人：此次结果仍待确认',
     attentionNoticeNotDelivered: '结果待确认的通知发送失败',
