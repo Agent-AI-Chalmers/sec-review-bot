@@ -13,7 +13,7 @@ export function stateLabel(machine: MachineBody, state: string): string {
 }
 
 export function stateDescription(machine: MachineBody, state: string): string {
-  return machine.details[state]?.description ?? ''
+  return machine.details[state]?.summary ?? ''
 }
 
 export function edgeLabel(

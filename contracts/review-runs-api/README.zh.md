@@ -17,7 +17,7 @@
 
 ## 运行状态
 
-[v1/openapi.yaml](v1/openapi.yaml) 中的 `x-state-machines` 定义了全部生命周期状态和允许的转换。[v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) 由它和中文覆盖层 [v1/overlays/zh.yaml](v1/overlays/zh.yaml) 生成，覆盖层是一份 [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) 文档，只替换标题、标签和说明。两份页面都按状态机各画一张图，并列出每个状态的含义和每条转换。控制台显示的中英文文本也来自这里。
+[v1/openapi.yaml](v1/openapi.yaml) 中的 `x-state-machines` 定义了全部生命周期状态和允许的转换。[v1/STATE_MACHINES.zh.md](v1/STATE_MACHINES.zh.md) 由它和中文覆盖层 [v1/overlays/zh.yaml](v1/overlays/zh.yaml) 生成，覆盖层是一份 [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.0.0.html) 文档，只替换标题、标签和说明。两份页面都按状态机各画一张图，并列出每个状态的含义和每条转换。每个状态必须提供简短概述 `summary` 和完整说明 `description`。控制台使用 `summary` 提示状态；生成文档使用 `description` 解释生命周期语义、边界情况和恢复规则。中文覆盖层分别翻译这两个字段。
 
 ## 两种运行记录
 

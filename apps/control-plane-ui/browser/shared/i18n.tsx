@@ -785,12 +785,12 @@ export const messages = {
     failureCodeSubmissionRecoveryExhausted:
       '提交的重放一直没有得到执行网关的答复，因此它是否被接受仍然未知。',
     failureCodeSubmissionRecoveryAbandoned:
-      'operator 决定不再等待这个结果。远端执行可能仍在继续。',
-    failureCodePreparationGivenUp: 'operator 决定不再等待这次准备。',
+      '管理员决定不再等待这个结果。远端执行可能仍在继续。',
+    failureCodePreparationGivenUp: '管理员决定不再等待这次准备。',
     failureCodePreparationAbandoned:
-      'operator 因为这个运行的记录互相矛盾而作废了它。远端执行可能仍在继续。',
+      '管理员因为这个运行的记录互相矛盾而作废了它。远端执行可能仍在继续。',
     failureCodePublicationGivenUp:
-      '某个步骤无法确认时，operator 决定停止发布；该步骤可能已经在 GitHub 上生效。',
+      '某个步骤无法确认时，管理员决定停止发布；该步骤可能已经在 GitHub 上生效。',
     failureCodeExecutionFailed: '执行网关报告任务执行失败。',
     failureCodeExecutionResultMissing: '执行网关报告成功，但没有可用的结果。',
     failureCodePublicationAbandoned: '这个运行不会产出结果，发布已停止。',

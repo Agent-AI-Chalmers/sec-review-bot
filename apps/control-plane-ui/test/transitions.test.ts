@@ -8,7 +8,8 @@ import {
   latestTransitionAxis,
   transitionDuration,
   transitionExplanation,
-  edgeLabel
+  edgeLabel,
+  stateDescription
 } from '../browser/features/runs/detail/transitions.js'
 
 function event(overrides: Partial<RunEvent>): RunEvent {
@@ -214,7 +215,7 @@ test('operator conclusions retain their reason while absent and unknown reasons 
     // none of the operator decisions: the explanation describes the reached state instead of
     // guessing a decision.
     const reached = stateMachine('preparation', language).details.failed
-      ?.description
+      ?.summary
     assert.ok(reached)
     assert.ok(!explanations.has(reached))
     assert.equal(transitionExplanation(base, language), reached)
@@ -225,5 +226,27 @@ test('operator conclusions retain their reason while absent and unknown reasons 
       ),
       reached
     )
+  }
+})
+
+test('state hints select the summary rather than the full contract description', async () => {
+  const { stateMachine } =
+    await import('../browser/features/runs/state-machines.generated.js')
+  for (const language of ['en', 'zh'] as const) {
+    for (const axis of ['preparation', 'execution', 'publication'] as const) {
+      const machine = stateMachine(axis, language)
+      for (const body of [machine, ...(machine.step ? [machine.step] : [])]) {
+        for (const state of body.states) {
+          assert.equal(
+            stateDescription(body, state),
+            body.details[state]!.summary
+          )
+        }
+      }
+      assert.notEqual(
+        machine.details.failed!.summary,
+        machine.details.failed!.description
+      )
+    }
   }
 })

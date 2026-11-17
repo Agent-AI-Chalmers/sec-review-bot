@@ -143,7 +143,7 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
 function overlayBlock(): Record<string, unknown> {
   const machine = () => ({
     title: 'Machine',
-    states: { a: { label: 'A', description: 'State a.' } },
+    states: { a: { label: 'A', summary: 'Brief a.', description: 'State a.' } },
     transitions: [
       { from: 'a', to: 'a', label: 'given up', reason: 'GIVEN_UP' },
       { from: 'a', to: 'a', label: 'resumed', reason: 'RESUMED' }
@@ -161,7 +161,7 @@ function fullOverlay(): { target: string; update: Record<string, string> }[] {
     { target: `$['x-state-machines'].${axis}`, update: { title: '机' } },
     {
       target: `$['x-state-machines'].${axis}.states.a`,
-      update: { label: '甲', description: '状态甲。' }
+      update: { label: '甲', summary: '甲概述。', description: '状态甲。' }
     },
     ...['GIVEN_UP', 'RESUMED'].map((reason) => ({
       target: `$['x-state-machines'].${axis}.transitions[?@.from=='a' && @.to=='a' && @.reason=='${reason}']`,
@@ -180,7 +180,9 @@ test('a complete text overlay replaces only text', () => {
   const block = apply(fullOverlay())
   assert.deepStrictEqual(block.preparation, {
     title: '机',
-    states: { a: { label: '甲', description: '状态甲。' } },
+    states: {
+      a: { label: '甲', summary: '甲概述。', description: '状态甲。' }
+    },
     transitions: [
       { from: 'a', to: 'a', label: '放弃', reason: 'GIVEN_UP' },
       { from: 'a', to: 'a', label: '恢复', reason: 'RESUMED' }
@@ -224,7 +226,7 @@ test('text left untranslated fails', () => {
 
 test('a node translated only in part fails', () => {
   const actions = fullOverlay()
-  actions[1]!.update = { label: '甲' }
+  delete actions[1]!.update.description
   assert.throws(() => apply(actions), /has no description translation/)
 })
 
@@ -266,4 +268,10 @@ test('an overlay transition target may space its filter operators freely', () =>
   const actions = fullOverlay()
   actions[2]!.target = actions[2]!.target.replaceAll(' && ', '&&')
   assert.doesNotThrow(() => apply(actions))
+})
+
+test('a state summary must be translated independently of its description', () => {
+  const actions = fullOverlay()
+  delete actions[1]!.update.summary
+  assert.throws(() => apply(actions), /has no summary translation/)
 })

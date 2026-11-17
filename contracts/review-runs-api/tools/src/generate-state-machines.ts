@@ -1,7 +1,7 @@
 // Project the contract's `x-state-machines` block into the module the console and Review Runs
 // read, and into the Markdown page people read. The block is the single source of truth for the
 // coordination lifecycles. Its text is English; `v1/overlays/zh.yaml` is an OpenAPI Overlay that
-// supplies the Chinese title, label, and description for the same machines. Regenerate with
+// supplies the Chinese title, label, summary, and description for the same machines. Regenerate with
 // `pnpm --dir contracts/review-runs-api/tools run generate`.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -39,13 +39,10 @@ export interface StateTransition {
   label?: string
 }
 
-/** One state on a machine: its display labels and the sentence shown when it is hovered. This
- * text lives in the contract so a tooltip can never describe a state differently from the
- * diagram or the schema. */
+/** A state's short overview and complete lifecycle semantics, in the selected language. */
 export interface StateDetail {
-  /** English label; the console localizes it by state key. */
   label: string
-  /** English sentence shown on hover; the console localizes it by state key. */
+  summary: string
   description: string
 }
 
@@ -57,7 +54,7 @@ export interface MachineBody {
   terminal: string[]
   /** State keys in declaration order. */
   states: string[]
-  /** Per-state label and hover description, keyed by the same values as `states`. */
+  /** Per-state label, summary, and full description, keyed by the same values as `states`. */
   details: Record<string, StateDetail>
   transitions: StateTransition[]
 }
@@ -167,7 +164,7 @@ function asRecord(value: unknown, where: string): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-/** Read the `states` map: each key is a state value, each value its labels and hover
+/** Read the `states` map: each key is a state value, each value its label, summary, and full
  * description. Every field is required, so a state cannot be added without saying what it
  * means. */
 function readStates(
@@ -184,6 +181,7 @@ function readStates(
     const record = raw as Record<string, unknown>
     details[state] = {
       label: asString(record.label, `${where}.${state}.label`),
+      summary: asString(record.summary, `${where}.${state}.summary`),
       description: asString(record.description, `${where}.${state}.description`)
     }
     states.push(state)
@@ -213,7 +211,7 @@ function asString(value: unknown, where: string): string {
 
 /** The text fields an overlay may replace. Anything else (states, transitions, reasons, fields)
  * is the contract's structure and stays English-only. */
-const TEXT_FIELDS = new Set(['title', 'label', 'description'])
+const TEXT_FIELDS = new Set(['title', 'label', 'summary', 'description'])
 
 /** The JSONPath forms this tool evaluates: a machine, a state, or one transition picked by its
  * `from`, `to`, and `reason`. Overlay targets may be any RFC 9535 expression; restricting them
@@ -254,7 +252,7 @@ export function applyTextOverlay(
     for (const [field, value] of Object.entries(update)) {
       if (!TEXT_FIELDS.has(field) || !(field in node))
         throw new Error(
-          `${where}: ${target} may only replace the existing title, label, or description, not ${field}`
+          `${where}: ${target} may only replace the existing title, label, summary, or description, not ${field}`
         )
       if (typeof value !== 'string' || value.trim() === '')
         throw new Error(`${where}: ${target}.${field} must be non-empty text`)
@@ -363,7 +361,7 @@ ${sources(languages)
  * in each language, and Review Runs reads the structure, which is identical across languages. */
 async function renderStateMachinesModule(): Promise<string> {
   const machines = `/** The three axis machines, in lifecycle order, with their text in each console language. The
- * structure is identical across languages; only title, label, and description differ. A
+ * structure is identical across languages; only title, label, summary, and description differ. A
  * machine's steps, when it has them, are its \`step\` member. */
 export const STATE_MACHINES_BY_LANGUAGE: Readonly<
   Record<Language, readonly StateMachine[]>
@@ -414,6 +412,7 @@ export interface StateTransition {
 
 export interface StateDetail {
   label: string
+  summary: string
   description: string
 }
 

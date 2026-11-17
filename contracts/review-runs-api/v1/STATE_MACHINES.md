@@ -186,7 +186,7 @@ flowchart LR
   publication_step_succeeded["succeeded"]
   publication_step_terminal_failed["terminal_failed"]
   publication_step_pending -->|"attempt started"| publication_step_running
-  publication_step_running -->|"taken over by a new owner"| publication_step_running
+  publication_step_running -->|"taken over by another process"| publication_step_running
   publication_step_failed -->|"retry started"| publication_step_running
   publication_step_running -->|"side effect written"| publication_step_succeeded
   publication_step_running -->|"retryable failure"| publication_step_failed
@@ -214,7 +214,7 @@ flowchart LR
 | From           | To                | Transition                            | Recorded reason                   |
 | -------------- | ----------------- | ------------------------------------- | --------------------------------- |
 | `pending`      | `running`         | attempt started                       |                                   |
-| `running`      | `running`         | taken over by a new owner             |                                   |
+| `running`      | `running`         | taken over by another process         |                                   |
 | `failed`       | `running`         | retry started                         |                                   |
 | `running`      | `succeeded`       | side effect written                   |                                   |
 | `running`      | `failed`          | retryable failure                     |                                   |
