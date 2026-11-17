@@ -14,12 +14,21 @@
 // It checks for the status key, not the response it points at: the shared
 // `components.responses.InternalError` / `PayloadTooLarge` are the ones to reuse, but pinning
 // the `$ref` target here would duplicate that decision rather than leave it to review.
+// @ts-check
+
+/**
+ * @param {{ responses?: Record<string, unknown>, requestBody?: unknown }} operation
+ * @param {unknown} _options
+ * @param {{ path: (string | number)[] }} context
+ * @returns {{ message: string, path: (string | number)[] }[]}
+ */
 export default function operationDeclaresServerErrors(
   operation,
   _options,
   context
 ) {
   const responses = operation.responses ?? {}
+  /** @type {{ message: string, path: (string | number)[] }[]} */
   const problems = []
 
   if (responses['500'] === undefined) {
