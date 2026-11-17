@@ -1,5 +1,5 @@
 import React from 'react'
-import { Alert, Container, Tabs, Title } from '@mantine/core'
+import { Alert, Button, Container, Tabs, Title } from '@mantine/core'
 import {
   apiPost,
   ApiError,
@@ -23,6 +23,7 @@ import { useMemoryEditor } from './useMemoryEditor.js'
 import { DEFAULT_PAGE_SIZE, useMemoryResources } from './useMemoryResources.js'
 import type { PagedResource } from './usePagedResource.js'
 import { CursorPagination } from '../../shared/CursorPagination.js'
+import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
   TrajectoryViewer,
@@ -212,6 +213,12 @@ export function Memory(): React.JSX.Element {
   )
   const overviewError = failureText(overview.error, 'memoryOverviewLoadFailed')
 
+  const unavailable =
+    Boolean(automationError && treeError && overviewError) &&
+    automation.data === undefined &&
+    tree.data === undefined &&
+    overview.data === undefined
+
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">
@@ -228,8 +235,8 @@ export function Memory(): React.JSX.Element {
         busy={busy}
         automationLoading={automation.loading}
         treeLoading={tree.loading}
-        automationError={automationError}
-        treeError={treeError}
+        automationError={unavailable ? '' : automationError}
+        treeError={unavailable ? '' : treeError}
         refresh={refresh}
         refreshing={refreshing}
         lastChecked={lastChecked}
@@ -241,94 +248,122 @@ export function Memory(): React.JSX.Element {
         }}
         onEdit={() => void beginEdit()}
       />
-      <Tabs value={activeTab} onChange={setActiveTab}>
-        <Tabs.List>
-          <Tabs.Tab value="overview">{t('memoryOverview')}</Tabs.Tab>
-          <Tabs.Tab value="versions">{t('memoryVersions')}</Tabs.Tab>
-          <Tabs.Tab value="observations">{t('memoryObservations')}</Tabs.Tab>
-        </Tabs.List>
-        <Tabs.Panel value="overview" pt="md">
-          {overviewError && (
-            <Alert color="red" mb="md">
-              {overviewError}
-            </Alert>
-          )}
-          {overview.loading && overview.data === undefined && (
-            <LoadingState message={t('loading')} />
-          )}
-          {overview.data && (
-            <MemoryOverview
-              overview={overview.data}
-              range={overviewRange}
-              onRangeChange={(range) => void changeOverviewRange(range)}
+      {unavailable ? (
+        <ResourceLoadError
+          fill
+          title={t('memoryUnavailable')}
+          message={t('memoryUnavailableHelp')}
+          actions={
+            <Button
+              variant="default"
+              loading={refreshing}
+              onClick={() => void refresh()}
+            >
+              {t('retry')}
+            </Button>
+          }
+        />
+      ) : (
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="overview">{t('memoryOverview')}</Tabs.Tab>
+            <Tabs.Tab value="versions">{t('memoryVersions')}</Tabs.Tab>
+            <Tabs.Tab value="observations">{t('memoryObservations')}</Tabs.Tab>
+          </Tabs.List>
+          <Tabs.Panel value="overview" pt="md">
+            {overviewError && (
+              <ResourceLoadError
+                fill
+                title={overviewError}
+                message={t('resourceRetryHelp')}
+                actions={
+                  <Button
+                    variant="default"
+                    loading={refreshing}
+                    onClick={() => void refresh()}
+                  >
+                    {t('retry')}
+                  </Button>
+                }
+              />
+            )}
+            {overview.loading && overview.data === undefined && (
+              <LoadingState message={t('loading')} />
+            )}
+            {overview.data && (
+              <MemoryOverview
+                overview={overview.data}
+                range={overviewRange}
+                onRangeChange={(range) => void changeOverviewRange(range)}
+              />
+            )}
+          </Tabs.Panel>
+          <Tabs.Panel value="versions" pt="md">
+            <MemoryVersionHistory
+              graphVersions={graphVersions.data?.versions ?? []}
+              graphTarget={graphTarget}
+              onShowLatest={() => {
+                setHighlightedVersion(undefined)
+                void showGraph()
+              }}
+              graphLoading={graphVersions.loading}
+              graphError={graphVersionsError}
+              listVersions={versionPages.resource.data?.page.versions ?? []}
+              listLoading={versionPages.resource.loading}
+              listError={versionPageError}
+              pagination={pagination(
+                versionPages,
+                versionPages.resource.data?.page.next_before_version
+              )}
+              activeVersion={activeVersion}
+              view={versionView}
+              highlightedVersion={highlightedVersion}
+              onViewChange={setVersionView}
+              onViewFiles={setViewVersion}
+              onViewTrajectory={viewMemoryMaintainerTrajectory}
+              onRevealObservation={revealObservation}
+              onCompare={setDiffVersion}
+              onSetCurrent={(version) => {
+                setRestoreError('')
+                setRestoreVersion(version)
+              }}
+              onHighlightEnd={() => setHighlightedVersion(undefined)}
             />
-          )}
-        </Tabs.Panel>
-        <Tabs.Panel value="versions" pt="md">
-          <MemoryVersionHistory
-            graphVersions={graphVersions.data?.versions ?? []}
-            graphTarget={graphTarget}
-            onShowLatest={() => {
-              setHighlightedVersion(undefined)
-              void showGraph()
-            }}
-            graphLoading={graphVersions.loading}
-            graphError={graphVersionsError}
-            listVersions={versionPages.resource.data?.page.versions ?? []}
-            listLoading={versionPages.resource.loading}
-            listError={versionPageError}
-            pagination={pagination(
-              versionPages,
-              versionPages.resource.data?.page.next_before_version
-            )}
-            activeVersion={activeVersion}
-            view={versionView}
-            highlightedVersion={highlightedVersion}
-            onViewChange={setVersionView}
-            onViewFiles={setViewVersion}
-            onViewTrajectory={viewMemoryMaintainerTrajectory}
-            onRevealObservation={revealObservation}
-            onCompare={setDiffVersion}
-            onSetCurrent={(version) => {
-              setRestoreError('')
-              setRestoreVersion(version)
-            }}
-            onHighlightEnd={() => setHighlightedVersion(undefined)}
-          />
-        </Tabs.Panel>
-        <Tabs.Panel value="observations" pt="md">
-          <MemoryObservationList
-            observations={
-              observationPages.resource.data?.page.observations ?? []
-            }
-            loading={observationPages.resource.loading}
-            error={observationsError}
-            pagination={pagination(
-              observationPages,
-              observationPages.resource.data?.page.next_cursor
-            )}
-            versionFilter={observationPages.query.filter}
-            onClearVersionFilter={() => {
-              setHighlightedObservation(undefined)
-              void observationPages.openFirst({
-                filter: undefined,
-                limit: DEFAULT_PAGE_SIZE
-              })
-            }}
-            highlightedObservation={highlightedObservation}
-            onHighlightEnd={() => setHighlightedObservation(undefined)}
-            onRevealVersion={revealVersion}
-            onViewTrajectory={(item) =>
-              setTrajectoryTarget({
-                title: t('memoryExtractorTrajectory'),
-                contentHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory/content`,
-                downloadHref: `/api/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`,
-                pageHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`
-              })
-            }
-          />
-        </Tabs.Panel>
-      </Tabs>
+          </Tabs.Panel>
+          <Tabs.Panel value="observations" pt="md">
+            <MemoryObservationList
+              observations={
+                observationPages.resource.data?.page.observations ?? []
+              }
+              loading={observationPages.resource.loading}
+              error={observationsError}
+              pagination={pagination(
+                observationPages,
+                observationPages.resource.data?.page.next_cursor
+              )}
+              versionFilter={observationPages.query.filter}
+              onClearVersionFilter={() => {
+                setHighlightedObservation(undefined)
+                void observationPages.openFirst({
+                  filter: undefined,
+                  limit: DEFAULT_PAGE_SIZE
+                })
+              }}
+              highlightedObservation={highlightedObservation}
+              onHighlightEnd={() => setHighlightedObservation(undefined)}
+              onRevealVersion={revealVersion}
+              onViewTrajectory={(item) =>
+                setTrajectoryTarget({
+                  title: t('memoryExtractorTrajectory'),
+                  contentHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory/content`,
+                  downloadHref: `/api/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`,
+                  pageHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`
+                })
+              }
+            />
+          </Tabs.Panel>
+        </Tabs>
+      )}
       <MemoryFilesViewer
         version={viewVersion}
         onClose={() => setViewVersion(undefined)}

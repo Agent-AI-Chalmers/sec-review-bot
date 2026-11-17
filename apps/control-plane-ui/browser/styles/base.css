@@ -249,7 +249,16 @@ samp {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--radius-panel);
   background: var(--surface-raised);
-  box-shadow: var(--shadow-sm);
+}
+
+.resource-load-error-fill {
+  width: 100%;
+  min-height: 300px;
+  justify-content: center;
+}
+
+.resource-load-error > p {
+  max-width: 60ch;
 }
 /*
  * A theme switch is a colour change, not a motion effect, so the cross-fade is only
