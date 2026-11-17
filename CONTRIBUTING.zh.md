@@ -35,16 +35,17 @@
 
 在每个受影响的包中运行检查，不要只检查直接改了代码的包。具体命令见各包的 README、`package.json` 或 `pyproject.toml`。
 
-| 区域                                                      | 开发指南                                                                                                       | 基本检查                                                                                 |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Execution、Memory Extraction 和 Memory Maintenance Worker | [`agents/README.zh.md`](agents/README.zh.md)                                                                   | Ruff、Black、mypy、Pyright、pytest                                                       |
-| GitHub Integration                                        | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md)                                 | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试                          |
-| Review Runs                                               | [`services/review-runs/README.zh.md`](services/review-runs/README.zh.md)                                       | format、lint、typecheck、测试、PostgreSQL 集成测试                                       |
-| Control Plane UI                                          | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md)                                     | format、lint、typecheck、测试、build；涉及用户可见的界面或操作流程时，运行浏览器冒烟测试 |
-| Execution Gateway                                         | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md)                           | format、lint、typecheck、测试、Temporal 集成测试                                         |
-| Memory Catalog Server                                     | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md)                                 | format、lint、typecheck、测试、PostgreSQL 集成测试                                       |
-| 仓库脚本                                                  | [`scripts/README.md`](scripts/README.md)                                                                       | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能 |
-| 文档                                                      | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据修改内容，检查本地链接是否有效、正文段落是否按要求不折行，以及中英文标题结构是否一致 |
+| 区域                                                      | 开发指南                                                                                                       | 基本检查                                                                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Execution、Memory Extraction 和 Memory Maintenance Worker | [`agents/README.zh.md`](agents/README.zh.md)                                                                   | Ruff、Black、mypy、Pyright、pytest                                                                        |
+| GitHub Integration                                        | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md)                                 | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试                                           |
+| Review Runs                                               | [`services/review-runs/README.zh.md`](services/review-runs/README.zh.md)                                       | format、lint、typecheck、测试、PostgreSQL 集成测试                                                        |
+| Control Plane UI                                          | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md)                                     | format、lint、typecheck、测试、build；涉及用户可见的界面或操作流程时，运行浏览器冒烟测试                  |
+| Execution Gateway                                         | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md)                           | format、lint、typecheck、测试、Temporal 集成测试                                                          |
+| Memory Catalog Server                                     | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md)                                 | format、lint、typecheck、测试、PostgreSQL 集成测试                                                        |
+| 部署与提交链路冒烟测试                                    | [`smoke-tests/README.zh.md`](smoke-tests/README.zh.md)                                                         | format、lint、typecheck、build；在 `smoke-tests/` 中手动运行 `pnpm run test:smoke`，验证 Compose 服务链路 |
+| 仓库脚本                                                  | [`scripts/README.md`](scripts/README.md)                                                                       | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能                  |
+| 文档                                                      | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据修改内容，检查本地链接是否有效、正文段落是否按要求不折行，以及中英文标题结构是否一致                  |
 
 修改契约后，按[契约指南](contracts/README.zh.md)和相关契约目录 README 的要求完成检查，并检查所有受影响的包。
 

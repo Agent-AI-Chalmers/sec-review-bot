@@ -30,9 +30,14 @@ automation-config:
   - '.sec-review/**'
 
 ops:
-  # Deployment scripts and the Compose topology.
+  # Deployment scripts, Compose topology, and deployment smoke tooling.
+  - 'package.json'
+  - 'pnpm-workspace.yaml'
+  - 'pnpm-lock.yaml'
+  - '.github/actions/setup-node/**'
   - 'ops/**'
   - 'compose.yaml'
+  - 'smoke-tests/**'
   - 'compose.env.sample'
   - 'compose.memory.env.sample'
   # A CI change can affect how ops is validated.
@@ -160,6 +165,7 @@ documentation:
   - 'ops/**'
   - 'scripts/**'
   - 'compose.yaml'
+  - 'smoke-tests/**'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - 'pnpm-lock.yaml'
@@ -170,3 +176,20 @@ documentation:
   - '.prettierignore'
   - '.autocorrectrc'
   - 'lefthook.yml'
+
+smoke:
+  - '.github/workflows/ci.yml'
+  - '.github/ci/**'
+  - 'smoke-tests/**'
+  - 'compose.yaml'
+  - 'ops/rustfs-init/**'
+  - 'ops/postgres-init/**'
+  - 'services/execution-gateway/**'
+  - 'services/review-runs/**'
+  - 'services/memory-catalog/**'
+  - 'apps/control-plane-ui/**'
+  - 'contracts/**'
+  - 'package.json'
+  - 'pnpm-lock.yaml'
+  - 'pnpm-workspace.yaml'
+  - '.dockerignore'

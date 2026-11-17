@@ -35,6 +35,8 @@ The called workflows use workflow_call; they do not trigger independent PR runs.
 
 GitHub displays called jobs beneath their caller names. Branch protection should require CI Status; installations that additionally require individual called-job check names must update those names when adopting this layout.
 
+The main workflow runs deployment smoke on changes selected by the `smoke` area, merge queue candidates, and manual dispatch. Its result contributes to CI Status alongside package and integration tests; build and probe logs are uploaded as an artifact.
+
 ## Shared Node Setup
 
 <!-- doc-default: shared-node-setup; source=.github/actions/setup-node/action.yml -->
