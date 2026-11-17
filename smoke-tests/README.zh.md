@@ -1,4 +1,4 @@
-# 部署与提交链路冒烟测试
+# 冒烟测试
 
 Language: [English](README.md) | 中文
 
@@ -10,7 +10,7 @@ Language: [English](README.md) | 中文
 bash smoke-tests/run.sh
 ```
 
-脚本使用各服务的生产 Dockerfile 构建镜像，并为探针构建测试镜像。它通过根目录的 `compose.yaml` 和 [`compose.test.yaml`](compose.test.yaml) 启动服务，等服务就绪后执行检查。宿主机不用安装 Node 或 pnpm。
+脚本使用各服务的生产 Dockerfile 构建镜像，并为探针构建测试镜像。根目录的 [`compose.yaml`](../compose.yaml) 定义服务如何构建和连接；[`compose.test.yaml`](compose.test.yaml) 调整测试用的端口和数据卷，并加入探针容器。脚本合并这两个文件来启动服务，等服务就绪后执行检查。宿主机不用安装 Node 或 pnpm。
 
 第一次运行可能需要下载依赖和基础设施镜像。Docker 会保留镜像和构建层，下次运行可以复用。
 
@@ -45,16 +45,6 @@ bash smoke-tests/run.sh
 每次运行都有自己的 Compose 项目和命名数据卷。脚本使用固定测试凭证，不读取运维配置中的 `.env`，也不占用宿主机端口。
 
 检查失败时，脚本打印容器状态和日志。退出时删除容器、网络和数据卷，保留镜像和构建缓存。
-
-SIGKILL 或宿主机关机会使退出清理无法执行。本地运行留下资源时，先用 `docker compose ls --all` 找到项目，将下方占位值替换为该项目的完整名称，再删除属于它的资源。命令中的 `xargs -r` 需要 GNU xargs。GitHub 托管 runner 会在 job 结束后被回收。
-
-```bash
-docker compose ls --all
-smoke_project='sec-review-smoke-<timestamp>-<pid>'
-docker ps -aq --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker rm -f
-docker network ls -q --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker network rm
-docker volume ls -q --filter "label=com.docker.compose.project=$smoke_project" | xargs -r docker volume rm
-```
 
 ## 文件职责
 
