@@ -10,8 +10,8 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['test/*.test.ts'],
-        },
+          include: ['test/*.test.ts']
+        }
       },
       {
         extends: true,
@@ -19,9 +19,9 @@ export default defineConfig({
           name: 'integration',
           environment: 'node',
           include: ['test/integration/**/*.test.ts'],
-          testTimeout: 120_000,
-        },
-      },
-    ],
-  },
+          testTimeout: 120_000
+        }
+      }
+    ]
+  }
 })

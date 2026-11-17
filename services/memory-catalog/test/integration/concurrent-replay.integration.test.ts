@@ -20,14 +20,14 @@ if (databaseUrl === undefined)
 const actor: Actor = { kind: 'user', id: 'reviewer@example.com' }
 
 async function withStore(
-  run: (store: PostgresMemoryCatalogStore, pool: Pool) => Promise<void>,
+  run: (store: PostgresMemoryCatalogStore, pool: Pool) => Promise<void>
 ): Promise<void> {
   const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
   const administrator = new Pool({ connectionString: databaseUrl })
   await administrator.query(`create schema ${schema}`)
   const pool = new Pool({
     connectionString: databaseUrl,
-    options: `-c search_path=${schema},public`,
+    options: `-c search_path=${schema},public`
   })
   const store = new PostgresMemoryCatalogStore('unused', pool)
   try {
@@ -52,7 +52,7 @@ async function withStore(
 async function overlapBehindLock<T>(
   pool: Pool,
   lockSql: string,
-  attempts: Array<() => Promise<T>>,
+  attempts: Array<() => Promise<T>>
 ): Promise<Array<PromiseSettledResult<T>>> {
   const holder: PoolClient = await pool.connect()
   const started: Array<Promise<T>> = []
@@ -93,7 +93,7 @@ async function waitUntilBlocked(pid: number, count: number): Promise<void> {
            join waiter on waiter.pid = any(pg_blocking_pids(activity.pid))
          )
          select count(*) as blocked from waiter`,
-        [pid],
+        [pid]
       )
       if (Number(blocked.rows[0]?.blocked) >= count) return
       if (Date.now() > deadline)
@@ -113,16 +113,16 @@ test('an overlapping retry of an automation change replays instead of conflictin
       'select 1 from memory_tree_automation where singleton=true for update',
       [
         () => store.changeMemoryTreeAutomation('paused', pause),
-        () => store.changeMemoryTreeAutomation('paused', pause),
-      ],
+        () => store.changeMemoryTreeAutomation('paused', pause)
+      ]
     )
     expect(
       results.map((result) => result.status),
-      'neither attempt may fail',
+      'neither attempt may fail'
     ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
       (result) =>
-        (result as PromiseFulfilledResult<{ created: boolean }>).value.created,
+        (result as PromiseFulfilledResult<{ created: boolean }>).value.created
     )
     expect(created.toSorted()).toStrictEqual([false, true])
   })
@@ -141,35 +141,35 @@ test('an overlapping retry of a restore replays instead of conflicting', async (
           uri: 's3://sec-review/memory/trees/seed.tar.zst',
           digest: `sha256:${'a'.repeat(64)}`,
           media_type: 'application/zstd',
-          size_bytes: 42,
+          size_bytes: 42
         },
-        actor,
-      ],
+        actor
+      ]
     )
     await pool.query(
-      'update memory_tree_state set active_version=1 where singleton=true',
+      'update memory_tree_state set active_version=1 where singleton=true'
     )
     const restore = {
       operation_id: 'restore-1',
       expected_active_version: 1,
       restored_version: 1,
-      actor,
+      actor
     }
     const results = await overlapBehindLock(
       pool,
       'select 1 from memory_tree_state where singleton=true for update',
       [
         () => store.restoreMemoryTree(restore),
-        () => store.restoreMemoryTree(restore),
-      ],
+        () => store.restoreMemoryTree(restore)
+      ]
     )
     expect(
       results.map((result) => result.status),
-      'neither attempt may fail',
+      'neither attempt may fail'
     ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
       (result) =>
-        (result as PromiseFulfilledResult<{ created: boolean }>).value.created,
+        (result as PromiseFulfilledResult<{ created: boolean }>).value.created
     )
     expect(created.toSorted()).toStrictEqual([false, true])
   })

@@ -7,20 +7,20 @@ import Ajv2020Module, { type AnySchemaObject } from 'ajv/dist/2020.js'
 import type {
   ExecutionError,
   ExecutionWorkflow,
-  WorkflowInputByName,
+  WorkflowInputByName
 } from './execution-api-types-generated.js'
 import { EXECUTION_API_VERSION } from './execution-api-version.js'
 
 const schemaByWorkflow: Record<ExecutionWorkflow, string> = {
   'issue-review': 'issue-review-input.schema.json',
   'pull-request-review': 'pull-request-review-input.schema.json',
-  'repository-review': 'repository-review-input.schema.json',
+  'repository-review': 'repository-review-input.schema.json'
 }
 
 const resultSchemaByWorkflow: Record<string, string> = {
   'issue-review': 'issue-review-result.schema.json',
   'pull-request-review': 'pull-request-review-result.schema.json',
-  'repository-review': 'repository-review-result.schema.json',
+  'repository-review': 'repository-review-result.schema.json'
 }
 
 function schemasRoot(): string {
@@ -28,7 +28,7 @@ function schemasRoot(): string {
     contractsRoot(),
     'execution-api',
     EXECUTION_API_VERSION,
-    'schemas',
+    'schemas'
   )
 }
 
@@ -36,10 +36,10 @@ function loadSchemas() {
   const root = schemasRoot()
   const ajv = new Ajv2020Module.default({ allErrors: true, strict: true })
   for (const name of readdirSync(root).filter((entry) =>
-    entry.endsWith('.json'),
+    entry.endsWith('.json')
   )) {
     const schema = JSON.parse(
-      readFileSync(path.join(root, name), 'utf8'),
+      readFileSync(path.join(root, name), 'utf8')
     ) as AnySchemaObject
     ajv.addSchema(schema, name)
   }
@@ -59,7 +59,7 @@ export function isExecutionError(value: unknown): value is ExecutionError {
   return (
     typeof error.category === 'string' &&
     ['input', 'workflow', 'llm', 'runtime', 'internal'].includes(
-      error.category,
+      error.category
     ) &&
     typeof error.code === 'string' &&
     typeof error.message === 'string' &&
@@ -73,7 +73,7 @@ export function isExecutionError(value: unknown): value is ExecutionError {
 
 export function validateExecutionInput<Workflow extends ExecutionWorkflow>(
   workflow: Workflow,
-  input: unknown,
+  input: unknown
 ): asserts input is WorkflowInputByName[Workflow] {
   if (!Object.hasOwn(schemaByWorkflow, workflow))
     throw new Error(`Unsupported workflow: ${workflow}`)
@@ -86,14 +86,14 @@ export function validateExecutionInput<Workflow extends ExecutionWorkflow>(
     const first = validator.errors?.[0]
     const location = first?.instancePath ? ` at ${first.instancePath}` : ''
     throw new Error(
-      `Execution input does not match API ${EXECUTION_API_VERSION}${location}: ${first?.message ?? 'invalid input'}`,
+      `Execution input does not match API ${EXECUTION_API_VERSION}${location}: ${first?.message ?? 'invalid input'}`
     )
   }
 }
 
 export function validateExecutionResult(
   workflow: string,
-  result: unknown,
+  result: unknown
 ): void {
   const schemaName = Object.hasOwn(resultSchemaByWorkflow, workflow)
     ? resultSchemaByWorkflow[workflow]
@@ -107,7 +107,7 @@ export function validateExecutionResult(
     const first = validator.errors?.[0]
     const location = first?.instancePath ? ` at ${first.instancePath}` : ''
     throw new Error(
-      `Execution result does not match API ${EXECUTION_API_VERSION}${location}: ${first?.message ?? 'invalid result'}`,
+      `Execution result does not match API ${EXECUTION_API_VERSION}${location}: ${first?.message ?? 'invalid result'}`
     )
   }
 }

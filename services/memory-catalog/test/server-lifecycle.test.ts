@@ -17,8 +17,8 @@ async function setup(t: TestContext) {
       new Promise<void>((resolve, reject) =>
         occupied.listening
           ? occupied.close((error) => (error ? reject(error) : resolve()))
-          : resolve(),
-      ),
+          : resolve()
+      )
   )
   const address = occupied.address()
   expect.assert(address && typeof address !== 'string')
@@ -27,7 +27,7 @@ async function setup(t: TestContext) {
     MEMORY_CATALOG_WORKER_TOKEN: 'worker',
     MEMORY_CATALOG_OPERATOR_TOKEN: 'operator',
     MEMORY_CATALOG_HOST: '127.0.0.1',
-    MEMORY_CATALOG_PORT: String(address.port),
+    MEMORY_CATALOG_PORT: String(address.port)
   }
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
@@ -43,7 +43,7 @@ async function setup(t: TestContext) {
   let closeFailure: Error | undefined
   vi.spyOn(
     PostgresMemoryCatalogStore.prototype,
-    'initialize',
+    'initialize'
   ).mockImplementation(() => {
     opens += 1
     return Promise.resolve()
@@ -52,7 +52,7 @@ async function setup(t: TestContext) {
     () => {
       closes += 1
       return closeFailure ? Promise.reject(closeFailure) : Promise.resolve()
-    },
+    }
   )
   return {
     occupied,
@@ -60,14 +60,14 @@ async function setup(t: TestContext) {
     closes: () => closes,
     failClose: (error: Error) => {
       closeFailure = error
-    },
+    }
   }
 }
 
 test('listen failure releases resources acquired during startup', async (t) => {
   const fixture = await setup(t)
   await expect(startMemoryCatalogServer()).rejects.toMatchObject({
-    code: 'EADDRINUSE',
+    code: 'EADDRINUSE'
   })
   expect(fixture.closes()).toBe(1)
 })
@@ -88,7 +88,7 @@ test('shutdown releases the backend even when HTTP close fails', async (t) => {
   await expect(running.close()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
-    message: failure.message,
+    message: failure.message
   })
   expect(fixture.closes()).toBe(1)
   await running.close()
@@ -104,7 +104,7 @@ test('shutdown does not close the backend twice after a backend close error', as
   await expect(running.close()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
-    message: failure.message,
+    message: failure.message
   })
   await running.close()
   expect(fixture.closes()).toBe(1)
@@ -114,7 +114,7 @@ test('invalid configuration fails before opening backend resources', async (t) =
   const fixture = await setup(t)
   delete process.env.MEMORY_CATALOG_WORKER_TOKEN
   await expect(startMemoryCatalogServer()).rejects.toThrow(
-    /MEMORY_CATALOG_WORKER_TOKEN/,
+    /MEMORY_CATALOG_WORKER_TOKEN/
   )
   expect(fixture.opens()).toBe(0)
 })
@@ -131,7 +131,7 @@ test('startup retains the original failure when backend cleanup also fails', asy
       expect.assert(original instanceof Error && 'code' in original)
       expect(original.code).toBe('EADDRINUSE')
       return true
-    },
+    }
   )
   expect(fixture.closes()).toBe(1)
 })
@@ -141,12 +141,12 @@ test('initialization failure releases the partially initialized backend', async 
   const failure = new Error('schema initialization failed')
   vi.spyOn(
     PostgresMemoryCatalogStore.prototype,
-    'initialize',
+    'initialize'
   ).mockImplementation(() => Promise.reject(failure))
   await expect(startMemoryCatalogServer()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
-    message: failure.message,
+    message: failure.message
   })
   expect(fixture.closes()).toBe(1)
 })

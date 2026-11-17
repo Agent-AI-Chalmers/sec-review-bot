@@ -6,7 +6,7 @@ import { PostgresMemoryCatalogStore } from '../src/catalog-store.js'
 import {
   ExtractionConflictError,
   AutomationPausedError,
-  MemoryTreeVersionConflictError,
+  MemoryTreeVersionConflictError
 } from '../src/catalog-store.js'
 import { learningReport, reorganizationReport } from './maintenance-report.js'
 
@@ -14,21 +14,21 @@ const artifact = {
   uri: 's3://sec-review/memory/trees/memory-tree.v1.tar.zst',
   digest: `sha256:${'a'.repeat(64)}`,
   media_type: 'application/tar+zstd',
-  size_bytes: 42,
+  size_bytes: 42
 }
 
 const versionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
   media_type: 'application/zstd',
-  size_bytes: 21,
+  size_bytes: 21
 }
 
 const extractionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst',
   digest: `sha256:${'c'.repeat(64)}`,
   media_type: 'application/zstd',
-  size_bytes: 18,
+  size_bytes: 18
 }
 
 test('extraction registration atomically stores its optional observation', async () => {
@@ -44,7 +44,7 @@ test('extraction registration atomically stores its optional observation', async
       if (sql.includes('select digest from extraction_publications'))
         return Promise.resolve({
           rows: [{ digest: extractionTrajectory.digest }],
-          rowCount: 1,
+          rowCount: 1
         })
       if (
         sql.includes('select 1 from memory_version_publications') &&
@@ -55,11 +55,11 @@ test('extraction registration atomically stores its optional observation', async
         return Promise.resolve({ rows: [], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -72,9 +72,9 @@ test('extraction registration atomically stores its optional observation', async
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
       observations: [
-        { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
-      ],
-    }),
+        { observation_id: 'extraction-1', body_markdown: 'Remember this.' }
+      ]
+    })
   ).toBe(true)
 
   const operations = statements
@@ -85,7 +85,7 @@ test('extraction registration atomically stores its optional observation', async
         sql !== 'commit' &&
         !sql.includes('extraction_publications') &&
         !sql.includes('memory_version_publications') &&
-        !sql.includes('pg_advisory_xact_lock'),
+        !sql.includes('pg_advisory_xact_lock')
     )
   expect(operations[0] ?? '').toMatch(/insert into extractions/)
   expect(operations[1] ?? '').toMatch(/insert into observations/)
@@ -102,7 +102,7 @@ test('extraction replay compares the optional observation as part of identity', 
       if (sql.includes('select digest from extraction_publications'))
         return Promise.resolve({
           rows: [{ digest: extractionTrajectory.digest }],
-          rowCount: 1,
+          rowCount: 1
         })
       if (
         sql.includes('select 1 from memory_version_publications') &&
@@ -115,11 +115,11 @@ test('extraction replay compares the optional observation as part of identity', 
         return Promise.resolve({ rows: [{ identical: false }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -131,8 +131,8 @@ test('extraction replay compares the optional observation as part of identity', 
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
-      observations: [],
-    }),
+      observations: []
+    })
   ).rejects.toThrow(ExtractionConflictError)
 })
 
@@ -155,17 +155,17 @@ test('learning commit records immutable history before moving the active pointer
       if (sql.includes('select observation_id from observations'))
         return Promise.resolve({
           rows: [{ observation_id: 'extraction-1' }],
-          rowCount: 1,
+          rowCount: 1
         })
       if (sql.includes('coalesce(max(version)'))
         return Promise.resolve({ rows: [{ version: '4' }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -178,13 +178,13 @@ test('learning commit records immutable history before moving the active pointer
         operation_id: 'maintenance-1',
         observation_ids: ['extraction-1'],
         trajectory_reference: versionTrajectory,
-        maintenance_report: learningReport(['extraction-1']),
-      },
-    }),
+        maintenance_report: learningReport(['extraction-1'])
+      }
+    })
   ).toStrictEqual({
     created: true,
     version: 4,
-    source: { kind: 'learning', operation_id: 'maintenance-1' },
+    source: { kind: 'learning', operation_id: 'maintenance-1' }
   })
 
   const operations = statements
@@ -195,7 +195,7 @@ test('learning commit records immutable history before moving the active pointer
         sql !== 'commit' &&
         !sql.includes('extraction_publications') &&
         !sql.includes('memory_version_publications') &&
-        !sql.includes('pg_advisory_xact_lock'),
+        !sql.includes('pg_advisory_xact_lock')
     )
   expect(operations[0] ?? '').toMatch(/operation_id/)
   expect(operations[1] ?? '').toMatch(/memory_tree_automation/)
@@ -207,11 +207,11 @@ test('learning commit records immutable history before moving the active pointer
   expect(operations[7] ?? '').toMatch(/update memory_tree_state/)
   expect(
     statements.find(({ sql }) => sql.includes('set consumed_version='))
-      ?.parameters,
+      ?.parameters
   ).toStrictEqual([4, ['extraction-1']])
   expect(
     statements.find(({ sql }) => sql.includes('update memory_tree_state'))
-      ?.parameters,
+      ?.parameters
   ).toStrictEqual([4])
 })
 
@@ -233,11 +233,11 @@ test('reorganization commit records history without consuming observations', asy
         return Promise.resolve({ rows: [{ version: '4' }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -249,23 +249,23 @@ test('reorganization commit records history without consuming observations', asy
         kind: 'reorganization',
         operation_id: 'maintenance-1',
         trajectory_reference: versionTrajectory,
-        maintenance_report: reorganizationReport,
-      },
-    }),
+        maintenance_report: reorganizationReport
+      }
+    })
   ).toStrictEqual({
     created: true,
     version: 4,
-    source: { kind: 'reorganization', operation_id: 'maintenance-1' },
+    source: { kind: 'reorganization', operation_id: 'maintenance-1' }
   })
   expect(
     statements.some(
       ({ sql }) =>
         sql.includes('select observation_id from observations') ||
-        sql.includes('update observations set consumed_version'),
-    ),
+        sql.includes('update observations set consumed_version')
+    )
   ).toBe(false)
   const insert = statements.find(({ sql }) =>
-    sql.includes('insert into memory_tree_versions'),
+    sql.includes('insert into memory_tree_versions')
   )
   expect(insert?.parameters).toStrictEqual([
     4,
@@ -275,7 +275,7 @@ test('reorganization commit records history without consuming observations', asy
     'maintenance-1',
     versionTrajectory,
     reorganizationReport,
-    null,
+    null
   ])
 })
 
@@ -290,16 +290,16 @@ test('an identical learning operation id replays the created version', async () 
       if (sql.includes('version.operation_id=$1')) {
         return Promise.resolve({
           rows: [{ version: '4', identical: true }],
-          rowCount: 1,
+          rowCount: 1
         })
       }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -312,13 +312,13 @@ test('an identical learning operation id replays the created version', async () 
         operation_id: 'maintenance-1',
         observation_ids: ['extraction-1'],
         trajectory_reference: versionTrajectory,
-        maintenance_report: learningReport(['extraction-1']),
-      },
-    }),
+        maintenance_report: learningReport(['extraction-1'])
+      }
+    })
   ).toStrictEqual({
     created: false,
     version: 4,
-    source: { kind: 'learning', operation_id: 'maintenance-1' },
+    source: { kind: 'learning', operation_id: 'maintenance-1' }
   })
 })
 
@@ -336,11 +336,11 @@ test('paused control rejects a new automatic version commit before active CAS', 
         return Promise.resolve({ rows: [{ state: 'paused' }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 0 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -353,12 +353,12 @@ test('paused control rejects a new automatic version commit before active CAS', 
         operation_id: 'maintenance-1',
         observation_ids: ['extraction-1'],
         trajectory_reference: versionTrajectory,
-        maintenance_report: learningReport(['extraction-1']),
-      },
-    }),
+        maintenance_report: learningReport(['extraction-1'])
+      }
+    })
   ).rejects.toThrow(AutomationPausedError)
   expect(statements.some((sql) => sql.includes('select active_version'))).toBe(
-    false,
+    false
   )
 })
 
@@ -368,7 +368,7 @@ test('manual edit commits without consuming observations', async () => {
     query: (sql: string, parameters?: unknown[]) => {
       statements.push({
         sql,
-        ...(parameters === undefined ? {} : { parameters }),
+        ...(parameters === undefined ? {} : { parameters })
       })
       if (
         sql.includes('select 1 from memory_version_publications') &&
@@ -381,11 +381,11 @@ test('manual edit commits without consuming observations', async () => {
         return Promise.resolve({ rows: [{ version: '3' }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -396,23 +396,23 @@ test('manual edit commits without consuming observations', async () => {
       source: {
         kind: 'manual',
         operation_id: 'operation-1',
-        actor: { kind: 'user', id: 'alice' },
-      },
-    }),
+        actor: { kind: 'user', id: 'alice' }
+      }
+    })
   ).toStrictEqual({
     created: true,
     version: 3,
-    source: { kind: 'manual', operation_id: 'operation-1' },
+    source: { kind: 'manual', operation_id: 'operation-1' }
   })
   expect(
     statements.some(
       ({ sql }) =>
         sql.includes('select observation_id from observations') ||
-        sql.includes('update observations set consumed_version'),
-    ),
+        sql.includes('update observations set consumed_version')
+    )
   ).toBe(false)
   const insert = statements.find(({ sql }) =>
-    sql.includes('insert into memory_tree_versions'),
+    sql.includes('insert into memory_tree_versions')
   )
   expect(insert?.parameters?.slice(0, 2)).toStrictEqual([3, 1])
 })
@@ -429,15 +429,15 @@ test('manual operation id replays identical content and rejects drift', async ()
       if (sql.includes('version.operation_id=$1'))
         return Promise.resolve({
           rows: [{ version: '5', identical }],
-          rowCount: 1,
+          rowCount: 1
         })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
   const input = {
@@ -446,18 +446,18 @@ test('manual operation id replays identical content and rejects drift', async ()
     source: {
       kind: 'manual' as const,
       operation_id: 'operation-1',
-      actor: { kind: 'user' as const, id: 'alice' },
-    },
+      actor: { kind: 'user' as const, id: 'alice' }
+    }
   }
 
   expect(await store.createMemoryTreeVersion(input)).toStrictEqual({
     created: false,
     version: 5,
-    source: { kind: 'manual', operation_id: 'operation-1' },
+    source: { kind: 'manual', operation_id: 'operation-1' }
   })
   identical = false
   await expect(store.createMemoryTreeVersion(input)).rejects.toThrow(
-    MemoryTreeVersionConflictError,
+    MemoryTreeVersionConflictError
   )
 })
 
@@ -482,11 +482,11 @@ test('restore moves the active pointer without creating a version', async () => 
         return Promise.resolve({ rows: [{ found: 1 }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
-    release: () => undefined,
+    release: () => undefined
   }
   const pool = {
     connect: () => Promise.resolve(client),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -495,15 +495,15 @@ test('restore moves the active pointer without creating a version', async () => 
       operation_id: 'restore-1',
       expected_active_version: 4,
       restored_version: 2,
-      actor: { kind: 'user', id: 'alice' },
-    }),
+      actor: { kind: 'user', id: 'alice' }
+    })
   ).toStrictEqual({
     created: true,
     active_version: 2,
-    operation_id: 'restore-1',
+    operation_id: 'restore-1'
   })
   expect(
-    statements.some((sql) => sql.includes('insert into memory_tree_versions')),
+    statements.some((sql) => sql.includes('insert into memory_tree_versions'))
   ).toBe(false)
 })
 
@@ -514,11 +514,11 @@ function assertStatementOrder(statements: string[], patterns: RegExp[]): void {
   let previous = -1
   for (const pattern of patterns) {
     const index = statements.findIndex(
-      (sql, position) => position > previous && pattern.test(sql),
+      (sql, position) => position > previous && pattern.test(sql)
     )
     expect.assert(
       index > previous,
-      `expected a statement matching ${pattern} after position ${previous}`,
+      `expected a statement matching ${pattern} after position ${previous}`
     )
     previous = index
   }
@@ -547,16 +547,16 @@ test('control replay is checked under the lock and precedes version checks', asy
                   resulting_state: 'paused',
                   resulting_version: '2',
                   actor: { kind: 'user', id: 'alice' },
-                  changed_at: new Date('2026-10-23T00:00:00Z'),
-                },
+                  changed_at: new Date('2026-10-23T00:00:00Z')
+                }
               ],
-              rowCount: 1,
+              rowCount: 1
             })
           return Promise.resolve({ rows: [], rowCount: 0 })
         },
-        release: () => undefined,
+        release: () => undefined
       }),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
@@ -564,20 +564,20 @@ test('control replay is checked under the lock and precedes version checks', asy
     await store.changeMemoryTreeAutomation('paused', {
       operation_id: 'pause-1',
       expected_version: 1,
-      actor: { kind: 'user', id: 'alice' },
-    }),
+      actor: { kind: 'user', id: 'alice' }
+    })
   ).toStrictEqual({
     created: false,
     automation: {
       state: 'paused',
       version: 2,
       changed_by: { kind: 'user', id: 'alice' },
-      changed_at: '2026-10-23T00:00:00.000Z',
-    },
+      changed_at: '2026-10-23T00:00:00.000Z'
+    }
   })
   assertStatementOrder(statements, [
     /from memory_tree_automation\s+where singleton=true for update/,
-    /from memory_tree_automation_operations/,
+    /from memory_tree_automation_operations/
   ])
 })
 
@@ -598,7 +598,7 @@ test('new control operation locks, checks, updates, and records the transition',
           if (sql.includes('select state, version from memory_tree_automation'))
             return Promise.resolve({
               rows: [{ state: 'enabled', version: '3' }],
-              rowCount: 1,
+              rowCount: 1
             })
           if (sql.includes('update memory_tree_automation'))
             return Promise.resolve({
@@ -607,23 +607,23 @@ test('new control operation locks, checks, updates, and records the transition',
                   state: 'paused',
                   version: '4',
                   changed_by: { kind: 'user', id: 'alice' },
-                  changed_at: new Date('2026-10-23T00:00:00Z'),
-                },
+                  changed_at: new Date('2026-10-23T00:00:00Z')
+                }
               ],
-              rowCount: 1,
+              rowCount: 1
             })
           return Promise.resolve({ rows: [], rowCount: 1 })
         },
-        release: () => undefined,
+        release: () => undefined
       }),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
   const result = await store.changeMemoryTreeAutomation('paused', {
     operation_id: 'pause-1',
     expected_version: 3,
-    actor: { kind: 'user', id: 'alice' },
+    actor: { kind: 'user', id: 'alice' }
   })
 
   expect(result.created).toBe(true)
@@ -631,6 +631,6 @@ test('new control operation locks, checks, updates, and records the transition',
     /from memory_tree_automation\s+where singleton=true for update/,
     /from memory_tree_automation_operations/,
     /update memory_tree_automation\s/,
-    /insert into memory_tree_automation_operations/,
+    /insert into memory_tree_automation_operations/
   ])
 })

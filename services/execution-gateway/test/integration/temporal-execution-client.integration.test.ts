@@ -6,7 +6,7 @@ import { expect, test } from 'vitest'
 
 import {
   ExecutionRunConflictError,
-  type ExecutionWorkflowInput,
+  type ExecutionWorkflowInput
 } from '../../src/execution.js'
 import type { IssueReviewInput } from '../../src/execution-api-types-generated.js'
 import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
@@ -24,10 +24,10 @@ async function issueReviewInput(): Promise<IssueReviewInput> {
         'execution-api',
         'v1',
         'fixtures',
-        'issue-review-input.json',
+        'issue-review-input.json'
       ),
-      'utf8',
-    ),
+      'utf8'
+    )
   ) as IssueReviewInput
 }
 
@@ -39,7 +39,7 @@ test('Temporal client submits and identifies execution requests', async () => {
     workflow: 'issue-review',
     run_id: runId,
     input: await issueReviewInput(),
-    timeout_seconds: 60,
+    timeout_seconds: 60
   }
 
   try {
@@ -54,7 +54,7 @@ test('Temporal client submits and identifies execution requests', async () => {
 
     expect(
       await client.start({ ...request, timeout_seconds: 120 }),
-      'Gateway timeout policy is not part of the caller request identity',
+      'Gateway timeout policy is not part of the caller request identity'
     ).toStrictEqual(created)
 
     await expect(
@@ -62,9 +62,9 @@ test('Temporal client submits and identifies execution requests', async () => {
         ...request,
         input: {
           ...request.input,
-          setup_declaration: 'steps:\n  - run: echo changed\n',
-        },
-      }),
+          setup_declaration: 'steps:\n  - run: echo changed\n'
+        }
+      })
     ).rejects.toThrow(ExecutionRunConflictError)
   } finally {
     await client.close()

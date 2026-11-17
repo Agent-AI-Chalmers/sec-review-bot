@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 
 import {
   InvalidCatalogCursorError,
-  PostgresMemoryCatalogQueries,
+  PostgresMemoryCatalogQueries
 } from '../src/catalog-queries.js'
 import { learningReport, reorganizationReport } from './maintenance-report.js'
 
@@ -12,21 +12,21 @@ const artifact = {
   uri: 's3://sec-review/memory/trees/memory-tree.v1.tar.zst',
   digest: `sha256:${'a'.repeat(64)}`,
   media_type: 'application/tar+zstd',
-  size_bytes: 42,
+  size_bytes: 42
 }
 
 const versionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
   media_type: 'application/zstd',
-  size_bytes: 21,
+  size_bytes: 21
 }
 
 const extractionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst',
   digest: `sha256:${'c'.repeat(64)}`,
   media_type: 'application/zstd',
-  size_bytes: 18,
+  size_bytes: 18
 }
 
 test('memory tree version history pagination returns an exclusive descending cursor', async () => {
@@ -46,7 +46,7 @@ test('memory tree version history pagination returns an exclusive descending cur
             trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-4']),
             actor: null,
-            created_at: new Date('2026-10-23T04:00:00Z'),
+            created_at: new Date('2026-10-23T04:00:00Z')
           },
           {
             version: '3',
@@ -58,7 +58,7 @@ test('memory tree version history pagination returns an exclusive descending cur
             trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-3']),
             actor: null,
-            created_at: new Date('2026-10-23T03:00:00Z'),
+            created_at: new Date('2026-10-23T03:00:00Z')
           },
           {
             version: '2',
@@ -70,13 +70,13 @@ test('memory tree version history pagination returns an exclusive descending cur
             trajectory_reference: versionTrajectory,
             maintenance_report: learningReport(['extraction-2']),
             actor: null,
-            created_at: new Date('2026-10-23T02:00:00Z'),
-          },
+            created_at: new Date('2026-10-23T02:00:00Z')
+          }
         ],
-        rowCount: 3,
+        rowCount: 3
       })
     },
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
@@ -98,7 +98,7 @@ test('extraction pagination uses a stable opaque exclusive cursor', async () => 
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
       body_markdown: 'Third.',
-      created_at: new Date('2026-10-23T03:00:00Z'),
+      created_at: new Date('2026-10-23T03:00:00Z')
     },
     {
       extraction_id: 'extraction-2',
@@ -108,28 +108,28 @@ test('extraction pagination uses a stable opaque exclusive cursor', async () => 
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
       body_markdown: null,
-      created_at: new Date('2026-10-23T02:00:00Z'),
-    },
+      created_at: new Date('2026-10-23T02:00:00Z')
+    }
   ]
   const pool = {
     query: (_sql: string, parameters: unknown[]) => {
       parametersSeen.push(parameters)
       return Promise.resolve({ rows, rowCount: rows.length })
     },
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
   const page = await queries.listExtractions(undefined, 1, {
     sourceWorkflow: 'issue-review',
-    hasObservation: true,
+    hasObservation: true
   })
 
   expect(parametersSeen).toStrictEqual([
-    [null, null, 'issue-review', null, true, 2],
+    [null, null, 'issue-review', null, true, 2]
   ])
   expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual([
-    'extraction-3',
+    'extraction-3'
   ])
   expect(typeof page.next_cursor).toBe('string')
   expect(page.next_cursor ?? '').toMatch(/^[A-Za-z0-9_-]+$/)
@@ -142,12 +142,12 @@ test('observation pagination rejects malformed cursors before querying', async (
       queried = true
       return Promise.resolve({ rows: [], rowCount: 0 })
     },
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
   await expect(queries.listObservations('not-json', 10, {})).rejects.toThrow(
-    InvalidCatalogCursorError,
+    InvalidCatalogCursorError
   )
   expect(queried).toBe(false)
 })
@@ -164,12 +164,12 @@ test('observation records include their authoritative extraction source', async 
             source_unit_id: 'review',
             body_markdown: 'Remember this.',
             consumed_version: null,
-            created_at: new Date('2026-10-23T00:00:00Z'),
-          },
+            created_at: new Date('2026-10-23T00:00:00Z')
+          }
         ],
-        rowCount: 1,
+        rowCount: 1
       }),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
@@ -183,8 +183,8 @@ test('observation records include their authoritative extraction source', async 
       source_unit_id: 'review',
       body_markdown: 'Remember this.',
       consumed_version: null,
-      created_at: '2026-10-23T00:00:00.000Z',
-    },
+      created_at: '2026-10-23T00:00:00.000Z'
+    }
   ])
 })
 
@@ -202,10 +202,10 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
               units_without_observation_count: '1',
               observation_count: '3',
               pending_observation_count: '2',
-              consumed_observation_count: '1',
-            },
+              consumed_observation_count: '1'
+            }
           ],
-          rowCount: 1,
+          rowCount: 1
         })
       if (sql.includes('generate_series')) {
         trendQuery = { sql, values }
@@ -214,10 +214,10 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
             {
               period_start: '2026-10-23',
               extracted_unit_count: '4',
-              units_with_observation_count: '3',
-            },
+              units_with_observation_count: '3'
+            }
           ],
-          rowCount: 1,
+          rowCount: 1
         })
       }
       return Promise.resolve({
@@ -226,13 +226,13 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
             source_workflow: 'issue-review',
             extracted_unit_count: '4',
             units_with_observation_count: '3',
-            units_without_observation_count: '1',
-          },
+            units_without_observation_count: '1'
+          }
         ],
-        rowCount: 1,
+        rowCount: 1
       })
     },
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
@@ -244,24 +244,24 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
       units_without_observation_count: 1,
       observation_count: 3,
       pending_observation_count: 2,
-      consumed_observation_count: 1,
+      consumed_observation_count: 1
     },
     trend_granularity: 'day',
     trend_points: [
       {
         period_start: '2026-10-23',
         extracted_unit_count: 4,
-        units_with_observation_count: 3,
-      },
+        units_with_observation_count: 3
+      }
     ],
     workflows: [
       {
         source_workflow: 'issue-review',
         extracted_unit_count: 4,
         units_with_observation_count: 3,
-        units_without_observation_count: 1,
-      },
-    ],
+        units_without_observation_count: 1
+      }
+    ]
   })
   expect(trendQuery?.values).toStrictEqual([29])
   expect(trendQuery?.sql ?? '').toMatch(/created_at at time zone 'UTC'/)
@@ -282,10 +282,10 @@ test('all-time catalog overview uses UTC month periods including an empty curren
               units_without_observation_count: '0',
               observation_count: '0',
               pending_observation_count: '0',
-              consumed_observation_count: '0',
-            },
+              consumed_observation_count: '0'
+            }
           ],
-          rowCount: 1,
+          rowCount: 1
         })
       if (sql.includes('generate_series')) {
         trendQuery = { sql, values }
@@ -294,15 +294,15 @@ test('all-time catalog overview uses UTC month periods including an empty curren
             {
               period_start: '2026-10-01',
               extracted_unit_count: '0',
-              units_with_observation_count: '0',
-            },
+              units_with_observation_count: '0'
+            }
           ],
-          rowCount: 1,
+          rowCount: 1
         })
       }
       return Promise.resolve({ rows: [], rowCount: 0 })
     },
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
@@ -313,8 +313,8 @@ test('all-time catalog overview uses UTC month periods including an empty curren
     {
       period_start: '2026-10-01',
       extracted_unit_count: 0,
-      units_with_observation_count: 0,
-    },
+      units_with_observation_count: 0
+    }
   ])
   expect(trendQuery?.values).toStrictEqual([])
   expect(trendQuery?.sql ?? '').toMatch(/date_trunc\('month'/)
@@ -331,12 +331,12 @@ test('memory-tree automation reads the durable singleton state', async () => {
             state: 'enabled',
             version: '0',
             changed_by: { kind: 'service', id: 'memory-catalog' },
-            changed_at: new Date('2026-10-23T00:00:00Z'),
-          },
+            changed_at: new Date('2026-10-23T00:00:00Z')
+          }
         ],
-        rowCount: 1,
+        rowCount: 1
       }),
-    end: () => Promise.resolve(),
+    end: () => Promise.resolve()
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
@@ -344,7 +344,7 @@ test('memory-tree automation reads the durable singleton state', async () => {
     state: 'enabled',
     version: 0,
     changed_by: { kind: 'service', id: 'memory-catalog' },
-    changed_at: '2026-10-23T00:00:00.000Z',
+    changed_at: '2026-10-23T00:00:00.000Z'
   })
 })
 
@@ -363,10 +363,10 @@ test('reorganization versions retain their source and trajectory in detail and h
             maintenance_report: reorganizationReport,
             actor: null,
             memory_tree_reference: artifact,
-            created_at: new Date('2026-10-23T04:00:00Z'),
-          },
-        ],
-      }),
+            created_at: new Date('2026-10-23T04:00:00Z')
+          }
+        ]
+      })
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
   const expected = {
@@ -376,14 +376,14 @@ test('reorganization versions retain their source and trajectory in detail and h
       kind: 'reorganization',
       operation_id: 'reorganization-2',
       trajectory_reference: versionTrajectory,
-      maintenance_report: reorganizationReport,
+      maintenance_report: reorganizationReport
     },
     memory_tree_reference: artifact,
-    created_at: '2026-10-23T04:00:00.000Z',
+    created_at: '2026-10-23T04:00:00.000Z'
   }
   expect(await queries.getMemoryTreeVersion(2)).toStrictEqual(expected)
   expect(await queries.listMemoryTreeVersions(undefined, 10)).toStrictEqual({
     versions: [expected],
-    next_before_version: null,
+    next_before_version: null
   })
 })

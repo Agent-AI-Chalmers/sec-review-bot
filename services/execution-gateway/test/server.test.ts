@@ -5,7 +5,7 @@ import { expect, test } from 'vitest'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
-  type ExecutionWorkflowInput,
+  type ExecutionWorkflowInput
 } from '../src/execution.js'
 import { createApp } from '../src/server.js'
 
@@ -20,13 +20,13 @@ class FakeExecutionRunClient {
       throw new ExecutionRunConflictError(
         request.run_id,
         request.workflow,
-        'issue-review',
+        'issue-review'
       )
     }
     const record: ExecutionRecord = {
       run_id: request.run_id,
       workflow: request.workflow,
-      status: 'running',
+      status: 'running'
     }
     this.records.set(request.run_id, record)
     return Promise.resolve(record)
@@ -46,17 +46,17 @@ function fixture(name: string): Record<string, unknown> {
         'execution-api',
         'v1',
         'fixtures',
-        name,
+        name
       ),
-      'utf8',
-    ),
+      'utf8'
+    )
   ) as Record<string, unknown>
 }
 
 test('health endpoint remains public when API authentication is configured', async () => {
   const app = await createApp({
     client: new FakeExecutionRunClient(),
-    token: 'secret',
+    token: 'secret'
   })
   const response = await app.inject({ method: 'GET', url: '/healthz' })
   expect(response.statusCode).toBe(200)
@@ -71,9 +71,9 @@ test('invalid workflow timeout fails while creating the app', async (t) => {
   })
 
   await expect(
-    createApp({ client: new FakeExecutionRunClient() }),
+    createApp({ client: new FakeExecutionRunClient() })
   ).rejects.toThrow(
-    /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/,
+    /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/
   )
 })
 
@@ -86,8 +86,8 @@ test('creates and reads an execution run', async () => {
     headers: { authorization: 'Bearer secret' },
     payload: {
       run_id: 'run-1',
-      input: fixture('issue-review-input.json'),
-    },
+      input: fixture('issue-review-input.json')
+    }
   })
   expect(create.statusCode).toBe(202)
   expect(create.body).toMatch(/"status":"running"/)
@@ -95,7 +95,7 @@ test('creates and reads an execution run', async () => {
   const read = await app.inject({
     method: 'GET',
     url: '/v1/runs/run-1',
-    headers: { authorization: 'Bearer secret' },
+    headers: { authorization: 'Bearer secret' }
   })
   expect(read.statusCode).toBe(200)
   expect(read.body).toMatch(/"run_id":"run-1"/)
@@ -107,7 +107,7 @@ test('rejects requests that violate the workflow input contract', async () => {
   const response = await app.inject({
     method: 'POST',
     url: '/v1/workflows/issue-review/runs',
-    payload: { run_id: 'run-invalid', input: {} },
+    payload: { run_id: 'run-invalid', input: {} }
   })
   expect(response.statusCode).toBe(400)
   const body = response.json<{
@@ -117,7 +117,7 @@ test('rejects requests that violate the workflow input contract', async () => {
   }>()
   expect({
     ...body,
-    error: { ...body.error, message: undefined },
+    error: { ...body.error, message: undefined }
   }).toStrictEqual({
     run_id: 'run-invalid',
     workflow: 'issue-review',
@@ -126,8 +126,8 @@ test('rejects requests that violate the workflow input contract', async () => {
       code: 'EXECUTION_REQUEST_INVALID',
       message: undefined,
       retryable: false,
-      details: {},
-    },
+      details: {}
+    }
   })
   expect(typeof body.error.message).toBe('string')
   await app.close()
@@ -136,11 +136,11 @@ test('rejects requests that violate the workflow input contract', async () => {
 test('requires the configured bearer token', async () => {
   const app = await createApp({
     client: new FakeExecutionRunClient(),
-    token: 'secret',
+    token: 'secret'
   })
   const response = await app.inject({
     method: 'GET',
-    url: '/v1/runs/run-1',
+    url: '/v1/runs/run-1'
   })
   expect(response.statusCode).toBe(401)
   expect(response.json()).toStrictEqual({
@@ -150,8 +150,8 @@ test('requires the configured bearer token', async () => {
       message:
         'None of the security schemes (HTTPBearer) successfully authenticated this request.',
       retryable: false,
-      details: {},
-    },
+      details: {}
+    }
   })
   await app.close()
 })
@@ -160,7 +160,7 @@ test('returns missing runs in the public error envelope', async () => {
   const app = await createApp({ client: new FakeExecutionRunClient() })
   const response = await app.inject({
     method: 'GET',
-    url: '/v1/runs/run-missing',
+    url: '/v1/runs/run-missing'
   })
   expect(response.statusCode).toBe(404)
   expect(response.json()).toStrictEqual({
@@ -170,8 +170,8 @@ test('returns missing runs in the public error envelope', async () => {
       code: 'EXECUTION_RUN_NOT_FOUND',
       message: 'Execution run not found.',
       retryable: false,
-      details: {},
-    },
+      details: {}
+    }
   })
   await app.close()
 })
@@ -185,8 +185,8 @@ test('reports Temporal submission failures as internal errors', async () => {
     url: '/v1/workflows/issue-review/runs',
     payload: {
       run_id: 'run-temporal-failure',
-      input: fixture('issue-review-input.json'),
-    },
+      input: fixture('issue-review-input.json')
+    }
   })
   expect(response.statusCode).toBe(500)
   expect(response.body).not.toMatch(/Temporal unavailable/)
@@ -204,8 +204,8 @@ for (const runtime of [null, {}, { workspace_image: 'benchmark:latest' }]) {
         payload: {
           run_id: 'run-invalid-runtime',
           input: fixture('issue-review-input.json'),
-          runtime,
-        },
+          runtime
+        }
       })
       expect(response.statusCode).toBe(400)
       expect(client.records.size).toBe(0)

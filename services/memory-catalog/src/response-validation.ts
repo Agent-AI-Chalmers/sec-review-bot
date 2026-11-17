@@ -9,7 +9,7 @@ export function registerResponseValidation(app: FastifyInstance): void {
     strict: false,
     coerceTypes: false,
     useDefaults: false,
-    removeAdditional: false,
+    removeAdditional: false
   })
   addFormats.default(ajv)
   app.addHook('onRoute', (route) => {
@@ -17,21 +17,21 @@ export function registerResponseValidation(app: FastifyInstance): void {
     const validators = new Map(
       Object.entries(route.schema.response).map(([status, schema]) => [
         status,
-        ajv.compile(schema as object),
-      ]),
+        ajv.compile(schema as object)
+      ])
     )
     const validateResponse: preSerializationHookHandler = (
       _request,
       reply,
       payload,
-      done,
+      done
     ) => {
       const validate = validators.get(String(reply.statusCode))
       if (!validate || !validate(payload)) {
         done(
           new Error(
-            `Memory Catalog response violates contract: ${validate ? ajv.errorsText(validate.errors) : 'undocumented status'}`,
-          ),
+            `Memory Catalog response violates contract: ${validate ? ajv.errorsText(validate.errors) : 'undocumented status'}`
+          )
         )
         return
       }
@@ -40,7 +40,7 @@ export function registerResponseValidation(app: FastifyInstance): void {
     const previous = route.preSerialization
     route.preSerialization = [
       ...(Array.isArray(previous) ? previous : previous ? [previous] : []),
-      validateResponse,
+      validateResponse
     ]
   })
 }

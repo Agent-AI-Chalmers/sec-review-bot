@@ -5,25 +5,25 @@ import {
   Connection,
   WorkflowExecutionAlreadyStartedError,
   WorkflowIdReusePolicy,
-  WorkflowNotFoundError,
+  WorkflowNotFoundError
 } from '@temporalio/client'
 
 import {
   isExecutionError,
-  validateExecutionResult,
+  validateExecutionResult
 } from './execution-api-validation.js'
 import {
   executionWorkflowType,
-  validateExecutionSubmission,
+  validateExecutionSubmission
 } from './execution-workflow-validation.js'
 import type {
   ExecutionArtifactStorage,
-  ExecutionError,
+  ExecutionError
 } from './execution-api-types-generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
-  type ExecutionWorkflowInput,
+  type ExecutionWorkflowInput
 } from './execution.js'
 
 function fingerprint(request: ExecutionWorkflowInput): string {
@@ -33,7 +33,7 @@ function fingerprint(request: ExecutionWorkflowInput): string {
   const requestIdentity = {
     workflow: request.workflow,
     run_id: request.run_id,
-    input: request.input,
+    input: request.input
   }
   return createHash('sha256')
     .update(JSON.stringify(canonicalValue(requestIdentity)))
@@ -46,7 +46,7 @@ function canonicalValue(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, canonicalValue(entry)]),
+        .map(([key, entry]) => [key, canonicalValue(entry)])
     )
   }
   return value
@@ -61,22 +61,22 @@ export class TemporalExecutionClient {
   private constructor(
     private readonly connection: Connection,
     private readonly client: Client,
-    private readonly taskQueue: string,
+    private readonly taskQueue: string
   ) {}
 
   static async connect(): Promise<TemporalExecutionClient> {
     const connection = await Connection.connect({
-      address: process.env.TEMPORAL_ADDRESS?.trim() || '127.0.0.1:7233',
+      address: process.env.TEMPORAL_ADDRESS?.trim() || '127.0.0.1:7233'
     })
     const client = new Client({
       connection,
-      namespace: process.env.TEMPORAL_NAMESPACE?.trim() || 'default',
+      namespace: process.env.TEMPORAL_NAMESPACE?.trim() || 'default'
     })
     return new TemporalExecutionClient(
       connection,
       client,
       process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() ||
-        'sec-review-execution',
+        'sec-review-execution'
     )
   }
 
@@ -92,8 +92,8 @@ export class TemporalExecutionClient {
         workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
         memo: {
           workflow: request.workflow,
-          request_fingerprint: requestFingerprint,
-        },
+          request_fingerprint: requestFingerprint
+        }
       })
     } catch (error) {
       if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error
@@ -110,14 +110,14 @@ export class TemporalExecutionClient {
       throw new ExecutionRunConflictError(
         request.run_id,
         request.workflow,
-        existing?.workflow,
+        existing?.workflow
       )
     }
     return (
       (await this.get(request.run_id)) ?? {
         run_id: request.run_id,
         workflow: request.workflow,
-        status: 'queued',
+        status: 'queued'
       }
     )
   }
@@ -140,7 +140,7 @@ export class TemporalExecutionClient {
       return {
         run_id: runId,
         ...(workflow ? { workflow } : {}),
-        status: 'running',
+        status: 'running'
       }
     }
     if (temporalStatus === 'COMPLETED') {
@@ -153,8 +153,8 @@ export class TemporalExecutionClient {
           artifact_storage: { status: 'unavailable' },
           error: executionError(
             'EXECUTION_RESPONSE_INVALID',
-            'Invalid workflow response.',
-          ),
+            'Invalid workflow response.'
+          )
         }
       }
       if (response.ok === true && 'result' in response) {
@@ -165,8 +165,8 @@ export class TemporalExecutionClient {
             artifact_storage: { status: 'unavailable' },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
-              'Completed execution is missing its workflow identity.',
-            ),
+              'Completed execution is missing its workflow identity.'
+            )
           }
         }
         try {
@@ -179,15 +179,15 @@ export class TemporalExecutionClient {
             artifact_storage: { status: 'unavailable' },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
-              error instanceof Error ? error.message : String(error),
-            ),
+              error instanceof Error ? error.message : String(error)
+            )
           }
         }
         let artifact_storage: ArtifactStorageProjection
         try {
           artifact_storage = parseExecutionArchiveArtifact(
             response.artifact_storage,
-            runId,
+            runId
           )
         } catch (error) {
           return {
@@ -198,12 +198,12 @@ export class TemporalExecutionClient {
               status: 'failed',
               error_code: 'ARTIFACT_REFERENCE_INVALID',
               message:
-                'Execution returned an invalid execution archive artifact.',
+                'Execution returned an invalid execution archive artifact.'
             },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
-              error instanceof Error ? error.message : String(error),
-            ),
+              error instanceof Error ? error.message : String(error)
+            )
           }
         }
         return {
@@ -214,9 +214,9 @@ export class TemporalExecutionClient {
           artifact_storage,
           ...(isRecord(response.memory_processing)
             ? {
-                memory_processing: response.memory_processing,
+                memory_processing: response.memory_processing
               }
-            : {}),
+            : {})
         }
       }
       return {
@@ -228,8 +228,8 @@ export class TemporalExecutionClient {
           ? response.error
           : executionError(
               'EXECUTION_RESPONSE_INVALID',
-              'Invalid workflow response.',
-            ),
+              'Invalid workflow response.'
+            )
       }
     }
     return {
@@ -239,8 +239,8 @@ export class TemporalExecutionClient {
       artifact_storage: { status: 'unavailable' },
       error: executionError(
         'EXECUTION_FAILED',
-        `Temporal workflow ended with status ${temporalStatus}.`,
-      ),
+        `Temporal workflow ended with status ${temporalStatus}.`
+      )
     }
   }
 
@@ -266,7 +266,7 @@ type ArtifactStorageProjection = ExecutionArtifactStorage & {
 
 export function parseExecutionArchiveArtifact(
   value: unknown,
-  runId: string,
+  runId: string
 ): ArtifactStorageProjection {
   if (!isRecord(value) || value.status !== 'available')
     throw new Error('Execution response is missing artifact_storage.')
@@ -301,8 +301,8 @@ export function parseExecutionArchiveArtifact(
       uri: artifact.uri,
       media_type: 'application/tar+zstd',
       digest: artifact.digest,
-      size_bytes: artifact.size_bytes as number,
-    },
+      size_bytes: artifact.size_bytes as number
+    }
   }
 }
 

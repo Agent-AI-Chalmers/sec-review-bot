@@ -2,7 +2,7 @@ export function integerEnv(
   name: string,
   defaultValue: number,
   minimum = 1,
-  maximum = Number.MAX_SAFE_INTEGER,
+  maximum = Number.MAX_SAFE_INTEGER
 ): number {
   const raw = process.env[name]
   if (raw === undefined) return defaultValue

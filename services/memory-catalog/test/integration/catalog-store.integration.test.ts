@@ -9,11 +9,11 @@ import {
   ExtractionConflictError,
   AutomationPausedError,
   MemoryTreeVersionConflictError,
-  PostgresMemoryCatalogStore,
+  PostgresMemoryCatalogStore
 } from '../../src/catalog-store.js'
 import type {
   ArtifactReference,
-  ExtractionRegistration,
+  ExtractionRegistration
 } from '../../src/contract-types-generated.js'
 import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
@@ -26,7 +26,7 @@ function artifact(name: string, digestCharacter: string): ArtifactReference {
     uri: `s3://sec-review/memory/${name}`,
     digest: `sha256:${digestCharacter.repeat(64)}`,
     media_type: 'application/zstd',
-    size_bytes: 42,
+    size_bytes: 42
   }
 }
 
@@ -39,11 +39,11 @@ const extraction: ExtractionRegistration = {
   execution_archive_digest: `sha256:${'d'.repeat(64)}`,
   trajectory_reference: artifact(
     'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
-    'c',
+    'c'
   ),
   observations: [
-    { observation_id: 'extraction-1', body_markdown: observationBody },
-  ],
+    { observation_id: 'extraction-1', body_markdown: observationBody }
+  ]
 }
 const versionInput = {
   expected_active_version: 0,
@@ -54,10 +54,10 @@ const versionInput = {
     observation_ids: [extraction.extraction_id],
     trajectory_reference: artifact(
       'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
-      'b',
+      'b'
     ),
-    maintenance_report: learningReport([extraction.extraction_id]),
-  },
+    maintenance_report: learningReport([extraction.extraction_id])
+  }
 }
 const reorganizationInput = {
   expected_active_version: 1,
@@ -67,10 +67,10 @@ const reorganizationInput = {
     operation_id: 'reorganization-1',
     trajectory_reference: artifact(
       'trajectories/memory-maintainer/reorganization.v1.jsonl.zst',
-      'e',
+      'e'
     ),
-    maintenance_report: reorganizationReport,
-  },
+    maintenance_report: reorganizationReport
+  }
 }
 
 const test = base.extend<{
@@ -89,21 +89,21 @@ const test = base.extend<{
     })
     const pool = new Pool({
       connectionString: databaseUrl,
-      options: `-c search_path=${schema},public`,
+      options: `-c search_path=${schema},public`
     })
     const store = new PostgresMemoryCatalogStore('unused', pool)
     resources.defer(() => store.close())
     await store.initialize()
     await use({ store, pool })
-  },
+  }
 })
 
 test('extractions are idempotent and learning consumes observations atomically', async ({
-  catalog: { store },
+  catalog: { store }
 }) => {
   const publication = {
     registration: extraction,
-    summary: 'Observation produced.',
+    summary: 'Observation produced.'
   }
   await store.reserveExtractionPublication(publication)
   await store.confirmExtractionPublication(publication)
@@ -115,32 +115,32 @@ test('extractions are idempotent and learning consumes observations atomically',
       observations: [
         {
           observation_id: 'extraction-1',
-          body_markdown: 'Conflicting observation.',
-        },
-      ],
-    }),
+          body_markdown: 'Conflicting observation.'
+        }
+      ]
+    })
   ).rejects.toThrow(ExtractionConflictError)
 
   const stored = await store.queries.getExtraction(extraction.extraction_id)
   expect(stored?.observations[0]?.body_markdown).toBe(
-    extraction.observations[0]?.body_markdown,
+    extraction.observations[0]?.body_markdown
   )
   expect(stored?.trajectory_reference).toStrictEqual(
-    extraction.trajectory_reference,
+    extraction.trajectory_reference
   )
 
   const extractionPage = await store.queries.listExtractions(undefined, 10, {
     sourceRunId: extraction.source_run_id,
-    hasObservation: true,
+    hasObservation: true
   })
   expect(extractionPage.extractions).toStrictEqual([stored])
   expect(extractionPage.next_cursor).toBe(null)
   expect(
     (
       await store.queries.listObservations(undefined, 10, {
-        status: 'pending',
+        status: 'pending'
       })
-    ).observations[0]?.extraction_id,
+    ).observations[0]?.extraction_id
   ).toBe(extraction.extraction_id)
 
   const learningInput = await store.getLearningInput(10)
@@ -148,8 +148,8 @@ test('extractions are idempotent and learning consumes observations atomically',
   expect(learningInput?.observations).toStrictEqual([
     {
       observation_id: extraction.extraction_id,
-      body_markdown: observationBody,
-    },
+      body_markdown: observationBody
+    }
   ])
 
   await store.reserveVersionPublication(versionInput)
@@ -157,36 +157,36 @@ test('extractions are idempotent and learning consumes observations atomically',
   expect(await store.createMemoryTreeVersion(versionInput)).toStrictEqual({
     created: true,
     version: 1,
-    source: { kind: 'learning', operation_id: 'maintenance-1' },
+    source: { kind: 'learning', operation_id: 'maintenance-1' }
   })
   expect(await store.createMemoryTreeVersion(versionInput)).toStrictEqual({
     created: false,
     version: 1,
-    source: { kind: 'learning', operation_id: 'maintenance-1' },
+    source: { kind: 'learning', operation_id: 'maintenance-1' }
   })
 
   expect((await store.queries.getObservationBacklog()).pending_count).toBe(0)
   expect((await store.queries.getMemoryTree()).version).toBe(1)
   expect(
-    (await store.queries.getMemoryTreeVersion(1))?.predecessor_version,
+    (await store.queries.getMemoryTreeVersion(1))?.predecessor_version
   ).toBe(null)
 
   const history = await store.queries.listMemoryTreeVersions(undefined, 10)
   expect(history.versions).toStrictEqual([
-    await store.queries.getMemoryTreeVersion(1),
+    await store.queries.getMemoryTreeVersion(1)
   ])
   expect(history.next_before_version).toBe(null)
   const consumed = await store.queries.listObservations(undefined, 10, {
     status: 'consumed',
-    consumedVersion: 1,
+    consumedVersion: 1
   })
   expect(consumed.observations[0]?.consumed_version).toBe(1)
   expect(
     (
       await store.queries.listObservations(undefined, 10, {
-        status: 'pending',
+        status: 'pending'
       })
-    ).observations,
+    ).observations
   ).toStrictEqual([])
 
   await expect(
@@ -194,23 +194,23 @@ test('extractions are idempotent and learning consumes observations atomically',
       expected_active_version: 0,
       memory_tree_reference: artifact(
         'trees/operator-memory-tree.tar.zst',
-        'e',
+        'e'
       ),
       source: {
         kind: 'manual',
         operation_id: 'operator-1',
-        actor: { kind: 'user', id: 'reviewer@example.com' },
-      },
-    }),
+        actor: { kind: 'user', id: 'reviewer@example.com' }
+      }
+    })
   ).rejects.toThrow(MemoryTreeVersionConflictError)
 })
 
 test('version operation identities cannot cross source kinds and reorganization replays safely', async ({
-  catalog: { store, pool },
+  catalog: { store, pool }
 }) => {
   const publication = {
     registration: extraction,
-    summary: 'Observation produced.',
+    summary: 'Observation produced.'
   }
   await store.reserveExtractionPublication(publication)
   await store.confirmExtractionPublication(publication)
@@ -221,19 +221,19 @@ test('version operation identities cannot cross source kinds and reorganization 
   for (const source of [
     {
       ...reorganizationInput.source,
-      operation_id: versionInput.source.operation_id,
+      operation_id: versionInput.source.operation_id
     },
     {
       kind: 'manual' as const,
       operation_id: versionInput.source.operation_id,
-      actor: { kind: 'user' as const, id: 'reviewer@example.com' },
-    },
+      actor: { kind: 'user' as const, id: 'reviewer@example.com' }
+    }
   ]) {
     const conflictingInput = { ...reorganizationInput, source }
     await store.reserveVersionPublication(conflictingInput)
     await store.confirmVersionPublication(conflictingInput)
     await expect(
-      store.createMemoryTreeVersion(conflictingInput),
+      store.createMemoryTreeVersion(conflictingInput)
     ).rejects.toThrow(MemoryTreeVersionConflictError)
   }
   expect((await store.queries.getMemoryTree()).version).toBe(1)
@@ -241,35 +241,35 @@ test('version operation identities cannot cross source kinds and reorganization 
   await store.reserveVersionPublication(reorganizationInput)
   await store.confirmVersionPublication(reorganizationInput)
   expect(
-    await store.createMemoryTreeVersion(reorganizationInput),
+    await store.createMemoryTreeVersion(reorganizationInput)
   ).toStrictEqual({
     created: true,
     version: 2,
-    source: { kind: 'reorganization', operation_id: 'reorganization-1' },
+    source: { kind: 'reorganization', operation_id: 'reorganization-1' }
   })
   expect(
-    await store.createMemoryTreeVersion(reorganizationInput),
+    await store.createMemoryTreeVersion(reorganizationInput)
   ).toStrictEqual({
     created: false,
     version: 2,
-    source: { kind: 'reorganization', operation_id: 'reorganization-1' },
+    source: { kind: 'reorganization', operation_id: 'reorganization-1' }
   })
   const queries = new PostgresMemoryCatalogQueries(pool)
   const version = await queries.getMemoryTreeVersion(2)
   expect(version?.source).toStrictEqual(reorganizationInput.source)
   const reorganizationHistory = await queries.listMemoryTreeVersions(
     undefined,
-    10,
+    10
   )
   expect(reorganizationHistory.versions[0]).toStrictEqual(version)
 })
 
 test('pausing blocks new automatic commits but permits replays, manual edits and restores', async ({
-  catalog: { store },
+  catalog: { store }
 }) => {
   const publication = {
     registration: extraction,
-    summary: 'Observation produced.',
+    summary: 'Observation produced.'
   }
   await store.reserveExtractionPublication(publication)
   await store.confirmExtractionPublication(publication)
@@ -285,15 +285,15 @@ test('pausing blocks new automatic commits but permits replays, manual edits and
   const pause = {
     operation_id: 'pause-automation',
     expected_version: 0,
-    actor,
+    actor
   }
   const paused = await store.changeMemoryTreeAutomation('paused', pause)
   expect(paused.automation.state).toBe('paused')
   expect((await store.createMemoryTreeVersion(versionInput)).created).toBe(
-    false,
+    false
   )
   expect(
-    (await store.createMemoryTreeVersion(reorganizationInput)).created,
+    (await store.createMemoryTreeVersion(reorganizationInput)).created
   ).toBe(false)
 
   const pendingExtraction = {
@@ -302,13 +302,13 @@ test('pausing blocks new automatic commits but permits replays, manual edits and
     observations: [
       {
         observation_id: 'extraction-while-paused',
-        body_markdown: observationBody,
-      },
-    ],
+        body_markdown: observationBody
+      }
+    ]
   }
   const pendingPublication = {
     registration: pendingExtraction,
-    summary: 'Observation while paused.',
+    summary: 'Observation while paused.'
   }
   await store.reserveExtractionPublication(pendingPublication)
   await store.confirmExtractionPublication(pendingPublication)
@@ -317,23 +317,23 @@ test('pausing blocks new automatic commits but permits replays, manual edits and
     {
       ...versionInput.source,
       operation_id: 'paused-learning',
-      observation_ids: [pendingExtraction.extraction_id],
+      observation_ids: [pendingExtraction.extraction_id]
     },
-    { ...reorganizationInput.source, operation_id: 'paused-reorganization' },
+    { ...reorganizationInput.source, operation_id: 'paused-reorganization' }
   ]) {
     const candidate = {
       ...reorganizationInput,
       expected_active_version: 2,
-      source,
+      source
     }
     await store.reserveVersionPublication(candidate)
     await store.confirmVersionPublication(candidate)
     await expect(store.createMemoryTreeVersion(candidate)).rejects.toThrow(
-      AutomationPausedError,
+      AutomationPausedError
     )
     expect(
       (await store.listVersionPublications(source.kind, source.operation_id))[0]
-        ?.status,
+        ?.status
     ).toBe('abandoned')
   }
   const manual = {
@@ -342,8 +342,8 @@ test('pausing blocks new automatic commits but permits replays, manual edits and
     source: {
       kind: 'manual' as const,
       operation_id: 'manual-while-paused',
-      actor,
-    },
+      actor
+    }
   }
   await store.reserveVersionPublication(manual)
   await store.confirmVersionPublication(manual)
@@ -355,29 +355,29 @@ test('pausing blocks new automatic commits but permits replays, manual edits and
         operation_id: 'restore-while-paused',
         expected_active_version: 3,
         restored_version: 1,
-        actor,
+        actor
       })
-    ).active_version,
+    ).active_version
   ).toBe(1)
   const resumed = await store.changeMemoryTreeAutomation('enabled', {
     operation_id: 'resume-automation',
     expected_version: 1,
-    actor,
+    actor
   })
   expect(resumed.automation.state).toBe('enabled')
   expect(await store.changeMemoryTreeAutomation('paused', pause)).toStrictEqual(
     {
       ...paused,
-      created: false,
-    },
+      created: false
+    }
   )
   expect(await store.queries.getMemoryTreeAutomation()).toStrictEqual(
-    resumed.automation,
+    resumed.automation
   )
 })
 
 test('one extraction publishes multiple observations that paginate and consume independently', async ({
-  catalog: { store, pool },
+  catalog: { store, pool }
 }) => {
   const extraction: ExtractionRegistration = {
     extraction_id: 'one-run',
@@ -389,17 +389,17 @@ test('one extraction publishes multiple observations that paginate and consume i
     observations: [
       {
         observation_id: 'lesson-a',
-        body_markdown: 'Trace implicit deserialization sinks.',
+        body_markdown: 'Trace implicit deserialization sinks.'
       },
       {
         observation_id: 'lesson-b',
-        body_markdown: 'Preserve serialization semantics.',
-      },
-    ],
+        body_markdown: 'Preserve serialization semantics.'
+      }
+    ]
   }
   const intent = {
     registration: extraction,
-    summary: 'Two independent lessons.',
+    summary: 'Two independent lessons.'
   }
   await store.reserveExtractionPublication(intent)
   await store.confirmExtractionPublication(intent)
@@ -408,38 +408,38 @@ test('one extraction publishes multiple observations that paginate and consume i
   const collision = { ...extraction, extraction_id: 'another-run' }
   const collisionIntent = {
     registration: collision,
-    summary: 'Conflicting IDs.',
+    summary: 'Conflicting IDs.'
   }
   await store.reserveExtractionPublication(collisionIntent)
   await store.confirmExtractionPublication(collisionIntent)
   await expect(store.registerExtraction(collision)).rejects.toThrow(
-    ExtractionConflictError,
+    ExtractionConflictError
   )
   expect(await store.queries.getExtraction('another-run')).toBe(undefined)
   expect(
-    (await store.listExtractionPublications('another-run'))[0]?.status,
+    (await store.listExtractionPublications('another-run'))[0]?.status
   ).toBe('present')
   expect(
-    (await store.queries.getExtraction('one-run'))?.observations,
+    (await store.queries.getExtraction('one-run'))?.observations
   ).toStrictEqual(extraction.observations)
   expect(
-    (await store.queries.listExtractions(undefined, 1, {})).extractions,
+    (await store.queries.listExtractions(undefined, 1, {})).extractions
   ).toHaveLength(1)
   // Equal timestamps force the observation ID to act as the pagination tie-breaker.
   await pool.query('update observations set created_at=$1', [
-    '2026-01-01T00:00:00Z',
+    '2026-01-01T00:00:00Z'
   ])
   const first = await store.queries.listObservations(undefined, 1, {})
   expect.assert(first.next_cursor)
   const second = await store.queries.listObservations(first.next_cursor, 1, {})
   expect([
     first.observations[0]?.observation_id,
-    second.observations[0]?.observation_id,
+    second.observations[0]?.observation_id
   ]).toStrictEqual(['lesson-b', 'lesson-a'])
   expect(second.next_cursor).toBe(null)
   const input = await store.getLearningInput(1)
   expect(input?.observations.map((item) => item.observation_id)).toStrictEqual([
-    'lesson-a',
+    'lesson-a'
   ])
   const version = {
     expected_active_version: 0,
@@ -449,8 +449,8 @@ test('one extraction publishes multiple observations that paginate and consume i
       operation_id: 'learn-one',
       observation_ids: ['lesson-a'],
       trajectory_reference: artifact('maintainer', 'f'),
-      maintenance_report: learningReport(['lesson-a']),
-    },
+      maintenance_report: learningReport(['lesson-a'])
+    }
   }
   await store.reserveVersionPublication(version)
   await store.confirmVersionPublication(version)
@@ -458,8 +458,8 @@ test('one extraction publishes multiple observations that paginate and consume i
   expect((await store.createMemoryTreeVersion(version)).created).toBe(false)
   expect(
     (await store.getLearningInput(10))?.observations.map(
-      (item) => item.observation_id,
-    ),
+      (item) => item.observation_id
+    )
   ).toStrictEqual(['lesson-b'])
   expect((await store.queries.getObservationBacklog()).pending_count).toBe(1)
   const overview = await store.queries.getCatalogOverview('all')

@@ -17,15 +17,15 @@ async function setup(t: TestContext) {
       new Promise<void>((resolve, reject) =>
         occupied.listening
           ? occupied.close((error) => (error ? reject(error) : resolve()))
-          : resolve(),
-      ),
+          : resolve()
+      )
   )
   const address = occupied.address()
   expect.assert(address && typeof address !== 'string')
   const environment: Record<string, string | undefined> = {
     EXECUTION_GATEWAY_TOKEN: 'test-token',
     EXECUTION_GATEWAY_HOST: '127.0.0.1',
-    EXECUTION_GATEWAY_PORT: String(address.port),
+    EXECUTION_GATEWAY_PORT: String(address.port)
   }
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
@@ -45,7 +45,7 @@ async function setup(t: TestContext) {
       close: () => {
         closes += 1
         return closeFailure ? Promise.reject(closeFailure) : Promise.resolve()
-      },
+      }
     } as TemporalExecutionClient)
   })
   return {
@@ -54,14 +54,14 @@ async function setup(t: TestContext) {
     closes: () => closes,
     failClose: (error: Error) => {
       closeFailure = error
-    },
+    }
   }
 }
 
 test('listen failure releases resources acquired during startup', async (t) => {
   const fixture = await setup(t)
   await expect(startExecutionGateway()).rejects.toMatchObject({
-    code: 'EADDRINUSE',
+    code: 'EADDRINUSE'
   })
   expect(fixture.closes()).toBe(1)
 })
@@ -82,7 +82,7 @@ test('shutdown releases the backend even when HTTP close fails', async (t) => {
   await expect(running.close()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
-    message: failure.message,
+    message: failure.message
   })
   expect(fixture.closes()).toBe(1)
   await running.close()
@@ -98,7 +98,7 @@ test('shutdown does not close the backend twice after a backend close error', as
   await expect(running.close()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
-    message: failure.message,
+    message: failure.message
   })
   await running.close()
   expect(fixture.closes()).toBe(1)
@@ -109,7 +109,7 @@ test('invalid configuration fails before opening backend resources', async (t) =
   process.env.EXECUTION_GATEWAY_HOST = '0.0.0.0'
   delete process.env.EXECUTION_GATEWAY_TOKEN
   await expect(startExecutionGateway()).rejects.toThrow(
-    /EXECUTION_GATEWAY_TOKEN/,
+    /EXECUTION_GATEWAY_TOKEN/
   )
   expect(fixture.opens()).toBe(0)
 })

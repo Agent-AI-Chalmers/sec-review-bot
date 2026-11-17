@@ -7,12 +7,12 @@ export function learningReport(extractionIds: string[]): MaintenanceReport {
       observation_id,
       action: 'added',
       topics: ['/memory/topics/example.md'],
-      reason: 'Adds durable review guidance.',
-    })),
+      reason: 'Adds durable review guidance.'
+    }))
   }
 }
 
 export const reorganizationReport: MaintenanceReport = {
   summary: 'Reviewed memory; no observations consumed.',
-  observation_decisions: [],
+  observation_decisions: []
 }
