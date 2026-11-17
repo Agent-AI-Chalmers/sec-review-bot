@@ -1,0 +1,67 @@
+# Used only by smoke-tests/run.sh, with disposable data and no host ports.
+services:
+  rustfs:
+    restart: 'no'
+    user: '0:0'
+    ports: !reset []
+    volumes:
+      - smoke-rustfs:/data
+  rustfs-init:
+    image: sec-review-smoke/rustfs-init:local
+  smoke-probe:
+    profiles: ['app']
+    image: sec-review-smoke/probe:local
+    build:
+      context: ./smoke-tests
+      additional_contexts:
+        workspace: .
+    environment:
+      REVIEW_RUNS_SERVICE_TOKEN: '${REVIEW_RUNS_SERVICE_TOKEN}'
+      REVIEW_RUNS_READ_TOKEN: '${REVIEW_RUNS_READ_TOKEN}'
+      EXECUTION_API_TOKEN: '${EXECUTION_API_TOKEN}'
+      AGENT_MEMORY_CATALOG_OPERATOR_TOKEN: '${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN}'
+      CONTROL_PLANE_UI_ACCESS_TOKEN: '${CONTROL_PLANE_UI_ACCESS_TOKEN}'
+      SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY: '${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY}'
+      SEC_REVIEW_INTEGRATION_S3_SECRET_KEY: '${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY}'
+      SEC_REVIEW_EXECUTION_S3_ACCESS_KEY: '${SEC_REVIEW_EXECUTION_S3_ACCESS_KEY}'
+      SEC_REVIEW_EXECUTION_S3_SECRET_KEY: '${SEC_REVIEW_EXECUTION_S3_SECRET_KEY}'
+    volumes:
+      - ./contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus:/smoke/input-bundle-corpus:ro
+      - ./contracts/execution-api/v1/fixtures/issue-review-input.json:/smoke/issue-review-input.json:ro
+  postgres:
+    restart: 'no'
+    ports: !reset []
+    volumes:
+      - smoke-postgres:/var/lib/postgresql
+  temporal:
+    restart: 'no'
+    user: '0:0'
+    ports: !reset []
+    volumes:
+      - smoke-temporal:/var/lib/temporal
+  execution-gateway:
+    image: sec-review-smoke/execution-gateway:local
+    restart: 'no'
+    ports: !reset []
+  review-runs:
+    environment:
+      AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS: '1000'
+    image: sec-review-smoke/review-runs:local
+    restart: 'no'
+    ports: !reset []
+  memory-catalog-server:
+    image: sec-review-smoke/memory-catalog:local
+    restart: 'no'
+    ports: !reset []
+  control-plane-ui:
+    image: sec-review-smoke/control-plane-ui:local
+    restart: 'no'
+    ports: !reset []
+  # Do not require the operator's env file when Compose parses the unused app.
+  github-integration:
+    env_file: !reset []
+
+volumes:
+  smoke-rustfs:
+  smoke-postgres:
+  smoke-temporal:

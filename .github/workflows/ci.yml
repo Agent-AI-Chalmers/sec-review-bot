@@ -27,14 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       automation-config: ${{ steps.filter.outputs.automation-config }}
-      catalog-seam: ${{ steps.filter.outputs.catalog-seam }}
-      input-bundle-seam: ${{ steps.filter.outputs.input-bundle-seam }}
-      memory-bff-seam: ${{ steps.filter.outputs.memory-bff-seam }}
       ops: ${{ steps.filter.outputs.ops }}
+      smoke: ${{ steps.filter.outputs.smoke }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       review-runs: ${{ steps.filter.outputs.review-runs }}
       execution-gateway: ${{ steps.filter.outputs.execution-gateway }}
-      system-tests: ${{ steps.filter.outputs.system-tests }}
       memory-catalog: ${{ steps.filter.outputs.memory-catalog }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
       control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
@@ -120,6 +117,26 @@ jobs:
         # interpolations require real secrets, so interpolating would always fail.
         # We validate the compose structure, not the operator's secret values.
         run: docker compose -f compose.yaml config -q --no-interpolate
+
+      - name: Set up smoke package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: smoke-tests
+
+      - name: Check smoke package
+        working-directory: smoke-tests
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm run build
+
+      - name: Check smoke script syntax
+        run: |
+          bash -n smoke-tests/run.sh
+
+      - name: Validate the smoke Compose overlay
+        run: docker compose -f compose.yaml -f smoke-tests/compose.test.yaml config -q --no-interpolate
 
   contract-tools:
     name: Contract Tools
@@ -251,55 +268,6 @@ jobs:
       - name: Integration test
         run: pnpm run test:integration
 
-  memory-artifact-smoke:
-    name: Smoke — Memory and Artifacts
-    needs: changes
-    if: >-
-      github.event_name == 'merge_group' ||
-      needs.changes.outputs.catalog-seam == 'true' ||
-      needs.changes.outputs.input-bundle-seam == 'true' ||
-      needs.changes.outputs.memory-bff-seam == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/check-seams
-        with:
-          catalog: ${{ github.event_name == 'merge_group' || needs.changes.outputs.catalog-seam == 'true' }}
-          input-bundle: ${{ github.event_name == 'merge_group' || needs.changes.outputs.input-bundle-seam == 'true' }}
-          memory-bff: ${{ github.event_name == 'merge_group' || needs.changes.outputs.memory-bff-seam == 'true' }}
-
-  execution-submission-system:
-    name: Smoke — Service Boundaries
-    needs: changes
-    if: >-
-      github.event_name == 'merge_group' ||
-      needs.changes.outputs.system-tests == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Set up Node package
-        uses: ./.github/actions/setup-node
-        with:
-          directory: services/execution-gateway
-
-      - name: Test Integration client against Review Runs HTTP
-        run: |
-          pnpm --dir apps/github-integration run build
-          pnpm --dir services/review-runs run build
-          node --test system-tests/review-runs-http/review-runs-http.test.mjs
-
-      - name: Test execution submission boundary
-        run: node --test system-tests/execution-submission/execution-submission.test.mjs
-
-      - name: Test publication coordination against the Review Runs store
-        run: node --test system-tests/publication-coordination/publication-coordination.test.mjs
-
   github-integration:
     name: GitHub Integration
     needs: changes
@@ -332,8 +300,7 @@ jobs:
         run: pnpm test
       # Deliberately no `test:integration` step. The only integration test here is the opt-in S3
       # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
-      # pass vacuously. The Integration-to-Review-Runs HTTP boundary is covered by the
-      # repository-level review-runs-http test in Smoke — Service Boundaries.
+      # pass vacuously.
 
   control-plane-ui:
     name: Control Plane UI
@@ -390,7 +357,7 @@ jobs:
         uses: ./.github/actions/check-agents
 
   scripts:
-    name: Scripts and System Test Tooling
+    name: Repository Scripts
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -405,19 +372,18 @@ jobs:
         id: setup-python
         uses: ./.github/actions/setup-python
 
-      # Repository scripts and system tests share the agents runtime dependencies
-      # for static checks; system test execution stays in the boundary jobs.
-      - name: Lint scripts and system tests with Ruff
+      # Repository scripts use the agents runtime dependencies for static checks.
+      - name: Lint scripts with Ruff
         working-directory: scripts
-        run: uv --project ../agents run ruff check . ../system-tests
+        run: uv --project ../agents run ruff check .
 
-      - name: Check script and system test formatting with Black
+      - name: Check script formatting with Black
         working-directory: scripts
-        run: uv --project ../agents run black --check . ../system-tests
+        run: uv --project ../agents run black --check .
 
-      - name: Compile scripts and system tests
+      - name: Compile scripts
         working-directory: scripts
-        run: python -m compileall -q . ../system-tests
+        run: python -m compileall -q .
 
       - name: Test repository scripts
         run: uv --project agents run python -m pytest scripts/tests
@@ -462,18 +428,49 @@ jobs:
       - name: Check Chinese documentation spacing and punctuation
         run: pnpm run lint:zh
 
+  smoke:
+    name: Deployment and service boundaries
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.smoke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Run black-box smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          started=$SECONDS
+          bash smoke-tests/run.sh 2>&1 | tee smoke.log
+          echo "Smoke completed in $((SECONDS - started)) seconds" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-smoke-log
+          path: smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   ci-status:
     name: CI Status
     needs:
       - changes
+      - smoke
       - automation-config
       - ops
       - contract-tools
       - review-runs
       - memory-catalog
       - execution-gateway
-      - execution-submission-system
-      - memory-artifact-smoke
       - github-integration
       - control-plane-ui
       - control-plane-ui-browser

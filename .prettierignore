@@ -1,6 +1,7 @@
 # Workspace packages run Prettier with their own config and ignore file.
 apps/*/
 services/*/
+smoke-tests/
 contracts/codegen/
 contracts/**/tools/
 # Agent runtime inputs and test fixtures keep their exact bytes.

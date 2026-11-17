@@ -68,9 +68,7 @@ source agents/.venv/bin/activate
 python -m scripts.replay.repository_triage --help
 ```
 
-## 系统测试
-
-提交测试、无需模型的冒烟测试探针和手动执行生命周期探针见[跨服务系统测试](../system-tests/README.md)，其中说明了前置条件、命令、覆盖范围、隔离方式和 CI 成本控制。
+## 运维探针
 
 ### Langfuse 运行统计探针
 

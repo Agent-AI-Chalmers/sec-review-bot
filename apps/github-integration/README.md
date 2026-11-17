@@ -34,7 +34,7 @@ pnpm test
 
 `pnpm test` runs tests that do not require external services. Keep the launcher when selecting a file, for example `pnpm test test/artifacts/git-workspace.test.ts`: it isolates inherited Git configuration before running tests.
 
-`pnpm run test:integration` runs the opt-in S3 upload test. Set `SEC_REVIEW_TEST_S3_ENDPOINT`, `SEC_REVIEW_TEST_S3_BUCKET`, and AWS credentials for a disposable bucket; the test skips when the endpoint or bucket is unset. For a local S3-compatible service, set `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`. Integration-to-Review-Runs HTTP tests belong to the repository [system tests](../../system-tests/README.md).
+`pnpm run test:integration` runs the opt-in S3 upload test. Set `SEC_REVIEW_TEST_S3_ENDPOINT`, `SEC_REVIEW_TEST_S3_BUCKET`, and AWS credentials for a disposable bucket; the test skips when the endpoint or bucket is unset. For a local S3-compatible service, set `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=path`.
 
 ## Local Receiver
 
