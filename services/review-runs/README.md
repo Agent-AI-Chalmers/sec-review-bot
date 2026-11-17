@@ -233,11 +233,14 @@ Checks:
 pnpm run format:check
 pnpm run lint
 pnpm run typecheck
+pnpm run test:types
 pnpm test
 pnpm run test:integration
 ```
 
 <!-- doc-default: review-runs.test-projects; source=services/review-runs/vitest.config.ts -->
+
+`pnpm run test:types` reports compile-time contract checks for handler requests, results, and registry completeness. These tests do not start the server.
 
 `pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
 

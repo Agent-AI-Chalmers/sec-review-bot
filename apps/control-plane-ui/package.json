@@ -12,7 +12,7 @@
     "build": "rm -rf dist-server && vite build && tsc -p tsconfig.server.build.json",
     "server": "node dist-server/server/main.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
-    "test": "vitest run",
+    "test": "vitest run --project logic --project components",
     "test:logic": "vitest run --project logic",
     "test:component": "vitest run --project components",
     "test:e2e": "playwright test",
@@ -24,7 +24,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:affected": "vitest run --since-last-run"
+    "test:affected": "vitest run --project logic --project components --since-last-run=true",
+    "test:types": "vitest run --project types"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
@@ -69,6 +70,6 @@
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript-eslint": "^8.72.1",
-    "vitest": "^5.1.0"
+    "vitest": "5.1.0"
   }
 }

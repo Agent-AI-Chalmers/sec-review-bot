@@ -322,12 +322,16 @@ test('the coordination event log records each transition once, oldest first', as
 
 test('touchObservation advances the row mtime without changing state', async () => {
   const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = await createQueuedRun(store)
+    // Place the prior observation in the past using PostgreSQL's own clock.
+    await pool.query(
+      `UPDATE executions SET observed_at=clock_timestamp()-interval '1 second' WHERE run_id=$1`,
+      [runId]
+    )
     const before = await store.queries.getRun(runId)
     expect(before?.execution.status).toBe('queued')
-    // The heartbeat must move the mtime forward even though the status is unchanged.
-    await new Promise((resolve) => setTimeout(resolve, 10))
     await store.executions.touchObservation(runId)
     const after = await store.queries.getRun(runId)
     expect(after?.execution.status, 'state is unchanged').toBe('queued')
@@ -350,18 +354,18 @@ test('touchObservation advances the row mtime without changing state', async () 
       'a pending run is not touched'
     ).toBe(preparingBefore)
   } finally {
+    await pool.end()
     await store.close()
   }
 })
 
 test('heartbeats do not refresh an expired recovery lease', async () => {
-  // The precise invariant a zero timeout cannot express: with a real timeout, keep heartbeating
-  // past the lease deadline and the claim must STILL be reclaimable. This fails if the lease is
-  // ever computed from observed_at (which the heartbeat moves) instead of claimed_at.
+  // An expired claimed_at and a fresh observed_at must still allow recovery takeover.
   const store = await createStore({
     connectorId: `lease-live:${randomUUID()}`,
-    claimTimeoutMs: 300
+    claimTimeoutMs: 30_000
   })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = `run-lease-live-${randomUUID()}`
     const admission = await store.admissions.create({
@@ -395,13 +399,11 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
     )
     expect.assert(first)
 
-    // Heartbeat repeatedly past the 300ms lease. If the lease were observed_at-based, these
-    // heartbeats would keep the claim alive and the reclaim below would return null.
-    const deadline = Date.now() + 600
-    while (Date.now() < deadline) {
-      await store.executions.touchObservation(runId)
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    }
+    await pool.query(
+      `UPDATE executions SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
+    await store.executions.touchObservation(runId)
 
     const second = await store.executions.claimSubmissionRecovery(
       runId,
@@ -413,6 +415,7 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
     )
     expect(second, 'reclaiming issues a new fencing token').not.toBe(first)
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -1226,6 +1229,8 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
     expect.assert(staleToken)
     expect.assert(currentToken)
     expect(staleToken).not.toBe(currentToken)
+    expect(await ownerA.publications.renewClaim(runId, staleToken)).toBe(false)
+    expect(await ownerB.publications.renewClaim(runId, currentToken)).toBe(true)
     expect(await ownerA.publications.complete(runId, staleToken)).toBe(false)
     expect(
       await ownerA.publications.fail(
@@ -3093,15 +3098,19 @@ test('a publisher that died mid-publication is taken over once its lease expires
   // `claimed_at` is claimable again, which is the only reason the claim token exists. This pins
   // that self-healing path - including the takeover event and the stale owner being fenced out -
   // because it is what makes an operator repair unnecessary in the common case.
-  const store = await createStore({ claimTimeoutMs: 50 })
+  const store = await createStore({ claimTimeoutMs: 30_000 })
   const runId = await createSuccessfulRun(store)
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const firstToken = await store.publicationClaims.claim(runId)
     expect.assert(firstToken)
     // The lease is still fresh, so nobody else may take it.
     expect(await store.publicationClaims.claim(runId)).toBe(null)
 
-    await new Promise((resolve) => setTimeout(resolve, 120))
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
     const secondToken = await store.publicationClaims.claim(runId)
     expect.assert(secondToken, 'an expired lease must be reclaimable')
     expect(secondToken).not.toBe(firstToken)
@@ -3140,6 +3149,7 @@ test('a publisher that died mid-publication is taken over once its lease expires
       'publishing->published'
     ])
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -3149,7 +3159,7 @@ test('reclaiming a running publication step records that another attempt started
   // cannot know whether the side effect happened, so it must not let a reclaim look like a first
   // attempt: `attempt_count` and `last_attempt_at` are what let the connector treat a reclaim as
   // a retry and reconcile against the remote object instead of repeating the call blindly.
-  const store = await createStore({ claimTimeoutMs: 50 })
+  const store = await createStore({ claimTimeoutMs: 30_000 })
   const runId = await createSuccessfulRun(store)
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
@@ -3177,7 +3187,10 @@ test('reclaiming a running publication step records that another attempt started
 
     // The publisher "dies" here: the step stays `running`. A new owner reclaims it once the
     // publication lease expires.
-    await new Promise((resolve) => setTimeout(resolve, 120))
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 minute' WHERE run_id=$1`,
+      [runId]
+    )
     const secondToken = await store.publicationClaims.claim(runId)
     expect.assert(secondToken)
     await store.publications.requirePublicationStepClaim(
@@ -4047,21 +4060,15 @@ test('an operator resume completes on a pool that has exactly one connection', a
       [runId]
     )
 
-    // A hang is the failure this test exists for, so bound it rather than waiting forever.
-    const resumed = await Promise.race([
-      store.operatorDecisions.resumeDisconnectedRun(runId),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('resume did not return')), 5_000)
-      )
-    ])
+    const resumed = await store.operatorDecisions.resumeDisconnectedRun(runId)
     expect(
-      (resumed as { publication: { status: string } }).publication.status,
+      resumed.publication.status,
       'the operator decision took effect'
     ).toBe('pending')
   } finally {
     await store.close()
   }
-})
+}, 5_000)
 
 test('a second step parking later does not move the publication parked_at', async () => {
   // Step events share the publication axis. The axis parks when its first step does; a later step
@@ -4761,9 +4768,20 @@ test('a step claim is refused once another path has concluded the publication', 
   // between, and the step would still be claimed `running` on a concluded publication. The
   // claim now locks the publication row first, so it either observes the conclusion or the
   // conclusion waits for it - never a `running` step left behind.
-  const store = await createStore()
+  const applicationName = `step-claim:${randomUUID()}`
+  const claimantPool = new Pool({
+    connectionString: requireTestDatabase(),
+    application_name: applicationName
+  })
+  const store = new ReviewRunStore({
+    pool: claimantPool,
+    connectorId: connectorId()
+  })
+  await store.initialize()
   const pool = new Pool({ connectionString: requireTestDatabase() })
   const blocker = await pool.connect()
+  let holding = false
+  let claim: Promise<unknown> | undefined
   try {
     const runId = await createSuccessfulRun(store)
     const token = await store.publicationClaims.claim(runId)
@@ -4773,19 +4791,34 @@ test('a step claim is refused once another path has concluded the publication', 
     // A separate transaction concludes the publication without committing yet. The claim must
     // wait for it rather than read the pre-conclusion snapshot.
     await blocker.query('BEGIN')
+    holding = true
     await blocker.query(
       `UPDATE publications SET status='skipped', claim_token=NULL, claimed_at=NULL,
          finished_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2`,
       [runId, store.connectorId]
     )
-    const claim = store.publications.requirePublicationStepClaim(
-      runId,
-      token,
-      's'
+    claim = store.publications.requirePublicationStepClaim(runId, token, 's')
+    const holder = await blocker.query<{ pid: number }>(
+      'SELECT pg_backend_pid() AS pid'
     )
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect.assert(holder.rows[0])
+    const holderPid = holder.rows[0].pid
+    await expect
+      .poll(
+        async () => {
+          const waiting = await pool.query(
+            `SELECT 1 FROM pg_stat_activity WHERE application_name=$1
+         AND $2=ANY(pg_blocking_pids(pid))`,
+            [applicationName, holderPid]
+          )
+          return waiting.rowCount
+        },
+        { timeout: 5_000, interval: 20 }
+      )
+      .toBeGreaterThan(0)
     await blocker.query('COMMIT')
+    holding = false
 
     await expect(
       claim,
@@ -4797,6 +4830,8 @@ test('a step claim is refused once another path has concluded the publication', 
       'the refused claim must not leave a running step behind'
     ).toBe('pending')
   } finally {
+    if (holding) await blocker.query('ROLLBACK')
+    await claim?.catch(() => undefined)
     blocker.release()
     await pool.end()
     await store.close()
@@ -5443,23 +5478,22 @@ test('a waiting publication claim reads step uncertainty committed by the lock h
       [runId]
     )
     pending = store.publicationClaims.claim(runId)
-    let waiting = false
-    const deadline = Date.now() + 5000
-    while (Date.now() < deadline) {
-      const activity = await observer.query(
-        `SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`,
-        [applicationName]
+    await expect
+      .poll(
+        async () => {
+          const activity = await observer.query(
+            `SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`,
+            [applicationName]
+          )
+          return activity.rowCount
+        },
+        {
+          timeout: 5_000,
+          interval: 20,
+          message: 'the claimant must be waiting before the holder commits'
+        }
       )
-      if (activity.rowCount) {
-        waiting = true
-        break
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20))
-    }
-    expect(
-      waiting,
-      'the claimant must be waiting before the holder commits'
-    ).toBe(true)
+      .toBeGreaterThan(0)
     await holder.query('COMMIT')
     holding = false
     const claimed = await pending

@@ -9,6 +9,19 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          name: 'types',
+          include: [],
+          typecheck: {
+            enabled: true,
+            only: true,
+            tsconfig: 'tsconfig.server.json',
+            include: ['test/**/*.test-d.ts']
+          }
+        }
+      },
+      {
+        extends: true,
+        test: {
           name: 'logic',
           environment: 'node',
           include: ['test/*.test.ts']

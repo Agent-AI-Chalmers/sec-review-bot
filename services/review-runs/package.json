@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:types": "vitest run --project types"
   },
   "dependencies": {
     "@platformatic/fastify-openapi-glue": "^5.2.0",

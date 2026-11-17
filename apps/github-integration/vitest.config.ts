@@ -10,6 +10,18 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          name: 'types',
+          include: [],
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ['test/**/*.test-d.ts']
+          }
+        }
+      },
+      {
+        extends: true,
+        test: {
           name: 'unit',
           environment: 'node',
           include: ['test/**/*.test.ts'],

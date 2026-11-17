@@ -22,10 +22,13 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
+pnpm run test:types
 pnpm test
 ```
 
 <!-- doc-default: github-integration.test-projects; source=apps/github-integration/vitest.config.ts -->
+
+`pnpm run test:types` reports compile-time contract checks for client requests and responses. These tests do not execute requests.
 
 `pnpm test` runs tests that do not require external services. Keep the launcher when selecting a file, for example `pnpm test test/artifacts/git-workspace.test.ts`: it isolates inherited Git configuration before running tests.
 

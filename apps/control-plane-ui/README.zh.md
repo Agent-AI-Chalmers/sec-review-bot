@@ -108,6 +108,7 @@ Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默�
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
+pnpm run test:types
 pnpm run colors:check
 pnpm run icons:check
 pnpm run styles:report
@@ -128,6 +129,7 @@ pnpm run build
 
 - `pnpm test`：运行逻辑、接口和界面组件测试。
 - `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：只运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/api-error.test.ts`。
+- `pnpm run test:types`：单独报告归档可用状态和必需引用字段的编译期检查，不执行应用代码。
 - `pnpm run test:affected`：开发时只重跑上次运行后受源码改动影响的测试。首次运行会为所有选中的测试建立记录；可追加文件路径缩小范围，例如 `pnpm run test:affected test/api-error.test.ts`。此命令使用实验性的依赖跟踪。修改契约、fixture、生成文件、环境或配置后，应显式运行相关测试；完成前仍需运行 `pnpm test` 和其他必要检查。
 - `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、滚动、下载等浏览器行为，以及无障碍和视觉效果。
 

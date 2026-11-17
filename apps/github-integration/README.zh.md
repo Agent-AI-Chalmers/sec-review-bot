@@ -24,10 +24,13 @@ pnpm run server
 pnpm run format:check
 pnpm run lint
 pnpm run build
+pnpm run test:types
 pnpm test
 ```
 
 <!-- doc-default: github-integration.test-projects; source=apps/github-integration/vitest.config.ts -->
+
+`pnpm run test:types` 单独报告客户端请求和响应的编译期契约检查，不发送请求。
 
 `pnpm test` 运行不依赖外部服务的测试。选择单个文件时也应保留启动器，例如 `pnpm test test/artifacts/git-workspace.test.ts`：它会在运行测试前隔离继承的 Git 配置。
 
