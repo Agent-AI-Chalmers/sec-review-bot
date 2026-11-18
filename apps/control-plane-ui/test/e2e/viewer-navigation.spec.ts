@@ -23,6 +23,9 @@ test('viewer investigation survives navigation but clear and reload remove it', 
   // Use the current translated placeholder rather than a CSS input position.
   const trajectorySearch = page.getByPlaceholder('Search messages, tools, and arguments')
   await expect(page.locator('.trajectory-timeline')).toBeVisible()
+  // Finish the upload's editor collapse before recording document scroll position;
+  // a later height change would move the browser's scroll anchor.
+  await expect(page.getByLabel('Paste trajectory JSONL')).toBeHidden()
   await trajectorySearch.fill('Investigation')
   await page.getByRole('checkbox', { name: 'System', exact: true }).uncheck()
   await page.evaluate(() => window.scrollTo(0, 650))

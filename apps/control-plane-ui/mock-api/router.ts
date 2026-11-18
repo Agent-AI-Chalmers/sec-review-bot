@@ -1,14 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { createMemoryHandler } from './memory/routes.js'
-import { runs } from './runs/generate.js'
+import { createRunFixtures } from './runs/generate.js'
 import { createRunsHandler } from './runs/routes.js'
 
-export function createMockApiRouter(): (
-  request: IncomingMessage,
-  response: ServerResponse,
-  next: () => void
-) => Promise<void> {
+export function createMockApiRouter(
+  now: () => number
+): (request: IncomingMessage, response: ServerResponse, next: () => void) => Promise<void> {
+  const snapshot = now()
+  const fixtures = createRunFixtures(snapshot)
+  const { runs } = fixtures
   let signedIn = true
   const sourceRunIds = Object.fromEntries(
     ['repository-review', 'pull-request-review', 'issue-review'].map((workflow) => {
@@ -26,8 +27,8 @@ export function createMockApiRouter(): (
       return [workflow, run.run_id]
     })
   ) as Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
-  const handleMemory = createMemoryHandler(sourceRunIds)
-  const handleRuns = createRunsHandler()
+  const handleMemory = createMemoryHandler(sourceRunIds, snapshot, now)
+  const handleRuns = createRunsHandler(fixtures, now)
 
   return async (request, response, next): Promise<void> => {
     if (!request.url?.startsWith('/api/')) {

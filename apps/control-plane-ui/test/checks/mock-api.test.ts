@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 
@@ -70,16 +70,18 @@ async function startFixtureServer(): Promise<{
 }
 
 test('mock API only describes reachable run states', async () => {
-  // runs/generate.ts validates every generated run at import time and throws on a
+  // createRunFixtures validates every generated run and throws on a
   // combination Review Runs cannot produce (for example a failed execution
-  // whose publication is still `pending`). Importing it is therefore the assertion:
+  // whose publication is still `pending`). Generating the records is the assertion:
   // this test exists so an unreachable fixture fails CI instead of silently
   // showing operators a state that cannot happen.
-  await import('../../mock-api/runs/generate.js')
+  ;(await import('../../mock-api/runs/generate.js')).createRunFixtures(Date.now())
 })
 
 test('mock API distinguishes a statistics snapshot from no snapshot', async () => {
-  const { runs, stepsByRun } = await import('../../mock-api/runs/generate.js')
+  const { runs, stepsByRun } = (await import('../../mock-api/runs/generate.js')).createRunFixtures(
+    Date.now()
+  )
   const completed = runs.filter((run) => run.execution.status === 'succeeded')
   const active = runs.find((run) => run.execution.status === 'running')
   const agentsFor = (workflow: (typeof completed)[number]['workflow']): string[] => {
@@ -574,7 +576,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
 })
 
 test('fixture event responses preserve the contract reason for a failed transition', async () => {
-  const { runs } = await import('../../mock-api/runs/generate.js')
+  const { runs } = (await import('../../mock-api/runs/generate.js')).createRunFixtures(Date.now())
   const run = runs.find(
     (value) => value.preparation.status === 'failed' && value.preparation.failure_code !== null
   )!
@@ -598,7 +600,9 @@ test('fixture events show a step that failed and was retried inside a publicatio
   // Step events are what tell a publication's own history apart from its steps': without one
   // run whose step failed and recovered, every step event in the fixtures would be a clean
   // success and the console would never show the difference locally.
-  const { runs, stepsByRun } = await import('../../mock-api/runs/generate.js')
+  const { runs, stepsByRun } = (await import('../../mock-api/runs/generate.js')).createRunFixtures(
+    Date.now()
+  )
   const run = runs.find((value) =>
     (stepsByRun.get(value.run_id) ?? []).some(
       (step) => step.status === 'succeeded' && step.attempt_count > 1
@@ -677,5 +681,91 @@ test('abandoning a contradictory preparation uses the current production reason'
     expect(run.notices[0]?.reason_code).toBe('PREPARATION_ABANDONED_BY_OPERATOR')
   } finally {
     await fixture.close()
+  }
+})
+
+// Configure after importing the plugin: module caching must not freeze scenario time.
+test('each mock server uses one configured clock for runs and memory', async () => {
+  const dates = ['2026-11-12T12:00:00Z', '2027-01-15T09:00:00Z']
+  const createdAt: number[] = []
+  try {
+    for (const date of dates) {
+      vi.stubEnv('CONTROL_PLANE_UI_MOCK_API_NOW', date)
+      const fixture = await startFixtureServer()
+      try {
+        const { runs } = (await (await fetch(`${fixture.base}/api/runs?limit=100`)).json()) as {
+          runs: Run[]
+        }
+        const automation = (await (
+          await fetch(`${fixture.base}/api/memory/tree/automation`)
+        ).json()) as {
+          changed_at: string
+        }
+        const reference = Date.parse(date)
+        expect(automation.changed_at).toBe(new Date(reference).toISOString())
+        const response = await fetch(`${fixture.base}/api/memory/tree/automation/pause`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ expected_version: 1 })
+        })
+        expect(response.status).toBe(201)
+        const paused = (await response.json()) as { automation: { changed_at: string } }
+        expect(paused.automation.changed_at).toBe(new Date(reference).toISOString())
+        const first = runs.find(
+          (run) => run.created_at === new Date(reference - 20 * 60_000).toISOString()
+        )
+        expect(first).toBeDefined()
+        const active = runs.find((run) => run.execution.status === 'running')!
+        expect(reference - Date.parse(active.execution.updated_at)).toBeGreaterThanOrEqual(0)
+        expect(reference - Date.parse(active.execution.updated_at)).toBeLessThanOrEqual(5_000)
+        createdAt.push(Date.parse(active.created_at))
+      } finally {
+        await fixture.close()
+      }
+    }
+    expect(createdAt[1] - createdAt[0]).toBe(Date.parse(dates[1]) - Date.parse(dates[0]))
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+test('mock API rejects an invalid configured clock before serving requests', () => {
+  vi.stubEnv('CONTROL_PLANE_UI_MOCK_API_NOW', 'invalid')
+  try {
+    expect(() => captureMiddleware()).toThrow('CONTROL_PLANE_UI_MOCK_API_NOW')
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+// A fixed test clock must not become the default for interactive development.
+test('unconfigured mock servers follow the current clock and regenerate independent state', async () => {
+  vi.stubEnv('CONTROL_PLANE_UI_MOCK_API_NOW', undefined)
+  const clock = vi.spyOn(Date, 'now')
+  const initial = Date.parse('2028-02-01T10:00:00Z')
+  try {
+    for (const now of [initial, initial + 3_600_000]) {
+      clock.mockReturnValue(now)
+      const fixture = await startFixtureServer()
+      try {
+        const response = await fetch(`${fixture.base}/api/memory/tree/automation`)
+        const automation = (await response.json()) as { changed_at: string; version: number }
+        expect(automation).toMatchObject({ changed_at: new Date(now).toISOString(), version: 1 })
+        clock.mockReturnValue(now + 60_000)
+        const paused = (await (
+          await fetch(`${fixture.base}/api/memory/tree/automation/pause`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ expected_version: 1 })
+          })
+        ).json()) as { automation: { changed_at: string } }
+        expect(paused.automation.changed_at).toBe(new Date(now + 60_000).toISOString())
+      } finally {
+        await fixture.close()
+      }
+    }
+  } finally {
+    clock.mockRestore()
+    vi.unstubAllEnvs()
   }
 })

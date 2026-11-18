@@ -11,21 +11,17 @@ import artifactContent from '../data/artifact-content.json' with { type: 'json' 
 import {
   DECLARED_QUERY_PARAMS,
   DEV_PAGE_SIZE,
-  decodeCursor,
   eventsFor,
-  parkedIndexes,
-  runs as initialRuns,
-  stepsByRun,
-  type FixtureRun
+  type FixtureRun,
+  type createRunFixtures
 } from './generate.js'
 
 const ARTIFACT_LOAD_ERROR_RUN_ID = 'fixture-artifact-load-error'
 
-export function createRunsHandler(): (
-  request: IncomingMessage,
-  response: ServerResponse
-) => Promise<void> {
-  const runs = structuredClone(initialRuns)
+export function createRunsHandler(
+  { runs, stepsByRun, parkedIndexes }: ReturnType<typeof createRunFixtures>,
+  now: () => number
+): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   // Runs the operator abandoned while this dev server has been running. Remembering them is
   // what makes the abandon button actually work locally: the queue shrinks and the detail
   // page stops offering the decision, instead of the button being permanently inert.
@@ -242,7 +238,7 @@ export function createRunsHandler(): (
       // The same conclusion Review Runs performs: the disconnected axis ends as a failure whose
       // code names the decision, whatever the run would still have produced is not published,
       // and the notice says the outcome was given up on rather than that nothing happened.
-      const now = new Date().toISOString()
+      const timestamp = new Date(now()).toISOString()
       const reasonCode =
         axis === 'preparation'
           ? 'PREPARATION_GIVEN_UP_BY_OPERATOR'
@@ -252,20 +248,20 @@ export function createRunsHandler(): (
       if (axis === 'preparation') {
         run.preparation.status = 'failed'
         run.preparation.failure_code = reasonCode
-        run.preparation.finished_at = now
+        run.preparation.finished_at = timestamp
         run.preparation.disconnect_reason = null
       } else if (axis === 'execution') {
         run.execution.status = 'failed'
-        run.execution.finished_at = now
+        run.execution.finished_at = timestamp
         run.failure_code = reasonCode
       } else {
         run.publication.status = 'failed'
-        run.publication.finished_at = now
+        run.publication.finished_at = timestamp
         run.failure_code = reasonCode
       }
       if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
         run.publication.status = 'skipped'
-        run.publication.finished_at = now
+        run.publication.finished_at = timestamp
       }
       run.notices = [
         {
@@ -306,7 +302,7 @@ export function createRunsHandler(): (
       run.preparation.disconnect_reason = null
       run.preparation.attempt_count = 0
       run.preparation.failure_code = null
-      run.preparation.updated_at = new Date().toISOString()
+      run.preparation.updated_at = new Date(now()).toISOString()
       resumed.add(runId)
       response.end(JSON.stringify({ run }))
       return
@@ -334,7 +330,7 @@ export function createRunsHandler(): (
       // The same transition Review Runs performs: conclude the axes that were still
       // open, keep the execution result, and record why. Clearing only the marker would show
       // the operator a run that looks untouched after an irreversible decision.
-      const now = new Date().toISOString()
+      const timestamp = new Date(now()).toISOString()
       run.preparation.status = 'failed'
       run.preparation.failure_code = 'PREPARATION_ABANDONED_BY_OPERATOR'
       run.notices = [
@@ -347,12 +343,12 @@ export function createRunsHandler(): (
           comment_url: null
         }
       ]
-      run.preparation.finished_at = now
+      run.preparation.finished_at = timestamp
       run.preparation.status = 'failed'
       run.preparation.disconnect_reason = null
       if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
         run.publication.status = 'skipped'
-        run.publication.finished_at = now
+        run.publication.finished_at = timestamp
       }
       abandoned.add(runId)
       response.end(JSON.stringify({ run }))
@@ -393,7 +389,7 @@ export function createRunsHandler(): (
       response.end(
         JSON.stringify({
           run_id: run.run_id,
-          events: eventsFor(run)
+          events: eventsFor(run, stepsByRun.get(run.run_id) ?? [])
         } satisfies ListRunEventsResponseBody)
       )
       return
@@ -411,4 +407,20 @@ export function createRunsHandler(): (
       }
     }
   }
+}
+
+interface Cursor {
+  createdAt: string
+  runId: string
+}
+
+function decodeCursor(value: string | null): Cursor | null {
+  if (value === null) {
+    return null
+  }
+  const [createdAt, runId, extra] = Buffer.from(value, 'base64url').toString('utf8').split('|')
+  if (createdAt === undefined || runId === undefined || extra !== undefined) {
+    return null
+  }
+  return { createdAt, runId }
 }

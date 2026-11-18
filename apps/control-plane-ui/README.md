@@ -80,7 +80,7 @@ Feature domains must not import one another. Reusable browser capabilities live 
 
 See [Mock API](mock-api/README.md) for development-server ownership, shared scenario data, and state lifetime.
 
-The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
+The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails data generation instead of appearing as plausible-looking demo data.
 
 To develop against a running Review Runs, build and start the BFF in one terminal:
 

@@ -7,7 +7,6 @@ import type {
 import historySamples from '../data/memory-history-samples.json' with { type: 'json' }
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
 import { validateTrajectoryEvent } from '../../shared/trajectory-events.js'
-import { BASE_TIME as RUNS_BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
   ExtractionRecord,
@@ -32,14 +31,10 @@ const trajectoryReference = {
 }
 
 export function createMemoryHandler(
-  sourceRunIds: SourceRunIds
+  sourceRunIds: SourceRunIds,
+  BASE_TIME: number,
+  now: () => number
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
-  // E2E pins the clock; interactive fixture previews stay relative to now.
-  const fixtureTime = process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME
-  const BASE_TIME = fixtureTime ? Date.parse(fixtureTime) : RUNS_BASE_TIME
-  if (!Number.isFinite(BASE_TIME)) {
-    throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
-  }
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
     version: 1,
@@ -590,7 +585,7 @@ export function createMemoryHandler(
           state: action === 'pause' ? 'paused' : 'enabled',
           version: memoryAutomation.version + 1,
           changed_by: { kind: 'service', id: 'control-plane-ui' },
-          changed_at: new Date().toISOString()
+          changed_at: new Date(now()).toISOString()
         }
         response.statusCode = 201
         response.end(
@@ -630,7 +625,7 @@ export function createMemoryHandler(
       memoryVersions.unshift({
         version: nextVersion,
         predecessor_version: activeMemoryVersion,
-        created_at: new Date().toISOString(),
+        created_at: new Date(now()).toISOString(),
         source: {
           kind: 'manual',
           operation_id: body.operation_id,

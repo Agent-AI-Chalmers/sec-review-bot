@@ -4,8 +4,10 @@ import { expect, test } from 'vitest'
 
 import { StateMachineDiagram } from '../../browser/features/runs/detail/StateMachineDiagram.js'
 import { stateMachine } from '../../browser/features/runs/state-machines.generated.js'
-import { runs } from '../../mock-api/runs/generate.js'
+import { createRunFixtures } from '../../mock-api/runs/generate.js'
 import { renderComponent } from './render.js'
+
+const { runs } = createRunFixtures(Date.parse('2026-11-12T12:00:00Z'))
 
 for (const language of ['en', 'zh'] as const) {
   test(`state tooltip shows the summary rather than lifecycle details (${language})`, async () => {
