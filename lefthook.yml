@@ -4,13 +4,8 @@ pre-commit:
   parallel: true
   commands:
     oxfmt:
-      glob: '*.{md,yml,yaml,json,jsonc,mjs,js}'
-      exclude:
-        - 'apps/**'
-        - 'services/**'
-        - 'contracts/**/tools/**'
-        - 'contracts/codegen/**'
-      run: pnpm exec oxfmt --check --no-error-on-unmatched-pattern {staged_files}
+      glob: '*.{md,yml,yaml,json,jsonc,mjs,cjs,js,jsx,mts,cts,ts,tsx,css,toml}'
+      run: node scripts/checks/check-staged-format.mjs {staged_files}
     markdownlint:
       glob: '*.md'
       run: pnpm exec markdownlint-cli2 {staged_files}
