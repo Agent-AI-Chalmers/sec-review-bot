@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   test: {
+    // Isolate concurrent package runs (vitest-dev/vitest#11748).
+    fsModuleCachePath: `${import.meta.dirname}/node_modules/.vitest-cache`,
     // jsdom workers are expensive to start; 3 was fastest locally, and one worker per core times out.
     maxWorkers: 3,
     projects: [

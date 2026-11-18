@@ -24,6 +24,8 @@ export SEC_REVIEW_EXECUTION_S3_SECRET_KEY=smoke-execution-secret
 export SEC_REVIEW_MEMORY_S3_SECRET_KEY=smoke-memory-secret SEC_REVIEW_UI_S3_SECRET_KEY=smoke-ui-secret
 export LANGFUSE_BASE_URL='' LANGFUSE_PUBLIC_KEY='' LANGFUSE_SECRET_KEY=''
 export TEMPORAL_NAMESPACE=default
+# Keep executions alive through replay and service restart checks.
+export TEMPORAL_WORKFLOW_TIMEOUT_SECONDS=10800
 
 compose=(docker compose --env-file /dev/null
   --project-name "sec-review-smoke-$(date +%s)-$$"
