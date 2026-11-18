@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { trajectoryCorpus } from '../contract-fixtures.ts'
+import { trajectoryCorpus } from '../contract-fixtures.js'
 import { expect } from '@playwright/test'
 
-import { runViewerFlow } from '../browser-flows/viewer.mjs'
-import { openAuthenticatedRuns, test } from './fixtures.ts'
+import { runViewerFlow } from '../browser-flows/viewer.js'
+import { openAuthenticatedRuns, test } from './fixtures.js'
 
 test('viewer browser behavior', async ({ page }) => {
   await openAuthenticatedRuns(page)
@@ -114,20 +114,31 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
       }))
       expect(style).toEqual(callBadgeStyle)
       const background = style.background
-      const [red, green, blue] = background.match(/[\d.]+/g).map(Number)
+      const [red, green, blue] = (background.match(/[\d.]+/g) ?? []).map(Number)
       expect(red).toBeGreaterThan(green)
       expect(red).toBeGreaterThan(blue)
     }
     const card = errors.first()
     await card.scrollIntoViewIfNeeded()
+    const viewport = page.viewportSize()
+    expect(viewport).not.toBeNull()
+    if (viewport === null) {
+      throw new Error('Viewer flow requires a viewport')
+    }
     const appearance = await card.evaluate((element, viewportWidth) => {
       const identity = element.querySelector('.trajectory-tool-call-identity')
+      if (identity === null) {
+        throw new Error('Missing tool identity')
+      }
       const name = identity.querySelector('.mantine-Text-root')
       const badge = identity.querySelector('.mantine-Badge-root')
       const icon = identity.querySelector('svg')
-      const isRed = (color) => {
-        const channels = color.match(/[\d.]+/g).map(Number)
+      const isRed = (color: string) => {
+        const channels = (color.match(/[\d.]+/g) ?? []).map(Number)
         return channels[0] > channels[1] && channels[0] > channels[2]
+      }
+      if (badge === null || name === null || icon === null) {
+        throw new Error('Missing tool identity content')
       }
       const badgeBox = badge.getBoundingClientRect()
       const nameBox = name.getBoundingClientRect()
@@ -139,7 +150,7 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
           badgeBox.left >= nameBox.right && Math.abs(badgeBox.top - nameBox.top) < 10,
         fitsViewport: element.getBoundingClientRect().right <= viewportWidth
       }
-    }, page.viewportSize().width)
+    }, viewport.width)
     expect(appearance).toEqual({
       redBorder: true,
       redName: true,

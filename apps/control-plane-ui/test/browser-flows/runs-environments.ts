@@ -1,8 +1,9 @@
+import type { Page, BrowserContext, Browser } from '@playwright/test'
 import assert from 'node:assert/strict'
 
-async function readContrast(page) {
+async function readContrast(page: Page) {
   return page.evaluate(() => {
-    const parseColour = (value) => {
+    const parseColour = (value: string) => {
       const match = value.match(/rgba?\(([^)]+)\)/)
       if (match === null) {
         return null
@@ -10,15 +11,15 @@ async function readContrast(page) {
       const [r, g, b, a = 1] = match[1].split(',').map((part) => Number.parseFloat(part))
       return { r, g, b, a }
     }
-    const luminance = ({ r, g, b }) => {
-      const channel = (value) => {
+    const luminance = ({ r, g, b }: { r: number; g: number; b: number }) => {
+      const channel = (value: number) => {
         const scaled = value / 255
         return scaled <= 0.03928 ? scaled / 12.92 : Math.pow((scaled + 0.055) / 1.055, 2.4)
       }
       return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
     }
-    const background = (element) => {
-      for (let node = element; node !== null; node = node.parentElement) {
+    const background = (element: Element) => {
+      for (let node: Element | null = element; node !== null; node = node.parentElement) {
         const colour = parseColour(getComputedStyle(node).backgroundColor)
         if (colour !== null && colour.a > 0.9) {
           return colour
@@ -26,7 +27,7 @@ async function readContrast(page) {
       }
       return { r: 255, g: 255, b: 255, a: 1 }
     }
-    const ratio = (element) => {
+    const ratio = (element: Element | null) => {
       if (element === null) {
         return null
       }
@@ -60,6 +61,23 @@ export async function runRunsInputAndThemeChecks({
   storageState,
   waitUntil,
   waitUntilValue
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  browser: Browser
+  base: string
+  storageState: Awaited<ReturnType<BrowserContext['storageState']>>
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+  waitUntilValue: <T>(
+    produce: () => Promise<T>,
+    predicate: (value: T) => boolean,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<T>
 }) {
   const touchContext = await browser.newContext({
     viewport,
@@ -97,9 +115,9 @@ export async function runRunsInputAndThemeChecks({
         () => readContrast(themePage),
         (value) =>
           Number.isFinite(value.title) &&
-          value.title >= 4.5 &&
+          (value.title ?? 0) >= 4.5 &&
           Number.isFinite(value.cell) &&
-          value.cell >= 4.5,
+          (value.cell ?? 0) >= 4.5,
         `${name} the ${theme} theme must render a readable contrast`
       )
       const dark = theme === 'dark'
@@ -109,7 +127,7 @@ export async function runRunsInputAndThemeChecks({
         `${name} the ${theme} theme must render its own background`
       )
       assert.ok(
-        contrast.title >= 4.5 && contrast.cell >= 4.5,
+        (contrast.title ?? 0) >= 4.5 && (contrast.cell ?? 0) >= 4.5,
         `${name} ${theme} theme contrast is too low (title ${contrast.title}, cell ${contrast.cell})`
       )
     } finally {
@@ -125,6 +143,17 @@ export async function runRunsClockCheck({
   base,
   storageState,
   waitUntil
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  browser: Browser
+  base: string
+  storageState: Awaited<ReturnType<BrowserContext['storageState']>>
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
 }) {
   const context = await browser.newContext({
     viewport,
@@ -171,6 +200,18 @@ export async function runRunsChineseCheck({
   base,
   storageState,
   waitUntilValue
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  browser: Browser
+  base: string
+  storageState: Awaited<ReturnType<BrowserContext['storageState']>>
+  waitUntilValue: <T>(
+    produce: () => Promise<T>,
+    predicate: (value: T) => boolean,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<T>
 }) {
   const context = await browser.newContext({
     viewport,

@@ -1,15 +1,30 @@
+import type { Page } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 
-import { chooseRunFilter } from './runs-fixture-support.mjs'
+import { chooseRunFilter } from './runs-fixture-support.js'
 
-export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
+export async function runFixtureRunListFlow({
+  name,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
   const rows = () =>
     page.$$eval('tbody tr td:first-child', (cells) => cells.map((cell) => cell.textContent))
   const previous = page.getByRole('button', { name: 'Previous page' })
   const next = page.getByRole('button', { name: 'Next page' })
   const perPage = page.getByRole('combobox', { name: 'Rows per page' })
-  const choosePageSize = async (size) => {
+  const choosePageSize = async (size: string) => {
     await perPage.click()
     await page
       .locator('[role="option"]', { hasText: new RegExp(`^${size}$`) })
@@ -116,7 +131,7 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   assert.strictEqual(await page.locator('.run-id').count(), 0)
 }
 
-export async function runFixtureRunRangeFlow({ page }) {
+export async function runFixtureRunRangeFlow({ page }: { page: Page }) {
   // Freeze only Date, not timers: presets stay on one minute boundary while
   // network and rendering still run normally, including the delayed response.
   const now = new Date()
@@ -125,12 +140,12 @@ export async function runFixtureRunRangeFlow({ page }) {
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)
   const allRows = await rows.count()
-  let hourRows
+  let hourRows: number | undefined
   for (const [label, range, minutes] of [
     ['Last hour', '1h', 60],
     ['Last 24 hours', '24h', 1440],
     ['All', null, null]
-  ]) {
+  ] as const) {
     const from =
       minutes === null
         ? null
@@ -151,7 +166,9 @@ export async function runFixtureRunRangeFlow({ page }) {
     ])
     expect(response.ok()).toBe(true)
     await expect(page).toHaveURL((url) => url.searchParams.get('range') === range)
-    const result = await response.json()
+    const result = (await response.json()) as {
+      runs: { run_id: string }[]
+    }
     const expectedLinks = result.runs.map((run) => `/runs/${encodeURIComponent(run.run_id)}`)
     await expect
       .poll(() =>
@@ -166,6 +183,7 @@ export async function runFixtureRunRangeFlow({ page }) {
       expect(count).toBeLessThan(allRows)
       hourRows = count
     } else if (range === '24h') {
+      assert.ok(hourRows !== undefined, 'Hour range must be checked first')
       expect(count).toBeGreaterThan(hourRows)
       expect(count).toBeLessThan(allRows)
     } else {

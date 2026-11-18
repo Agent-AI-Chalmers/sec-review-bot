@@ -1,8 +1,10 @@
+import type { Page, BrowserContext } from '@playwright/test'
+import type { ViteDevServer } from 'vite'
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 import { expect } from '@playwright/test'
 
-async function waitForCondition(predicate, message) {
+async function waitForCondition(predicate: () => boolean | Promise<boolean>, message: string) {
   const deadline = Date.now() + 5_000
   for (;;) {
     if (await predicate()) {
@@ -15,14 +17,24 @@ async function waitForCondition(predicate, message) {
   }
 }
 
-export async function runMemoryPreflightFlow({ name, context, base, server }) {
+export async function runMemoryPreflightFlow({
+  name,
+  context,
+  base,
+  server
+}: {
+  name: string
+  context: BrowserContext
+  base: string
+  server: ViteDevServer | undefined
+}) {
   if (name === 'desktop') {
-    const aGate = Promise.withResolvers()
-    const bGate = Promise.withResolvers()
-    const aRequested = Promise.withResolvers()
-    const bRequested = Promise.withResolvers()
-    const aSettled = Promise.withResolvers()
-    const trajectoryResponse = (content) => ({
+    const aGate = Promise.withResolvers<void>()
+    const bGate = Promise.withResolvers<void>()
+    const aRequested = Promise.withResolvers<void>()
+    const bRequested = Promise.withResolvers<void>()
+    const aSettled = Promise.withResolvers<void>()
+    const trajectoryResponse = (content: string) => ({
       events: [
         {
           seq: 1,
@@ -254,16 +266,24 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
   }
 }
 
-async function openVersionList(page) {
+async function openVersionList(page: Page) {
   await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page.getByText('List', { exact: true }).click()
 }
 
-export async function runMemoryChineseFlow({ page, base, name }) {
+export async function runMemoryChineseFlow({
+  page,
+  base,
+  name
+}: {
+  page: Page
+  base: string
+  name: string
+}) {
   // Other panels may settle first. Hold observations until their tab opens so
   // geometry checks must wait for this response, independently of overview data.
-  const observations = Promise.withResolvers()
+  const observations = Promise.withResolvers<void>()
   await page.route('**/api/memory/observations?*', async (route) => {
     await observations.promise
     await route.continue()
@@ -332,7 +352,19 @@ export async function runMemoryChineseFlow({ page, base, name }) {
   }
 }
 
-export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
+export async function runMemoryOverviewFlow({
+  page,
+  name,
+  waitUntil
+}: {
+  page: Page
+  name: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
   const memoryEndpoints = [
     '/api/memory/tree/automation',
     '/api/memory/tree',
@@ -341,7 +373,7 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
     '/api/memory/overview'
   ]
   const memoryRequestCounts = Object.fromEntries(memoryEndpoints.map((endpoint) => [endpoint, 0]))
-  const countMemoryRequest = (request) => {
+  const countMemoryRequest = (request: import('@playwright/test').Request) => {
     const pathname = new URL(request.url()).pathname
     const endpoint = memoryEndpoints.find(
       (candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`)
@@ -400,12 +432,23 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
   page.off('request', countMemoryRequest)
 }
 
-export async function runMemoryVersionFlow({ page, name, viewport, screenshotPath }) {
+export async function runMemoryVersionFlow({
+  page,
+  name,
+  viewport,
+  screenshotPath
+}: {
+  page: Page
+  name: string
+  viewport: { width: number; height: number } | null
+  screenshotPath: string
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByText('Versions', { exact: true }).click()
   await expect(page.locator('[data-version-node="56"]')).toBeVisible()
   const versionGraphLayout = await page.evaluate(() => {
-    const box = (version) => {
+    const box = (version: number) => {
       const node = document.querySelector(`.version-graph-node[data-version-node="${version}"]`)
       if (node === null) {
         return null
@@ -526,7 +569,20 @@ export async function runMemoryVersionFlow({ page, name, viewport, screenshotPat
   }
 }
 
-export async function runMemoryFilesFlow({ page, context, base, name, viewport }) {
+export async function runMemoryFilesFlow({
+  page,
+  context,
+  base,
+  name,
+  viewport
+}: {
+  page: Page
+  context: BrowserContext
+  base: string
+  name: string
+  viewport: { width: number; height: number } | null
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await openVersionList(page)
   await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()
@@ -638,7 +694,22 @@ export async function runMemoryFilesFlow({ page, context, base, name, viewport }
   await diffPage.close()
 }
 
-export async function runMemoryTrajectoryFlow({ page, name, viewport, waitUntil }) {
+export async function runMemoryTrajectoryFlow({
+  page,
+  name,
+  viewport,
+  waitUntil
+}: {
+  page: Page
+  name: string
+  viewport: { width: number; height: number } | null
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await openVersionList(page)
   await page.getByRole('button', { name: 'Trajectory' }).first().click()
   const maintenanceDialog = page.getByRole('dialog', {
@@ -814,7 +885,22 @@ export async function runMemoryTrajectoryFlow({ page, name, viewport, waitUntil 
   await page.getByText('List', { exact: true }).click()
 }
 
-export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
+export async function runMemoryEditFlow({
+  page,
+  name,
+  viewport,
+  waitUntil
+}: {
+  page: Page
+  name: string
+  viewport: { width: number; height: number } | null
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await openVersionList(page)
   await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()
@@ -889,7 +975,7 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
   })
   await discardDialog.getByText('Your edits have not been committed and will be lost.').waitFor()
   await discardDialog.getByRole('button', { name: 'Continue editing' }).click()
-  const editRequests = []
+  const editRequests: unknown[] = []
   await page.route('**/api/memory/edit', async (route) => {
     editRequests.push(route.request().postDataJSON())
     if (editRequests.length === 1) {

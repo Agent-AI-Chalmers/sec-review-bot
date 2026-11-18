@@ -1,8 +1,26 @@
+import type { Page } from '@playwright/test'
 import assert from 'node:assert/strict'
 
-import { openPublishedRepositoryRun } from './runs-fixture-support.mjs'
+import { openPublishedRepositoryRun } from './runs-fixture-support.js'
 
-export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, waitUntil }) {
+export async function runFixtureRunDeliveryFlow({
+  name,
+  viewport,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await openPublishedRepositoryRun({ name, page, base, waitUntil })
 
   const publicationBody =
@@ -14,12 +32,20 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
     // The publication phase only renders elapsed time when it has a start. Include the
     // served run in the failure because a bad fixture and a stale list row look identical.
     const runId = decodeURIComponent(new URL(page.url()).pathname).split('/').pop()
+    assert.ok(runId, 'Run URL must contain an ID')
     const served = await page.evaluate(async (id) => {
       const response = await fetch(`/api/runs/${encodeURIComponent(id)}`)
       if (!response.ok) {
         return { status: response.status }
       }
-      const { run } = await response.json()
+      const { run } = (await response.json()) as {
+        run: {
+          workflow: unknown
+          publication: unknown
+          execution: unknown
+          preparation: { status: unknown } | null
+        }
+      }
       return {
         status: response.status,
         workflow: run.workflow,
@@ -74,7 +100,7 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
     const row = document.querySelector('.artifact-row')
     const summary = document.querySelector('.publication-summary p')
     const firstStep = document.querySelector('.delivery-item')
-    const gap = (above, below) =>
+    const gap = (above: Element | null, below: Element | null) =>
       above === null || below === null
         ? null
         : Math.round(below.getBoundingClientRect().top - above.getBoundingClientRect().bottom)
@@ -126,7 +152,12 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
     2,
     `${name} JSONL preview must render one collapsible record per line`
   )
-  await runFilesDialog.getByRole('radio', { name: 'Source' }).evaluate((element) => element.click())
+  await runFilesDialog.getByRole('radio', { name: 'Source' }).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error('Expected an HTML control')
+    }
+    element.click()
+  })
   await runFilesDialog.locator('.cm-editor').waitFor()
   assert.strictEqual(
     await runFilesDialog.locator('.cm-content[contenteditable="false"]').count(),

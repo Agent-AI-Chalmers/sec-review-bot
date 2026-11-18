@@ -1,8 +1,23 @@
+import type { Page } from '@playwright/test'
 import assert from 'node:assert/strict'
 
-import { chooseRunFilter } from './runs-fixture-support.mjs'
+import { chooseRunFilter } from './runs-fixture-support.js'
 
-export async function runRunsTimelineFlow({ name, page, base, waitUntil }) {
+export async function runRunsTimelineFlow({
+  name,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
   await chooseRunFilter(page, 'Execution', 'Running')
   await waitUntil(

@@ -1,20 +1,22 @@
+import type { Page } from '@playwright/test'
+import type { ViteDevServer } from 'vite'
 import { setTimeout as delay } from 'node:timers/promises'
 
 import {
   runRunsChineseCheck,
   runRunsClockCheck,
   runRunsInputAndThemeChecks
-} from '../browser-flows/runs-environments.mjs'
-import { runFixtureAdminFlow, runRunsErrorFlow } from '../browser-flows/runs-errors.mjs'
-import { runFixtureRunDeliveryFlow } from '../browser-flows/runs-fixture-delivery.mjs'
+} from '../browser-flows/runs-environments.js'
+import { runFixtureAdminFlow, runRunsErrorFlow } from '../browser-flows/runs-errors.js'
+import { runFixtureRunDeliveryFlow } from '../browser-flows/runs-fixture-delivery.js'
 import {
   runFixtureRunListFlow,
   runFixtureRunRangeFlow
-} from '../browser-flows/runs-fixture-list.mjs'
-import { runFixtureRunStatisticsFlow } from '../browser-flows/runs-fixture-statistics.mjs'
-import { runRunsTimelineFlow } from '../browser-flows/runs-timeline.mjs'
-import { runRunsFlow } from '../browser-flows/runs.mjs'
-import { openAuthenticatedRuns, test } from './fixtures.ts'
+} from '../browser-flows/runs-fixture-list.js'
+import { runFixtureRunStatisticsFlow } from '../browser-flows/runs-fixture-statistics.js'
+import { runRunsTimelineFlow } from '../browser-flows/runs-timeline.js'
+import { runRunsFlow } from '../browser-flows/runs.js'
+import { openAuthenticatedRuns, test } from './fixtures.js'
 
 const EXPECTED_HEADERS = [
   'Run',
@@ -27,7 +29,11 @@ const EXPECTED_HEADERS = [
   'Failure code'
 ]
 
-async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  message: string,
+  { timeoutMs = 5_000, intervalMs = 50 } = {}
+) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
     if (await predicate()) {
@@ -40,10 +46,10 @@ async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 5
   }
 }
 
-async function waitUntilValue(
-  produce,
-  predicate,
-  message,
+async function waitUntilValue<T>(
+  produce: () => Promise<T>,
+  predicate: (value: T) => boolean,
+  message: string,
   { timeoutMs = 5_000, intervalMs = 50 } = {}
 ) {
   const deadline = Date.now() + timeoutMs
@@ -59,7 +65,7 @@ async function waitUntilValue(
   }
 }
 
-async function runFilesError(page, baseURL) {
+async function runFilesError(page: Page, baseURL: string) {
   await page.goto(`${baseURL}/runs/fixture-artifact-load-error/files`, {
     waitUntil: 'domcontentloaded'
   })
@@ -67,7 +73,10 @@ async function runFilesError(page, baseURL) {
   await page.getByRole('link', { name: 'Download execution archive' }).waitFor()
 }
 
-async function skipEmptyExternalRuns(page, fixtureRuntime) {
+async function skipEmptyExternalRuns(
+  page: Page,
+  fixtureRuntime: { baseURL: string; server: ViteDevServer | undefined }
+) {
   if (fixtureRuntime.server !== undefined) {
     return
   }
@@ -84,7 +93,6 @@ test('runs browser behavior', async ({ page, fixtureRuntime }, testInfo) => {
     name: testInfo.project.name,
     viewport: page.viewportSize(),
     page,
-    base: fixtureRuntime.baseURL,
     server: fixtureRuntime.server,
     waitUntil,
     expectedHeaders: EXPECTED_HEADERS,

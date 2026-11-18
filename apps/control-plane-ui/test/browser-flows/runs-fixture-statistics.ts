@@ -1,9 +1,24 @@
+import type { Page, Locator } from '@playwright/test'
 import assert from 'node:assert/strict'
 
-import { openPublishedRepositoryRun } from './runs-fixture-support.mjs'
+import { openPublishedRepositoryRun } from './runs-fixture-support.js'
 
-async function clickAndWaitForExpansion({ control, expanded, waitUntil, message }) {
-  let previousBox = null
+async function clickAndWaitForExpansion({
+  control,
+  expanded,
+  waitUntil,
+  message
+}: {
+  control: Locator
+  expanded: boolean
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+  message: string
+}) {
+  let previousBox: Awaited<ReturnType<Locator['boundingBox']>> = null
   let stableSamples = 0
   await control.scrollIntoViewIfNeeded()
   await waitUntil(async () => {
@@ -28,7 +43,24 @@ async function clickAndWaitForExpansion({ control, expanded, waitUntil, message 
   )
 }
 
-export async function runFixtureRunStatisticsFlow({ name, viewport, page, base, waitUntil }) {
+export async function runFixtureRunStatisticsFlow({
+  name,
+  viewport,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await openPublishedRepositoryRun({ name, page, base, waitUntil })
   const statistics = page.getByTestId('execution-statistics')
   await statistics.waitFor()

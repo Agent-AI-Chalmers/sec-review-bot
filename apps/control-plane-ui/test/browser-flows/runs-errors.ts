@@ -1,11 +1,26 @@
+import type { Page } from '@playwright/test'
 import assert from 'node:assert/strict'
 
-export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
+export async function runFixtureAdminFlow({
+  name,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
   await page.getByTestId('parked-runs').waitFor()
   const parkedRunId = await page.evaluate(async () => {
     const response = await fetch('/api/runs/parked')
-    const body = await response.json()
+    const body = (await response.json()) as { blocks: { run_id: string }[] }
     return body.blocks[0].run_id
   })
   await page
@@ -56,7 +71,9 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   let syntheticTransitionCount = 12
   await page.route('**/api/runs/*/events', async (route) => {
     const response = await route.fetch()
-    const body = await response.json()
+    const body = (await response.json()) as {
+      events: { from_status: string | null; occurred_at: string; [key: string]: unknown }[]
+    }
     const sample = body.events.find((event) => event.from_status !== null)
     assert.ok(sample, `${name} fixtures need a transition to synthesize`)
     const transitions = Array.from({ length: syntheticTransitionCount }, (_, index) => ({
@@ -110,7 +127,12 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   // page button between Playwright's pointer-down and pointer-up, leaving focus
   // on page two without dispatching its click. This flow tests pagination state,
   // so dispatch the DOM click atomically in the page instead of racing the poll.
-  await secondPage.evaluate((element) => element.click())
+  await secondPage.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error('Expected an HTML control')
+    }
+    element.click()
+  })
   await waitUntil(
     async () => (await transitions.locator('.run-transition').count()) === 1,
     `${name} the second transition page must show the remaining row`
@@ -118,7 +140,21 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   await page.unroute('**/api/runs/*/events')
 }
 
-export async function runRunsErrorFlow({ name, page, base, waitUntil }) {
+export async function runRunsErrorFlow({
+  name,
+  page,
+  base,
+  waitUntil
+}: {
+  name: string
+  page: Page
+  base: string
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+}) {
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.route('**/api/runs*', (route) =>

@@ -8,10 +8,14 @@ import {
   runMemoryTrajectoryFlow,
   runMemoryEditFlow,
   runMemoryPreflightFlow
-} from '../browser-flows/memory.mjs'
-import { openAuthenticatedRuns, test } from './fixtures.ts'
+} from '../browser-flows/memory.js'
+import { openAuthenticatedRuns, test } from './fixtures.js'
 
-async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  message: string,
+  { timeoutMs = 5_000, intervalMs = 50 } = {}
+) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
     if (await predicate()) {

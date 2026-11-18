@@ -1,7 +1,8 @@
+import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import assert from 'node:assert/strict'
 
-export async function runViewerFlow({ page }) {
+export async function runViewerFlow({ page }: { page: Page }) {
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
   await page.getByRole('heading', { name: 'Trajectory Viewer' }).waitFor()
   const pastedTrajectory = [

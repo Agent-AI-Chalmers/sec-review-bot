@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test'
+import type { ViteDevServer } from 'vite'
 import assert from 'node:assert/strict'
 
 export async function runRunsFlow({
@@ -8,7 +10,20 @@ export async function runRunsFlow({
   waitUntil,
   expectedHeaders,
   screenshotPath
+}: {
+  name: string
+  viewport: { width: number; height: number } | null
+  page: Page
+  server: ViteDevServer | undefined
+  waitUntil: (
+    predicate: () => boolean | Promise<boolean>,
+    message: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ) => Promise<void>
+  expectedHeaders: string[]
+  screenshotPath: string
 }) {
+  assert.ok(viewport, 'Browser flow requires a viewport')
   await page.screenshot({
     path: screenshotPath,
     fullPage: true
