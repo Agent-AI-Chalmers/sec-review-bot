@@ -53,14 +53,7 @@
         "status": {
           "type": "string",
           "description": "Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own \"in progress\" state and is unrelated to the Execution API provider, which is only submitted to once preparation reaches `submitted`.",
-          "enum": [
-            "pending",
-            "preparing",
-            "uncertain",
-            "disconnected",
-            "submitted",
-            "failed"
-          ]
+          "enum": ["pending", "preparing", "uncertain", "disconnected", "submitted", "failed"]
         },
         "attempt_count": {
           "type": "integer",
@@ -151,22 +144,11 @@
             },
             "ingestion_status": {
               "type": ["string", "null"],
-              "enum": [
-                "settled",
-                "partial_window",
-                "no_observations",
-                "unavailable",
-                null
-              ]
+              "enum": ["settled", "partial_window", "no_observations", "unavailable", null]
             },
             "usage_coverage": {
               "type": ["string", "null"],
-              "enum": [
-                "complete_for_observed_calls",
-                "partial",
-                "unavailable",
-                null
-              ],
+              "enum": ["complete_for_observed_calls", "partial", "unavailable", null],
               "description": "Coverage for calls returned by Langfuse. It is not proof that every real model call was uploaded."
             },
             "root_trace_count": {
@@ -469,14 +451,7 @@
         "description": "Delivery state of one user-visible coordination notice.\n",
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "notice_id",
-          "kind",
-          "axis",
-          "status",
-          "reason_code",
-          "comment_url"
-        ],
+        "required": ["notice_id", "kind", "axis", "status", "reason_code", "comment_url"],
         "properties": {
           "notice_id": {
             "type": "string"
@@ -491,13 +466,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "pending",
-              "delivering",
-              "delivered",
-              "failed",
-              "superseded"
-            ]
+            "enum": ["pending", "delivering", "delivered", "failed", "superseded"]
           },
           "reason_code": {
             "type": ["string", "null"]

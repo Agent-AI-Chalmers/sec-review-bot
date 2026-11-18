@@ -58,9 +58,9 @@ test('submission sends authentication and accepts only the expected identity', a
   configureExecution()
   globalThis.fetch = async (input, init) => {
     expect(input).toBe('https://execution.test/v1/workflows/issue-review/runs')
-    expect(
-      (init?.headers as Record<string, string> | undefined)?.authorization
-    ).toBe('Bearer test-token')
+    expect((init?.headers as Record<string, string> | undefined)?.authorization).toBe(
+      'Bearer test-token'
+    )
     return new Response(
       JSON.stringify({
         run_id: 'run-1',
@@ -112,26 +112,22 @@ test('status response cannot substitute another run or workflow', async () => {
       { status: 200 }
     )
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as Error).message).toMatch(/unexpected run_id/)
-      expect(isTerminalExecutionPollingError(error)).toBe(true)
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as Error).message).toMatch(/unexpected run_id/)
+    expect(isTerminalExecutionPollingError(error)).toBe(true)
+    return true
+  })
 })
 
 test('malformed successful status response is a terminal protocol failure', async () => {
   configureExecution()
   globalThis.fetch = async () => new Response('{invalid', { status: 200 })
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as { code?: string }).code).toBe('EXECUTION_INVALID_JSON')
-      expect(isTerminalExecutionPollingError(error)).toBe(true)
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as { code?: string }).code).toBe('EXECUTION_INVALID_JSON')
+    expect(isTerminalExecutionPollingError(error)).toBe(true)
+    return true
+  })
 })
 
 test('oversized successful status response is a terminal protocol failure', async () => {
@@ -150,15 +146,11 @@ test('oversized successful status response is a terminal protocol failure', asyn
       }
     )
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as { code?: string }).code).toBe(
-        'EXECUTION_RESPONSE_TOO_LARGE'
-      )
-      expect(isTerminalExecutionPollingError(error)).toBe(true)
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as { code?: string }).code).toBe('EXECUTION_RESPONSE_TOO_LARGE')
+    expect(isTerminalExecutionPollingError(error)).toBe(true)
+    return true
+  })
   expect(bodyCancelled).toBe(true)
 })
 
@@ -166,13 +158,11 @@ test('malformed transient error response remains retryable', async () => {
   configureExecution()
   globalThis.fetch = async () => new Response('{invalid', { status: 500 })
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as { name?: string }).name).toBe('ExecutionServiceError')
-      expect(isTerminalExecutionPollingError(error)).toBe(false)
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as { name?: string }).name).toBe('ExecutionServiceError')
+    expect(isTerminalExecutionPollingError(error)).toBe(false)
+    return true
+  })
 })
 
 test('status response must match the persisted workflow', async () => {
@@ -235,9 +225,7 @@ test('status response validates an available artifact against the run identity',
       })
     )
 
-  expect((await getExecutionRunStatus('run-1')).artifact_storage).toStrictEqual(
-    artifactStorage
-  )
+  expect((await getExecutionRunStatus('run-1')).artifact_storage).toStrictEqual(artifactStorage)
 })
 
 test('status response rejects an artifact reference owned by another run', async () => {
@@ -261,14 +249,10 @@ test('status response rejects an artifact reference owned by another run', async
       })
     )
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as { code?: string }).code).toBe(
-        'EXECUTION_INVALID_ARTIFACT_STORAGE'
-      )
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as { code?: string }).code).toBe('EXECUTION_INVALID_ARTIFACT_STORAGE')
+    return true
+  })
 })
 
 test('status response rejects an unknown Execution state', async () => {
@@ -283,13 +267,11 @@ test('status response rejects an unknown Execution state', async () => {
       { status: 200 }
     )
 
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (error: unknown) => {
-      expect((error as { code?: string }).code).toBe('EXECUTION_INVALID_STATUS')
-      expect((error as { retryable?: boolean }).retryable).toBe(false)
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((error: unknown) => {
+    expect((error as { code?: string }).code).toBe('EXECUTION_INVALID_STATUS')
+    expect((error as { retryable?: boolean }).retryable).toBe(false)
+    return true
+  })
 })
 
 test('a status query is split into batches the Execution API accepts', async () => {
@@ -298,9 +280,9 @@ test('a status query is split into batches the Execution API accepts', async () 
   configureExecution()
   const sent: string[][] = []
   globalThis.fetch = async (_input, init) => {
-    const body = JSON.parse(
-      typeof init?.body === 'string' ? init.body : ''
-    ) as { run_ids: string[] }
+    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '') as {
+      run_ids: string[]
+    }
     sent.push(body.run_ids)
     return new Response(
       JSON.stringify({
@@ -338,9 +320,9 @@ test('the status batch size is the limit the contract publishes', () => {
     }
   }
 
-  expect(
-    spec.components.schemas.RunStatusQuery.properties.run_ids.maxItems
-  ).toBe(EXECUTION_STATUS_QUERY_LIMIT)
+  expect(spec.components.schemas.RunStatusQuery.properties.run_ids.maxItems).toBe(
+    EXECUTION_STATUS_QUERY_LIMIT
+  )
 })
 
 for (const error of [
@@ -368,15 +350,11 @@ for (const error of [
         }),
         { status: 200 }
       )
-    await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-      (failure: unknown) => {
-        expect(isTerminalExecutionPollingError(failure)).toBe(true)
-        expect((failure as { code?: string }).code).toBe(
-          'EXECUTION_INVALID_RESPONSE'
-        )
-        return true
-      }
-    )
+    await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((failure: unknown) => {
+      expect(isTerminalExecutionPollingError(failure)).toBe(true)
+      expect((failure as { code?: string }).code).toBe('EXECUTION_INVALID_RESPONSE')
+      return true
+    })
   })
 }
 
@@ -394,14 +372,12 @@ test('malformed HTTP error fields cannot override retry behavior with coerced va
       }),
       { status: 503 }
     )
-  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy(
-    (failure: unknown) => {
-      expect(isTerminalExecutionPollingError(failure)).toBe(false)
-      expect((failure as { code?: string }).code).toBe('EXECUTION_API_ERROR')
-      expect((failure as Error).message).toBe('Execution returned HTTP 503.')
-      return true
-    }
-  )
+  await expect(getExecutionRunStatus('run-1')).rejects.toSatisfy((failure: unknown) => {
+    expect(isTerminalExecutionPollingError(failure)).toBe(false)
+    expect((failure as { code?: string }).code).toBe('EXECUTION_API_ERROR')
+    expect((failure as Error).message).toBe('Execution returned HTTP 503.')
+    return true
+  })
 })
 
 test('preserves a fully validated terminal Execution error', async () => {

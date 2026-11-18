@@ -36,16 +36,11 @@ test('replaces dots, so a ".." or ".lock" cannot survive', () => {
   // The previous sanitizer preserved dots and produced refs git refused (a 422 and no PR).
   for (const value of ['a..b', '..', '.lock', 'a.b', 'v1.2.3']) {
     const segment = sanitizeBranchSegment(value)
-    expect(segment, `${value} -> ${segment} must contain no dot`).not.toContain(
-      '.'
-    )
+    expect(segment, `${value} -> ${segment} must contain no dot`).not.toContain('.')
     // `..` reduces to an empty segment, which cannot form a ref on its own; callers always
     // concatenate it into a larger name, so only a non-empty result has to be ref-valid.
     if (segment !== '') {
-      expect.assert(
-        gitAcceptsRef(segment),
-        `${value} -> ${segment} must be a valid ref`
-      )
+      expect.assert(gitAcceptsRef(segment), `${value} -> ${segment} must be a valid ref`)
     }
   }
 })
@@ -87,10 +82,7 @@ test('every sanitized value is accepted by git for the inputs that matter', () =
     // An empty segment cannot form a ref; callers append a run id, so allow it here but require
     // that any non-empty result is a ref git accepts.
     if (segment !== '') {
-      expect.assert(
-        gitAcceptsRef(segment),
-        `${value} -> ${segment} must be a valid ref`
-      )
+      expect.assert(gitAcceptsRef(segment), `${value} -> ${segment} must be a valid ref`)
     }
   }
 })

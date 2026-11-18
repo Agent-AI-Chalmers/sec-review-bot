@@ -4,10 +4,7 @@ import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
 
 import { transaction } from '../database/transaction.js'
-import {
-  DeterministicReviewRunError,
-  PUBLICATION_STEP_ERROR_CODES
-} from '../errors.js'
+import { DeterministicReviewRunError, PUBLICATION_STEP_ERROR_CODES } from '../errors.js'
 import type { PublicationStatus, PublicationStepRecord } from '../shapes.js'
 import { appendEvent, type AppendEventFields } from './review-run-events.js'
 import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
@@ -35,10 +32,7 @@ const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
 ]
 
 /** A disconnected publication requires an operator decision before overall conclusion. */
-const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
-  'publishing',
-  'uncertain'
-]
+const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = ['publishing', 'uncertain']
 
 /** Claims spend the write budget, including attempts whose owner dies before reporting.
  * Exhaustion requires remote reconciliation before the step can be concluded.
@@ -170,10 +164,7 @@ export class PublicationStore {
    * The parked steps become fresh pending work, but this operation does not claim them. The
    * normal publication selector must perform the execution-axis checks and return the claim token
    * to the publisher that will actually use it. */
-  async resumeDisconnectedOn(
-    client: PoolClient,
-    runId: string
-  ): Promise<boolean> {
+  async resumeDisconnectedOn(client: PoolClient, runId: string): Promise<boolean> {
     const result = await client.query<{ from_status: string }>(
       `WITH previous AS (
          SELECT run_id, status FROM publications
@@ -208,9 +199,7 @@ export class PublicationStore {
       toStatus: 'pending',
       reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
     })
-    for (const step of resumedSteps.rows.toSorted((a, b) =>
-      a.step_key.localeCompare(b.step_key)
-    ))
+    for (const step of resumedSteps.rows.toSorted((a, b) => a.step_key.localeCompare(b.step_key)))
       await this.appendStepEvent(client, runId, step.step_key, {
         fromStatus: 'disconnected',
         toStatus: 'pending',
@@ -331,56 +320,49 @@ export class PublicationStore {
         `Publication ${runId} contains duplicate step keys.`,
         PUBLICATION_STEP_ERROR_CODES.set_duplicate
       )
-    const owned = await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        const existing = await client.query<{ step_key: string }>(
-          `
+    const owned = await this.withOwnedPublication(runId, token, false, async (client) => {
+      const existing = await client.query<{ step_key: string }>(
+        `
         SELECT step_key FROM publication_steps
         WHERE run_id=$1 AND connector_id=$2
         ORDER BY step_key
       `,
-          [runId, this.connectorId]
-        )
-        if (existing.rowCount === 0) {
-          for (const stepKey of uniqueKeys) {
-            await client.query(
-              `
+        [runId, this.connectorId]
+      )
+      if (existing.rowCount === 0) {
+        for (const stepKey of uniqueKeys) {
+          await client.query(
+            `
             INSERT INTO publication_steps (connector_id,run_id,step_key,status)
             VALUES ($1,$2,$3,'pending')
           `,
-              [this.connectorId, runId, stepKey]
-            )
-            // A step's creation is recorded like an axis' admission: `null -> pending`, so the log
-            // shows every step that existed, including one that was never attempted.
-            await this.appendStepEvent(client, runId, stepKey, {
-              fromStatus: null,
-              toStatus: 'pending'
-            })
-          }
-          return true
-        }
-        // The stored set is the run's step set: it was fixed by the claim that created it, and every
-        // later pass over this run - a takeover after an expired lease, an operator resume - is a
-        // repeat of the same publication, not a fresh one. It must derive the same set: adding a
-        // step would publish an unrecorded side effect, while omitting one would leave stored work
-        // that this publisher never attempts and can never complete.
-        const persisted = existing.rows.map((row) => row.step_key).sort()
-        if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
-          throw new DeterministicReviewRunError(
-            `Publication step set changed for run ${runId}.`,
-            PUBLICATION_STEP_ERROR_CODES.set_changed
+            [this.connectorId, runId, stepKey]
           )
+          // A step's creation is recorded like an axis' admission: `null -> pending`, so the log
+          // shows every step that existed, including one that was never attempted.
+          await this.appendStepEvent(client, runId, stepKey, {
+            fromStatus: null,
+            toStatus: 'pending'
+          })
         }
         return true
       }
-    )
+      // The stored set is the run's step set: it was fixed by the claim that created it, and every
+      // later pass over this run - a takeover after an expired lease, an operator resume - is a
+      // repeat of the same publication, not a fresh one. It must derive the same set: adding a
+      // step would publish an unrecorded side effect, while omitting one would leave stored work
+      // that this publisher never attempts and can never complete.
+      const persisted = existing.rows.map((row) => row.step_key).sort()
+      if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
+        throw new DeterministicReviewRunError(
+          `Publication step set changed for run ${runId}.`,
+          PUBLICATION_STEP_ERROR_CODES.set_changed
+        )
+      }
+      return true
+    })
     if (!owned)
-      throw new Error(
-        `Publication claim was lost before steps were initialized: ${runId}`
-      )
+      throw new Error(`Publication claim was lost before steps were initialized: ${runId}`)
   }
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
     return await this.listPublicationStepsWith(this.pool, runId)
@@ -418,10 +400,7 @@ export class PublicationStore {
     client: PoolClient,
     runId: string,
     stepKey: string,
-    transition: Pick<
-      AppendEventFields,
-      'fromStatus' | 'toStatus' | 'reasonCode'
-    >
+    transition: Pick<AppendEventFields, 'fromStatus' | 'toStatus' | 'reasonCode'>
   ): Promise<void> {
     await appendEvent(client, {
       axis: 'publication',
@@ -470,14 +449,10 @@ export class PublicationStore {
     // caller can see `attempt_count > 1` and reconcile against the remote object before issuing
     // another call. Assuming a reclaim means "nothing happened yet" is what would duplicate a
     // comment or a pull request.
-    return await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        // `previous` reads the row before this UPDATE, so the event names the state the claim left.
-        const result = await client.query<{ from_status: string }>(
-          `
+    return await this.withOwnedPublication(runId, token, false, async (client) => {
+      // `previous` reads the row before this UPDATE, so the event names the state the claim left.
+      const result = await client.query<{ from_status: string }>(
+        `
         UPDATE publication_steps s
         SET status='running', claimed_by=$3, attempt_count=s.attempt_count+1,
             last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
@@ -502,67 +477,51 @@ export class PublicationStore {
           )
         RETURNING previous.status AS from_status
       `,
-          [
-            runId,
-            this.connectorId,
-            token,
-            stepKey,
-            MAX_PUBLICATION_STEP_ATTEMPTS
-          ]
-        )
-        const claimed = result.rows[0]
-        if (claimed === undefined) return false
-        await this.appendStepEvent(client, runId, stepKey, {
-          fromStatus: claimed.from_status,
-          toStatus: 'running'
-        })
-        return true
-      }
-    )
+        [runId, this.connectorId, token, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
+      )
+      const claimed = result.rows[0]
+      if (claimed === undefined) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: claimed.from_status,
+        toStatus: 'running'
+      })
+      return true
+    })
   }
-  async requirePublicationStepClaim(
-    runId: string,
-    token: string,
-    stepKey: string
-  ): Promise<void> {
+  async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
     if (await this.claimPublicationStep(runId, token, stepKey)) return
 
     // A token that no longer owns the publication gets `not_claimable` below: there is nothing
     // left for it to reconcile.
-    const exhausted = await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        const steps = await this.listPublicationStepsWith(client, runId)
-        const current = steps.find((item) => item.step_key === stepKey)
-        const needsReconciliation =
-          current !== undefined &&
-          isStepExhausted(current) &&
-          // A step that already reached a terminal outcome is not re-tested: only the live states
-          // can still be waiting for the reconciliation below.
-          (current.status === 'failed' ||
-            current.status === 'running' ||
-            current.status === 'uncertain')
-        if (needsReconciliation && current.status !== 'uncertain') {
-          const moved = await client.query(
-            `UPDATE publication_steps SET status='uncertain', claimed_by=NULL,
+    const exhausted = await this.withOwnedPublication(runId, token, false, async (client) => {
+      const steps = await this.listPublicationStepsWith(client, runId)
+      const current = steps.find((item) => item.step_key === stepKey)
+      const needsReconciliation =
+        current !== undefined &&
+        isStepExhausted(current) &&
+        // A step that already reached a terminal outcome is not re-tested: only the live states
+        // can still be waiting for the reconciliation below.
+        (current.status === 'failed' ||
+          current.status === 'running' ||
+          current.status === 'uncertain')
+      if (needsReconciliation && current.status !== 'uncertain') {
+        const moved = await client.query(
+          `UPDATE publication_steps SET status='uncertain', claimed_by=NULL,
              updated_at=clock_timestamp()
            WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
              AND status IN ('failed','running') AND attempt_count >= $4`,
-            [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
-          )
-          // `current` was read under the publication lock, so it is the status this UPDATE left.
-          if (moved.rowCount === 1)
-            await this.appendStepEvent(client, runId, stepKey, {
-              fromStatus: current.status,
-              toStatus: 'uncertain'
-            })
-        }
-        await derivePublicationStatus(client, this.connectorId, runId)
-        return needsReconciliation
+          [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
+        )
+        // `current` was read under the publication lock, so it is the status this UPDATE left.
+        if (moved.rowCount === 1)
+          await this.appendStepEvent(client, runId, stepKey, {
+            fromStatus: current.status,
+            toStatus: 'uncertain'
+          })
       }
-    )
+      await derivePublicationStatus(client, this.connectorId, runId)
+      return needsReconciliation
+    })
     // A `disconnected` step never reaches here: an operator resume returns it to `pending`, and
     // every other route into `disconnected` parks the publication itself, which excludes it from
     // every claim. So the only reason a step is refused below is a spent attempt budget, and
@@ -604,58 +563,42 @@ export class PublicationStore {
     runId: string,
     token: string,
     stepKey: string,
-    outcome:
-      | { found: true; remote: { id?: string | null; url?: string | null } }
-      | { found: false }
+    outcome: { found: true; remote: { id?: string | null; url?: string | null } } | { found: false }
   ): Promise<boolean> {
-    return await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        // Both answers share one guard and one parameter prefix: $1-$3 name the step and $4 is the
-        // attempt ceiling, so the two statements cannot drift apart on what "still exhausted" means.
-        const exhaustedStep = `WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
+    return await this.withOwnedPublication(runId, token, false, async (client) => {
+      // Both answers share one guard and one parameter prefix: $1-$3 name the step and $4 is the
+      // attempt ceiling, so the two statements cannot drift apart on what "still exhausted" means.
+      const exhaustedStep = `WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
               AND status='uncertain' AND attempt_count>=$4`
-        const stepParams = [
-          runId,
-          this.connectorId,
-          stepKey,
-          MAX_PUBLICATION_STEP_ATTEMPTS
-        ]
-        const result = outcome.found
-          ? await client.query(
-              `
+      const stepParams = [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
+      const result = outcome.found
+        ? await client.query(
+            `
             UPDATE publication_steps
             SET status='succeeded', claimed_by=NULL, remote_object_id=$5,
                 remote_object_url=$6, failure_code=NULL, failure_message=NULL,
                 updated_at=clock_timestamp()
             ${exhaustedStep}
           `,
-              [
-                ...stepParams,
-                outcome.remote.id ?? null,
-                outcome.remote.url ?? null
-              ]
-            )
-          : await client.query(
-              `
+            [...stepParams, outcome.remote.id ?? null, outcome.remote.url ?? null]
+          )
+        : await client.query(
+            `
             UPDATE publication_steps
             SET status='terminal_failed', claimed_by=NULL, updated_at=clock_timestamp()
             ${exhaustedStep}
           `,
-              stepParams
-            )
-        if (result.rowCount !== 1) return false
-        await this.appendStepEvent(client, runId, stepKey, {
-          fromStatus: 'uncertain',
-          toStatus: outcome.found ? 'succeeded' : 'terminal_failed'
-        })
-        // Settling is what clears a step-level uncertainty, so the axis has to follow it back.
-        await derivePublicationStatus(client, this.connectorId, runId)
-        return true
-      }
-    )
+            stepParams
+          )
+      if (result.rowCount !== 1) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: 'uncertain',
+        toStatus: outcome.found ? 'succeeded' : 'terminal_failed'
+      })
+      // Settling is what clears a step-level uncertainty, so the axis has to follow it back.
+      await derivePublicationStatus(client, this.connectorId, runId)
+      return true
+    })
   }
   async completePublicationStep(
     runId: string,
@@ -665,35 +608,24 @@ export class PublicationStore {
   ): Promise<boolean> {
     // Every step commit checks the current publication token, so a previous owner cannot
     // record remote data after takeover or release.
-    return await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        const result = await client.query(
-          `
+    return await this.withOwnedPublication(runId, token, false, async (client) => {
+      const result = await client.query(
+        `
         UPDATE publication_steps s
         SET status='succeeded', claimed_by=NULL,
             remote_object_id=$4, remote_object_url=$5,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
       `,
-          [
-            runId,
-            this.connectorId,
-            stepKey,
-            remote.id ?? null,
-            remote.url ?? null
-          ]
-        )
-        if (result.rowCount !== 1) return false
-        await this.appendStepEvent(client, runId, stepKey, {
-          fromStatus: 'running',
-          toStatus: 'succeeded'
-        })
-        return true
-      }
-    )
+        [runId, this.connectorId, stepKey, remote.id ?? null, remote.url ?? null]
+      )
+      if (result.rowCount !== 1) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: 'running',
+        toStatus: 'succeeded'
+      })
+      return true
+    })
   }
   async failPublicationStep(
     runId: string,
@@ -704,37 +636,33 @@ export class PublicationStore {
   ): Promise<boolean> {
     const terminal = options.retry === false
     const expected = options.expectedUnresolvedRecoveryCount ?? null
-    return await this.withOwnedPublication(
-      runId,
-      token,
-      false,
-      async (client) => {
-        // A reconciliation failure names the count it was reported against, the way an activity
-        // failure carries its attempt number. If the count has already moved past it, this exact
-        // failure was recorded by an earlier call whose response was lost: answer that it is
-        // recorded instead of spending the budget again. The step may have parked since, so this is
-        // decided before the status guard below, which would refuse a `disconnected` step.
-        if (expected !== null) {
-          const current = await client.query<{
-            unresolved_recovery_count: number
-          }>(
-            `SELECT unresolved_recovery_count FROM publication_steps
-           WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
-            [runId, this.connectorId, stepKey]
-          )
-          const stored = current.rows[0]?.unresolved_recovery_count
-          if (stored !== undefined && stored > expected) return true
-        }
-        // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
-        // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step, $7-$9 the
-        // retry flag, the recovery budget, and the count this failure was reported against. Swapping
-        // $3 and $4 would silently store the message as the code (both are text), which no
-        // status-only assertion would catch.
-        const result = await client.query<{
-          from_status: string
-          to_status: string
+    return await this.withOwnedPublication(runId, token, false, async (client) => {
+      // A reconciliation failure names the count it was reported against, the way an activity
+      // failure carries its attempt number. If the count has already moved past it, this exact
+      // failure was recorded by an earlier call whose response was lost: answer that it is
+      // recorded instead of spending the budget again. The step may have parked since, so this is
+      // decided before the status guard below, which would refuse a `disconnected` step.
+      if (expected !== null) {
+        const current = await client.query<{
+          unresolved_recovery_count: number
         }>(
-          `
+          `SELECT unresolved_recovery_count FROM publication_steps
+           WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
+          [runId, this.connectorId, stepKey]
+        )
+        const stored = current.rows[0]?.unresolved_recovery_count
+        if (stored !== undefined && stored > expected) return true
+      }
+      // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
+      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step, $7-$9 the
+      // retry flag, the recovery budget, and the count this failure was reported against. Swapping
+      // $3 and $4 would silently store the message as the code (both are text), which no
+      // status-only assertion would catch.
+      const result = await client.query<{
+        from_status: string
+        to_status: string
+      }>(
+        `
         UPDATE publication_steps s
         SET status=CASE
               WHEN s.status='uncertain' AND $7::boolean
@@ -757,34 +685,33 @@ export class PublicationStore {
           AND ($9::integer IS NULL OR s.unresolved_recovery_count = $9)
         RETURNING previous.status AS from_status, s.status AS to_status
       `,
-          [
-            runId,
-            this.connectorId,
-            error.code ?? null,
-            error.message,
-            terminal ? 'terminal_failed' : 'failed',
-            stepKey,
-            options.retry === true,
-            MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES,
-            expected
-          ]
-        )
-        const moved = result.rows[0]
-        if (moved === undefined) return false
-        await this.appendStepEvent(client, runId, stepKey, {
-          fromStatus: moved.from_status,
-          toStatus: moved.to_status,
-          reasonCode: error.code ?? null
-        })
-        // A reconciliation that could not reach an answer moves the step to `disconnected`; the
-        // axis reports that so the run surfaces in the operator queue instead of looking active.
-        // A terminal step failure ends only that step. Whether the publication goes on is the
-        // connector's decision: it may publish its other steps and then conclude through `complete`
-        // (refused while any step has not succeeded) or `fail`. Concluding the publication here
-        // would take the claim away from steps the connector still means to publish.
-        await derivePublicationStatus(client, this.connectorId, runId)
-        return true
-      }
-    )
+        [
+          runId,
+          this.connectorId,
+          error.code ?? null,
+          error.message,
+          terminal ? 'terminal_failed' : 'failed',
+          stepKey,
+          options.retry === true,
+          MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES,
+          expected
+        ]
+      )
+      const moved = result.rows[0]
+      if (moved === undefined) return false
+      await this.appendStepEvent(client, runId, stepKey, {
+        fromStatus: moved.from_status,
+        toStatus: moved.to_status,
+        reasonCode: error.code ?? null
+      })
+      // A reconciliation that could not reach an answer moves the step to `disconnected`; the
+      // axis reports that so the run surfaces in the operator queue instead of looking active.
+      // A terminal step failure ends only that step. Whether the publication goes on is the
+      // connector's decision: it may publish its other steps and then conclude through `complete`
+      // (refused while any step has not succeeded) or `fail`. Concluding the publication here
+      // would take the claim away from steps the connector still means to publish.
+      await derivePublicationStatus(client, this.connectorId, runId)
+      return true
+    })
   }
 }

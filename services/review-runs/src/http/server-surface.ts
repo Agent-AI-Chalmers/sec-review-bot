@@ -66,9 +66,7 @@ type QueryScalarType = 'integer' | 'number' | 'boolean'
 function coerceQueryStrings(request: FastifyRequest): void {
   const querystring = request.routeOptions?.schema?.querystring
   const properties = (
-    querystring as
-      | { properties?: Record<string, { type?: QueryScalarType }> }
-      | undefined
+    querystring as { properties?: Record<string, { type?: QueryScalarType }> } | undefined
   )?.properties
   if (properties === undefined) return
   const query = request.query as Record<string, unknown> | null
@@ -109,17 +107,11 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
 /** Report a stored row the contract cannot represent, with the identity and fault needed to
  * find it. The reads that can hit one skip and report it rather than failing the whole read,
  * so this is the only record that the row was dropped. */
-function logDroppedRunRow(
-  connectorId: string,
-  dropped: { run_id: string; error: unknown }
-): void {
+function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error: unknown }): void {
   logEvent('review_runs_run_row_dropped', {
     connector_id: connectorId,
     run_id: dropped.run_id,
-    error:
-      dropped.error instanceof Error
-        ? dropped.error.message
-        : String(dropped.error)
+    error: dropped.error instanceof Error ? dropped.error.message : String(dropped.error)
   })
 }
 
@@ -129,10 +121,7 @@ function logDroppedRunRow(
  * byte by byte from the response-time difference. `timingSafeEqual` throws when the buffers
  * differ in length, which is why the length is compared first: the length of the expected
  * token is not the secret, and a mismatch is a plain rejection. */
-function bearerTokenMatches(
-  header: string | undefined,
-  expected: string
-): boolean {
+function bearerTokenMatches(header: string | undefined, expected: string): boolean {
   if (header === undefined) return false
   const provided = Buffer.from(header)
   const want = Buffer.from(`Bearer ${expected}`)
@@ -197,8 +186,7 @@ export async function registerReviewRunsRoutes(
           connector_id: store.connectorId,
           message: error instanceof Error ? error.message : String(error)
         }),
-      logDroppedRunRow: (dropped) =>
-        logDroppedRunRow(store.connectorId, dropped)
+      logDroppedRunRow: (dropped) => logDroppedRunRow(store.connectorId, dropped)
     }),
     ...buildCoordinationRouteHandlers(store),
     ...buildAdminRouteHandlers(store)
@@ -238,9 +226,7 @@ export async function registerReviewRunsRoutes(
     // Defense in depth: a Postgres datetime parse error (22007/22008) can only
     // originate from a bad `from`/`to` filter.
     if (errorCode === '22007' || errorCode === '22008') {
-      return reply
-        .code(400)
-        .send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
+      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
     }
     if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
       return reply.code(413).send({ error: 'Request body is too large.' })
@@ -261,9 +247,7 @@ export async function registerReviewRunsRoutes(
     if (errorCode === 'FST_ERR_VALIDATION') {
       const detail = error instanceof Error ? error.message : String(error)
       const context =
-        typeof error === 'object' &&
-        error !== null &&
-        'validationContext' in error
+        typeof error === 'object' && error !== null && 'validationContext' in error
           ? (error as { validationContext?: string }).validationContext
           : undefined
       const code =
@@ -283,10 +267,7 @@ export async function registerReviewRunsRoutes(
         : 500
     // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
     // must not leak into the envelope, which would also break the OpenAPI enum.
-    const code =
-      errorCode !== null && errorCodeEnum.includes(errorCode)
-        ? errorCode
-        : undefined
+    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
     // An unexpected internal fault (5xx) must not leak its message (which may carry SQLSTATE
     // or connection details); the caller only learns that the request failed. Known 4xx
     // results keep their message, since those are the caller's own input being rejected.
@@ -309,11 +290,7 @@ export async function registerReviewRunsRoutes(
       )
     }
     const message =
-      status >= 500
-        ? 'Internal error'
-        : error instanceof Error
-          ? error.message
-          : String(error)
+      status >= 500 ? 'Internal error' : error instanceof Error ? error.message : String(error)
     return reply.code(status).send({
       error: message,
       ...(code === undefined ? {} : { code })

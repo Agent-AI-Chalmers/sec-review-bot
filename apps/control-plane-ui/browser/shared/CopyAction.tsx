@@ -33,11 +33,7 @@ export function CopyAction({
           aria-label={text}
           onClick={() => void copy()}
         >
-          {copied ? (
-            <IconCheck size={ICON_SIZE.sm} />
-          ) : (
-            <IconCopy size={ICON_SIZE.sm} />
-          )}
+          {copied ? <IconCheck size={ICON_SIZE.sm} /> : <IconCopy size={ICON_SIZE.sm} />}
         </ActionIcon>
       </Tooltip>
       <span className="visually-hidden" aria-live="polite">

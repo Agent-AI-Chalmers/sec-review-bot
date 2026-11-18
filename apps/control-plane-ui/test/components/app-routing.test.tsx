@@ -46,13 +46,8 @@ test('unknown routes preserve the URL and render a not-found page', async () => 
     </LanguageProvider>
   )
 
-  expect(
-    await screen.findByRole('heading', { name: '404' })
-  ).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument()
   expect(screen.getByText('The requested page does not exist.')).toBeVisible()
-  expect(screen.getByRole('link', { name: 'Back to runs' })).toHaveAttribute(
-    'href',
-    '/runs'
-  )
+  expect(screen.getByRole('link', { name: 'Back to runs' })).toHaveAttribute('href', '/runs')
   expect(window.location.pathname).toBe('/unknown')
 })

@@ -6,9 +6,7 @@ export default function createViteConfig(): UserConfig {
   return {
     plugins: [
       react(),
-      ...(process.env.CONTROL_PLANE_UI_DEV_FIXTURES === '1'
-        ? [devFixtures()]
-        : [])
+      ...(process.env.CONTROL_PLANE_UI_DEV_FIXTURES === '1' ? [devFixtures()] : [])
     ],
     build: {
       target: 'es2025',

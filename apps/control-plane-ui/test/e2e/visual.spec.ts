@@ -4,11 +4,7 @@ import { expect, test } from './fixtures.js'
 
 type Theme = 'light' | 'dark'
 
-async function openFixturePage(
-  page: Page,
-  path: string,
-  theme: Theme
-): Promise<void> {
+async function openFixturePage(page: Page, path: string, theme: Theme): Promise<void> {
   await page.addInitScript((selectedTheme) => {
     localStorage.setItem('ui-theme', selectedTheme)
   }, theme)
@@ -77,9 +73,7 @@ test('trajectory viewer', async ({ page }) => {
 
 test('run files error state', async ({ page }) => {
   await openFixturePage(page, '/runs/fixture-artifact-load-error/files', 'dark')
-  await page
-    .getByText('The run files could not be opened.', { exact: true })
-    .waitFor()
+  await page.getByText('The run files could not be opened.', { exact: true }).waitFor()
   await expectPageSnapshot(page, 'run-files-error-dark.png')
 })
 
@@ -95,9 +89,7 @@ for (const surface of ['runs', 'memory'] as const) {
       )
       await openFixturePage(page, `/${surface}`, theme)
       await expect(page.getByRole('alert')).toHaveCount(1)
-      await expect(
-        page.getByRole('button', { name: 'Retry', exact: true })
-      ).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
       await expectPageSnapshot(page, `${surface}-unavailable-${theme}.png`)
       await page.unroute(`**/api/${surface}**`)
       await page.getByRole('button', { name: 'Retry', exact: true }).click()

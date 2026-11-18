@@ -78,9 +78,7 @@ test('manual comment authorization denies missing sender without GitHub lookup',
 
 test('manual comment authorization denies when permission lookup fails', async () => {
   // A real API failure is an HTTP error status, which Octokit maps to a RequestError.
-  const octokit = fakeGitHub(() =>
-    githubJson({ message: 'unavailable' }, 500)
-  ).octokit
+  const octokit = fakeGitHub(() => githubJson({ message: 'unavailable' }, 500)).octokit
 
   const decision = await authorizeManualCommentCommand({
     octokit,

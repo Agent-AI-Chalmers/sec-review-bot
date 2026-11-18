@@ -43,9 +43,7 @@ export function useRunDetail(runId: string): RunDetailData {
         api<ListRunPublicationStepsResponseBody>(
           `/runs/${encodeURIComponent(runId)}/publication-steps`
         ),
-        api<ListRunEventsResponseBody>(
-          `/runs/${encodeURIComponent(runId)}/events`
-        )
+        api<ListRunEventsResponseBody>(`/runs/${encodeURIComponent(runId)}/events`)
       ])
       setLoaded({
         runId,

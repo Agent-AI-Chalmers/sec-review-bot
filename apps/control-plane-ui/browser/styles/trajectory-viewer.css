@@ -91,13 +91,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    black 8%,
-    black 92%,
-    transparent
-  );
+  mask-image: linear-gradient(to bottom, transparent, black 8%, black 92%, transparent);
 }
 
 .trajectory-minimap-segment {
@@ -211,30 +205,17 @@
 }
 
 .trajectory-tool-call {
-  --trajectory-tool-color: light-dark(
-    var(--mantine-color-green-9),
-    var(--mantine-color-green-4)
-  );
+  --trajectory-tool-color: light-dark(var(--mantine-color-green-9), var(--mantine-color-green-4));
   padding: var(--space-3);
-  border: 1px solid
-    light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
+  border: 1px solid light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
   border-left: 3px solid var(--mantine-color-green-6);
   border-radius: var(--radius-panel);
-  background: light-dark(
-    var(--mantine-color-white),
-    var(--mantine-color-dark-7)
-  );
+  background: light-dark(var(--mantine-color-white), var(--mantine-color-dark-7));
 }
 
 .trajectory-tool-call[data-result-status='error'] {
-  --trajectory-tool-color: light-dark(
-    var(--mantine-color-red-9),
-    var(--mantine-color-red-4)
-  );
-  border-color: light-dark(
-    var(--mantine-color-red-2),
-    var(--mantine-color-red-9)
-  );
+  --trajectory-tool-color: light-dark(var(--mantine-color-red-9), var(--mantine-color-red-4));
+  border-color: light-dark(var(--mantine-color-red-2), var(--mantine-color-red-9));
   border-left-color: var(--mantine-color-red-6);
 }
 
@@ -328,10 +309,7 @@
 .json-code {
   padding: 0.12em 0.36em;
   border-radius: 4px;
-  background: light-dark(
-    var(--mantine-color-gray-1),
-    var(--mantine-color-dark-6)
-  );
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6));
   color: var(--mantine-color-text);
   font-family: var(--mantine-font-family-monospace);
   font-size: 0.875em;
@@ -445,14 +423,12 @@
 }
 
 .trajectory-diff-old {
-  border: 1px solid
-    light-dark(var(--mantine-color-red-2), var(--mantine-color-red-9));
+  border: 1px solid light-dark(var(--mantine-color-red-2), var(--mantine-color-red-9));
   background: var(--status-failed-soft);
 }
 
 .trajectory-diff-new {
-  border: 1px solid
-    light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
+  border: 1px solid light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
   background: var(--status-complete-soft);
 }
 
@@ -498,10 +474,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
-  background: light-dark(
-    var(--mantine-color-gray-1),
-    var(--mantine-color-dark-6)
-  );
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6));
   border: 1px solid var(--mantine-color-default-border);
   border-bottom: none;
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
@@ -546,8 +519,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
-  border-bottom: 1px solid
-    light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
 }
 
 .trajectory-diff-cell {
@@ -609,10 +581,7 @@
   padding: 0 2px;
   border-radius: var(--mantine-radius-xs);
   color: inherit;
-  background: light-dark(
-    var(--mantine-color-yellow-2),
-    var(--mantine-color-yellow-8)
-  );
+  background: light-dark(var(--mantine-color-yellow-2), var(--mantine-color-yellow-8));
 }
 
 .viewer-input textarea {

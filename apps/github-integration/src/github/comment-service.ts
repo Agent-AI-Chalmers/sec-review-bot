@@ -75,9 +75,7 @@ function isOwnPullRequestApprovalError(error: unknown): boolean {
           return String(item)
         })
       : [typeof responseErrors === 'string' ? responseErrors : ''])
-  ].filter(
-    (item): item is string => typeof item === 'string' && item.trim() !== ''
-  )
+  ].filter((item): item is string => typeof item === 'string' && item.trim() !== '')
 
   return errorTexts.some((item) => {
     const text = item.toLowerCase()
@@ -108,10 +106,7 @@ export async function findIssueCommentByMarker(
     repo_name,
     issue_number,
     marker
-  }: Omit<
-    CreateIssueCommentUnlessMarkerExistsArgs,
-    'body' | 'assert_publication_claim'
-  >
+  }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body' | 'assert_publication_claim'>
 ): Promise<IssueCommentSummary | null> {
   let page = 1
 

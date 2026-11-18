@@ -42,17 +42,13 @@ test('publication recovery preserves intents and attachment transactions select 
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: artifact('a'),
-      observations: [
-        { observation_id: 'extract-1', body_markdown: 'Remember this.' }
-      ]
+      observations: [{ observation_id: 'extract-1', body_markdown: 'Remember this.' }]
     },
     summary: 'Produced observation.'
   }
   try {
     await store.initialize()
-    expect((await store.reserveExtractionPublication(intent)).status).toBe(
-      'reserved'
-    )
+    expect((await store.reserveExtractionPublication(intent)).status).toBe('reserved')
     await expect(store.registerExtraction(intent.registration)).rejects.toThrow(
       ExtractionConflictError
     )
@@ -68,9 +64,7 @@ test('publication recovery preserves intents and attachment transactions select 
     await store.confirmExtractionPublication(intent)
     expect(await store.registerExtraction(intent.registration)).toBe(true)
     // A response-lost replay sees both the full intent and the authoritative attachment.
-    expect(
-      (await store.listExtractionPublications('extract-1'))[0]?.status
-    ).toBe('selected')
+    expect((await store.listExtractionPublications('extract-1'))[0]?.status).toBe('selected')
     expect(await store.registerExtraction(intent.registration)).toBe(false)
     const alternative = {
       ...intent,
@@ -81,12 +75,10 @@ test('publication recovery preserves intents and attachment transactions select 
     }
     await store.reserveExtractionPublication(alternative)
     await store.confirmExtractionPublication(alternative)
-    await expect(
-      store.registerExtraction(alternative.registration)
-    ).rejects.toThrow(ExtractionConflictError)
-    expect(
-      (await store.listExtractionPublications('extract-1'))[1]?.status
-    ).toBe('present')
+    await expect(store.registerExtraction(alternative.registration)).rejects.toThrow(
+      ExtractionConflictError
+    )
+    expect((await store.listExtractionPublications('extract-1'))[1]?.status).toBe('present')
 
     const version = {
       expected_active_version: 0,
@@ -111,20 +103,14 @@ test('publication recovery preserves intents and attachment transactions select 
       store.createMemoryTreeVersion(version),
       store.createMemoryTreeVersion(competing)
     ])
-    expect(
-      outcomes.filter((outcome) => outcome.status === 'fulfilled')
-    ).toHaveLength(1)
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
     const failed = outcomes.find((outcome) => outcome.status === 'rejected')
     expect.assert(
-      failed?.status === 'rejected' &&
-        failed.reason instanceof MemoryTreeVersionConflictError
+      failed?.status === 'rejected' && failed.reason instanceof MemoryTreeVersionConflictError
     )
     expect((await store.queries.getMemoryTree()).version).toBe(1)
     expect((await store.queries.getObservationBacklog()).pending_count).toBe(0)
-    const publications = await store.listVersionPublications(
-      'learning',
-      'maintain-1'
-    )
+    const publications = await store.listVersionPublications('learning', 'maintain-1')
     expect(publications[0]?.status).toBe('selected')
     expect(publications[1]?.status).toBe('present')
     const selectedPublication = publications[0]
@@ -185,22 +171,19 @@ test('publication recovery preserves intents and attachment transactions select 
     const concurrent = await Promise.allSettled(
       candidates.map((candidate) => store.createMemoryTreeVersion(candidate))
     )
-    expect(
-      concurrent.filter((result) => result.status === 'fulfilled')
-    ).toHaveLength(1)
+    expect(concurrent.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     const rejected = concurrent.find((result) => result.status === 'rejected')
     expect.assert(
-      rejected?.status === 'rejected' &&
-        rejected.reason instanceof MemoryTreeVersionConflictError
+      rejected?.status === 'rejected' && rejected.reason instanceof MemoryTreeVersionConflictError
     )
     const recorded = await Promise.all(
       candidates.map((candidate) =>
         store.listVersionPublications(candidate.source.kind, 'shared-operation')
       )
     )
-    expect(
-      recorded.flat().filter((publication) => publication.status === 'selected')
-    ).toHaveLength(1)
+    expect(recorded.flat().filter((publication) => publication.status === 'selected')).toHaveLength(
+      1
+    )
     expect((await store.queries.getMemoryTree()).version).toBe(2)
 
     // Preparation cleanup is idempotent and never changes selected publications.
@@ -208,9 +191,9 @@ test('publication recovery preserves intents and attachment transactions select 
       kind: 'learning',
       operation_id: 'maintain-1'
     })
-    expect(
-      (await store.listVersionPublications('learning', 'maintain-1'))[0]?.status
-    ).toBe('selected')
+    expect((await store.listVersionPublications('learning', 'maintain-1'))[0]?.status).toBe(
+      'selected'
+    )
     expect(
       (
         await store.createMemoryTreeVersion({
@@ -245,15 +228,9 @@ test('publication recovery preserves intents and attachment transactions select 
         operation_id: 'prepared'
       })
     ).toStrictEqual([])
-    expect((await store.confirmVersionPublication(prepared)).status).toBe(
-      'abandoned'
-    )
-    expect((await store.reserveVersionPublication(prepared)).status).toBe(
-      'abandoned'
-    )
-    await expect(store.createMemoryTreeVersion(prepared)).rejects.toThrow(
-      PublicationAbandonedError
-    )
+    expect((await store.confirmVersionPublication(prepared)).status).toBe('abandoned')
+    expect((await store.reserveVersionPublication(prepared)).status).toBe('abandoned')
+    await expect(store.createMemoryTreeVersion(prepared)).rejects.toThrow(PublicationAbandonedError)
 
     // A paused commit persists abandonment despite returning an HTTP conflict.
     const pausedCandidate = {
@@ -263,16 +240,11 @@ test('publication recovery preserves intents and attachment transactions select 
     await store.reserveVersionPublication(pausedCandidate)
     await store.confirmVersionPublication(pausedCandidate)
     await pool.query("update memory_tree_automation set state='paused'")
-    await expect(
-      store.createMemoryTreeVersion(pausedCandidate)
-    ).rejects.toThrow(AutomationPausedError)
+    await expect(store.createMemoryTreeVersion(pausedCandidate)).rejects.toThrow(
+      AutomationPausedError
+    )
     expect(
-      (
-        await store.listVersionPublications(
-          'reorganization',
-          'paused-candidate'
-        )
-      )[0]?.status
+      (await store.listVersionPublications('reorganization', 'paused-candidate'))[0]?.status
     ).toBe('abandoned')
     expect((await store.queries.getMemoryTree()).version).toBe(2)
     // The two ways a candidate is abandoned are recorded apart, so an operator can tell a paused
@@ -292,9 +264,9 @@ test('publication recovery preserves intents and attachment transactions select 
     ])
     await pool.query("update memory_tree_automation set state='enabled'")
     // A response-lost retry after resume must not submit the abandoned candidate.
-    await expect(
-      store.createMemoryTreeVersion(pausedCandidate)
-    ).rejects.toThrow(PublicationAbandonedError)
+    await expect(store.createMemoryTreeVersion(pausedCandidate)).rejects.toThrow(
+      PublicationAbandonedError
+    )
 
     // Commit and cleanup serialize: either a selected version survives or its candidate is abandoned.
     const racing = {
@@ -311,12 +283,8 @@ test('publication recovery preserves intents and attachment transactions select 
       })
     ])
     const cleanup = race[1]
-    expect.assert(
-      cleanup?.status === 'fulfilled' && Array.isArray(cleanup.value)
-    )
-    const status = (
-      await store.listVersionPublications('reorganization', 'racing')
-    )[0]?.status
+    expect.assert(cleanup?.status === 'fulfilled' && Array.isArray(cleanup.value))
+    const status = (await store.listVersionPublications('reorganization', 'racing'))[0]?.status
     if (cleanup.value.length) {
       expect(status).toBe('abandoned')
       expect((await store.queries.getMemoryTree()).version).toBe(2)
@@ -344,31 +312,18 @@ test('publication recovery preserves intents and attachment transactions select 
         maintenance_report: reorganizationReport
       }
     }
+    expect((await store.reserveVersionPublication(latePublication)).status).toBe('reserved')
+    expect((await store.confirmVersionPublication(latePublication)).status).toBe('present')
     expect(
-      (await store.reserveVersionPublication(latePublication)).status
-    ).toBe('reserved')
-    expect(
-      (await store.confirmVersionPublication(latePublication)).status
-    ).toBe('present')
-    expect(
-      (
-        await store.listVersionPublications(
-          'reorganization',
-          'late-publication'
-        )
-      )[0]?.status
+      (await store.listVersionPublications('reorganization', 'late-publication'))[0]?.status
     ).toBe('present')
     await store.abandonVersionPublications(lateOwner)
     const laterPublication = {
       ...latePublication,
       memory_tree_reference: artifact('c')
     }
-    expect(
-      (await store.reserveVersionPublication(laterPublication)).status
-    ).toBe('reserved')
-    expect(
-      (await store.confirmVersionPublication(laterPublication)).status
-    ).toBe('present')
+    expect((await store.reserveVersionPublication(laterPublication)).status).toBe('reserved')
+    expect((await store.confirmVersionPublication(laterPublication)).status).toBe('present')
     const latePublications = await store.listVersionPublications(
       lateOwner.kind,
       lateOwner.operation_id
@@ -377,15 +332,13 @@ test('publication recovery preserves intents and attachment transactions select 
     expect(
       latePublications.find(
         ({ intent }) =>
-          intent.memory_tree_reference.digest ===
-          latePublication.memory_tree_reference.digest
+          intent.memory_tree_reference.digest === latePublication.memory_tree_reference.digest
       )?.status
     ).toBe('abandoned')
     expect(
       latePublications.find(
         ({ intent }) =>
-          intent.memory_tree_reference.digest ===
-          laterPublication.memory_tree_reference.digest
+          intent.memory_tree_reference.digest === laterPublication.memory_tree_reference.digest
       )?.status
     ).toBe('present')
   } finally {

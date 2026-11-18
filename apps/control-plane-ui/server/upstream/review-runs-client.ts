@@ -38,12 +38,7 @@ export function createReviewRunsClient({
         { headers: readHeaders },
         options
       ),
-    read: (path) =>
-      requestUpstream(
-        `${baseUrl}/v1${path}`,
-        { headers: readHeaders },
-        options
-      ),
+    read: (path) => requestUpstream(`${baseUrl}/v1${path}`, { headers: readHeaders }, options),
     decide: (runId, action, adminToken, body) =>
       requestUpstream(
         `${baseUrl}/v1/admin/runs/${encodeURIComponent(runId)}/${action}`,

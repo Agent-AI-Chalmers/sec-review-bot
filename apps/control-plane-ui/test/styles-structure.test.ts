@@ -19,9 +19,7 @@ const expectedLoadOrder = [
 const responsiveFile = 'responsive.css'
 
 function importedStyles(source: string): string[] {
-  return [...source.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"];?/g)].map(
-    ([, file]) => file
-  )
+  return [...source.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"];?/g)].map(([, file]) => file)
 }
 
 function matchingBrace(source: string, openingBrace: number): number {
@@ -122,9 +120,7 @@ function classSelectors(source: string): string[] {
 test('the stylesheet entry imports every domain file once without nested imports', async () => {
   const entry = await readFile(entryPath, 'utf8')
   const imports = importedStyles(entry)
-  const files = (await readdir(stylesDirectory))
-    .filter((file) => file.endsWith('.css'))
-    .sort()
+  const files = (await readdir(stylesDirectory)).filter((file) => file.endsWith('.css')).sort()
 
   expect(imports).toStrictEqual(expectedLoadOrder)
   expect([...imports].sort()).toStrictEqual(files)
@@ -149,28 +145,23 @@ test('domain styles do not redefine the same selector in different files', async
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     for (const selector of new Set(classSelectors(source))) {
       const existingOwner = owners.get(selector)
-      expect(
-        existingOwner,
-        `${selector} is defined in both ${existingOwner} and ${file}`
-      ).toBe(undefined)
+      expect(existingOwner, `${selector} is defined in both ${existingOwner} and ${file}`).toBe(
+        undefined
+      )
       owners.set(selector, file)
     }
   }
 })
 
 test('responsive rules are isolated in the final stylesheet', async () => {
-  const files = (await readdir(stylesDirectory)).filter((file) =>
-    file.endsWith('.css')
-  )
+  const files = (await readdir(stylesDirectory)).filter((file) => file.endsWith('.css'))
 
   for (const file of files) {
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     if (file === responsiveFile) {
       expect(source).toMatch(/@media\b/)
     } else {
-      expect(source, `${file} must not own media queries`).not.toMatch(
-        /@media\b/
-      )
+      expect(source, `${file} must not own media queries`).not.toMatch(/@media\b/)
     }
   }
 })

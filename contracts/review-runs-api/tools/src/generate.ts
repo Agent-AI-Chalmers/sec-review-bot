@@ -10,10 +10,7 @@ import { generatedArtifacts as stateMachines } from './generate-state-machines.j
 import { generatedArtifacts as types } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.filename === path.resolve(process.argv[1])
-) {
+if (process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1])) {
   for (const artifact of [...types(), ...schemas(), ...stateMachines()]) {
     mkdirSync(path.dirname(artifact.output), { recursive: true })
     writeFileSync(artifact.output, await artifact.render())

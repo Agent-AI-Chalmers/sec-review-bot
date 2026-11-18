@@ -50,30 +50,14 @@ function validateTextFile(name: string, value: Buffer): void {
   }
 }
 
-function writeTarString(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: string
-): void {
+function writeTarString(target: Buffer, offset: number, length: number, value: string): void {
   const bytes = Buffer.from(value, 'utf8')
-  if (bytes.length > length)
-    throw new Error(`Memory tree tar field is too long: ${value}`)
+  if (bytes.length > length) throw new Error(`Memory tree tar field is too long: ${value}`)
   bytes.copy(target, offset)
 }
 
-function writeTarOctal(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: number
-): void {
-  writeTarString(
-    target,
-    offset,
-    length,
-    `${value.toString(8).padStart(length - 1, '0')}\0`
-  )
+function writeTarOctal(target: Buffer, offset: number, length: number, value: number): void {
+  writeTarString(target, offset, length, `${value.toString(8).padStart(length - 1, '0')}\0`)
 }
 
 function splitUstarPath(name: string): { name: string; prefix: string } {
@@ -82,10 +66,7 @@ function splitUstarPath(name: string): { name: string; prefix: string } {
     if (name[index] !== '/') continue
     const prefix = name.slice(0, index)
     const suffix = name.slice(index + 1)
-    if (
-      Buffer.byteLength(prefix, 'utf8') <= 155 &&
-      Buffer.byteLength(suffix, 'utf8') <= 100
-    )
+    if (Buffer.byteLength(prefix, 'utf8') <= 155 && Buffer.byteLength(suffix, 'utf8') <= 100)
       return { name: suffix, prefix }
   }
   throw new Error(`Memory tree path does not fit POSIX ustar fields: ${name}`)
@@ -108,8 +89,7 @@ function rawUstarEntry(
 ): Buffer[] {
   const header = Buffer.alloc(512)
   const split = splitUstarPath(name)
-  const directory =
-    type === 'directory' || (type === undefined && body === undefined)
+  const directory = type === 'directory' || (type === undefined && body === undefined)
   writeTarString(header, 0, 100, split.name)
   writeTarOctal(header, 100, 8, directory ? 0o755 : 0o644)
   writeTarOctal(header, 108, 8, 0)
@@ -132,13 +112,8 @@ function paxEntry(name: string, body: Buffer | undefined): Buffer[] {
   try {
     return rawUstarEntry(name, body)
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('ustar fields'))
-      throw error
-    const marker = crypto
-      .createHash('sha256')
-      .update(name)
-      .digest('hex')
-      .slice(0, 24)
+    if (!(error instanceof Error) || !error.message.includes('ustar fields')) throw error
+    const marker = crypto.createHash('sha256').update(name).digest('hex').slice(0, 24)
     return [
       ...rawUstarEntry(`PaxHeaders/${marker}`, paxRecord('path', name), 'pax'),
       ...rawUstarEntry(`PaxPath/${marker}`, body)
@@ -161,13 +136,9 @@ export function memoryTreeObjectKey(digest: string): string {
 export async function buildMemoryTreeArtifact(
   content: ReadonlyMap<string, Buffer | string>
 ): Promise<BuiltMemoryTreeArtifact> {
-  if (!content.has('MEMORY.md'))
-    throw new Error('Memory tree requires MEMORY.md.')
+  if (!content.has('MEMORY.md')) throw new Error('Memory tree requires MEMORY.md.')
   const files = [...content.entries()]
-    .map(
-      ([name, value]) =>
-        [name, Buffer.isBuffer(value) ? value : Buffer.from(value)] as const
-    )
+    .map(([name, value]) => [name, Buffer.isBuffer(value) ? value : Buffer.from(value)] as const)
     .sort(([left], [right]) => compareArchivePaths(left, right))
   let extractedBytes = MANIFEST.length
   for (const [name, value] of files) {
@@ -196,14 +167,9 @@ export async function buildMemoryTreeArtifact(
   ].sort((left, right) => compareArchivePaths(left.name, right.name))
   if (orderedEntries.length + 2 > MAX_MEMORY_TREE_ENTRIES)
     throw new Error('Memory tree exceeds the entry count limit.')
-  const tarParts = [
-    ...paxEntry('manifest.json', MANIFEST),
-    ...paxEntry('memory/', undefined)
-  ]
+  const tarParts = [...paxEntry('manifest.json', MANIFEST), ...paxEntry('memory/', undefined)]
   for (const item of orderedEntries) {
-    tarParts.push(
-      ...paxEntry(item.name, item.directory ? undefined : item.value)
-    )
+    tarParts.push(...paxEntry(item.name, item.directory ? undefined : item.value))
   }
   tarParts.push(Buffer.alloc(1024))
   const bytes = zstdCompressSync(Buffer.concat(tarParts))
@@ -219,9 +185,7 @@ export async function buildMemoryTreeArtifact(
   }
 }
 
-export async function readMemoryTreeArtifact(
-  bytes: Buffer
-): Promise<Map<string, Buffer>> {
+export async function readMemoryTreeArtifact(bytes: Buffer): Promise<Map<string, Buffer>> {
   if (bytes.length > MAX_MEMORY_TREE_ARTIFACT_BYTES)
     throw new Error('Memory tree archive exceeds the size limit.')
   const tarBytes = decompressRestrictedPaxArchive(
@@ -245,16 +209,11 @@ export async function readMemoryTreeArtifact(
         if (count > MAX_MEMORY_TREE_ENTRIES)
           throw new Error('Memory tree exceeds the entry count limit.')
         const name = header.name
-        if (seenPaths.has(name))
-          throw new Error(`Memory tree contains a duplicate entry: ${name}`)
+        if (seenPaths.has(name)) throw new Error(`Memory tree contains a duplicate entry: ${name}`)
         seenPaths.add(name)
         if (count === 1 && name !== 'manifest.json')
           throw new Error('Memory tree manifest must be the first entry.')
-        if (
-          previousName &&
-          name !== 'memory/' &&
-          compareArchivePaths(name, previousName) <= 0
-        )
+        if (previousName && name !== 'memory/' && compareArchivePaths(name, previousName) <= 0)
           throw new Error('Memory tree entries are not in canonical order.')
         previousName = name
         if (
@@ -264,22 +223,14 @@ export async function readMemoryTreeArtifact(
           (header.uname ?? '') !== '' ||
           (header.gname ?? '') !== ''
         )
-          throw new Error(
-            `Memory tree entry metadata is not canonical: ${name}`
-          )
+          throw new Error(`Memory tree entry metadata is not canonical: ${name}`)
 
-        const body = await collect(
-          stream as unknown as AsyncIterable<Uint8Array>
-        )
+        const body = await collect(stream as unknown as AsyncIterable<Uint8Array>)
         extractedBytes += body.length
         if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES)
           throw new Error('Memory tree exceeds the extracted size limit.')
         if (name === 'manifest.json') {
-          if (
-            header.type !== 'file' ||
-            header.mode !== 0o644 ||
-            !body.equals(MANIFEST)
-          )
+          if (header.type !== 'file' || header.mode !== 0o644 || !body.equals(MANIFEST))
             throw new Error('Memory tree manifest is invalid.')
           sawManifest = true
         } else if (
@@ -309,12 +260,7 @@ export async function readMemoryTreeArtifact(
   })
   extract.end(tarBytes)
   await completed
-  if (
-    !sawManifest ||
-    !sawMemoryDirectory ||
-    !sawTopicsDirectory ||
-    !result.has('MEMORY.md')
-  )
+  if (!sawManifest || !sawMemoryDirectory || !sawTopicsDirectory || !result.has('MEMORY.md'))
     throw new Error('Memory tree required entries are missing.')
   return result
 }

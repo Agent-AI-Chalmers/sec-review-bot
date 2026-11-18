@@ -63,9 +63,7 @@ test('the repository is split into owner and repo for the installation lookup', 
   await installationOctokitForRepo(app, 'octo/example')
 
   expect(requests).toHaveLength(1)
-  expect(new URL(requests[0]!.url).pathname).toBe(
-    '/repos/octo/example/installation'
-  )
+  expect(new URL(requests[0]!.url).pathname).toBe('/repos/octo/example/installation')
 })
 
 test('a repository with no installation propagates the 404', async () => {
@@ -74,9 +72,9 @@ test('a repository with no installation propagates the 404', async () => {
   const client = fakeGitHub(() => githubJson({})).octokit
   const app = appDouble({ lookupStatus: 404, installationOctokit: client })
 
-  await expect(
-    installationOctokitForRepo(app, 'attacker/repo')
-  ).rejects.toSatisfy((error: { status?: number }) => error.status === 404)
+  await expect(installationOctokitForRepo(app, 'attacker/repo')).rejects.toSatisfy(
+    (error: { status?: number }) => error.status === 404
+  )
 })
 
 test('an invalid repository name is rejected before any request', async () => {
@@ -88,9 +86,7 @@ test('an invalid repository name is rejected before any request', async () => {
     getInstallationOctokit: async (_id: number) => octokit
   }
 
-  await expect(installationOctokitForRepo(app, 'octo')).rejects.toSatisfy(
-    () => true
-  )
+  await expect(installationOctokitForRepo(app, 'octo')).rejects.toSatisfy(() => true)
   expect(requests).toStrictEqual([])
   expect(() => splitRepoFullName('octo')).toThrow()
 })

@@ -55,11 +55,7 @@ export function fakeApp({
     request: {
       fetch: async (input: string | URL | Request, init?: RequestInit) => {
         const url =
-          typeof input === 'string'
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
         const method = (init?.method ?? 'GET').toUpperCase()
         const rawBody = init?.body
         const body =

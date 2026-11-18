@@ -35,9 +35,10 @@ export function RunFilters({
     {
       name: 'workflow',
       label: t('workflow'),
-      options: ['issue-review', 'pull-request-review', 'repository-review'].map(
-        (value) => ({ value, label: workflowLabel(value, t) })
-      )
+      options: ['issue-review', 'pull-request-review', 'repository-review'].map((value) => ({
+        value,
+        label: workflowLabel(value, t)
+      }))
     },
     {
       name: 'preparation_status',
@@ -76,9 +77,7 @@ export function RunFilters({
   const activeFilters = filters.flatMap(({ name, label, options }) => {
     const value = search.get(name)
     return value
-      ? [
-          `${label}: ${options.find((option) => option.value === value)?.label ?? value}`
-        ]
+      ? [`${label}: ${options.find((option) => option.value === value)?.label ?? value}`]
       : []
   })
   for (const [name, label] of [
@@ -90,11 +89,7 @@ export function RunFilters({
   }
   return (
     <Box className="operations-bar" mb="lg">
-      <Group
-        className="operations-filter-heading"
-        justify="space-between"
-        gap="xs"
-      >
+      <Group className="operations-filter-heading" justify="space-between" gap="xs">
         <Button
           className="operations-filter-toggle"
           variant="subtle"
@@ -118,19 +113,13 @@ export function RunFilters({
           </Button>
         )}
       </Group>
-      <div
-        id={controlsId}
-        className="operations-filter-grid"
-        data-opened={opened}
-      >
+      <div id={controlsId} className="operations-filter-grid" data-opened={opened}>
         {filters.map(({ name, label, options }) => (
           <Select
             key={name}
             label={label}
             value={search.get(name) || 'all'}
-            onChange={(value) =>
-              onChange(name, value === null || value === 'all' ? '' : value)
-            }
+            onChange={(value) => onChange(name, value === null || value === 'all' ? '' : value)}
             data={[{ value: 'all', label: t('all') }, ...options]}
             allowDeselect={false}
             comboboxProps={{ withinPortal: true }}

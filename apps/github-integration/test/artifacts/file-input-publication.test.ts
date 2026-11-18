@@ -44,12 +44,10 @@ test('identical bundles from different attempts publish one independent file', a
   await fs.rm(fileURLToPath(first.uri))
   await fs.writeFile(fileURLToPath(second.uri), 'changed staging file')
   expect(await inputBundleExists(left)).toBe(true)
-  expect(await fs.readFile(new URL(left.uri), 'utf8')).toBe(
-    'same immutable archive'
-  )
-  expect(await fs.readdir(path.dirname(fileURLToPath(left.uri)))).toStrictEqual(
-    ['input-bundle.v1.tar.zst']
-  )
+  expect(await fs.readFile(new URL(left.uri), 'utf8')).toBe('same immutable archive')
+  expect(await fs.readdir(path.dirname(fileURLToPath(left.uri)))).toStrictEqual([
+    'input-bundle.v1.tar.zst'
+  ])
 })
 
 test('an incomplete or invalid staging copy never occupies the final path', async () => {
@@ -59,9 +57,7 @@ test('an incomplete or invalid staging copy never occupies the final path', asyn
   await fs.writeFile(new URL(source.uri), 'corrupt')
   await expect(publishInputBundle(source, run)).rejects.toThrow(/differs/)
   expect(await inputBundleExists(published)).toBe(false)
-  expect(
-    await fs.readdir(path.dirname(fileURLToPath(published.uri)))
-  ).toStrictEqual([])
+  expect(await fs.readdir(path.dirname(fileURLToPath(published.uri)))).toStrictEqual([])
   const rebuilt = await bundle()
   expect(await publishInputBundle(rebuilt, run)).toStrictEqual(published)
 })
@@ -69,21 +65,14 @@ test('an incomplete or invalid staging copy never occupies the final path', asyn
 test('conflicting bytes at the final path are rejected without overwrite', async () => {
   const source = await bundle()
   const run = randomUUID()
-  const destination = fileURLToPath(
-    publishedInputBundleReference(source, run).uri
-  )
+  const destination = fileURLToPath(publishedInputBundleReference(source, run).uri)
   await fs.mkdir(path.dirname(destination), { recursive: true })
   await fs.writeFile(destination, 'conflicting bytes')
   await expect(publishInputBundle(source, run)).rejects.toThrow(/differs/)
   expect(await fs.readFile(destination, 'utf8')).toBe('conflicting bytes')
 })
 
-for (const crash of [
-  'reserved',
-  'published',
-  'confirmed',
-  'committed'
-] as const) {
+for (const crash of ['reserved', 'published', 'confirmed', 'committed'] as const) {
   test(`file publication recovers after ${crash} and staging loss`, async () => {
     const run = randomUUID()
     const source = await bundle()
@@ -137,11 +126,7 @@ for (const crash of [
       })
     ).rejects.toThrow(/worker stopped/)
     await fs.rm(fileURLToPath(source.uri))
-    const recovered = await recoverInputBundlePublication(
-      store,
-      run,
-      'takeover'
-    )
+    const recovered = await recoverInputBundlePublication(store, run, 'takeover')
     if (crash === 'reserved') {
       expect(recovered).toBe(false)
       expect(candidate?.status).toBe('abandoned')

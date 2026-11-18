@@ -2,10 +2,7 @@ import { EXECUTION_API_VERSION } from '../../execution/execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
-import {
-  getRepositoryRefSha,
-  splitRepoFullName
-} from '../../github/repository-service.js'
+import { getRepositoryRefSha, splitRepoFullName } from '../../github/repository-service.js'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
 import type {
@@ -68,10 +65,7 @@ async function materializeWorkspace(
   })
 }
 
-async function writeJsonArtifact(
-  artifact_path: string,
-  value: unknown
-): Promise<void> {
+async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
@@ -114,8 +108,7 @@ export async function prepareRepositoryReviewInput({
     repo_full_name,
     default_branch: trusted_default_branch.default_branch
   }
-  const targetBranchForResolution =
-    target_branch || trusted_default_branch.default_branch
+  const targetBranchForResolution = target_branch || trusted_default_branch.default_branch
   const headResolutionTarget = head_sha || targetBranchForResolution
   const resolvedHeadSha = await getRepositoryRefSha(octokit, {
     owner_login: repo.owner_login,
@@ -129,10 +122,7 @@ export async function prepareRepositoryReviewInput({
     run_id
   )
   const workspace_path = path.join(input_bundle_root, 'workspace')
-  const incremental_window_path = path.join(
-    input_bundle_root,
-    'incremental-window'
-  )
+  const incremental_window_path = path.join(input_bundle_root, 'incremental-window')
   const history_path = path.join(input_bundle_root, 'history')
 
   // A supplied run ID is reused after uncertain submission failures. Remove
@@ -145,9 +135,7 @@ export async function prepareRepositoryReviewInput({
 
   const resolvedScanMode = normalizeScanMode(scan_mode)
   const requestedBaseSha =
-    typeof base_sha === 'string' && base_sha.trim() !== ''
-      ? base_sha.trim()
-      : null
+    typeof base_sha === 'string' && base_sha.trim() !== '' ? base_sha.trim() : null
   let resolvedBaseSha: string | null = null
 
   let changedFilesForScanScope: ChangedFileRecord[] | null = null
@@ -189,13 +177,7 @@ export async function prepareRepositoryReviewInput({
     resolvedBaseSha.trim() !== ''
       ? [resolvedBaseSha, resolvedHeadSha]
       : [resolvedHeadSha]
-  await materializeWorkspace(
-    octokit,
-    repo,
-    workspace_path,
-    historyRefs,
-    resolvedBaseSha
-  )
+  await materializeWorkspace(octokit, repo, workspace_path, historyRefs, resolvedBaseSha)
 
   if (
     resolvedScanMode === 'incremental' &&
@@ -225,10 +207,7 @@ export async function prepareRepositoryReviewInput({
     // into the workflow input, so an unbounded list would cross Temporal and be persisted, and
     // the failure would surface as an infrastructure error far from its cause. The limits match
     // `maxItems` in the v1 schemas, which is where the boundary is defined.
-    if (
-      incrementalResult.changed_files.length >
-      MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES
-    ) {
+    if (incrementalResult.changed_files.length > MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES) {
       throw new Error(
         `incremental window is too large: ${incrementalResult.changed_files.length} changed ` +
           `files exceeds the limit of ${MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES}`
@@ -273,47 +252,41 @@ export async function prepareRepositoryReviewInput({
   })
 
   // The claim-owning command registers and publishes this input bundle after preparation.
-  const { input } =
-    await archiveInputBundleAndBuildInput<RepositoryReviewInput>({
-      input_bundle_root,
-      include_incremental_window: resolvedScanMode === 'incremental',
-      workflow: 'repository review',
-      build_input: (
-        reference: InputBundleArtifactRef
-      ): RepositoryReviewInput => ({
-        api_version: EXECUTION_API_VERSION,
-        input_bundle: reference,
-        review_intent: {
-          objective: 'audit',
-          ...(test_changes ? { test_changes } : {})
-        },
-        scan_target: {
-          target_branch: targetBranchForResolution,
-          default_branch: trusted_default_branch.default_branch,
-          event_type,
-          scan_mode: resolvedScanMode,
-          base_sha: resolvedBaseSha,
-          head_sha: resolvedHeadSha,
-          commit_shas: commitShasForScanTarget
-        },
-        scan_scope: {
-          paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
-          incremental_changed_files: Array.isArray(changedFilesForScanScope)
-            ? changedFilesForScanScope.map((item) => ({
-                path: item.path,
-                status: item.status,
-                previous_path: item.previous_path
-              }))
-            : []
-        },
-        ...(setup_declaration ? { setup_declaration } : {})
-      })
-    })
-
-  const input_path = path.join(
+  const { input } = await archiveInputBundleAndBuildInput<RepositoryReviewInput>({
     input_bundle_root,
-    'repository-review-input.json'
-  )
+    include_incremental_window: resolvedScanMode === 'incremental',
+    workflow: 'repository review',
+    build_input: (reference: InputBundleArtifactRef): RepositoryReviewInput => ({
+      api_version: EXECUTION_API_VERSION,
+      input_bundle: reference,
+      review_intent: {
+        objective: 'audit',
+        ...(test_changes ? { test_changes } : {})
+      },
+      scan_target: {
+        target_branch: targetBranchForResolution,
+        default_branch: trusted_default_branch.default_branch,
+        event_type,
+        scan_mode: resolvedScanMode,
+        base_sha: resolvedBaseSha,
+        head_sha: resolvedHeadSha,
+        commit_shas: commitShasForScanTarget
+      },
+      scan_scope: {
+        paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
+        incremental_changed_files: Array.isArray(changedFilesForScanScope)
+          ? changedFilesForScanScope.map((item) => ({
+              path: item.path,
+              status: item.status,
+              previous_path: item.previous_path
+            }))
+          : []
+      },
+      ...(setup_declaration ? { setup_declaration } : {})
+    })
+  })
+
+  const input_path = path.join(input_bundle_root, 'repository-review-input.json')
   await writeJsonArtifact(input_path, input)
 
   return {

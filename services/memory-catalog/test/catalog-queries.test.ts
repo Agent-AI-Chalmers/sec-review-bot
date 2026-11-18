@@ -2,10 +2,7 @@ import { expect, test } from 'vitest'
 
 import type { Pool } from 'pg'
 
-import {
-  InvalidCatalogCursorError,
-  PostgresMemoryCatalogQueries
-} from '../src/catalog-queries.js'
+import { InvalidCatalogCursorError, PostgresMemoryCatalogQueries } from '../src/catalog-queries.js'
 import { learningReport, reorganizationReport } from './maintenance-report.js'
 
 const artifact = {
@@ -125,12 +122,8 @@ test('extraction pagination uses a stable opaque exclusive cursor', async () => 
     hasObservation: true
   })
 
-  expect(parametersSeen).toStrictEqual([
-    [null, null, 'issue-review', null, true, 2]
-  ])
-  expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual([
-    'extraction-3'
-  ])
+  expect(parametersSeen).toStrictEqual([[null, null, 'issue-review', null, true, 2]])
+  expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual(['extraction-3'])
   expect(typeof page.next_cursor).toBe('string')
   expect(page.next_cursor ?? '').toMatch(/^[A-Za-z0-9_-]+$/)
 })

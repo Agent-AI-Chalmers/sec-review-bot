@@ -72,11 +72,7 @@ export function ArtifactWorkspace({
   // reader can use and one that opens on whichever file happens to sort first.
   React.useEffect(() => {
     if (names.length === 0) return
-    setSelectedFile(
-      names.includes(source.preferredFile)
-        ? source.preferredFile
-        : (names[0] ?? '')
-    )
+    setSelectedFile(names.includes(source.preferredFile) ? source.preferredFile : (names[0] ?? ''))
   }, [names, source.preferredFile])
 
   throwIfUnauthorized(artifact.error)

@@ -23,11 +23,7 @@ for (const [name, source, expected] of [
     '<instructions>\n```xml\n<role>literal</role>\n```\n</instructions>',
     '\n```xml\n<role>literal</role>\n```\n'
   ],
-  [
-    'tilde and unfinished fences',
-    '<instructions>\n~~~xml\n<tag/>',
-    '\n~~~xml\n<tag/>'
-  ],
+  ['tilde and unfinished fences', '<instructions>\n~~~xml\n<tag/>', '\n~~~xml\n<tag/>'],
   [
     'indented code',
     'Example:\n\n    <tag>literal</tag>\n\n<end/>',

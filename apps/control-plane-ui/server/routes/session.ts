@@ -1,11 +1,7 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import {
-  RequestBodyTooLargeError,
-  readBoundedRequestBody,
-  sendJson
-} from '../http.js'
+import { RequestBodyTooLargeError, readBoundedRequestBody, sendJson } from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 
 export interface SessionRoutes {
@@ -40,8 +36,7 @@ export function createSessionRoutes({
       ?.slice('control_plane_ui_session='.length)
 
   const prepareSlot = (now: number): void => {
-    for (const [session, expiresAt] of sessions)
-      if (expiresAt <= now) sessions.delete(session)
+    for (const [session, expiresAt] of sessions) if (expiresAt <= now) sessions.delete(session)
     while (sessions.size >= maximumSessions) {
       const oldest = sessions.keys().next().value
       if (oldest === undefined) break
@@ -61,10 +56,7 @@ export function createSessionRoutes({
     return true
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.url === '/api/session' && request.method === 'POST') {
       // Signing in is a state change too: without this, another site could force the
       // browser into a session it did not ask for.

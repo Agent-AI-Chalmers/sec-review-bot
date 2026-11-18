@@ -13,10 +13,7 @@ export interface RefreshState {
   lastChecked: Date | undefined
 }
 
-export function useRefresh(
-  load: () => Promise<void>,
-  enabled = true
-): RefreshState {
+export function useRefresh(load: () => Promise<void>, enabled = true): RefreshState {
   const { autoRefresh, refreshInterval } = usePreferences()
   const [refreshing, setRefreshing] = React.useState(false)
   const [lastChecked, setLastChecked] = React.useState<Date>()
@@ -61,15 +58,11 @@ export function RefreshControls({
   autoRefreshEnabled = true
 }: RefreshState & { autoRefreshEnabled?: boolean }): React.JSX.Element {
   const { language } = useLanguage()
-  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
-    usePreferences()
+  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } = usePreferences()
   const t = useMessages()
-  const intervalLabel = (ms: number): string =>
-    ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`
+  const intervalLabel = (ms: number): string => (ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`)
   const lastCheckedText = `${t('lastChecked')}: ${
-    lastChecked
-      ? formatDate(lastChecked.toISOString(), language)
-      : t('neverChecked')
+    lastChecked ? formatDate(lastChecked.toISOString(), language) : t('neverChecked')
   }`
   return (
     // Keep refresh status and preferences together without coupling pages to the app shell.
@@ -113,11 +106,7 @@ export function RefreshControls({
               {([5000, 15000, 30000, 60000] as const).map((ms) => (
                 <Menu.Item
                   key={ms}
-                  rightSection={
-                    refreshInterval === ms ? (
-                      <IconCheck size={ICON_SIZE.sm} />
-                    ) : null
-                  }
+                  rightSection={refreshInterval === ms ? <IconCheck size={ICON_SIZE.sm} /> : null}
                   onClick={() => setRefreshInterval(ms)}
                 >
                   {intervalLabel(ms)}

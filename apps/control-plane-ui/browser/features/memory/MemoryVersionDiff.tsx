@@ -1,29 +1,12 @@
 import React from 'react'
-import {
-  ActionIcon,
-  Alert,
-  Group,
-  Modal,
-  SegmentedControl,
-  Text,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Alert, Group, Modal, SegmentedControl, Text, Tooltip } from '@mantine/core'
 import { IconExternalLink } from '@tabler/icons-react'
 
 import type { MemoryTreeContentResponse } from '../../../shared/artifact-content.js'
-import {
-  api,
-  isAbortError,
-  throwIfUnauthorized
-} from '../../shared/api-client.js'
+import { api, isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
 import { DiffEditor } from '../workspace/DiffEditor.js'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
-import {
-  type Language,
-  type Translator,
-  useLanguage,
-  useMessages
-} from '../../shared/i18n.js'
+import { type Language, type Translator, useLanguage, useMessages } from '../../shared/i18n.js'
 import type { MemoryTreeVersion } from './api-types.generated.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
@@ -100,9 +83,7 @@ export function MemoryVersionDiffContent({
   const [before, setBefore] = React.useState<Record<string, string>>({})
   const [after, setAfter] = React.useState<Record<string, string>>({})
   const [selectedFile, setSelectedFile] = React.useState('')
-  const [mode, setMode] = React.useState<'side-by-side' | 'unified'>(
-    'side-by-side'
-  )
+  const [mode, setMode] = React.useState<'side-by-side' | 'unified'>('side-by-side')
   const [error, setError] = React.useState<unknown>()
 
   React.useEffect(() => {
@@ -116,10 +97,9 @@ export function MemoryVersionDiffContent({
     const previous =
       predecessorVersion === null
         ? Promise.resolve<MemoryTreeContentResponse>({ files: {} })
-        : api<MemoryTreeContentResponse>(
-            `/memory/versions/${predecessorVersion}/content`,
-            { signal: controller.signal }
-          )
+        : api<MemoryTreeContentResponse>(`/memory/versions/${predecessorVersion}/content`, {
+            signal: controller.signal
+          })
     void Promise.all([
       previous,
       api<MemoryTreeContentResponse>(`/memory/versions/${version}/content`, {
@@ -132,30 +112,21 @@ export function MemoryVersionDiffContent({
         setAfter(currentBody.files)
         const changes = changedFiles(previousBody.files, currentBody.files)
         setSelectedFile(
-          changes.has('MEMORY.md')
-            ? 'MEMORY.md'
-            : ([...changes.keys()].sort()[0] ?? '')
+          changes.has('MEMORY.md') ? 'MEMORY.md' : ([...changes.keys()].sort()[0] ?? '')
         )
       })
       .catch((failure: unknown) => {
-        if (!controller.signal.aborted && !isAbortError(failure))
-          setError(failure)
+        if (!controller.signal.aborted && !isAbortError(failure)) setError(failure)
       })
     return (): void => controller.abort()
   }, [predecessorVersion, version, t])
 
   throwIfUnauthorized(error)
 
-  const changes = React.useMemo(
-    () => changedFiles(before, after),
-    [after, before]
-  )
+  const changes = React.useMemo(() => changedFiles(before, after), [after, before])
   // Deleted files must remain selectable even though they no longer exist in the new archive.
   const files = React.useMemo(
-    () =>
-      Object.fromEntries(
-        [...changes.keys()].map((path) => [path, after[path] ?? ''])
-      ),
+    () => Object.fromEntries([...changes.keys()].map((path) => [path, after[path] ?? ''])),
     [after, changes]
   )
   const markers = React.useMemo(
@@ -165,14 +136,9 @@ export function MemoryVersionDiffContent({
           path,
           {
             label: t(
-              kind === 'added'
-                ? 'diffAdded'
-                : kind === 'deleted'
-                  ? 'diffDeleted'
-                  : 'diffModified'
+              kind === 'added' ? 'diffAdded' : kind === 'deleted' ? 'diffDeleted' : 'diffModified'
             ),
-            color:
-              kind === 'added' ? 'green' : kind === 'deleted' ? 'red' : 'yellow'
+            color: kind === 'added' ? 'green' : kind === 'deleted' ? 'red' : 'yellow'
           }
         ])
       ),

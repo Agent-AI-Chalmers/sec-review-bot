@@ -61,8 +61,6 @@ test('an unauthorized query failure is rethrown unchanged for the ErrorBoundary'
 
 test('resource and transport failures remain available for local error UI', () => {
   expect(() => throwIfUnauthorized(new ApiError(404))).not.toThrow()
-  expect(() =>
-    throwIfUnauthorized(new Error('network unavailable'))
-  ).not.toThrow()
+  expect(() => throwIfUnauthorized(new Error('network unavailable'))).not.toThrow()
   expect(() => throwIfUnauthorized(undefined)).not.toThrow()
 })

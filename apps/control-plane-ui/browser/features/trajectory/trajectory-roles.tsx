@@ -1,10 +1,5 @@
 import React from 'react'
-import {
-  IconRobot,
-  IconSettings,
-  IconTool,
-  IconUser
-} from '@tabler/icons-react'
+import { IconRobot, IconSettings, IconTool, IconUser } from '@tabler/icons-react'
 
 import { ICON_SIZE } from '../../shared/design.js'
 import type { TrajectoryRole } from './trajectory-model.js'

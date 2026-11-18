@@ -8,10 +8,7 @@ import { integerEnv } from '../utils/env.js'
 import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { asErrorMessage, errorCode } from '../utils/error-utils.js'
 import { classifyPublicationFailure } from './publication-failure.js'
-import {
-  isPublicationClaimLostError,
-  PublicationClaimLostError
-} from './publication-claim.js'
+import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import {
   reviewRunsClient,
   type PublicationCoordinatorStore,
@@ -50,8 +47,7 @@ async function publishWork(
       await installationOctokitForRepo(app, repo)
   }
   if (work.workflow === 'issue-review') await handleIssueReviewRun(common)
-  else if (work.workflow === 'pull-request-review')
-    await handlePullRequestReviewRun(common)
+  else if (work.workflow === 'pull-request-review') await handlePullRequestReviewRun(common)
   else await handleRepositoryReviewRun(common)
 }
 
@@ -154,9 +150,7 @@ export async function publishReviewRunsOnce({
   // publishable mid-interval is picked up as soon as it does, and the poll timer above
   // stays as the backstop. The wait stays comfortably inside the client's request
   // timeout.
-  const work = await store.claimNextPublication(
-    Math.min(pollIntervalMs(), 10_000)
-  )
+  const work = await store.claimNextPublication(Math.min(pollIntervalMs(), 10_000))
   if (work === null) return
   try {
     const ownsClaim = await withPublicationHeartbeat(

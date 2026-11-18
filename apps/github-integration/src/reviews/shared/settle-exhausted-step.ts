@@ -20,10 +20,7 @@ import { asErrorMessage, errorCode } from '../../utils/error-utils.js'
 
 /** Whether a publish error is the "no attempts left, reconcile first" signal. */
 export function isPublicationStepExhausted(error: unknown): boolean {
-  return (
-    errorCode(error) ===
-    EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
-  )
+  return errorCode(error) === EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
 }
 
 /** What a reconciliation found, in the shape the completion path already uses. */
@@ -85,9 +82,9 @@ export async function settleExhaustedStep({
   // The count this lookup will be reported against, read before looking. Like an activity
   // failure that carries its attempt number, it identifies this one failure, so reporting it
   // again after a lost response cannot spend the budget a second time.
-  const expectedUnresolvedRecoveryCount = (
-    await store.listPublicationSteps(runId)
-  ).find((step) => step.step_key === stepKey)?.unresolved_recovery_count
+  const expectedUnresolvedRecoveryCount = (await store.listPublicationSteps(runId)).find(
+    (step) => step.step_key === stepKey
+  )?.unresolved_recovery_count
   let found: ReconciledRemote | null
   try {
     found = await find()
@@ -164,7 +161,5 @@ export async function findOpenPullRequestByHeadBranch(
     per_page: 1
   })
   const pull = response.data[0]
-  return pull === undefined
-    ? null
-    : { number: pull.number, html_url: pull.html_url }
+  return pull === undefined ? null : { number: pull.number, html_url: pull.html_url }
 }

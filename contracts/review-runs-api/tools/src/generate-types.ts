@@ -65,19 +65,9 @@ export interface OpenApiDocument {
 export function operationRoutes(
   spec: OpenApiDocument
 ): Array<{ operationId: string; path: string; method: string }> {
-  const methods = [
-    'get',
-    'put',
-    'post',
-    'delete',
-    'options',
-    'head',
-    'patch',
-    'trace'
-  ]
+  const methods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
   const paths = spec.paths ?? {}
-  const routes: Array<{ operationId: string; path: string; method: string }> =
-    []
+  const routes: Array<{ operationId: string; path: string; method: string }> = []
   for (const [path, item] of Object.entries(paths)) {
     for (const method of methods) {
       const operation = item[method] as { operationId?: string } | undefined
@@ -156,11 +146,7 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
 }
 
 // Generate the server's closed error-code vocabulary from the contract enum.
-export const ERROR_CODES_PATH = path.resolve(
-  REVIEW_RUNS_ROOT,
-  'src',
-  'error-codes-generated.ts'
-)
+export const ERROR_CODES_PATH = path.resolve(REVIEW_RUNS_ROOT, 'src', 'error-codes-generated.ts')
 
 /** Preserve every error-code enum member; reject non-string values rather than silently
  * generating an incomplete vocabulary for response validation.
@@ -181,9 +167,7 @@ export function errorResponseCodes(spec: OpenApiDocument): string[] {
 
 /** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
 export function publicationStepCodes(spec: OpenApiDocument): string[] {
-  return errorResponseCodes(spec).filter((value) =>
-    value.startsWith('PUBLICATION_STEP_')
-  )
+  return errorResponseCodes(spec).filter((value) => value.startsWith('PUBLICATION_STEP_'))
 }
 
 /** Render server and connector error-code projections. */
@@ -259,9 +243,7 @@ export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
  * than an empty list: an empty allow-list would make the console send no filters at all,
  * which is a silent loss of function, not a change to an empty set. */
 export function listRunQueryParameters(spec: OpenApiDocument): string[] {
-  const list = (
-    spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined
-  )?.get
+  const list = (spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined)?.get
   const parameters = list?.parameters
   if (!Array.isArray(parameters)) {
     throw new Error("openapi.yaml's listRuns has no parameters to project.")
@@ -302,9 +284,7 @@ export function listRunQueryParameters(spec: OpenApiDocument): string[] {
     }
     return Object.keys(candidate.schema.properties)
   }
-  throw new Error(
-    "openapi.yaml's listRuns declares no query parameters to project."
-  )
+  throw new Error("openapi.yaml's listRuns declares no query parameters to project.")
 }
 
 /** Render the console query-parameter allowlist. */
@@ -377,16 +357,14 @@ async function formatOutput(file: string, source: string): Promise<string> {
     semi: false,
     singleQuote: true,
     trailingComma: 'none',
-    printWidth: 80,
+    printWidth: 100,
     sortImports: false,
     sortPackageJson: false,
     embeddedLanguageFormatting: 'off',
     proseWrap: 'preserve'
   })
   if (result.errors.length > 0) {
-    throw new Error(
-      `Failed to format ${file}: ${JSON.stringify(result.errors)}`
-    )
+    throw new Error(`Failed to format ${file}: ${JSON.stringify(result.errors)}`)
   }
   return result.code
 }

@@ -38,12 +38,8 @@ function stubOctokit(
     // The installation guard reads the repository first.
     if (tail === '') {
       if (options.repoLookupFailsWith !== undefined)
-        return githubJson(
-          { message: 'Server Error' },
-          options.repoLookupFailsWith
-        )
-      if (!installed.has(`${owner}/${repo}`))
-        return githubJson({ message: 'Not Found' }, 404)
+        return githubJson({ message: 'Server Error' }, options.repoLookupFailsWith)
+      if (!installed.has(`${owner}/${repo}`)) return githubJson({ message: 'Not Found' }, 404)
       return githubJson({ full_name: `${owner}/${repo}` })
     }
     if (tail.endsWith('/issues') && method === 'GET') return githubJson([])
@@ -68,14 +64,7 @@ test('a repository failure target must be exactly owner/repo', async () => {
   // opportunistically: `a/b/c` truncated to `a/b` would report into a different repository than
   // the one that was scanned. Anything ambiguous counts as "no target", which the caller records
   // as an undelivered notice rather than posting somewhere misleading.
-  for (const verified_repository of [
-    'a/b/c',
-    'octo',
-    '/example',
-    'octo/',
-    '',
-    '   '
-  ]) {
+  for (const verified_repository of ['a/b/c', 'octo', '/example', 'octo/', '', '   ']) {
     const report = {
       created: [] as Array<{ owner: string; repo: string }>,
       commented: [] as number[],
@@ -94,14 +83,10 @@ test('a repository failure target must be exactly owner/repo', async () => {
       kind: 'failure',
       assert_notice_claim: keepNoticeClaim
     })
-    expect(
-      result,
-      `${JSON.stringify(verified_repository)} must not resolve to a repository`
-    ).toBe(null)
-    expect(
-      report.created,
-      'no issue may be created for an invalid target'
-    ).toStrictEqual([])
+    expect(result, `${JSON.stringify(verified_repository)} must not resolve to a repository`).toBe(
+      null
+    )
+    expect(report.created, 'no issue may be created for an invalid target').toStrictEqual([])
   }
 })
 
@@ -334,9 +319,7 @@ for (const limited of [true, false]) {
             status: 403,
             headers: {
               'content-type': 'application/json',
-              ...(limited
-                ? { 'retry-after': '60', 'x-ratelimit-remaining': '0' }
-                : {})
+              ...(limited ? { 'retry-after': '60', 'x-ratelimit-remaining': '0' } : {})
             }
           }
         )

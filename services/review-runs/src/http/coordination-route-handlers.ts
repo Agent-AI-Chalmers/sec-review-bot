@@ -9,10 +9,7 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
   return {
     admitRun: async (request) => {
       const body = request.body
-      if (
-        body.preparation_input === undefined ||
-        body.preparation_input_version === undefined
-      )
+      if (body.preparation_input === undefined || body.preparation_input_version === undefined)
         throw new Error('Preparation input is required for run admission.')
       return await store.admissions.admit({
         ...body,
@@ -50,12 +47,7 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
     settleInputBundleCandidate: async (request) => {
       const { runId } = request.params
       const { token, digest, status } = request.body
-      return await store.inputBundleCandidates.settle(
-        runId,
-        token,
-        digest,
-        status
-      )
+      return await store.inputBundleCandidates.settle(runId, token, digest, status)
     },
     renewPreparationClaim: async (request) => {
       const { runId } = request.params
@@ -84,9 +76,7 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
       const { token, failure, retry, retry_after_ms } = request.body
       return await store.preparations.fail(runId, token, failure, {
         retry: retry ?? false,
-        ...(retry_after_ms === undefined
-          ? {}
-          : { retryAfterMs: retry_after_ms })
+        ...(retry_after_ms === undefined ? {} : { retryAfterMs: retry_after_ms })
       })
     },
 
@@ -94,12 +84,7 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
       const { noticeId } = request.params
       const body = request.body
       return body.delivered
-        ? await store.notices.complete(
-            noticeId,
-            body.token,
-            true,
-            body.comment_url
-          )
+        ? await store.notices.complete(noticeId, body.token, true, body.comment_url)
         : await store.notices.complete(noticeId, body.token, false)
     },
 
@@ -117,22 +102,14 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
     initializePublicationSteps: async (request, reply) => {
       const { runId } = request.params
       const { token, step_keys } = request.body
-      await store.publications.initializePublicationSteps(
-        runId,
-        token,
-        step_keys
-      )
+      await store.publications.initializePublicationSteps(runId, token, step_keys)
       return reply.code(200).send()
     },
 
     requirePublicationStepClaim: async (request, reply) => {
       const { runId, stepKey } = request.params
       const { token } = request.body
-      await store.publications.requirePublicationStepClaim(
-        runId,
-        token,
-        stepKey
-      )
+      await store.publications.requirePublicationStepClaim(runId, token, stepKey)
       return reply.code(200).send()
     },
 
@@ -160,23 +137,15 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
 
     failPublicationStep: async (request) => {
       const { runId, stepKey } = request.params
-      const { token, failure, retry, expected_unresolved_recovery_count } =
-        request.body
-      return await store.publications.failPublicationStep(
-        runId,
-        token,
-        stepKey,
-        failure,
-        {
-          ...(retry === undefined ? {} : { retry }),
-          ...(expected_unresolved_recovery_count === undefined
-            ? {}
-            : {
-                expectedUnresolvedRecoveryCount:
-                  expected_unresolved_recovery_count
-              })
-        }
-      )
+      const { token, failure, retry, expected_unresolved_recovery_count } = request.body
+      return await store.publications.failPublicationStep(runId, token, stepKey, failure, {
+        ...(retry === undefined ? {} : { retry }),
+        ...(expected_unresolved_recovery_count === undefined
+          ? {}
+          : {
+              expectedUnresolvedRecoveryCount: expected_unresolved_recovery_count
+            })
+      })
     },
 
     completePublication: async (request) => {
@@ -202,18 +171,13 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
       const { runId } = request.params
       const run = await store.queries.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      return reply.send(
-        await store.publications.listPublicationSteps(run.run_id)
-      )
+      return reply.send(await store.publications.listPublicationSteps(run.run_id))
     },
 
-    getPreparationHeartbeatInterval: async () =>
-      store.preparations.heartbeatIntervalMs(),
+    getPreparationHeartbeatInterval: async () => store.preparations.heartbeatIntervalMs(),
 
-    getPublicationHeartbeatInterval: async () =>
-      store.publications.heartbeatIntervalMs(),
+    getPublicationHeartbeatInterval: async () => store.publications.heartbeatIntervalMs(),
 
-    getRunNoticeHeartbeatInterval: async () =>
-      store.notices.heartbeatIntervalMs()
+    getRunNoticeHeartbeatInterval: async () => store.notices.heartbeatIntervalMs()
   } satisfies Partial<OperationHandlers>
 }

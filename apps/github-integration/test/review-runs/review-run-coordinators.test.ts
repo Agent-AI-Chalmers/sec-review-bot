@@ -35,13 +35,11 @@ function unreachedPreparationMembers(): Pick<
   }
   return {
     ...inputBundlePublicationStore(),
-    checkpointPreparationInput: async () =>
-      unreached('checkpointPreparationInput'),
+    checkpointPreparationInput: async () => unreached('checkpointPreparationInput'),
     admitReviewRun: async () => unreached('admitReviewRun'),
     submitPreparedRun: async () => unreached('submitPreparedRun'),
     renewPreparationClaim: async () => unreached('renewPreparationClaim'),
-    preparationHeartbeatIntervalMs: () =>
-      unreached('preparationHeartbeatIntervalMs')
+    preparationHeartbeatIntervalMs: () => unreached('preparationHeartbeatIntervalMs')
   }
 }
 
@@ -62,8 +60,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   // real request this test can assert on.
   const client = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/comments') && method === 'GET')
-      return githubJson([])
+    if (pathname.endsWith('/comments') && method === 'GET') return githubJson([])
     if (pathname.endsWith('/comments'))
       return githubJson({ id: 9, html_url: 'https://example.test/comment/9' })
     return githubJson({ full_name: 'octo/example' })
@@ -103,9 +100,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   expect(requests[0]!.url).toMatch(/\/repos\/octo\/example\/installation$/)
   // The reply path then verifies the repository and posts the notice through the client.
   expect(
-    client.requests.map(
-      (request) => `${request.method} ${new URL(request.url).pathname}`
-    )
+    client.requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)
   ).toStrictEqual([
     'GET /repos/octo/example',
     'GET /repos/octo/example/issues/7/comments',
@@ -134,8 +129,7 @@ test('a repository scan failure reports into the repository summary issue', asyn
           title: '[sec-review-bot] Repository Security Review Summary'
         }
       ])
-    if (pathname.endsWith('/comments') && method === 'GET')
-      return githubJson([])
+    if (pathname.endsWith('/comments') && method === 'GET') return githubJson([])
     if (pathname.endsWith('/comments') && method === 'POST')
       return githubJson({ id: 5, html_url: 'https://example.test/comment/5' })
     return githubJson({ full_name: 'octo/example' })
@@ -168,9 +162,7 @@ test('a repository scan failure reports into the repository summary issue', asyn
 
   expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
   const created = client.requests.find(
-    (request) =>
-      request.method === 'POST' &&
-      new URL(request.url).pathname.endsWith('/comments')
+    (request) => request.method === 'POST' && new URL(request.url).pathname.endsWith('/comments')
   )
   expect.assert(created, 'the failure must be posted as a comment')
   const body = created.body as { body: string }
@@ -218,10 +210,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
   })
 
   expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
-  expect(
-    completed,
-    'an unrecoverable notice is concluded, not left claimable'
-  ).toStrictEqual([
+  expect(completed, 'an unrecoverable notice is concluded, not left claimable').toStrictEqual([
     // No comment URL: nothing was posted, and the notice says so instead of staying open.
     ['notice-test', 'notice-token', false]
   ])
@@ -269,9 +258,7 @@ test('a process without the GitHub installation concludes the notice, which the 
   })
 
   expect(await deliverRunNoticeOnce({ app, store })).toBe(true)
-  expect(claimed, 'the claim is per connector, so this process takes it').toBe(
-    1
-  )
+  expect(claimed, 'the claim is per connector, so this process takes it').toBe(1)
   expect(
     completed,
     'the notice is concluded as undelivered, not left for a process that could deliver it'
@@ -380,11 +367,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    failPreparation: async (
-      _runId: string,
-      _token: string,
-      failure: { message: string }
-    ) => {
+    failPreparation: async (_runId: string, _token: string, failure: { message: string }) => {
       failures.push(failure)
       return { retry_scheduled: false }
     }
@@ -441,11 +424,7 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    failPreparation: async (
-      _runId: string,
-      _token: string,
-      failure: { message: string }
-    ) => {
+    failPreparation: async (_runId: string, _token: string, failure: { message: string }) => {
       failures.push(failure)
       return { retry_scheduled: false }
     }
@@ -500,11 +479,7 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
           open_pr: null
         }
       }),
-      failPreparation: async (
-        _runId: string,
-        _token: string,
-        failure: { message: string }
-      ) => {
+      failPreparation: async (_runId: string, _token: string, failure: { message: string }) => {
         failures.push(failure)
         return { retry_scheduled: false }
       },
@@ -650,9 +625,7 @@ test('a claimed synchronize preparation recovers from the payload admission pers
   // webhook `before` commit only exists in the persisted payload.
   expect(
     client.requests.some(
-      (request) =>
-        request.method === 'GET' &&
-        /\/pulls\/7$/.test(new URL(request.url).pathname)
+      (request) => request.method === 'GET' && /\/pulls\/7$/.test(new URL(request.url).pathname)
     ),
     'recovery must not re-read the pull request'
   ).toBe(false)
@@ -714,10 +687,7 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
   await prepareReviewRunsOnce({ app, store })
   expect(events).toStrictEqual(['renew', 'resolve', 'checkpoint'])
   expect(checkpoints).toHaveLength(1)
-  expect(checkpoints[0]?.slice(0, 2)).toStrictEqual([
-    'reference-run',
-    'recovery-token'
-  ])
+  expect(checkpoints[0]?.slice(0, 2)).toStrictEqual(['reference-run', 'recovery-token'])
   const checkpoint = parsePullRequestPreparationInput(checkpoints[0]?.[2])
   expect(checkpoint.pr?.head_sha).toBe('captured-head')
   expect(checkpoint.test_changes).toBe('deny')
@@ -728,10 +698,8 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
 
 for (const kind of ['preparation', 'notice'] as const) {
   test(`${kind} shutdown drains current work without claiming more`, async () => {
-    const { promise: entered, resolve: markEntered } =
-      Promise.withResolvers<void>()
-    const { promise: release, resolve: releaseWork } =
-      Promise.withResolvers<void>()
+    const { promise: entered, resolve: markEntered } = Promise.withResolvers<void>()
+    const { promise: release, resolve: releaseWork } = Promise.withResolvers<void>()
     let claims = 0
     let completed = false
     const finish = async (): Promise<boolean> => {

@@ -23,9 +23,7 @@ function observation(index: number): ObservationRecord {
   }
 }
 
-function renderList(
-  props: Partial<React.ComponentProps<typeof MemoryObservationList>>
-): void {
+function renderList(props: Partial<React.ComponentProps<typeof MemoryObservationList>>): void {
   renderComponent(
     <MemoryRouter>
       <MemoryObservationList
@@ -54,9 +52,7 @@ function renderList(
 
 test('the version filter banner names the filtered version', () => {
   renderList({ versionFilter: 2 })
-  expect(
-    screen.getByText('Showing observations included in version 2.')
-  ).toBeInTheDocument()
+  expect(screen.getByText('Showing observations included in version 2.')).toBeInTheDocument()
 })
 
 test('a revealed observation is highlighted once it is in the list', () => {
@@ -67,9 +63,7 @@ test('a revealed observation is highlighted once it is in the list', () => {
 
 test('a revealed observation missing from the page is reported without its id', () => {
   renderList({ highlightedObservation: 'observation-9' })
-  expect(
-    screen.getByText('This observation is not on this page.')
-  ).toBeInTheDocument()
+  expect(screen.getByText('This observation is not on this page.')).toBeInTheDocument()
   expect(screen.queryByText(/extraction-9/)).not.toBeInTheDocument()
 })
 

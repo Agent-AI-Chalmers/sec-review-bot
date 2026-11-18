@@ -9,10 +9,7 @@ import type { ReviewRunWorkflow } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
 import { appendEvent } from './review-run-events.js'
-import {
-  abandonInFlightPublication,
-  abandonInFlightPublications
-} from './publication-abandon.js'
+import { abandonInFlightPublication, abandonInFlightPublications } from './publication-abandon.js'
 import { skipPendingExecutions } from './execution-skip.js'
 import { queueRunNotice } from './run-notices.js'
 
@@ -144,20 +141,14 @@ export class PreparationStore {
     })
   }
 
-  async checkpointInput(
-    runId: string,
-    token: string,
-    input: JsonObject
-  ): Promise<void> {
+  async checkpointInput(runId: string, token: string, input: JsonObject): Promise<void> {
     const result = await this.pool.query(
       `UPDATE preparations SET input=$4::jsonb, updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
       [runId, this.connectorId, token, JSON.stringify(input)]
     )
     if (result.rowCount !== 1)
-      throw new Error(
-        `Preparation claim was lost before checkpointing input for ${runId}.`
-      )
+      throw new Error(`Preparation claim was lost before checkpointing input for ${runId}.`)
   }
 
   heartbeatIntervalMs(): number {
@@ -199,11 +190,7 @@ export class PreparationStore {
         const savepoint = `expire_${candidate.run_id.replace(/[^a-zA-Z0-9_]/g, '_')}`
         await client.query(`SAVEPOINT ${savepoint}`)
         try {
-          await this.concludeExpiry(
-            client,
-            candidate.run_id,
-            candidate.attempt_count
-          )
+          await this.concludeExpiry(client, candidate.run_id, candidate.attempt_count)
           await client.query(`RELEASE SAVEPOINT ${savepoint}`)
           concluded += 1
         } catch (error) {
@@ -291,8 +278,7 @@ export class PreparationStore {
       [runId, this.connectorId, exhausted]
     )
     const row = expired.rows[0]
-    if (row === undefined)
-      throw new Error(`Expired preparation ${runId} could not be concluded.`)
+    if (row === undefined) throw new Error(`Expired preparation ${runId} could not be concluded.`)
     const preparationEventId = await appendEvent(client, {
       runId,
       connectorId: this.connectorId,
@@ -306,20 +292,14 @@ export class PreparationStore {
     // Execution never ran, so it is skipped, not failed. The failure reason stays on the
     // preparation row (and is surfaced through the run's preparation summary). A run whose
     // execution already left `pending` contradicts that premise: refuse to overwrite it.
-    const skippedRuns = await skipPendingExecutions(client, this.connectorId, [
-      runId
-    ])
+    const skippedRuns = await skipPendingExecutions(client, this.connectorId, [runId])
     if (skippedRuns.length !== 1)
       throw new ExpiryUnreconcilableError(
         'EXECUTION_ALREADY_ADVANCED',
         `preparation ${runId} expired with its execution no longer pending`
       )
     // Publication is not applicable either; the helper converges an in-flight publication too.
-    const abandoned = await abandonInFlightPublications(
-      client,
-      this.connectorId,
-      [runId]
-    )
+    const abandoned = await abandonInFlightPublications(client, this.connectorId, [runId])
     await queueRunNotice(client, {
       runId,
       connectorId: this.connectorId,
@@ -428,20 +408,14 @@ export class PreparationStore {
         : undefined
       if (submissionUncertain) {
         if (result?.rowCount !== 1)
-          throw new Error(
-            `Preparation claim was lost before failing review run ${runId}.`
-          )
+          throw new Error(`Preparation claim was lost before failing review run ${runId}.`)
       } else {
         // Execution never ran, so it is skipped rather than failed. The reason stays on the
         // preparation row. Comparing the returned ids against the request makes a run that was
         // no longer `pending` surface as a lost transition instead of passing silently.
-        const skipped = await skipPendingExecutions(client, this.connectorId, [
-          runId
-        ])
+        const skipped = await skipPendingExecutions(client, this.connectorId, [runId])
         if (skipped.length !== 1)
-          throw new Error(
-            `Execution for ${runId} was not pending when preparation failed.`
-          )
+          throw new Error(`Execution for ${runId} was not pending when preparation failed.`)
       }
       // Publication is only "not applicable" once execution is conclusively skipped. An
       // uncertain submission may still be accepted, so its publication stays `pending`: ruling

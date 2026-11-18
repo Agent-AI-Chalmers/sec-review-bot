@@ -8,18 +8,12 @@ import {
   WorkflowNotFoundError
 } from '@temporalio/client'
 
-import {
-  isExecutionError,
-  validateExecutionResult
-} from './execution-api-validation.js'
+import { isExecutionError, validateExecutionResult } from './execution-api-validation.js'
 import {
   executionWorkflowType,
   validateExecutionSubmission
 } from './execution-workflow-validation.js'
-import type {
-  ExecutionArtifactStorage,
-  ExecutionError
-} from './execution-api-types-generated.js'
+import type { ExecutionArtifactStorage, ExecutionError } from './execution-api-types-generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
@@ -75,8 +69,7 @@ export class TemporalExecutionClient {
     return new TemporalExecutionClient(
       connection,
       client,
-      process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() ||
-        'sec-review-execution'
+      process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() || 'sec-review-execution'
     )
   }
 
@@ -98,20 +91,11 @@ export class TemporalExecutionClient {
     } catch (error) {
       if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error
       const existing = await this.get(request.run_id)
-      const description = await this.client.workflow
-        .getHandle(request.run_id)
-        .describe()
-      if (
-        description.memo?.request_fingerprint === requestFingerprint &&
-        existing
-      ) {
+      const description = await this.client.workflow.getHandle(request.run_id).describe()
+      if (description.memo?.request_fingerprint === requestFingerprint && existing) {
         return existing
       }
-      throw new ExecutionRunConflictError(
-        request.run_id,
-        request.workflow,
-        existing?.workflow
-      )
+      throw new ExecutionRunConflictError(request.run_id, request.workflow, existing?.workflow)
     }
     return (
       (await this.get(request.run_id)) ?? {
@@ -133,9 +117,7 @@ export class TemporalExecutionClient {
     }
     const temporalStatus = statusName(description.status)
     const workflow =
-      typeof description.memo?.workflow === 'string'
-        ? description.memo.workflow
-        : undefined
+      typeof description.memo?.workflow === 'string' ? description.memo.workflow : undefined
     if (temporalStatus === 'RUNNING') {
       return {
         run_id: runId,
@@ -151,10 +133,7 @@ export class TemporalExecutionClient {
           ...(workflow ? { workflow } : {}),
           status: 'failed',
           artifact_storage: { status: 'unavailable' },
-          error: executionError(
-            'EXECUTION_RESPONSE_INVALID',
-            'Invalid workflow response.'
-          )
+          error: executionError('EXECUTION_RESPONSE_INVALID', 'Invalid workflow response.')
         }
       }
       if (response.ok === true && 'result' in response) {
@@ -185,10 +164,7 @@ export class TemporalExecutionClient {
         }
         let artifact_storage: ArtifactStorageProjection
         try {
-          artifact_storage = parseExecutionArchiveArtifact(
-            response.artifact_storage,
-            runId
-          )
+          artifact_storage = parseExecutionArchiveArtifact(response.artifact_storage, runId)
         } catch (error) {
           return {
             run_id: runId,
@@ -197,8 +173,7 @@ export class TemporalExecutionClient {
             artifact_storage: {
               status: 'failed',
               error_code: 'ARTIFACT_REFERENCE_INVALID',
-              message:
-                'Execution returned an invalid execution archive artifact.'
+              message: 'Execution returned an invalid execution archive artifact.'
             },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
@@ -226,10 +201,7 @@ export class TemporalExecutionClient {
         artifact_storage: { status: 'unavailable' },
         error: isExecutionError(response.error)
           ? response.error
-          : executionError(
-              'EXECUTION_RESPONSE_INVALID',
-              'Invalid workflow response.'
-            )
+          : executionError('EXECUTION_RESPONSE_INVALID', 'Invalid workflow response.')
       }
     }
     return {

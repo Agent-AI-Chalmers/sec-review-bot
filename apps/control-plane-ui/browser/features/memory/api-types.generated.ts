@@ -211,10 +211,7 @@ export type MemoryTreeVersionCreation = {
    */
   expected_active_version: number
   memory_tree_reference: ArtifactReference
-  source:
-    | LearningVersionSource
-    | ReorganizationVersionSource
-    | ManualVersionCreationSource
+  source: LearningVersionSource | ReorganizationVersionSource | ManualVersionCreationSource
 }
 
 export type VersionPublication = {
@@ -693,8 +690,7 @@ export type ListExtractionsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListExtractionsResponseBody =
-  ListExtractionsResponseBodyByStatus['200']
+export type ListExtractionsResponseBody = ListExtractionsResponseBodyByStatus['200']
 
 export type RegisterExtractionBody = ExtractionRegistration
 
@@ -715,8 +711,7 @@ export type RegisterExtractionResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RegisterExtractionResponseBody =
-  RegisterExtractionResponseBodyByStatus['200']
+export type RegisterExtractionResponseBody = RegisterExtractionResponseBodyByStatus['200']
 
 export type GetExtractionPath = {
   /**
@@ -759,8 +754,7 @@ export type GetObservationBacklogResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetObservationBacklogResponseBody =
-  GetObservationBacklogResponseBodyByStatus['200']
+export type GetObservationBacklogResponseBody = GetObservationBacklogResponseBodyByStatus['200']
 
 export type ListObservationsQuery = {
   /**
@@ -796,8 +790,7 @@ export type ListObservationsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListObservationsResponseBody =
-  ListObservationsResponseBodyByStatus['200']
+export type ListObservationsResponseBody = ListObservationsResponseBodyByStatus['200']
 
 export type GetCatalogOverviewQuery = {
   /**
@@ -821,8 +814,7 @@ export type GetCatalogOverviewResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetCatalogOverviewResponseBody =
-  GetCatalogOverviewResponseBodyByStatus['200']
+export type GetCatalogOverviewResponseBody = GetCatalogOverviewResponseBodyByStatus['200']
 
 export type GetLearningInputQuery = {
   /**
@@ -847,8 +839,7 @@ export type GetLearningInputResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetLearningInputResponseBody =
-  GetLearningInputResponseBodyByStatus['200']
+export type GetLearningInputResponseBody = GetLearningInputResponseBodyByStatus['200']
 
 export type CreateMemoryTreeVersionBody = MemoryTreeVersionCreation
 
@@ -870,8 +861,9 @@ export type CreateMemoryTreeVersionResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CreateMemoryTreeVersionResponseBody =
-  CreateMemoryTreeVersionResponseBodyByStatus['200' | '201']
+export type CreateMemoryTreeVersionResponseBody = CreateMemoryTreeVersionResponseBodyByStatus[
+  | '200'
+  | '201']
 
 export type ListMemoryTreeVersionsQuery = {
   /**
@@ -901,8 +893,7 @@ export type ListMemoryTreeVersionsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListMemoryTreeVersionsResponseBody =
-  ListMemoryTreeVersionsResponseBodyByStatus['200']
+export type ListMemoryTreeVersionsResponseBody = ListMemoryTreeVersionsResponseBodyByStatus['200']
 
 export type GetMemoryTreeOptions = {
   body?: never
@@ -940,8 +931,7 @@ export type RestoreMemoryTreeResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RestoreMemoryTreeResponseBody =
-  RestoreMemoryTreeResponseBodyByStatus['200' | '201']
+export type RestoreMemoryTreeResponseBody = RestoreMemoryTreeResponseBodyByStatus['200' | '201']
 
 export type GetMemoryTreeAutomationOptions = {
   body?: never
@@ -961,8 +951,7 @@ export type GetMemoryTreeAutomationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetMemoryTreeAutomationResponseBody =
-  GetMemoryTreeAutomationResponseBodyByStatus['200']
+export type GetMemoryTreeAutomationResponseBody = GetMemoryTreeAutomationResponseBodyByStatus['200']
 
 export type PauseMemoryTreeAutomationBody = MemoryTreeAutomationOperation
 
@@ -984,8 +973,9 @@ export type PauseMemoryTreeAutomationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type PauseMemoryTreeAutomationResponseBody =
-  PauseMemoryTreeAutomationResponseBodyByStatus['200' | '201']
+export type PauseMemoryTreeAutomationResponseBody = PauseMemoryTreeAutomationResponseBodyByStatus[
+  | '200'
+  | '201']
 
 export type ResumeMemoryTreeAutomationBody = MemoryTreeAutomationOperation
 
@@ -1007,8 +997,9 @@ export type ResumeMemoryTreeAutomationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ResumeMemoryTreeAutomationResponseBody =
-  ResumeMemoryTreeAutomationResponseBodyByStatus['200' | '201']
+export type ResumeMemoryTreeAutomationResponseBody = ResumeMemoryTreeAutomationResponseBodyByStatus[
+  | '200'
+  | '201']
 
 export type GetMemoryTreeVersionPath = {
   /**
@@ -1034,8 +1025,7 @@ export type GetMemoryTreeVersionResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetMemoryTreeVersionResponseBody =
-  GetMemoryTreeVersionResponseBodyByStatus['200']
+export type GetMemoryTreeVersionResponseBody = GetMemoryTreeVersionResponseBodyByStatus['200']
 
 export type ReserveExtractionPublicationBody = ExtractionPublicationIntent
 
@@ -1198,8 +1188,7 @@ export type ListVersionPublicationsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListVersionPublicationsResponseBody =
-  ListVersionPublicationsResponseBodyByStatus['200']
+export type ListVersionPublicationsResponseBody = ListVersionPublicationsResponseBodyByStatus['200']
 
 export interface OperationOptionsById {
   health: HealthOptions

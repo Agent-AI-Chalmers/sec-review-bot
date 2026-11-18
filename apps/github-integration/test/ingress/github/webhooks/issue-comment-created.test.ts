@@ -113,9 +113,7 @@ function submittedIssueRun(issue: IssueContext): PreparedIssueReviewRun {
   }
 }
 
-function submittedPullRequestRun(
-  pr: PullRequestContext
-): PreparedPullRequestReviewRun {
+function submittedPullRequestRun(pr: PullRequestContext): PreparedPullRequestReviewRun {
   return {
     pr,
     run_id: 'run-pr-test',
@@ -164,8 +162,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
   let review_objective: 'audit' | 'repair' | null | undefined = null
   let open_pr: boolean | null | undefined
-  let forwarded_trusted: { default_branch: string; head_sha: string } | null =
-    null
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -236,8 +233,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {
   let pullRequestReviewCalled = false
-  let forwarded_trusted: { default_branch: string; head_sha: string } | null =
-    null
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -302,12 +298,7 @@ test('issue-comment-created delegates PR context loading until after command adm
         contextLoaded = true
         throw new Error('GitHub PR lookup failed')
       },
-      startPullRequestReviewCommandFn: async ({
-        octokit,
-        pr_reference,
-        deps,
-        on_admitted
-      }) => {
+      startPullRequestReviewCommandFn: async ({ octokit, pr_reference, deps, on_admitted }) => {
         commandStarted = true
         expect(contextLoaded).toBe(false)
         expect.assert(pr_reference)
@@ -317,9 +308,9 @@ test('issue-comment-created delegates PR context loading until after command adm
           status: 'pending',
           replayed: false
         })
-        await expect(
-          deps.get_pull_request_context(octokit, pr_reference)
-        ).rejects.toThrow(/GitHub PR lookup failed/)
+        await expect(deps.get_pull_request_context(octokit, pr_reference)).rejects.toThrow(
+          /GitHub PR lookup failed/
+        )
         return { run_id: 'run-pr-context' }
       }
     }
@@ -372,8 +363,5 @@ test('an unrecognized mention logs at most once per repository per window', asyn
     log.mockRestore()
   }
 
-  expect(
-    logged,
-    'one diagnostic line per repository, not one per comment'
-  ).toHaveLength(2)
+  expect(logged, 'one diagnostic line per repository, not one per comment').toHaveLength(2)
 })

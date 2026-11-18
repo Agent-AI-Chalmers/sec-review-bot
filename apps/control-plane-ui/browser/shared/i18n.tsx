@@ -104,10 +104,8 @@ export const messages = {
     diffFileAdded: 'Added',
     diffFileDeleted: 'Deleted',
     diffFileMoved: 'Moved',
-    trajectoryDiffFallback:
-      'Patch structure could not be parsed; showing the raw text.',
-    trajectoryDiffTruncated:
-      'The tool truncated this diff; only part of the change is shown.',
+    trajectoryDiffFallback: 'Patch structure could not be parsed; showing the raw text.',
+    trajectoryDiffTruncated: 'The tool truncated this diff; only part of the change is shown.',
     downloadMemoryTree: 'Download memory tree',
     resizeFileTree: 'Resize file tree',
     memoryMaintainerTrajectory: 'Memory maintainer trajectory',
@@ -131,8 +129,7 @@ export const messages = {
     trajectoryArtifact: 'Attached data',
     trajectoryArguments: 'Arguments',
     trajectoryJumpResult: 'Jump to result',
-    trajectoryRepeatedSystem:
-      'Unchanged system instructions — view earlier message',
+    trajectoryRepeatedSystem: 'Unchanged system instructions — view earlier message',
     trajectoryEmptyArguments: 'Recorded arguments: {}',
     trajectoryJumpCall: 'Back to call',
     trajectoryTokensIn: 'Input',
@@ -170,8 +167,7 @@ export const messages = {
     edit: 'Edit',
     commitVersion: 'Commit version',
     discardMemoryChangesTitle: 'Discard memory changes?',
-    discardMemoryChangesWarning:
-      'Your edits have not been committed and will be lost.',
+    discardMemoryChangesWarning: 'Your edits have not been committed and will be lost.',
     continueEditing: 'Continue editing',
     discardChanges: 'Discard changes',
     memoryLoadFailed: 'Memory data could not be loaded.',
@@ -180,8 +176,7 @@ export const messages = {
     memoryVersionsLoadFailed: 'Version history could not be loaded.',
     memoryObservationsLoadFailed: 'Observation records could not be loaded.',
     memoryOverviewLoadFailed: 'Memory overview could not be loaded.',
-    memoryAutomationConflict:
-      'Memory automation changed elsewhere. Refresh and confirm again.',
+    memoryAutomationConflict: 'Memory automation changed elsewhere. Refresh and confirm again.',
     memoryAutomationFailed: 'The memory automation change failed.',
     memoryVersionConflict:
       'The active version changed. Your text was kept; reload the latest tree before confirming.',
@@ -195,8 +190,7 @@ export const messages = {
     maintenanceDecisions: 'Decisions',
     noObservationDecisions: 'No observations were consumed.',
     showObservation: 'View observation',
-    observationsForVersion:
-      'Showing observations included in version {version}.',
+    observationsForVersion: 'Showing observations included in version {version}.',
     showAllObservations: 'Show all observations',
     observationNotFound: 'This observation is not on this page.',
     versionGraphRange: 'Versions {from}–{to}',
@@ -257,8 +251,7 @@ export const messages = {
     filterFrom: 'From',
     filterTo: 'Until',
     noRunsYet: 'No runs yet',
-    runsLoadFailed:
-      'Could not retrieve the run list. Please retry. Your filters have been kept.',
+    runsLoadFailed: 'Could not retrieve the run list. Please retry. Your filters have been kept.',
     workflowIssueReview: 'Issue review',
     workflowPullRequestReview: 'Pull request review',
     workflowRepositoryReview: 'Repository review',
@@ -286,8 +279,7 @@ export const messages = {
     statisticsPending: 'Waiting',
     statisticsReconciling: 'Collecting',
     statisticsUnavailable: 'Unavailable',
-    statisticsNoObservations:
-      'No model usage was collected for this execution.',
+    statisticsNoObservations: 'No model usage was collected for this execution.',
     statisticsPartialWarning:
       'This snapshot is incomplete. Some late calls or token usage may be missing.',
     statisticsInputTokens: 'Input',
@@ -324,8 +316,7 @@ export const messages = {
     statisticsCombinedDelivery: 'Combined delivery',
     statisticsCombinedDeliveryCount: 'combined delivery',
     statisticsCombinedDeliveries: 'combined deliveries',
-    failureCodePreparationRetryExhausted:
-      'Preparation kept failing and ran out of retries.',
+    failureCodePreparationRetryExhausted: 'Preparation kept failing and ran out of retries.',
     // Each sentence states what the code itself means - the fact it names and its consequence.
     // What the system did about it, and what an operator can choose, belongs to the state and the
     // banner around this code; repeating it here says the same thing twice and puts decisions
@@ -338,22 +329,19 @@ export const messages = {
       'Replays of the submission kept ending without an answer from the Execution Gateway, so its acceptance is still unknown.',
     failureCodeSubmissionRecoveryGivenUp:
       'An operator stopped waiting for this outcome. Remote execution may still be continuing.',
-    failureCodePreparationGivenUp:
-      'An operator stopped waiting for this preparation.',
+    failureCodePreparationGivenUp: 'An operator stopped waiting for this preparation.',
     failureCodePreparationAbandoned:
       'An operator abandoned this run because its records contradict each other. Remote execution may still be continuing.',
     failureCodePublicationGivenUp:
       'An operator stopped publishing while a step could not be confirmed; that step may already have taken effect remotely.',
-    failureCodeExecutionFailed:
-      'The Execution Gateway reported that the task failed.',
+    failureCodeExecutionFailed: 'The Execution Gateway reported that the task failed.',
     failureCodeExecutionResultMissing:
       'The Execution Gateway reported success without a usable result.',
     failureCodePublicationAbandoned:
       'Publishing stopped because the run will not produce a result.',
     failureCodePublicationStepRetryExhausted:
       'One publishing step kept failing and ran out of retries.',
-    failureCodeGithubValidationRejected:
-      'GitHub rejected the content this run tried to publish.',
+    failureCodeGithubValidationRejected: 'GitHub rejected the content this run tried to publish.',
     cancel: 'Cancel',
     blockedRunTitle: 'This run needs your review',
     // Reason-agnostic on purpose. The banner states the situation and the choices, which are the
@@ -373,10 +361,8 @@ export const messages = {
       'This ends tracking of the execution; remote work may continue.',
     abandonRun: 'Abandon',
     abandonTitle: 'Abandon this run',
-    abandonExplainer:
-      'This closes the run instead of trying again, and it cannot be undone.',
-    abandonExplainerKeepsResult:
-      'The result it already recorded is kept as evidence.',
+    abandonExplainer: 'This closes the run instead of trying again, and it cannot be undone.',
+    abandonExplainerKeepsResult: 'The result it already recorded is kept as evidence.',
     abandonReasonLabel: 'Reason for this decision',
     abandonReasonHint: 'Recorded with the decision so the next person knows.',
     abandonTokenLabel: 'Admin token',
@@ -464,14 +450,11 @@ export const messages = {
     failureNoticeNotDelivered:
       'The requester could not be told: the failure notice could not be delivered',
     failureNoticeDelivering: 'Telling the requester that this run failed',
-    attentionNoticeDelivered:
-      'The requester was told this outcome needs confirmation',
+    attentionNoticeDelivered: 'The requester was told this outcome needs confirmation',
     attentionNoticeNotDelivered:
       'The requester could not be told that this outcome needs confirmation',
-    attentionNoticeDelivering:
-      'Telling the requester that this outcome needs confirmation',
-    attentionNoticeSuperseded:
-      'This notice no longer applies because recovery was resumed'
+    attentionNoticeDelivering: 'Telling the requester that this outcome needs confirmation',
+    attentionNoticeSuperseded: 'This notice no longer applies because recovery was resumed'
   },
   zh: {
     language: '语言',
@@ -541,8 +524,7 @@ export const messages = {
     completedExtractions: '已完成提取次数',
     unitsWithObservation: '已产出观察项',
     unitsWithoutObservation: '未产出观察项',
-    unitsWithoutObservationHelp:
-      '提取已完成，提取 Agent 判定该单元没有需要记录的观察项。',
+    unitsWithoutObservationHelp: '提取已完成，提取 Agent 判定该单元没有需要记录的观察项。',
     observationYield: '观察项产出率',
     observationsUnit: '个观察项',
     extractionTrend: '提取与产出趋势',
@@ -645,11 +627,9 @@ export const messages = {
     memoryVersionsLoadFailed: '无法加载版本历史。',
     memoryObservationsLoadFailed: '无法加载观察项。',
     memoryOverviewLoadFailed: '无法加载记忆概览。',
-    memoryAutomationConflict:
-      '记忆自动更新状态已被其他操作修改，请刷新后重新确认。',
+    memoryAutomationConflict: '记忆自动更新状态已被其他操作修改，请刷新后重新确认。',
     memoryAutomationFailed: '记忆自动更新操作失败。',
-    memoryVersionConflict:
-      '当前版本已变更。你的编辑内容已保留，请加载最新记忆树后重新确认。',
+    memoryVersionConflict: '当前版本已变更。你的编辑内容已保留，请加载最新记忆树后重新确认。',
     memoryEditFailed: '无法提交此次编辑。',
     memoryRestoreConflict: '当前版本已发生变化，请刷新后再切换。',
     memoryRestoreFailed: '无法切换当前版本。',
@@ -664,8 +644,7 @@ export const messages = {
     observationNotFound: '当前页没有这条观察项。',
     versionGraphRange: '版本 {from}–{to}',
     versionGraphLatest: '返回最新版本',
-    versionGraphCentered:
-      '显示所选版本附近最多 {count} 个版本，不显示与范围外版本的连线。',
+    versionGraphCentered: '显示所选版本附近最多 {count} 个版本，不显示与范围外版本的连线。',
     versionGraphWindow:
       '显示最近的最多 {count} 个版本，不显示与范围外版本的连线。更早的版本可在列表中查看。',
     extractionId: '提取 ID',
@@ -749,8 +728,7 @@ export const messages = {
     statisticsReconciling: '正在汇总',
     statisticsUnavailable: '无法获取',
     statisticsNoObservations: '本次执行未采集到模型用量。',
-    statisticsPartialWarning:
-      '当前统计尚不完整，可能缺少延迟上报的调用记录或部分 Token 用量。',
+    statisticsPartialWarning: '当前统计尚不完整，可能缺少延迟上报的调用记录或部分 Token 用量。',
     statisticsInputTokens: '输入',
     statisticsOutputTokens: '输出',
     statisticsCacheReadTokens: '缓存读取',
@@ -793,8 +771,7 @@ export const messages = {
     failureCodeSubmissionUncertain: '执行网关尚未确认是否已接受任务。',
     failureCodeSubmissionRecoveryExhausted:
       '多次重新提交后，执行网关仍未给出确定答复，无法确认任务是否已被接受。',
-    failureCodeSubmissionRecoveryGivenUp:
-      '管理员已停止等待提交结果。远端执行可能仍在继续。',
+    failureCodeSubmissionRecoveryGivenUp: '管理员已停止等待提交结果。远端执行可能仍在继续。',
     failureCodePreparationGivenUp: '管理员已停止等待输入准备完成。',
     failureCodePreparationAbandoned:
       '管理员因该运行的记录相互矛盾而将其作废。远端执行可能仍在继续。',
@@ -803,8 +780,7 @@ export const messages = {
     failureCodeExecutionFailed: '执行网关报告任务执行失败。',
     failureCodeExecutionResultMissing: '执行网关报告成功，但没有可用的结果。',
     failureCodePublicationAbandoned: '该运行不会产生结果，发布已停止。',
-    failureCodePublicationStepRetryExhausted:
-      '某个发布步骤反复失败，重试次数已用完。',
+    failureCodePublicationStepRetryExhausted: '某个发布步骤反复失败，重试次数已用完。',
     failureCodeGithubValidationRejected: 'GitHub 拒绝了本次发布的内容。',
     cancel: '取消',
     blockedRunTitle: '该运行需要人工处理',
@@ -814,10 +790,8 @@ export const messages = {
       '当前无法恢复：执行状态已不再允许重新领取准备任务，即使恢复也无法继续准备。',
     blockedOutcomeResume:
       '恢复后，准备阶段将回到「待确认」，可重新尝试。允许尝试的次数会重置，已记录的结果会保留。',
-    blockedOutcomeAbandon:
-      '作废后，准备阶段将记为失败，结果不再发布。已记录的结果会作为证据保留。',
-    blockedOutcomeAbandonRemoteExecution:
-      '系统将停止跟踪执行状态，但远端任务可能仍在继续。',
+    blockedOutcomeAbandon: '作废后，准备阶段将记为失败，结果不再发布。已记录的结果会作为证据保留。',
+    blockedOutcomeAbandonRemoteExecution: '系统将停止跟踪执行状态，但远端任务可能仍在继续。',
     abandonRun: '作废',
     abandonTitle: '作废该运行',
     abandonExplainer: '作废后，该运行将结束，不再重试。此操作不可撤销。',
@@ -918,9 +892,7 @@ export const messages = {
 type MessageKey = keyof typeof messages.en
 
 export type Message = {
-  [K in MessageKey]: Placeholders<(typeof messages.en)[K]> extends never
-    ? K
-    : never
+  [K in MessageKey]: Placeholders<(typeof messages.en)[K]> extends never ? K : never
 }[MessageKey]
 
 const LanguageContext = React.createContext<{
@@ -931,11 +903,7 @@ const LanguageContext = React.createContext<{
   setLanguage: () => {}
 })
 
-export function LanguageProvider({
-  children
-}: {
-  children: React.ReactNode
-}): React.JSX.Element {
+export function LanguageProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   // Keep the selected UI language local to this console; it is presentation
   // state, not Review Runs account settings.
   const [language, setLanguage] = React.useState<Language>(
@@ -958,21 +926,17 @@ export function useLanguage(): React.ContextType<typeof LanguageContext> {
   return React.useContext(LanguageContext)
 }
 
-type Placeholders<S extends string> =
-  S extends `${string}{${infer Name}}${infer Rest}`
-    ? (Name extends '' ? never : Name) | Placeholders<Rest>
-    : never
+type Placeholders<S extends string> = S extends `${string}{${infer Name}}${infer Rest}`
+  ? (Name extends '' ? never : Name) | Placeholders<Rest>
+  : never
 
-type MessageArguments<K extends MessageKey> = [
-  Placeholders<(typeof messages.en)[K]>
-] extends [never]
+type MessageArguments<K extends MessageKey> = [Placeholders<(typeof messages.en)[K]>] extends [
+  never
+]
   ? []
   : [params: Record<Placeholders<(typeof messages.en)[K]>, string | number>]
 
-export type Translator = <K extends MessageKey>(
-  key: K,
-  ...args: MessageArguments<K>
-) => string
+export type Translator = <K extends MessageKey>(key: K, ...args: MessageArguments<K>) => string
 
 export function translate<K extends MessageKey>(
   language: Language,

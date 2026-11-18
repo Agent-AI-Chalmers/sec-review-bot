@@ -24,9 +24,7 @@ test('preparation heartbeat renews the claim while work remains active', async (
   onTestFinished(async () => {
     await heartbeat.stop()
   })
-  await expect
-    .poll(() => renewals, { timeout: 500, interval: 10 })
-    .toBeGreaterThanOrEqual(2)
+  await expect.poll(() => renewals, { timeout: 500, interval: 10 }).toBeGreaterThanOrEqual(2)
   expect(await heartbeat.stop()).toBe(true)
   expect.assert(renewals >= 2)
 })
@@ -56,9 +54,7 @@ test('preparation heartbeat fences active work when its claim is lost', async ()
   )
 
   current = false
-  await expect(heartbeat.assertOwned()).rejects.toThrow(
-    PreparationClaimLostError
-  )
+  await expect(heartbeat.assertOwned()).rejects.toThrow(PreparationClaimLostError)
   expect(await heartbeat.stop()).toBe(false)
 })
 

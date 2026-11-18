@@ -61,18 +61,10 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
   const store = {
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       claimed.push(stepKey)
     },
-    completePublicationStep: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
       completed.push(stepKey)
       return true
     },
@@ -115,10 +107,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
 })
 
 test('repository delivery continues after a deterministic failure', async () => {
-  const steps = [
-    step('repository:delivery:delivery-a'),
-    step('repository:delivery:delivery-b')
-  ]
+  const steps = [step('repository:delivery:delivery-a'), step('repository:delivery:delivery-b')]
   const failures: Array<{ stepKey: string; retry: boolean | undefined }> = []
   const attempted: string[] = []
   const store = {
@@ -178,19 +167,12 @@ test('repository delivery continues after a deterministic failure', async () => 
   })
 
   expect(attempted).toStrictEqual(['delivery-a', 'delivery-b'])
-  expect(failures).toStrictEqual([
-    { stepKey: 'repository:delivery:delivery-a', retry: false }
-  ])
-  expect(published.map((item) => item.html_url)).toStrictEqual([
-    'https://example.test/pull/12'
-  ])
+  expect(failures).toStrictEqual([{ stepKey: 'repository:delivery:delivery-a', retry: false }])
+  expect(published.map((item) => item.html_url)).toStrictEqual(['https://example.test/pull/12'])
 })
 
 test('repository delivery stops the publication when the credential is refused', async () => {
-  const steps = [
-    step('repository:delivery:delivery-a'),
-    step('repository:delivery:delivery-b')
-  ]
+  const steps = [step('repository:delivery:delivery-a'), step('repository:delivery:delivery-b')]
   const attempted: string[] = []
   const failures: Array<{ stepKey: string; retry: boolean | undefined }> = []
   const store = {
@@ -244,9 +226,7 @@ test('repository delivery stops the publication when the credential is refused',
   ).rejects.toSatisfy(() => true)
 
   expect(attempted).toStrictEqual(['delivery-a'])
-  expect(failures).toStrictEqual([
-    { stepKey: 'repository:delivery:delivery-a', retry: false }
-  ])
+  expect(failures).toStrictEqual([{ stepKey: 'repository:delivery:delivery-a', retry: false }])
 })
 
 test('repository delivery recovery skips terminal failures and reaches later work', async () => {
@@ -261,11 +241,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   const store = {
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       claimed.push(stepKey)
     },
     completePublicationStep: async () => true,
@@ -300,9 +276,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   })
 
   expect(claimed).toStrictEqual(['repository:delivery:delivery-b'])
-  expect(published.map((item) => item.html_url)).toStrictEqual([
-    'https://example.test/pull/12'
-  ])
+  expect(published.map((item) => item.html_url)).toStrictEqual(['https://example.test/pull/12'])
 })
 test('summary issue lookup reuses an issue when the create response is lost', async () => {
   let created = false
@@ -376,9 +350,7 @@ test('an exhausted delivery step is concluded from the draft PR a previous owner
 
   const { octokit } = fakeGitHub(({ method, url }) => {
     if (new URL(url).pathname.endsWith('/pulls') && method === 'GET') {
-      return githubJson([
-        { number: 77, html_url: 'https://example.test/pull/77' }
-      ])
+      return githubJson([{ number: 77, html_url: 'https://example.test/pull/77' }])
     }
     return githubJson({})
   })
@@ -410,9 +382,7 @@ test('an exhausted delivery step is concluded from the draft PR a previous owner
       found: { remote: { id: 77, url: 'https://example.test/pull/77' } }
     }
   ])
-  expect(published.map((item) => item.html_url)).toStrictEqual([
-    'https://example.test/pull/77'
-  ])
+  expect(published.map((item) => item.html_url)).toStrictEqual(['https://example.test/pull/77'])
 })
 
 test('a delivery reconciliation that cannot reach GitHub is recorded once and settles nothing', async () => {
@@ -488,10 +458,7 @@ test('a delivery reconciliation that cannot reach GitHub is recorded once and se
   }
   expect(writes).toStrictEqual(['fail retry=true'])
   expect.assert(
-    errors.some(
-      (line) =>
-        line.includes('delivery_draft_pr_failed') && line.includes('delivery-a')
-    ),
+    errors.some((line) => line.includes('delivery_draft_pr_failed') && line.includes('delivery-a')),
     'the reconciliation failure is logged with its delivery id'
   )
 })
@@ -500,29 +467,18 @@ test('a deterministic reconciliation failure skips only its delivery', async () 
   // A 404 on the lookup (the repository or branch is gone) will not change on retry, so it must
   // not stop the publication: the other deliveries still publish. The failed lookup is recorded on
   // its step as a non-retryable failure, once, and the step is not settled as absent.
-  const steps = [
-    step('repository:delivery:delivery-a'),
-    step('repository:delivery:delivery-b')
-  ]
+  const steps = [step('repository:delivery:delivery-a'), step('repository:delivery:delivery-b')]
   const writes: string[] = []
   const store = {
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       if (stepKey === 'repository:delivery:delivery-a')
         throw Object.assign(new Error('no attempts left'), {
           code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
         })
     },
-    completePublicationStep: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
       writes.push(`complete ${stepKey}`)
       return true
     },
@@ -576,9 +532,7 @@ test('a deterministic reconciliation failure skips only its delivery', async () 
         reused: false
       })
     })
-    expect(published.map((item) => item.html_url)).toStrictEqual([
-      'https://example.test/pull/2'
-    ])
+    expect(published.map((item) => item.html_url)).toStrictEqual(['https://example.test/pull/2'])
   } finally {
     console.error = restore
   }
@@ -592,29 +546,18 @@ test('a transient reconciliation failure still lets later deliveries publish bef
   // The failed lookup belongs to its own step and is already recorded there. Stopping the loop on
   // it would skip the deliveries after it on every pass until that step parks, so they are
   // attempted first and the publication is still returned for retry afterwards.
-  const steps = [
-    step('repository:delivery:delivery-a'),
-    step('repository:delivery:delivery-b')
-  ]
+  const steps = [step('repository:delivery:delivery-a'), step('repository:delivery:delivery-b')]
   const writes: string[] = []
   const store = {
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       if (stepKey === 'repository:delivery:delivery-a')
         throw Object.assign(new Error('no attempts left'), {
           code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
         })
     },
-    completePublicationStep: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
       writes.push(`complete ${stepKey}`)
       return true
     },

@@ -6,9 +6,7 @@ export class RefreshQueue {
 
   constructor(
     private readonly run: () => Promise<void>,
-    private readonly onRunningChange: (
-      running: boolean
-    ) => void = (): void => {},
+    private readonly onRunningChange: (running: boolean) => void = (): void => {},
     private readonly onAttemptSettled: () => void = (): void => {}
   ) {}
 

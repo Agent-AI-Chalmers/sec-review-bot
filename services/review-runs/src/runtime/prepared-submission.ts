@@ -69,12 +69,9 @@ export async function submitPreparedRun(
         args.preparationToken,
         {
           code:
-            executionAccepted ||
-            error instanceof ExecutionSubmissionUncertainError
+            executionAccepted || error instanceof ExecutionSubmissionUncertainError
               ? SUBMISSION_STATE_UNCERTAIN
-              : error instanceof Error &&
-                  'code' in error &&
-                  typeof error.code === 'string'
+              : error instanceof Error && 'code' in error && typeof error.code === 'string'
                 ? error.code
                 : 'REVIEW_START_FAILED',
           message: error instanceof Error ? error.message : String(error)

@@ -22,17 +22,13 @@ test('extractCommentCommand parses a plain review command', () => {
 })
 
 test('extractCommentCommand parses the test-changes deny value', () => {
-  expect(
-    extractCommentCommand('@sec-review-bot review --test-changes deny')
-  ).toStrictEqual({
+  expect(extractCommentCommand('@sec-review-bot review --test-changes deny')).toStrictEqual({
     command: 'review',
     mention: 'sec-review-bot',
     test_changes: 'deny',
     open_pr: false
   })
-  expect(
-    extractCommentCommand('@sec-review-bot review --test-changes allow')
-  ).toStrictEqual({
+  expect(extractCommentCommand('@sec-review-bot review --test-changes allow')).toStrictEqual({
     command: 'review',
     mention: 'sec-review-bot',
     test_changes: 'allow',
@@ -41,9 +37,7 @@ test('extractCommentCommand parses the test-changes deny value', () => {
 })
 
 test('extractCommentCommand parses the open-pr flag', () => {
-  expect(
-    extractCommentCommand('@sec-review-bot review --open-pr')
-  ).toStrictEqual({
+  expect(extractCommentCommand('@sec-review-bot review --open-pr')).toStrictEqual({
     command: 'review',
     mention: 'sec-review-bot',
     test_changes: 'allow',
@@ -59,50 +53,30 @@ test('extractCommentCommand parses combined flags in any order', () => {
     open_pr: true
   }
   expect(
-    extractCommentCommand(
-      '@sec-review-bot review --open-pr --test-changes deny'
-    )
+    extractCommentCommand('@sec-review-bot review --open-pr --test-changes deny')
   ).toStrictEqual(expected)
   expect(
-    extractCommentCommand(
-      '@sec-review-bot review --test-changes deny --open-pr'
-    )
+    extractCommentCommand('@sec-review-bot review --test-changes deny --open-pr')
   ).toStrictEqual(expected)
 })
 
 test('extractCommentCommand rejects a bare or invalid test-changes value', () => {
-  expect(extractCommentCommand('@sec-review-bot review --open-pr=true')).toBe(
-    null
-  )
-  expect(extractCommentCommand('@sec-review-bot review --test-changes')).toBe(
-    null
-  )
-  expect(
-    extractCommentCommand('@sec-review-bot review --test-changes maybe')
-  ).toBe(null)
-  expect(
-    extractCommentCommand('@sec-review-bot review --test-changes=deny')
-  ).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --open-pr=true')).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --test-changes')).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --test-changes maybe')).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --test-changes=deny')).toBe(null)
 })
 
 test('extractCommentCommand rejects unknown flags', () => {
   // A typo must fail the whole command rather than being silently ignored.
-  expect(
-    extractCommentCommand(
-      '@sec-review-bot review --repair-mode=no-test-changes'
-    )
-  ).toBe(null)
-  expect(
-    extractCommentCommand('@sec-review-bot review --no-test-changes')
-  ).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --repair-mode=no-test-changes')).toBe(null)
+  expect(extractCommentCommand('@sec-review-bot review --no-test-changes')).toBe(null)
   expect(extractCommentCommand('@sec-review-bot review --bogus=1')).toBe(null)
   expect(extractCommentCommand('@sec-review-bot review --bogus')).toBe(null)
 })
 
 test('extractCommentCommand rejects the old positional forms and the objective words', () => {
-  expect(extractCommentCommand('@sec-review-bot review no-test-changes')).toBe(
-    null
-  )
+  expect(extractCommentCommand('@sec-review-bot review no-test-changes')).toBe(null)
   expect(extractCommentCommand('@sec-review-bot review deny')).toBe(null)
   expect(extractCommentCommand('@sec-review-bot review audit')).toBe(null)
   expect(extractCommentCommand('@sec-review-bot review repair')).toBe(null)
@@ -110,16 +84,12 @@ test('extractCommentCommand rejects the old positional forms and the objective w
 })
 
 test('extractCommentCommand ignores quoted commands', () => {
-  expect(
-    extractCommentCommand('> @sec-review-bot review\n\nI meant this earlier.')
-  ).toBe(null)
+  expect(extractCommentCommand('> @sec-review-bot review\n\nI meant this earlier.')).toBe(null)
 })
 
 test('extractCommentCommand parses a command after quoted text', () => {
   expect(
-    extractCommentCommand(
-      '> @sec-review-bot review\n\n@sec-review-bot review --test-changes deny'
-    )
+    extractCommentCommand('> @sec-review-bot review\n\n@sec-review-bot review --test-changes deny')
   ).toStrictEqual({
     command: 'review',
     mention: 'sec-review-bot',
@@ -176,9 +146,7 @@ test('unmatchedMentions names the mentions an ignored comment addressed', () => 
     'quoted history is not a mention the reader typed now'
   ).toStrictEqual([])
   expect(unmatchedMentions('no mention here')).toStrictEqual([])
-  expect(
-    unmatchedMentions('please ask @someone-else about this')
-  ).toStrictEqual(['someone-else'])
+  expect(unmatchedMentions('please ask @someone-else about this')).toStrictEqual(['someone-else'])
 })
 
 test('unmatchedMentions sees a mention wrapped in markdown or punctuation', () => {
@@ -241,10 +209,7 @@ test('unmatchedMentions ignores email addresses and URL paths', () => {
     '_@example.com',
     'EMAIL@EXAMPLE.COM'
   ]) {
-    expect(
-      unmatchedMentions(body),
-      `an address is not a mention: ${body}`
-    ).toStrictEqual([])
+    expect(unmatchedMentions(body), `an address is not a mention: ${body}`).toStrictEqual([])
   }
   expect(
     unmatchedMentions('foo@bar.com then @real-mention'),

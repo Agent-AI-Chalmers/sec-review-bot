@@ -144,17 +144,12 @@ function tokenUsage(observation: LangfuseObservation): ParsedTokenUsage | null {
   // Langfuse usage details are mutually exclusive billing buckets. The Review Runs
   // boundary exposes OpenTelemetry-style inclusive input/output totals instead.
   const inputTokens =
-    ordinaryInput === null
-      ? null
-      : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
-  const outputTokens =
-    ordinaryOutput === null ? null : ordinaryOutput + (reasoning ?? 0)
+    ordinaryInput === null ? null : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
+  const outputTokens = ordinaryOutput === null ? null : ordinaryOutput + (reasoning ?? 0)
   // The total is ours, not the source's: forwarding a disagreeing source total
   // would put a second token vocabulary inside one contract.
   const derivedTotal =
-    inputTokens === null || outputTokens === null
-      ? null
-      : inputTokens + outputTokens
+    inputTokens === null || outputTokens === null ? null : inputTokens + outputTokens
   const result: TokenUsage = {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -165,15 +160,12 @@ function tokenUsage(observation: LangfuseObservation): ParsedTokenUsage | null {
   }
   return {
     usage: result,
-    sourceTotalMismatch:
-      total !== null && derivedTotal !== null && total !== derivedTotal
+    sourceTotalMismatch: total !== null && derivedTotal !== null && total !== derivedTotal
   }
 }
 
 function tokenValue(value: unknown): number | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-    ? value
-    : null
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
 function completeTotals(
@@ -211,8 +203,7 @@ export function aggregateExecutionStatistics(
     const batchIndex = positiveInteger(call.metadata.sec_review_batch_index)
     const chunkId = stringValue(call.metadata.sec_review_chunk_id)
     const provider = stringValue(call.metadata.ls_provider) ?? 'unknown'
-    const model =
-      stringValue(call.model) ?? stringValue(call.metadata.ls_model_name)
+    const model = stringValue(call.model) ?? stringValue(call.metadata.ls_model_name)
     const key = JSON.stringify([
       agentName,
       caseId,
@@ -277,9 +268,7 @@ export function aggregateExecutionStatistics(
   // This only describes calls returned by Langfuse. The store separately refuses to interpret
   // an empty root set as proof of zero calls, because the producer may not be exporting.
   const usageCoverage =
-    usageReportedCallCount === observedCallCount
-      ? 'complete_for_observed_calls'
-      : 'partial'
+    usageReportedCallCount === observedCallCount ? 'complete_for_observed_calls' : 'partial'
   const sortedGroups = [...groups.values()]
     .sort((left, right) =>
       [
@@ -320,11 +309,7 @@ export function aggregateExecutionStatistics(
       model: group.model,
       modelCallCount: group.modelCallCount,
       usageReportedCallCount: group.usageReportedCallCount,
-      tokenUsage: completeTotals(
-        group.sums,
-        group.reported,
-        group.modelCallCount
-      )
+      tokenUsage: completeTotals(group.sums, group.reported, group.modelCallCount)
     }))
   const totals = completeTotals(sums, reported, observedCallCount)
   const fingerprint = {

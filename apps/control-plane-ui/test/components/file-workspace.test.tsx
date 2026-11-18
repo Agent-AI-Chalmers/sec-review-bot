@@ -27,18 +27,13 @@ test.each(['new', 'rename'] as const)(
       })
     )
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(
-      within(dialog).getByRole('textbox', { name: 'File path' }),
-      {
-        target: { value: 'MEMORY.md' }
-      }
-    )
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'File path' }), {
+      target: { value: 'MEMORY.md' }
+    })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     expect(onFilesChange).not.toHaveBeenCalled()
     if (operation === 'new')
-      await waitFor(() =>
-        expect(within(dialog).getByRole('alert')).toBeVisible()
-      )
+      await waitFor(() => expect(within(dialog).getByRole('alert')).toBeVisible())
   }
 )
 
@@ -50,10 +45,7 @@ test('file navigation exposes current file and directory expansion', () => {
       onSelectFile={vi.fn()}
     />
   )
-  expect(screen.getByRole('button', { name: 'MEMORY.md' })).toHaveAttribute(
-    'aria-current',
-    'true'
-  )
+  expect(screen.getByRole('button', { name: 'MEMORY.md' })).toHaveAttribute('aria-current', 'true')
   const directory = screen.getByRole('button', { name: 'notes' })
   expect(directory).toHaveAttribute('aria-expanded', 'true')
   fireEvent.click(directory)

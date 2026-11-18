@@ -69,10 +69,7 @@ test('app HTTP handler routes repository dispatch requests before webhook middle
     }
   })
 
-  await handler(
-    requestFor('/repository-review-dispatch?scan=full'),
-    captureResponse()
-  )
+  await handler(requestFor('/repository-review-dispatch?scan=full'), captureResponse())
 
   expect(calls).toStrictEqual(['dispatch'])
 })
@@ -168,9 +165,7 @@ test('app HTTP handler rejects malformed request URLs', async () => {
   await handler(requestFor('/', { host: 'bad host' }), response)
 
   expect(response.statusCodeValue).toBe(400)
-  expect(response.headers['content-type']).toBe(
-    'application/json; charset=utf-8'
-  )
+  expect(response.headers['content-type']).toBe('application/json; charset=utf-8')
   expect(String(response.body)).toMatch(/Invalid request URL/)
 })
 
@@ -207,7 +202,5 @@ test('a rejected asynchronous webhook middleware becomes an HTTP error', async (
   await handler(requestFor('/api/github/webhooks'), response)
 
   expect(response.statusCodeValue).toBe(500)
-  expect(response.body).toBe(
-    JSON.stringify({ error: 'Internal server error.' })
-  )
+  expect(response.body).toBe(JSON.stringify({ error: 'Internal server error.' }))
 })

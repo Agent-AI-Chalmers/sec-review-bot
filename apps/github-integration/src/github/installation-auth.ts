@@ -1,8 +1,6 @@
 import type { Octokit } from 'octokit'
 
-export async function getInstallationAccessToken(
-  octokit: Octokit
-): Promise<string> {
+export async function getInstallationAccessToken(octokit: Octokit): Promise<string> {
   const authResult = await octokit.auth({
     type: 'installation'
   })
@@ -13,9 +11,7 @@ export async function getInstallationAccessToken(
       : undefined
 
   if (typeof token !== 'string' || token.trim() === '') {
-    throw new Error(
-      'Unable to resolve GitHub App installation token for git materialization.'
-    )
+    throw new Error('Unable to resolve GitHub App installation token for git materialization.')
   }
 
   return token.trim()

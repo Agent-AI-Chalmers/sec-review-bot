@@ -5,13 +5,11 @@ import { artifactStoreFromEnvironment } from './artifacts/store.js'
 export function main(): void {
   const reviewRunsToken = process.env.REVIEW_RUNS_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
-  const secureCookiesValue =
-    process.env.CONTROL_PLANE_UI_SECURE_COOKIES?.trim() || 'false'
+  const secureCookiesValue = process.env.CONTROL_PLANE_UI_SECURE_COOKIES?.trim() || 'false'
   if (!['true', 'false'].includes(secureCookiesValue))
     throw new Error('CONTROL_PLANE_UI_SECURE_COOKIES must be true or false.')
   if (!reviewRunsToken) throw new Error('REVIEW_RUNS_READ_TOKEN is required.')
-  if (!accessToken)
-    throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
+  if (!accessToken) throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
   createControlPlaneUiBffServer({
     reviewRunsUrl: process.env.REVIEW_RUNS_URL ?? 'http://127.0.0.1:8090',
     reviewRunsToken,

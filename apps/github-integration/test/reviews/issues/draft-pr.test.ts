@@ -12,10 +12,7 @@ import { fakeGitHub, githubJson } from '../../github-client.js'
 
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
 type CreateDraftPrIssue = CreateDraftPrParams['issue']
-type TestMitigation = Omit<
-  Partial<ReviewRecord['mitigation']>,
-  'file_changes'
-> & {
+type TestMitigation = Omit<Partial<ReviewRecord['mitigation']>, 'file_changes'> & {
   file_changes?: unknown[]
 }
 
@@ -81,9 +78,7 @@ function createOctokitMock({
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
-    trees: [] as Array<
-      Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
-    >,
+    trees: [] as Array<Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>>,
     commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
     refs: [] as Array<{ ref: string; sha: string }>,
     readRefs: [] as string[],
@@ -150,8 +145,7 @@ function createOctokitMock({
       })
       // A 422 "Reference already exists" is what GitHub answers for a duplicate branch.
       // A real duplicate-ref reply: `isBranchAlreadyExists` reads `response.data.message`.
-      if (branchAlreadyExists)
-        return githubJson({ message: 'Reference already exists' }, 422)
+      if (branchAlreadyExists) return githubJson({ message: 'Reference already exists' }, 422)
       return githubJson({})
     }
     if (pathname.includes('/git/commits/')) {
@@ -165,8 +159,7 @@ function createOctokitMock({
           : { tree: { sha: 'base-tree-sha' } }
       )
     }
-    if (pathname.endsWith('/pulls') && method === 'GET')
-      return githubJson(existingPullRequests)
+    if (pathname.endsWith('/pulls') && method === 'GET') return githubJson(existingPullRequests)
     if (pathname.endsWith('/pulls') && method === 'POST') {
       calls.pulls.push({
         title: String(payload.title),
@@ -254,9 +247,7 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
   expect(result?.number).toBe(1)
   // The whole run id names the branch. A shorter segment (the last 8 characters) is what two
   // runs can share, and this branch is the publication's idempotency key.
-  expect(harness.readRefs).toStrictEqual([
-    'heads/sec-review-bot/issue-42-run-12345678'
-  ])
+  expect(harness.readRefs).toStrictEqual(['heads/sec-review-bot/issue-42-run-12345678'])
   expect(harness.updatedRefs).toStrictEqual([])
 })
 
@@ -269,14 +260,8 @@ test('two runs of the same issue never share a draft branch', () => {
     owner_login: 'octo-org',
     repo_name: 'example'
   }
-  const first = buildDraftBranchName(
-    issue,
-    'aaaaaaaa-1111-4111-8111-00000000c0de'
-  )
-  const second = buildDraftBranchName(
-    issue,
-    'bbbbbbbb-2222-4222-8222-00000000c0de'
-  )
+  const first = buildDraftBranchName(issue, 'aaaaaaaa-1111-4111-8111-00000000c0de')
+  const second = buildDraftBranchName(issue, 'bbbbbbbb-2222-4222-8222-00000000c0de')
   expect(first).not.toBe(second)
   expect(buildDraftBranchName(issue, undefined)).not.toBe(
     buildDraftBranchName(issue, 'aaaaaaaa-1111-4111-8111-00000000c0de')
@@ -342,8 +327,7 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
       }),
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2)
-          throw new PublicationClaimLostError('run-12345678')
+        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-12345678')
       }
     })
   ).rejects.toThrow(PublicationClaimLostError)
@@ -632,9 +616,10 @@ const blockedVerificationCases: Array<{
     }
   },
   { name: 'manual review', verification: { next_step: 'manual-review' } },
-  ...(['partial', 'local-only', 'misaligned', 'unresolved', null] as const).map(
-    (coverage) => ({ name: `coverage ${coverage}`, verification: { coverage } })
-  ),
+  ...(['partial', 'local-only', 'misaligned', 'unresolved', null] as const).map((coverage) => ({
+    name: `coverage ${coverage}`,
+    verification: { coverage }
+  })),
   ...(['failed', 'unresolved', null] as const).map((regression) => ({
     name: `regression ${regression}`,
     verification: { regression }

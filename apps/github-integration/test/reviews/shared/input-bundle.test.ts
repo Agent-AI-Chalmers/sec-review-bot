@@ -49,9 +49,7 @@ function octokitForContent(
       })
     }
     const query = parsed.searchParams
-    const path = decodeURIComponent(
-      parsed.pathname.split('/contents/')[1] ?? ''
-    )
+    const path = decodeURIComponent(parsed.pathname.split('/contents/')[1] ?? '')
     const ref = query.get('ref') ?? undefined
     requests.push({ path, ...(ref !== undefined ? { ref } : {}) })
     const content = files[path]
@@ -77,9 +75,7 @@ test('readSetupDeclaration returns the declaration text from the default branch 
 
   expect(declaration).toBe('setup:\n  - run: echo hi\n')
   // Reads the exact commit, not a branch name, so a fork cannot change it.
-  expect(requests).toStrictEqual([
-    { path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }
-  ])
+  expect(requests).toStrictEqual([{ path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }])
 })
 
 test('readSetupDeclaration returns null when the declaration is absent', async () => {
@@ -152,9 +148,7 @@ test('readSetupDeclaration propagates a non-404 read failure instead of skipping
   // repository without the environment the default branch declared.
   // 403 is a real HTTP reply, so Octokit maps it to a RequestError with that status - which is
   // what the code under test must distinguish from a 404.
-  const octokit = fakeGitHub(() =>
-    githubJson({ message: 'Forbidden' }, 403)
-  ).octokit
+  const octokit = fakeGitHub(() => githubJson({ message: 'Forbidden' }, 403)).octokit
 
   await expect(
     readSetupDeclaration({
@@ -214,15 +208,11 @@ test('readSetupDeclaration returns null when the setup directory exists without 
   ).toBe(null)
 })
 
-for (const failingPath of [
-  '/git/trees/' + '1'.repeat(40),
-  '/contents/.sec-review/setup.yml'
-]) {
+for (const failingPath of ['/git/trees/' + '1'.repeat(40), '/contents/.sec-review/setup.yml']) {
   test(`readSetupDeclaration propagates a read failure at ${failingPath}`, async () => {
     const octokit = fakeGitHub(({ url }) => {
       const pathname = decodeURIComponent(new URL(url).pathname)
-      if (pathname.endsWith(failingPath))
-        return githubJson({ message: 'Forbidden' }, 403)
+      if (pathname.endsWith(failingPath)) return githubJson({ message: 'Forbidden' }, 403)
       const root = pathname.endsWith('/' + 'a'.repeat(40))
       return githubJson({
         truncated: false,
@@ -248,9 +238,7 @@ for (const failingPath of [
 }
 
 test('readSetupDeclaration fails on a truncated tree instead of assuming absence', async () => {
-  const octokit = fakeGitHub(() =>
-    githubJson({ tree: [], truncated: true })
-  ).octokit
+  const octokit = fakeGitHub(() => githubJson({ tree: [], truncated: true })).octokit
   await expect(
     readSetupDeclaration({
       octokit,
@@ -269,9 +257,7 @@ test('readSetupDeclaration accepts executable files and checks trees at pinned S
     if (pathname.endsWith(`/git/trees/${sha}`))
       return githubJson({
         truncated: false,
-        tree: [
-          { path: '.sec-review', type: 'tree', mode: '040000', sha: subtree }
-        ]
+        tree: [{ path: '.sec-review', type: 'tree', mode: '040000', sha: subtree }]
       })
     if (pathname.endsWith(`/git/trees/${subtree}`))
       return githubJson({
@@ -316,10 +302,7 @@ test('assertWorkflowInputFits rejects an input past the contract byte limit', ()
       }))
     }
   }
-  expect.assert(
-    Buffer.byteLength(JSON.stringify(oversized), 'utf8') >
-      MAX_WORKFLOW_INPUT_BYTES
-  )
+  expect.assert(Buffer.byteLength(JSON.stringify(oversized), 'utf8') > MAX_WORKFLOW_INPUT_BYTES)
   expect(() => assertWorkflowInputFits(oversized, 'repository review')).toThrow(
     /exceeds the workflow input limit/
   )
@@ -335,9 +318,7 @@ test('assertWorkflowInputFits allows an input whose entry count is near the limi
       }))
     }
   }
-  expect.assert(
-    Buffer.byteLength(JSON.stringify(fits), 'utf8') < MAX_WORKFLOW_INPUT_BYTES
-  )
+  expect.assert(Buffer.byteLength(JSON.stringify(fits), 'utf8') < MAX_WORKFLOW_INPUT_BYTES)
   assertWorkflowInputFits(fits, 'repository review')
 })
 
@@ -355,16 +336,8 @@ test('archiveInputBundle reproduces bytes for the same logical tree', async () =
         '{"api_version":"v1","workspace":{"snapshot":"workspace.snapshot.tar"},"history":{"path":"history"}}\n',
         'utf8'
       )
-      await fs.writeFile(
-        path.join(root, 'history', 'review.json'),
-        '{"kind":"review"}\n',
-        'utf8'
-      )
-      await fs.writeFile(
-        path.join(root, 'workspace.snapshot.tar'),
-        'snapshot',
-        'utf8'
-      )
+      await fs.writeFile(path.join(root, 'history', 'review.json'), '{"kind":"review"}\n', 'utf8')
+      await fs.writeFile(path.join(root, 'workspace.snapshot.tar'), 'snapshot', 'utf8')
       const timestamp = new Date(Date.now() - index * 60_000)
       await fs.utimes(path.join(root, 'manifest.json'), timestamp, timestamp)
       await fs.utimes(path.join(root, 'history'), timestamp, timestamp)
@@ -387,9 +360,7 @@ test('archiveInputBundle reproduces bytes for the same logical tree', async () =
     )
   } finally {
     await Promise.all(
-      [...roots, ...archivePaths].map((target) =>
-        fs.rm(target, { recursive: true, force: true })
-      )
+      [...roots, ...archivePaths].map((target) => fs.rm(target, { recursive: true, force: true }))
     )
   }
 })

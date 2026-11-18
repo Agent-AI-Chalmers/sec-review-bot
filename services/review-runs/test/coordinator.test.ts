@@ -96,12 +96,7 @@ test('coordination expires preparations before recovery and active observation',
     }
   })
 
-  expect(events).toStrictEqual([
-    'expire',
-    'recover:recover-1',
-    'read',
-    'observe:active-1'
-  ])
+  expect(events).toStrictEqual(['expire', 'recover:recover-1', 'read', 'observe:active-1'])
 })
 
 test('one pass reads every active run status in a single request', async () => {
@@ -116,9 +111,7 @@ test('one pass reads every active run status in a single request', async () => {
       return projected([])
     },
     async listActiveRuns() {
-      return projected(
-        [1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` }))
-      )
+      return projected([1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` })))
     }
   }
   const reads: string[][] = []
@@ -203,9 +196,7 @@ test('a single row the contract cannot represent degrades that run, not the pass
           { ...run, run_id: 'active-1' },
           { ...run, run_id: 'active-2' }
         ],
-        dropped: [
-          { run_id: 'active-bad', error: new Error('unrepresentable artifact') }
-        ]
+        dropped: [{ run_id: 'active-bad', error: new Error('unrepresentable artifact') }]
       }
     }
   }
@@ -231,10 +222,7 @@ test('a single row the contract cannot represent degrades that run, not the pass
     }
   })
 
-  expect(observed, 'the healthy runs are still observed').toStrictEqual([
-    'active-1',
-    'active-2'
-  ])
+  expect(observed, 'the healthy runs are still observed').toStrictEqual(['active-1', 'active-2'])
   expect(reported).toStrictEqual([
     { run_id: 'recover-bad', message: 'poison' },
     { run_id: 'active-bad', message: 'unrepresentable artifact' }
@@ -253,9 +241,7 @@ test('an unclassified submission recovery failure aborts the coordination pass',
       ])
     },
     async listActiveRuns() {
-      expect.unreachable(
-        'active runs must not be read after recovery aborts the pass'
-      )
+      expect.unreachable('active runs must not be read after recovery aborts the pass')
     }
   }
   const recovered: string[] = []
@@ -267,14 +253,10 @@ test('an unclassified submission recovery failure aborts the coordination pass',
         throw new Error('database unavailable')
       },
       async readExecutionStatuses() {
-        expect.unreachable(
-          'Execution must not be read after recovery aborts the pass'
-        )
+        expect.unreachable('Execution must not be read after recovery aborts the pass')
       },
       async observeActiveRun() {
-        expect.unreachable(
-          'no active run can be observed after recovery aborts the pass'
-        )
+        expect.unreachable('no active run can be observed after recovery aborts the pass')
       },
       onDroppedRunRow() {
         expect.unreachable('this pass drops no rows')

@@ -6,10 +6,7 @@ import { generatedArtifacts as payloadTypes } from './generate-api-types.js'
 import { generatedArtifacts as apiTypes } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.filename === path.resolve(process.argv[1])
-) {
+if (process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1])) {
   for (const artifact of [...apiTypes(), ...payloadTypes()]) {
     mkdirSync(path.dirname(artifact.output), { recursive: true })
     writeFileSync(artifact.output, await artifact.render())

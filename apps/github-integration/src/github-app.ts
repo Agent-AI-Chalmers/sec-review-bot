@@ -26,10 +26,7 @@ function requireConfigValue(name: string, value: string | undefined): string {
 
 export function createGitHubApp(): App {
   const required_app_id = requireConfigValue('APP_ID', app_id)
-  const required_private_key_path = requireConfigValue(
-    'PRIVATE_KEY_PATH',
-    private_key_path
-  )
+  const required_private_key_path = requireConfigValue('PRIVATE_KEY_PATH', private_key_path)
   const required_secret = requireConfigValue('WEBHOOK_SECRET', secret)
   const private_key = fs.readFileSync(required_private_key_path, 'utf8')
 

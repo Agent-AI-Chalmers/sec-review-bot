@@ -17,8 +17,7 @@ export class LatestRequestGuard {
     this.controller = controller
     return {
       signal: controller.signal,
-      isCurrent: () =>
-        generation === this.generation && !controller.signal.aborted,
+      isCurrent: () => generation === this.generation && !controller.signal.aborted,
       cancel: () => controller.abort()
     }
   }

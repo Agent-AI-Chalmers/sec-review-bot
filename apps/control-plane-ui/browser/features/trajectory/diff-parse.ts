@@ -110,11 +110,7 @@ export function parsePatch(text: string): ParsedPatch {
     // The Begin Patch dialect has no line counts; its body runs until the next
     // section marker. "---"/"+++" are content there, never file headers.
     if (currentHunk && !countedHunk) {
-      if (
-        line.startsWith('@@') ||
-        line.startsWith('*** ') ||
-        line.startsWith('Index: ')
-      ) {
+      if (line.startsWith('@@') || line.startsWith('*** ') || line.startsWith('Index: ')) {
         currentHunk = undefined
       } else {
         if (line.startsWith('\\')) continue

@@ -5,17 +5,13 @@ async function readContrast(page) {
     const parseColour = (value) => {
       const match = value.match(/rgba?\(([^)]+)\)/)
       if (match === null) return null
-      const [r, g, b, a = 1] = match[1]
-        .split(',')
-        .map((part) => Number.parseFloat(part))
+      const [r, g, b, a = 1] = match[1].split(',').map((part) => Number.parseFloat(part))
       return { r, g, b, a }
     }
     const luminance = ({ r, g, b }) => {
       const channel = (value) => {
         const scaled = value / 255
-        return scaled <= 0.03928
-          ? scaled / 12.92
-          : Math.pow((scaled + 0.055) / 1.055, 2.4)
+        return scaled <= 0.03928 ? scaled / 12.92 : Math.pow((scaled + 0.055) / 1.055, 2.4)
       }
       return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
     }
@@ -86,10 +82,7 @@ export async function runRunsInputAndThemeChecks({
     })
     try {
       const themePage = await themeContext.newPage()
-      await themePage.addInitScript(
-        (value) => localStorage.setItem('ui-theme', value),
-        theme
-      )
+      await themePage.addInitScript((value) => localStorage.setItem('ui-theme', value), theme)
       await themePage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await themePage.getByRole('heading', { name: 'Runs' }).waitFor()
       const contrast = await waitUntilValue(
@@ -133,9 +126,7 @@ export async function runRunsClockCheck({
   try {
     const page = await context.newPage()
     await page.clock.install()
-    await page.addInitScript(() =>
-      localStorage.setItem('ui-auto-refresh', 'false')
-    )
+    await page.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
     await page.goto(`${base}/runs?execution_status=running`, {
       waitUntil: 'networkidle'
     })
@@ -143,10 +134,7 @@ export async function runRunsClockCheck({
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline')
     const readElapsed = () =>
-      page
-        .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-        .nth(2)
-        .textContent()
+      page.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(2).textContent()
     await waitUntil(
       async () => /so far/.test((await readElapsed()) ?? ''),
       `${name} an in-flight phase must read as still running`
@@ -184,10 +172,9 @@ export async function runRunsChineseCheck({
   try {
     const page = await context.newPage()
     await page.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
-    await page.goto(
-      `${base}/runs?workflow=repository-review&publication_status=published`,
-      { waitUntil: 'networkidle' }
-    )
+    await page.goto(`${base}/runs?workflow=repository-review&publication_status=published`, {
+      waitUntil: 'networkidle'
+    })
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline')
     const badges = await waitUntilValue(
@@ -213,11 +200,7 @@ export async function runRunsChineseCheck({
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline')
     const execution = await waitUntilValue(
-      () =>
-        page
-          .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-          .nth(2)
-          .textContent(),
+      () => page.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(2).textContent(),
       (text) => text !== null && text.length > 0,
       `${name} the zh run must render its execution phase`
     )

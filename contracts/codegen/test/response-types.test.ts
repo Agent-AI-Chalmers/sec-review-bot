@@ -23,9 +23,7 @@ type HealthStatus = Assert<Equal<HealthResponseBodyByStatus['200'], HealthRespon
 test('response indexing preserves Kubb success selection and error-only fallback', async () => {
   // Distinct status aliases can share a body. Keep the status map and select exactly
   // Kubb's original members, rather than including every response (especially errors).
-  const directory = await mkdtemp(
-    path.join(os.tmpdir(), 'memory-response-types-')
-  )
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'memory-response-types-'))
   const response = (schema: string) => ({
     description: schema,
     content: {
@@ -104,23 +102,14 @@ test('response indexing preserves Kubb success selection and error-only fallback
       })
     )
     const generated = await renderOpenApiTypes(spec)
-    const file = ts.createSourceFile(
-      'types.ts',
-      generated,
-      ts.ScriptTarget.Latest,
-      true
-    )
+    const file = ts.createSourceFile('types.ts', generated, ts.ScriptTarget.Latest, true)
     expect(
       !file.statements.some(
-        (node) =>
-          ts.isTypeAliasDeclaration(node) &&
-          /Status[0-9]+$/.test(node.name.text)
+        (node) => ts.isTypeAliasDeclaration(node) && /Status[0-9]+$/.test(node.name.text)
       )
     ).toBeTruthy()
     const aliases = new Map(
-      file.statements
-        .filter(ts.isTypeAliasDeclaration)
-        .map((node) => [node.name.text, node.type])
+      file.statements.filter(ts.isTypeAliasDeclaration).map((node) => [node.name.text, node.type])
     )
     for (const [name, expected] of [
       ['WithSuccessResponseBody', ['200', '201', '202', '204']],
@@ -129,14 +118,10 @@ test('response indexing preserves Kubb success selection and error-only fallback
     ] as const) {
       const type = aliases.get(name)
       expect.assert(type && ts.isIndexedAccessTypeNode(type))
-      const indices = ts.isUnionTypeNode(type.indexType)
-        ? type.indexType.types
-        : [type.indexType]
+      const indices = ts.isUnionTypeNode(type.indexType) ? type.indexType.types : [type.indexType]
       expect(
         indices.map((member) => {
-          expect.assert(
-            ts.isLiteralTypeNode(member) && ts.isStringLiteral(member.literal)
-          )
+          expect.assert(ts.isLiteralTypeNode(member) && ts.isStringLiteral(member.literal))
           return member.literal.text
         })
       ).toStrictEqual(expected)
@@ -153,9 +138,7 @@ test('response indexing preserves Kubb success selection and error-only fallback
     })
     const diagnostics = ts.getPreEmitDiagnostics(program)
     expect(
-      diagnostics.map((diagnostic) =>
-        ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-      )
+      diagnostics.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
     ).toStrictEqual([])
   } finally {
     await rm(directory, { recursive: true, force: true })

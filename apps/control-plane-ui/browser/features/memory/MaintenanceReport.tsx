@@ -1,14 +1,5 @@
 import React from 'react'
-import {
-  Anchor,
-  Badge,
-  Button,
-  Code,
-  Group,
-  Modal,
-  Stack,
-  Text
-} from '@mantine/core'
+import { Anchor, Badge, Button, Code, Group, Modal, Stack, Text } from '@mantine/core'
 import { IconListCheck } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'

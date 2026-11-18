@@ -41,9 +41,7 @@ export interface StateMachine extends MachineBody {
 /** The three axis machines, in lifecycle order, with their text in each console language. The
  * structure is identical across languages; only title, label, summary, and description differ. A
  * machine's steps, when it has them, are its `step` member. */
-export const STATE_MACHINES_BY_LANGUAGE: Readonly<
-  Record<Language, readonly StateMachine[]>
-> = {
+export const STATE_MACHINES_BY_LANGUAGE: Readonly<Record<Language, readonly StateMachine[]>> = {
   en: [
     {
       axis: 'preparation',
@@ -52,26 +50,17 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
       field: 'preparation.status',
       initial: 'pending',
       terminal: ['submitted', 'failed'],
-      states: [
-        'pending',
-        'preparing',
-        'uncertain',
-        'disconnected',
-        'submitted',
-        'failed'
-      ],
+      states: ['pending', 'preparing', 'uncertain', 'disconnected', 'submitted', 'failed'],
       details: {
         pending: {
           label: 'Pending',
-          summary:
-            'The run was accepted and is waiting for input preparation to start.',
+          summary: 'The run was accepted and is waiting for input preparation to start.',
           description: 'Admitted, but no preparer has claimed the work yet.'
         },
         preparing: {
           label: 'Preparing',
           summary: 'Review input is being prepared.',
-          description:
-            'A coordinator currently owns the claim and is building the Execution input.'
+          description: 'A coordinator currently owns the claim and is building the Execution input.'
         },
         uncertain: {
           label: 'Uncertain',
@@ -178,15 +167,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
       details: {
         pending: {
           label: 'Pending',
-          summary:
-            'Waiting for prepared input to be submitted to the execution service.',
+          summary: 'Waiting for prepared input to be submitted to the execution service.',
           description:
             'Admitted, but its prepared input has not been submitted to the Execution API provider yet.'
         },
         queued: {
           label: 'Queued',
-          summary:
-            'The execution service accepted the task. It has not yet been observed running.',
+          summary: 'The execution service accepted the task. It has not yet been observed running.',
           description:
             'The Execution API provider accepted the submission; polling has not yet seen it start.'
         },
@@ -213,8 +200,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         uncertain: {
           label: 'Uncertain',
-          summary:
-            'Acceptance is unconfirmed. Recovery resubmits under the same run identity.',
+          summary: 'Acceptance is unconfirmed. Recovery resubmits under the same run identity.',
           description:
             'The task was submitted, but no response arrived, so it is unknown whether the Execution API provider accepted it. This is not a failure: the submission is replayed under the same run_id.'
         },
@@ -331,8 +317,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         pending: {
           label: 'Pending',
           summary: 'Waiting for a successful execution result to publish.',
-          description:
-            'Waiting for a successful execution result before publishing.'
+          description: 'Waiting for a successful execution result before publishing.'
         },
         publishing: {
           label: 'Publishing',
@@ -356,8 +341,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         published: {
           label: 'Published',
-          summary:
-            'All publication steps succeeded. The results are available.',
+          summary: 'All publication steps succeeded. The results are available.',
           description: 'All publication steps succeeded; the result is visible.'
         },
         failed: {
@@ -369,10 +353,8 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         skipped: {
           label: 'Skipped',
-          summary:
-            'No result will be published because execution did not succeed.',
-          description:
-            'There was nothing to publish because execution did not succeed.'
+          summary: 'No result will be published because execution did not succeed.',
+          description: 'There was nothing to publish because execution did not succeed.'
         }
       },
       transitions: [
@@ -478,15 +460,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         details: {
           pending: {
             label: 'Pending',
-            summary:
-              'Not attempted, or manually requeued with retry and recovery limits reset.',
+            summary: 'Not attempted, or manually requeued with retry and recovery limits reset.',
             description:
               'Not attempted yet, or returned to the queue with fresh budgets by an operator.'
           },
           running: {
             label: 'Running',
-            summary:
-              'An attempt started and may have taken effect, even if its process stopped.',
+            summary: 'An attempt started and may have taken effect, even if its process stopped.',
             description:
               'An attempt started. Its owner may still be performing the side effect, or may have died after performing it, so a later claim cannot assume nothing happened.'
           },
@@ -506,15 +486,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           },
           disconnected: {
             label: 'Disconnected',
-            summary:
-              'Checks ran out; the remote result needs manual confirmation.',
+            summary: 'Checks ran out; the remote result needs manual confirmation.',
             description:
               'Reconciliation used its budget without an answer. An operator has to establish what is on the remote system.'
           },
           succeeded: {
             label: 'Succeeded',
-            summary:
-              'The remote change was made successfully or confirmed by a later check.',
+            summary: 'The remote change was made successfully or confirmed by a later check.',
             description:
               'The side effect exists, either written by an attempt or found by reconciliation.'
           },
@@ -610,14 +588,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
       field: 'preparation.status',
       initial: 'pending',
       terminal: ['submitted', 'failed'],
-      states: [
-        'pending',
-        'preparing',
-        'uncertain',
-        'disconnected',
-        'submitted',
-        'failed'
-      ],
+      states: ['pending', 'preparing', 'uncertain', 'disconnected', 'submitted', 'failed'],
       details: {
         pending: {
           label: '等待中',
@@ -631,8 +602,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         uncertain: {
           label: '待确认',
-          summary:
-            '准备认领已过期，输入是否已保存待确认；可用同一运行标识重新提交。',
+          summary: '准备认领已过期，输入是否已保存待确认；可用同一运行标识重新提交。',
           description:
             '准备进程尚未报告结果，认领就已过期，因此无法确认准备好的输入是否已送达 Review Runs。这不表示准备失败。任务可被重新领取，并使用同一运行标识重建、提交输入；重复提交是幂等的。'
         },
@@ -645,13 +615,11 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         submitted: {
           label: '已提交',
           summary: '输入已准备完成并提交执行。',
-          description:
-            '输入已被接受并提交给 Execution API 提供方，准备阶段已完成。'
+          description: '输入已被接受并提交给 Execution API 提供方，准备阶段已完成。'
         },
         failed: {
           label: '失败',
-          summary:
-            '准备已永久失败或由人工结束。永久失败会跳过执行；人工结束后远端任务仍可能继续。',
+          summary: '准备已永久失败或由人工结束。永久失败会跳过执行；人工结束后远端任务仍可能继续。',
           description:
             '准备阶段已结束，未得到可用结果。可能是准备永久失败（重试次数用尽或无法构建输入），此时输入从未提交给 Execution API 提供方，执行会被跳过；也可能是管理员对失联的准备任务选择放弃等待或作废运行，此时输入可能已经提交，任务可能仍在远端执行。'
         }
@@ -734,14 +702,12 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         pending: {
           label: '等待中',
           summary: '等待将准备好的输入提交给执行服务。',
-          description:
-            '运行已接收，准备好的输入尚未提交给 Execution API 提供方。'
+          description: '运行已接收，准备好的输入尚未提交给 Execution API 提供方。'
         },
         queued: {
           label: '排队中',
           summary: '执行服务已接受任务，尚未观察到任务开始执行。',
-          description:
-            'Execution API 提供方已接受任务，轮询尚未发现任务开始执行。'
+          description: 'Execution API 提供方已接受任务，轮询尚未发现任务开始执行。'
         },
         running: {
           label: '执行中',
@@ -757,8 +723,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         skipped: {
           label: '已跳过',
           summary: '准备失败，执行已跳过。具体原因见准备阶段的失败信息。',
-          description:
-            '准备失败，执行未开始。失败原因记录在准备轴上，不属于执行失败。'
+          description: '准备失败，执行未开始。失败原因记录在准备轴上，不属于执行失败。'
         },
         uncertain: {
           label: '待确认',
@@ -768,15 +733,13 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         disconnected: {
           label: '失联',
-          summary:
-            '恢复次数已用尽，提交结果仍未知，需人工核查；不代表执行失败。',
+          summary: '恢复次数已用尽，提交结果仍未知，需人工核查；不代表执行失败。',
           description:
             '自动恢复次数已用尽，Execution API 提供方仍未给出确定答复。该运行将等待管理员处理，不会被记为失败。'
         },
         failed: {
           label: '失败',
-          summary:
-            '因失败、结果不可用或人工决定而停止跟踪；停止等待不会取消远端任务。',
+          summary: '因失败、结果不可用或人工决定而停止跟踪；停止等待不会取消远端任务。',
           description:
             '该运行已停止跟踪执行状态。可能是轮询确认了失败（Execution API 提供方报告失败、找不到运行、未返回结果或响应违反协议），或重新提交时收到确定的失败答复；也可能是管理员对失联的执行选择放弃等待，或作废了准备阶段。管理员的这些操作不会发送取消请求，远端任务仍可能继续执行并成功。临时网络错误（超时、5xx、连接中断）不属于确定的失败。'
         }
@@ -888,8 +851,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         uncertain: {
           label: '待确认',
-          summary:
-            '某个步骤可能已生效，正在核对；其他步骤可继续，尚未判定失败。',
+          summary: '某个步骤可能已生效，正在核对；其他步骤可继续，尚未判定失败。',
           description:
             '某个发布步骤可能已在远端生效，系统正在核对结果。发布轴的状态由优先级最高的步骤状态决定。此状态不表示失败，其他步骤仍可继续发布。'
         },
@@ -906,8 +868,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
         },
         failed: {
           label: '失败',
-          summary:
-            '发布失败或由人工停止，部分步骤可能已生效；可重试的失败会重新排队。',
+          summary: '发布失败或由人工停止，部分步骤可能已生效；可重试的失败会重新排队。',
           description:
             '发布已结束并记为失败：可能是负责发布的进程确认发布失败（例如发生不可重试的失败，或仍有步骤未成功），也可能是管理员放弃等待。可重试的失败会回到 `pending`。'
         },
@@ -1021,8 +982,7 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           pending: {
             label: '等待中',
             summary: '尚未尝试，或已由管理员重新排队并重置尝试与核对次数。',
-            description:
-              '该步骤尚未尝试，或已由管理员重新排队并重置允许尝试和核对的次数。'
+            description: '该步骤尚未尝试，或已由管理员重新排队并重置允许尝试和核对的次数。'
           },
           running: {
             label: '进行中',
@@ -1038,27 +998,23 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
           },
           uncertain: {
             label: '待确认',
-            summary:
-              '尝试次数已用尽，先前操作可能已生效；须核对远端结果后才能结束。',
+            summary: '尝试次数已用尽，先前操作可能已生效；须核对远端结果后才能结束。',
             description:
               '尝试次数已用尽，之前的尝试可能已在远端生效。连接器必须先核对远端结果，才能结束该步骤。'
           },
           disconnected: {
             label: '失联',
             summary: '核对次数已用尽，远端结果仍待人工确认。',
-            description:
-              '核对次数已用尽，仍无法确认结果，需要管理员核查远端情况。'
+            description: '核对次数已用尽，仍无法确认结果，需要管理员核查远端情况。'
           },
           succeeded: {
             label: '发布成功',
             summary: '远端操作已成功完成，或已通过后续核对确认。',
-            description:
-              '远端操作已生效：发布尝试已报告成功，或后续核对已确认结果存在。'
+            description: '远端操作已生效：发布尝试已报告成功，或后续核对已确认结果存在。'
           },
           terminal_failed: {
             label: '最终失败',
-            summary:
-              '不会再尝试：已发生不可重试的失败，或已确认远端操作未生效。',
+            summary: '不会再尝试：已发生不可重试的失败，或已确认远端操作未生效。',
             description:
               '该步骤不会再次尝试：某次尝试发生不可重试的失败，或核对已确认远端操作未生效。'
           }
@@ -1142,17 +1098,11 @@ export const STATE_MACHINES_BY_LANGUAGE: Readonly<
 } as const
 
 /** The machines with the contract's own (English) text. */
-export const STATE_MACHINES: readonly StateMachine[] =
-  STATE_MACHINES_BY_LANGUAGE.en
+export const STATE_MACHINES: readonly StateMachine[] = STATE_MACHINES_BY_LANGUAGE.en
 
 /** The machine for one axis, with its text in `language`. */
-export function stateMachine(
-  axis: CoordinationAxis,
-  language: Language = 'en'
-): StateMachine {
-  const machine = STATE_MACHINES_BY_LANGUAGE[language].find(
-    (candidate) => candidate.axis === axis
-  )
+export function stateMachine(axis: CoordinationAxis, language: Language = 'en'): StateMachine {
+  const machine = STATE_MACHINES_BY_LANGUAGE[language].find((candidate) => candidate.axis === axis)
   if (machine === undefined) throw new Error(`no state machine for ${axis}`)
   return machine
 }

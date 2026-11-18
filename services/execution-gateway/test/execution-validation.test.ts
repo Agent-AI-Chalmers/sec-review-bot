@@ -21,14 +21,7 @@ import { REPOSITORY_ROOT as REPO_ROOT } from './project-paths.js'
 function contractFixture(name: string): unknown {
   return JSON.parse(
     readFileSync(
-      path.join(
-        REPO_ROOT,
-        'contracts',
-        'execution-api',
-        EXECUTION_API_VERSION,
-        'fixtures',
-        name
-      ),
+      path.join(REPO_ROOT, 'contracts', 'execution-api', EXECUTION_API_VERSION, 'fixtures', name),
       'utf8'
     )
   )
@@ -43,9 +36,7 @@ const EXECUTION_WORKFLOW_FIXTURES_ROOT = path.join(
 )
 
 function executionWorkflowFixture(name: string): unknown {
-  return JSON.parse(
-    readFileSync(path.join(EXECUTION_WORKFLOW_FIXTURES_ROOT, name), 'utf8')
-  )
+  return JSON.parse(readFileSync(path.join(EXECUTION_WORKFLOW_FIXTURES_ROOT, name), 'utf8'))
 }
 
 interface ExecutionWorkflowFixtureManifest {
@@ -54,9 +45,7 @@ interface ExecutionWorkflowFixtureManifest {
 }
 
 function executionWorkflowFixtureManifest(): ExecutionWorkflowFixtureManifest {
-  return executionWorkflowFixture(
-    'manifest.json'
-  ) as ExecutionWorkflowFixtureManifest
+  return executionWorkflowFixture('manifest.json') as ExecutionWorkflowFixtureManifest
 }
 
 test('execution workflow shared fixtures match Gateway validation', () => {
@@ -69,18 +58,14 @@ test('execution workflow shared fixtures match Gateway validation', () => {
   )
 
   expect(declared).toStrictEqual(actual)
-  expect(manifest.valid.some((name) => manifest.invalid.includes(name))).toBe(
-    false
-  )
+  expect(manifest.valid.some((name) => manifest.invalid.includes(name))).toBe(false)
   for (const name of manifest.valid) {
-    expect(() =>
-      validateExecutionWorkflowInput(executionWorkflowFixture(name))
-    ).not.toThrow()
+    expect(() => validateExecutionWorkflowInput(executionWorkflowFixture(name))).not.toThrow()
   }
   for (const name of manifest.invalid) {
-    expect(() =>
-      validateExecutionWorkflowInput(executionWorkflowFixture(name))
-    ).toThrow(/execution-workflow\/v1/)
+    expect(() => validateExecutionWorkflowInput(executionWorkflowFixture(name))).toThrow(
+      /execution-workflow\/v1/
+    )
   }
 })
 
@@ -111,16 +96,10 @@ test('execution workflow input rejects runtime overrides', () => {
     input: {},
     timeout_seconds: 60
   }
-  for (const runtime of [
-    null,
-    {},
-    { workspace_image: 'benchmark:latest' },
-    'image',
-    []
-  ]) {
-    expect(() =>
-      validateExecutionWorkflowInput({ ...request, runtime })
-    ).toThrow(/Execution Workflow input does not match/)
+  for (const runtime of [null, {}, { workspace_image: 'benchmark:latest' }, 'image', []]) {
+    expect(() => validateExecutionWorkflowInput({ ...request, runtime })).toThrow(
+      /Execution Workflow input does not match/
+    )
   }
 })
 
@@ -134,23 +113,15 @@ test('execution errors match the public envelope before crossing HTTP', () => {
       details: {}
     })
   ).toBe(true)
-  expect(
-    isExecutionError({ code: 'EXECUTION_FAILED', message: 'failed' })
-  ).toBe(false)
+  expect(isExecutionError({ code: 'EXECUTION_FAILED', message: 'failed' })).toBe(false)
 })
 
 test('the generated API version selects input and result schemas', () => {
   expect(() =>
-    validateExecutionInput(
-      'issue-review',
-      contractFixture('issue-review-input.json')
-    )
+    validateExecutionInput('issue-review', contractFixture('issue-review-input.json'))
   ).not.toThrow()
   expect(() =>
-    validateExecutionResult(
-      'repository-review',
-      contractFixture('repository-review-result.json')
-    )
+    validateExecutionResult('repository-review', contractFixture('repository-review-result.json'))
   ).not.toThrow()
 })
 

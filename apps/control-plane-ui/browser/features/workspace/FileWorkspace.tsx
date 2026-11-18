@@ -31,10 +31,7 @@ const MarkdownPreview = React.lazy(async () => ({
 function validFilePath(path: string): boolean {
   if (!path || path.startsWith('/') || path.endsWith('/')) return false
   const parts = path.split('/')
-  return parts.every(
-    (part) =>
-      part !== '' && part !== '.' && part !== '..' && !part.includes('\\')
-  )
+  return parts.every((part) => part !== '' && part !== '.' && part !== '..' && !part.includes('\\'))
 }
 
 function linkedFile(
@@ -92,9 +89,7 @@ export function FileWorkspace({
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const { workspaceRef, sidebarWidth, splitterProps } = useWorkspaceSidebar()
   const paths = React.useMemo(
-    () => [
-      ...new Set([...Object.keys(files), ...Object.keys(unpreviewableFiles)])
-    ],
+    () => [...new Set([...Object.keys(files), ...Object.keys(unpreviewableFiles)])],
     [files, unpreviewableFiles]
   )
   const isMarkdown = selectedFile.endsWith('.md')
@@ -107,15 +102,7 @@ export function FileWorkspace({
     if (unpreviewable) return
     if (!isMarkdown && !isJson && !isJsonLines && mode === 'preview')
       setMode(editable ? 'edit' : 'source')
-  }, [
-    editable,
-    isJson,
-    isJsonLines,
-    isMarkdown,
-    mode,
-    selectedFile,
-    unpreviewable
-  ])
+  }, [editable, isJson, isJsonLines, isMarkdown, mode, selectedFile, unpreviewable])
 
   const openOperation = (next: 'new' | 'rename'): void => {
     setOperation(next)
@@ -240,11 +227,7 @@ export function FileWorkspace({
             </Text>
             <Group gap="sm" wrap="nowrap">
               {content === undefined && modeData.length > 1 && (
-                <SegmentedControl
-                  value={mode}
-                  onChange={setMode}
-                  data={modeData}
-                />
+                <SegmentedControl value={mode} onChange={setMode} data={modeData} />
               )}
               {toolbar}
             </Group>
@@ -264,9 +247,7 @@ export function FileWorkspace({
                 value={files[selectedFile] ?? ''}
                 ariaLabel={t('workspaceEditor')}
                 language={isJson ? 'json' : isMarkdown ? 'markdown' : 'text'}
-                onChange={(value) =>
-                  onFilesChange?.({ ...files, [selectedFile]: value })
-                }
+                onChange={(value) => onFilesChange?.({ ...files, [selectedFile]: value })}
               />
             </React.Suspense>
           ) : mode === 'preview' && isMarkdown ? (
@@ -286,10 +267,7 @@ export function FileWorkspace({
           ) : mode === 'preview' && (isJson || isJsonLines) ? (
             <div className="file-workspace-preview">
               <React.Suspense fallback={null}>
-                <JsonFilePreview
-                  content={files[selectedFile] ?? ''}
-                  jsonLines={isJsonLines}
-                />
+                <JsonFilePreview content={files[selectedFile] ?? ''} jsonLines={isJsonLines} />
               </React.Suspense>
             </div>
           ) : (
@@ -298,13 +276,7 @@ export function FileWorkspace({
                 key={`${selectedFile}-source`}
                 value={files[selectedFile] ?? ''}
                 ariaLabel={t('workspaceSource')}
-                language={
-                  isJson || isJsonLines
-                    ? 'json'
-                    : isMarkdown
-                      ? 'markdown'
-                      : 'text'
-                }
+                language={isJson || isJsonLines ? 'json' : isMarkdown ? 'markdown' : 'text'}
                 readOnly
                 onChange={() => undefined}
               />

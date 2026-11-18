@@ -66,17 +66,13 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
   expect(document.messages[0]?.modelName).toBe('deepseek-v4-pro')
   expect(document.messages[0]?.searchable ?? '').toMatch(/deepseek-v4-pro/)
   // Assistant names are hidden in the header, so they must not be searchable.
-  expect(document.messages[0]?.searchable ?? '').not.toMatch(
-    /issue-single-agent/
-  )
+  expect(document.messages[0]?.searchable ?? '').not.toMatch(/issue-single-agent/)
   // Tool names stay searchable because the header still shows them.
   expect(document.messages[1]?.searchable ?? '').toMatch(/read_file/)
   expect(document.messages[0]?.reasoning).toBe('Need repository evidence.')
   expect(document.messages[0]?.toolCalls[0]?.resultMessageId).toBe('tool-1')
   expect(document.messages[1]?.toolCallId).toBe('call-1')
-  expect(document.messages[0]?.toolCalls[0]?.diff ?? '').toMatch(
-    /^Index: diff-only/
-  )
+  expect(document.messages[0]?.toolCalls[0]?.diff ?? '').toMatch(/^Index: diff-only/)
   // The diff is rendered with the call, so its text must be searchable there.
   expect(document.messages[0]?.searchable ?? '').toMatch(/diff-only\/path\.ts/)
   expect(document.messages[0]?.toolCalls[0]?.diffTruncated).toBe(true)
@@ -180,22 +176,13 @@ test('Responses function calls render once, while unmatched blocks remain inspec
 
 test('failed analysis fixture preserves empty arguments, errors and repeated prompt provenance', () => {
   const events = readTrajectoryJsonl(
-    readFileSync(
-      new URL('./fixtures/trajectory-failed-analysis.jsonl', import.meta.url),
-      'utf8'
-    )
+    readFileSync(new URL('./fixtures/trajectory-failed-analysis.jsonl', import.meta.url), 'utf8')
   )
   const document = buildTrajectoryDocument(events)
-  const systems = document.messages.filter(
-    (message) => message.role === 'system'
-  )
+  const systems = document.messages.filter((message) => message.role === 'system')
   expect(systems).toHaveLength(5)
   expect(systems[0].repeatedSystemId).toBe(undefined)
-  expect.assert(
-    systems
-      .slice(1)
-      .every((message) => message.repeatedSystemId === systems[0].id)
-  )
+  expect.assert(systems.slice(1).every((message) => message.repeatedSystemId === systems[0].id))
   const response = document.messages.find((message) => message.seq === 10)!
   expect(response.content).toBe('')
   expect(response.toolCalls).toHaveLength(5)
@@ -247,7 +234,5 @@ test('system prompt references never cross branches or skip changed instructions
       message: { id: 'unknown', role: 'system', content: 'A' }
     }
   ])
-  expect.assert(
-    document.messages.every((message) => message.repeatedSystemId === undefined)
-  )
+  expect.assert(document.messages.every((message) => message.repeatedSystemId === undefined))
 })

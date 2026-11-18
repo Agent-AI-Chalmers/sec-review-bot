@@ -3,9 +3,7 @@ import postcss from 'postcss'
 
 export type ThemeName = 'light' | 'dark'
 
-export type ThemeColors = Readonly<
-  Record<ThemeName, Readonly<Record<string, string>>>
->
+export type ThemeColors = Readonly<Record<ThemeName, Readonly<Record<string, string>>>>
 
 export type ColorContractIssue = Readonly<{
   severity: 'error' | 'warning'
@@ -56,13 +54,8 @@ export function parseThemeColors(css: string): ThemeColors {
   // from typed `<color>` declarations keeps new tokens covered automatically and
   // excludes unrelated custom properties such as spacing and transition timing.
   root.walkAtRules('property', (rule) => {
-    const syntax = rule.nodes?.find(
-      (node) => node.type === 'decl' && node.prop === 'syntax'
-    )
-    if (
-      syntax?.type === 'decl' &&
-      syntax.value.replaceAll(/['"]/g, '') === '<color>'
-    ) {
+    const syntax = rule.nodes?.find((node) => node.type === 'decl' && node.prop === 'syntax')
+    if (syntax?.type === 'decl' && syntax.value.replaceAll(/['"]/g, '') === '<color>') {
       colorProperties.add(rule.params)
     }
   })
@@ -74,13 +67,8 @@ export function parseThemeColors(css: string): ThemeColors {
     themes.dark[property] = ''
   }
 
-  for (const [theme, selector] of Object.entries(THEME_SELECTORS) as [
-    ThemeName,
-    string
-  ][]) {
-    const rule = root.nodes.find(
-      (node) => node.type === 'rule' && node.selector === selector
-    )
+  for (const [theme, selector] of Object.entries(THEME_SELECTORS) as [ThemeName, string][]) {
+    const rule = root.nodes.find((node) => node.type === 'rule' && node.selector === selector)
     if (rule?.type !== 'rule') {
       throw new Error(`Missing ${selector} color theme rule`)
     }
@@ -95,19 +83,12 @@ export function parseThemeColors(css: string): ThemeColors {
   return themes
 }
 
-export function validateThemeTransitionCoverage(
-  css: string
-): ColorContractIssue[] {
+export function validateThemeTransitionCoverage(css: string): ColorContractIssue[] {
   const root = postcss.parse(css)
   const registeredColors = new Set<string>()
   root.walkAtRules('property', (rule) => {
-    const syntax = rule.nodes?.find(
-      (node) => node.type === 'decl' && node.prop === 'syntax'
-    )
-    if (
-      syntax?.type === 'decl' &&
-      syntax.value.replaceAll(/['"]/g, '') === '<color>'
-    ) {
+    const syntax = rule.nodes?.find((node) => node.type === 'decl' && node.prop === 'syntax')
+    if (syntax?.type === 'decl' && syntax.value.replaceAll(/['"]/g, '') === '<color>') {
       registeredColors.add(rule.params)
     }
   })
@@ -117,9 +98,7 @@ export function validateThemeTransitionCoverage(
   )
   const transition =
     transitionRule?.type === 'rule'
-      ? transitionRule.nodes.find(
-          (node) => node.type === 'decl' && node.prop === 'transition'
-        )
+      ? transitionRule.nodes.find((node) => node.type === 'decl' && node.prop === 'transition')
       : undefined
   const transitionedColors = new Set(
     transition?.type === 'decl'
@@ -140,10 +119,7 @@ export function validateColorContract(
   brandColors: readonly string[]
 ): ColorContractIssue[] {
   const issues: ColorContractIssue[] = []
-  const colorNames = new Set([
-    ...Object.keys(themes.light),
-    ...Object.keys(themes.dark)
-  ])
+  const colorNames = new Set([...Object.keys(themes.light), ...Object.keys(themes.dark)])
 
   for (const name of colorNames) {
     for (const theme of Object.keys(THEME_SELECTORS) as ThemeName[]) {

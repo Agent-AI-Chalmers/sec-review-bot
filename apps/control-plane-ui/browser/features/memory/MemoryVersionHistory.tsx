@@ -75,9 +75,7 @@ export function MemoryVersionHistory({
           {error}
         </Alert>
       )}
-      {loading && versions.length === 0 && (
-        <LoadingState message={t('loading')} />
-      )}
+      {loading && versions.length === 0 && <LoadingState message={t('loading')} />}
       <Group justify="end" mb="md">
         <SegmentedControl
           value={view}
@@ -90,12 +88,9 @@ export function MemoryVersionHistory({
       </Group>
       {isGraph ? (
         <VersionGraph
-          windowHelp={t(
-            graphTarget === undefined
-              ? 'versionGraphWindow'
-              : 'versionGraphCentered',
-            { count: String(GRAPH_VERSION_WINDOW) }
-          )}
+          windowHelp={t(graphTarget === undefined ? 'versionGraphWindow' : 'versionGraphCentered', {
+            count: String(GRAPH_VERSION_WINDOW)
+          })}
           historical={graphTarget !== undefined}
           onShowLatest={onShowLatest}
           versions={versions}
@@ -115,12 +110,8 @@ export function MemoryVersionHistory({
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th className="memory-version-cell">
-                  {t('version')}
-                </Table.Th>
-                <Table.Th className="memory-predecessor-cell">
-                  {t('predecessorVersion')}
-                </Table.Th>
+                <Table.Th className="memory-version-cell">{t('version')}</Table.Th>
+                <Table.Th className="memory-predecessor-cell">{t('predecessorVersion')}</Table.Th>
                 <Table.Th>{t('versionMethod')}</Table.Th>
                 <Table.Th>{t('created')}</Table.Th>
                 <Table.Th>{t('actions')}</Table.Th>
@@ -133,22 +124,17 @@ export function MemoryVersionHistory({
                   data-memory-version={item.version}
                   tabIndex={-1}
                   className={
-                    activeVersion !== undefined &&
-                    item.version === activeVersion
+                    activeVersion !== undefined && item.version === activeVersion
                       ? 'memory-current-row'
                       : ''
                   }
                   aria-current={
-                    activeVersion !== undefined &&
-                    item.version === activeVersion
+                    activeVersion !== undefined && item.version === activeVersion
                       ? 'true'
                       : undefined
                   }
                 >
-                  <Table.Td
-                    data-label={t('version')}
-                    className="memory-version-cell"
-                  >
+                  <Table.Td data-label={t('version')} className="memory-version-cell">
                     {item.version}
                   </Table.Td>
                   <Table.Td
@@ -207,8 +193,7 @@ export function MemoryVersionHistory({
                       ) : (
                         <span aria-hidden="true" />
                       )}
-                      {activeVersion !== undefined &&
-                      item.version === activeVersion ? (
+                      {activeVersion !== undefined && item.version === activeVersion ? (
                         <div className="memory-current-action memory-current-indicator">
                           <IconHistory size={ICON_SIZE.sm} />
                           {t('alreadyCurrent')}
@@ -224,10 +209,7 @@ export function MemoryVersionHistory({
                           {t('restore')}
                         </Button>
                       ) : (
-                        <span
-                          className="memory-current-action"
-                          aria-hidden="true"
-                        />
+                        <span className="memory-current-action" aria-hidden="true" />
                       )}
                     </div>
                   </Table.Td>

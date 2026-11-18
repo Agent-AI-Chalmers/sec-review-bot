@@ -51,7 +51,9 @@ List the commands you ran to check the change and report the results. Also note 
 
 ## Formatting And Lint Responsibilities
 
-Oxfmt owns formatting, including the final formatting of contract projections. A generator must produce output that passes the formatter without another rewrite; repeating generation must leave the same bytes. Keep the existing 80-column style and fixture exclusions.
+<!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
+
+Oxfmt owns formatting, including the final formatting of contract projections. A generator must produce output that passes the formatter without another rewrite; repeating generation must leave the same bytes. Set Oxfmt’s `printWidth` explicitly to 100 in CLI configs and generator options, and retain fixture exclusions.
 
 <!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
 

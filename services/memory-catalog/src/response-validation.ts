@@ -20,12 +20,7 @@ export function registerResponseValidation(app: FastifyInstance): void {
         ajv.compile(schema as object)
       ])
     )
-    const validateResponse: preSerializationHookHandler = (
-      _request,
-      reply,
-      payload,
-      done
-    ) => {
+    const validateResponse: preSerializationHookHandler = (_request, reply, payload, done) => {
       const validate = validators.get(String(reply.statusCode))
       if (!validate || !validate(payload)) {
         done(

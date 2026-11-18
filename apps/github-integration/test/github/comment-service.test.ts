@@ -204,10 +204,7 @@ test('approval fallback rechecks publication ownership before creating a comment
     // response (rather than throwing) is what a real API does, so Octokit maps it to a
     // RequestError with status 422 and the code under test takes its fallback path.
     if (reviewAttempts === 1)
-      return githubJson(
-        { message: 'Cannot approve your own pull request' },
-        422
-      )
+      return githubJson({ message: 'Cannot approve your own pull request' }, 422)
     return githubJson({
       id: 456,
       html_url: 'https://example.test/review/456',

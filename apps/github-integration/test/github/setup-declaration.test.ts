@@ -2,10 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import {
-  SetupDeclarationError,
-  parseSetupDeclaration
-} from '../../src/github/setup-declaration.js'
+import { SetupDeclarationError, parseSetupDeclaration } from '../../src/github/setup-declaration.js'
 import { CONTRACTS_ROOT } from '../contract-fixtures.js'
 
 // Shared corpus of the setup-declaration contract family, also run by the
@@ -21,9 +18,7 @@ interface CorpusManifest {
 }
 
 function corpusManifest(): CorpusManifest {
-  return JSON.parse(
-    readFileSync(path.join(corpusDir, 'manifest.json'), 'utf8')
-  ) as CorpusManifest
+  return JSON.parse(readFileSync(path.join(corpusDir, 'manifest.json'), 'utf8')) as CorpusManifest
 }
 
 function corpusFiles(): string[] {
@@ -50,17 +45,13 @@ test('shared setup-declaration corpus classifies consistently', () => {
   const manifest = corpusManifest()
   for (const name of manifest.valid) {
     const content = readFileSync(path.join(corpusDir, name), 'utf8')
-    expect(
-      parseSetupDeclaration(content),
-      `${name} should parse to a declaration`
-    ).not.toBe(null)
+    expect(parseSetupDeclaration(content), `${name} should parse to a declaration`).not.toBe(null)
   }
   for (const name of manifest.invalid) {
     const content = readFileSync(path.join(corpusDir, name), 'utf8')
-    expect(
-      () => parseSetupDeclaration(content),
-      `${name} should be rejected`
-    ).toThrow(SetupDeclarationError)
+    expect(() => parseSetupDeclaration(content), `${name} should be rejected`).toThrow(
+      SetupDeclarationError
+    )
   }
 })
 
@@ -70,13 +61,10 @@ test('blank content means no declaration', () => {
 })
 
 test('rejects an invalid declaration with a reason', () => {
-  expect(() =>
-    parseSetupDeclaration('setup:\n  - uses: actions/checkout@v4\n')
-  ).toThrow(
+  expect(() => parseSetupDeclaration('setup:\n  - uses: actions/checkout@v4\n')).toThrow(
     expect.toSatisfy(
       (error: unknown) =>
-        error instanceof SetupDeclarationError &&
-        error.reason === 'unsupported-step-key'
+        error instanceof SetupDeclarationError && error.reason === 'unsupported-step-key'
     )
   )
 })
@@ -104,17 +92,11 @@ test('rejects unquoted booleans and numbers in string positions', () => {
       `run: ${raw} should be rejected`
     ).toThrow(SetupDeclarationError)
     expect(
-      () =>
-        parseSetupDeclaration(
-          `setup:\n  - run: x\n    working-directory: ${raw}\n`
-        ),
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    working-directory: ${raw}\n`),
       `working-directory: ${raw} should be rejected`
     ).toThrow(SetupDeclarationError)
     expect(
-      () =>
-        parseSetupDeclaration(
-          `setup:\n  - run: x\n    env:\n      FLAG: ${raw}\n`
-        ),
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      FLAG: ${raw}\n`),
       `env value ${raw} should be rejected`
     ).toThrow(SetupDeclarationError)
   }
@@ -123,10 +105,7 @@ test('rejects unquoted booleans and numbers in string positions', () => {
 test('rejects non-string env keys', () => {
   for (const raw of ['true', '123', '1.5', 'null', '~']) {
     expect(
-      () =>
-        parseSetupDeclaration(
-          `setup:\n  - run: x\n    env:\n      ${raw}: ok\n`
-        ),
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      ${raw}: ok\n`),
       `env key ${raw} should be rejected`
     ).toThrow(SetupDeclarationError)
   }
@@ -136,13 +115,7 @@ test('rejects explicit YAML tags', () => {
   // The format is the plain Core schema. Both enforcers reject every explicit
   // tag, because `yaml` silently falls back to the raw string for a mismatched
   // tag (`!!bool on` -> "on") while the worker's loader raises.
-  for (const raw of [
-    '!!bool on',
-    '!!str npm ci',
-    '!!seq [a]',
-    '!!set {a}',
-    '!!int 5'
-  ]) {
+  for (const raw of ['!!bool on', '!!str npm ci', '!!seq [a]', '!!set {a}', '!!int 5']) {
     expect(
       () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
       `explicit tag ${raw} should be rejected`
@@ -155,10 +128,7 @@ test('rejects a float-syntax timeout', () => {
   // them to a Python float and rejects them; both sides reject by source text.
   for (const raw of ['1.0', '1e3', '1.0e2', '10.']) {
     expect(
-      () =>
-        parseSetupDeclaration(
-          `setup:\n  - run: x\n    timeout_seconds: ${raw}\n`
-        ),
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`),
       `timeout ${raw} should be rejected`
     ).toThrow(SetupDeclarationError)
   }
@@ -171,8 +141,8 @@ test('rejects a float-syntax timeout', () => {
     ['+5', 5]
   ] as const) {
     expect(
-      parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`)
-        ?.steps[0]?.timeout_seconds,
+      parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`)?.steps[0]
+        ?.timeout_seconds,
       `timeout ${raw} should preserve its integer value`
     ).toBe(expected)
   }
@@ -180,9 +150,7 @@ test('rejects a float-syntax timeout', () => {
 
 test('rejects an oversized declaration', () => {
   const filler = 'x'.repeat(65536 + 1)
-  expect(() => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`)).toThrow(
-    SetupDeclarationError
-  )
+  expect(() => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`)).toThrow(SetupDeclarationError)
 })
 
 test('rejects an alias-expansion bomb as an invalid declaration', () => {
@@ -195,9 +163,7 @@ test('rejects an alias-expansion bomb as an invalid declaration', () => {
   }
   expect(() => parseSetupDeclaration(`setup:\n  - run: x\n${bomb}`)).toThrow(
     expect.toSatisfy(
-      (error: unknown) =>
-        error instanceof SetupDeclarationError &&
-        error.reason === 'invalid-yaml'
+      (error: unknown) => error instanceof SetupDeclarationError && error.reason === 'invalid-yaml'
     )
   )
 })

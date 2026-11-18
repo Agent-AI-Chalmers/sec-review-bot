@@ -1,13 +1,5 @@
 import type React from 'react'
-import {
-  Box,
-  Button,
-  Container,
-  Group,
-  Stack,
-  Text,
-  Title
-} from '@mantine/core'
+import { Box, Button, Container, Group, Stack, Text, Title } from '@mantine/core'
 import { IconInbox } from '@tabler/icons-react'
 import { useMessages } from '../../../shared/i18n.js'
 import { RefreshControls } from '../../../shared/refresh.js'
@@ -37,24 +29,12 @@ export function Runs(): React.JSX.Element {
     openNextPage,
     openPreviousPage
   } = useRunsLocation()
-  const {
-    data,
-    blocked,
-    error,
-    auxiliaryError,
-    refresh,
-    refreshing,
-    lastChecked
-  } = useRunsData(query)
+  const { data, blocked, error, auxiliaryError, refresh, refreshing, lastChecked } =
+    useRunsData(query)
   const totalPages = data?.next_cursor != null ? page + 1 : page
   return (
     <Container size="lg" py="xl">
-      <Group
-        className="runs-heading"
-        justify="space-between"
-        align="center"
-        mb="lg"
-      >
+      <Group className="runs-heading" justify="space-between" align="center" mb="lg">
         <Title order={1}>{t('runs')}</Title>
         <Group
           className="runs-heading-actions"
@@ -64,11 +44,7 @@ export function Runs(): React.JSX.Element {
           justify="flex-end"
         >
           <RunJump />
-          <RefreshControls
-            refresh={refresh}
-            refreshing={refreshing}
-            lastChecked={lastChecked}
-          />
+          <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
         </Group>
       </Group>
       <ParkedRuns blocked={blocked} />
@@ -81,15 +57,10 @@ export function Runs(): React.JSX.Element {
       {auxiliaryError !== undefined && data !== undefined && (
         <Text role="alert" c="red" mb="md">
           {t('parkedRunsError')}
-          {failureReason(auxiliaryError, t) &&
-            ` ${failureReason(auxiliaryError, t)}`}
+          {failureReason(auxiliaryError, t) && ` ${failureReason(auxiliaryError, t)}`}
         </Text>
       )}
-      <RunFilters
-        search={search}
-        onChange={updateFilter}
-        onClear={clearFilters}
-      />
+      <RunFilters search={search} onChange={updateFilter} onClear={clearFilters} />
       <Box aria-busy={refreshing}>
         {data === undefined && Boolean(error) ? (
           <ResourceLoadError
@@ -97,11 +68,7 @@ export function Runs(): React.JSX.Element {
             title={t('runsUnavailable')}
             message={`${t('runsLoadFailed')} ${failureReason(error, t) ?? ''}`.trim()}
             actions={
-              <Button
-                variant="default"
-                loading={refreshing}
-                onClick={() => void refresh()}
-              >
+              <Button variant="default" loading={refreshing} onClick={() => void refresh()}>
                 {t('retry')}
               </Button>
             }

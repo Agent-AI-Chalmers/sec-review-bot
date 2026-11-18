@@ -11,15 +11,11 @@ function readConfiguredPort(value?: string) {
   if (value === undefined) delete env.PORT
   else env.PORT = value
 
-  return spawnSync(
-    process.execPath,
-    ['--import', 'tsx', '--eval', READ_PORT_SCRIPT],
-    {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      env
-    }
-  )
+  return spawnSync(process.execPath, ['--import', 'tsx', '--eval', READ_PORT_SCRIPT], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env
+  })
 }
 
 function readConfiguredAddressingStyle(value?: string) {
@@ -27,15 +23,11 @@ function readConfiguredAddressingStyle(value?: string) {
   if (value === undefined) delete env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE
   else env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE = value
 
-  return spawnSync(
-    process.execPath,
-    ['--import', 'tsx', '--eval', READ_ADDRESSING_STYLE_SCRIPT],
-    {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      env
-    }
-  )
+  return spawnSync(process.execPath, ['--import', 'tsx', '--eval', READ_ADDRESSING_STYLE_SCRIPT], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env
+  })
 }
 
 test('PORT defaults only when it is unset and exports a number', () => {
@@ -81,7 +73,5 @@ test('S3 addressing style rejects unknown values', () => {
   const result = readConfiguredAddressingStyle('hostname')
 
   expect(result.status).not.toBe(0)
-  expect(`${result.stdout}${result.stderr}`).toMatch(
-    /SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE must/
-  )
+  expect(`${result.stdout}${result.stderr}`).toMatch(/SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE must/)
 })

@@ -4,11 +4,7 @@
 // through a node it does not touch, one line per state pair, a return edge never hides under its
 // forward twin) can be tested on the produced paths instead of on screenshots.
 import type { StateMachine } from '../state-machines.generated.js'
-import {
-  STATE_LAYOUT,
-  isReturnEdge,
-  selfLoopSide
-} from './state-machine-layout.js'
+import { STATE_LAYOUT, isReturnEdge, selfLoopSide } from './state-machine-layout.js'
 
 export const NODE_W = 118
 export const NODE_H = 32
@@ -94,11 +90,7 @@ function round(value: number) {
 
 /** A curve between two different states. `bend` pushes the control point to the left of the
  * direction of travel, so an edge and its reverse bow to opposite sides and never overlap. */
-function curve(
-  from: Point,
-  to: Point,
-  bend: number
-): { d: string; samples: Point[] } {
+function curve(from: Point, to: Point, bend: number): { d: string; samples: Point[] } {
   const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
   const dx = to.x - from.x
   const dy = to.y - from.y
@@ -127,10 +119,7 @@ function curve(
 
 /** A small loop on one edge of a node, off-centre so it stays clear of edges meeting the node's
  * middle. */
-function selfLoop(
-  center: Point,
-  side: 'above' | 'below'
-): { d: string; samples: Point[] } {
+function selfLoop(center: Point, side: 'above' | 'below'): { d: string; samples: Point[] } {
   const direction = side === 'below' ? 1 : -1
   const anchorX = center.x + NODE_W / 2 - 26
   const y = center.y + (direction * NODE_H) / 2
@@ -157,8 +146,7 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const centers = new Map<string, Point>()
   for (const state of machine.states) {
     const cell = layout[state]
-    if (cell === undefined)
-      throw new Error(`${machine.axis}.${state} has no diagram cell`)
+    if (cell === undefined) throw new Error(`${machine.axis}.${state} has no diagram cell`)
     centers.set(state, cellCenter(cell.col, cell.row))
   }
   const nodes = machine.states.map((state) => ({
@@ -189,13 +177,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
       continue
     }
     const kind = isReturnEdge(machine.axis, from, to) ? 'return' : 'forward'
-    const others = nodes.filter(
-      (node) => node.state !== from && node.state !== to
-    )
+    const others = nodes.filter((node) => node.state !== from && node.state !== to)
     const blocked = (samples: Point[]): boolean =>
-      samples.some((point) =>
-        others.some((node) => insideNode(point, node.center, NODE_MARGIN))
-      )
+      samples.some((point) => others.some((node) => insideNode(point, node.center, NODE_MARGIN)))
     // Straight when nothing is in the way and no reverse edge shares the chord; otherwise bend,
     // widening until the curve clears every other node.
     const twin = groups.has(`${to}->${from}`)

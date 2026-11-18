@@ -4,10 +4,7 @@ import type { Octokit } from 'octokit'
 
 import type { TestChangesPolicy } from '../execution/input.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import {
-  getPullRequestContext,
-  type PullRequestContext
-} from '../github/pull-request-service.js'
+import { getPullRequestContext, type PullRequestContext } from '../github/pull-request-service.js'
 import { reviewRunsClient } from '../review-runs/client.js'
 import { pullRequestReviewPublishContext } from '../review-runs/publish-context.js'
 import {
@@ -43,11 +40,7 @@ type StartPullRequestReviewCommandArgs = {
   test_changes?: TestChangesPolicy | null
   delivery_id: string
   claimed_preparation?: ClaimedPreparation
-  on_admitted?: (admission: {
-    run_id: string
-    status: string
-    replayed: boolean
-  }) => void
+  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartPullRequestReviewCommandDeps>
 } & (
   | { pr: PullRequestContext; pr_reference?: never }
@@ -98,8 +91,7 @@ export async function startPullRequestReviewCommand({
       // Admission happens before PR lookup, input preparation, and Execution
       // submission. Any failure below therefore remains attached to this run_id
       // instead of becoming an untracked pre-run error.
-      const resolvedPr =
-        pr ?? (await get_pull_request_context(octokit, pr_reference))
+      const resolvedPr = pr ?? (await get_pull_request_context(octokit, pr_reference))
       if (pr === undefined) {
         // Capture the resolved snapshot before expensive work. Recovery follows the
         // same path, so subsequent attempts never silently move to a newer HEAD.

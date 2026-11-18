@@ -44,11 +44,7 @@ async function createGitFixture(root: string): Promise<GitFixture> {
     cwd: source
   })
   await fs.mkdir(path.join(source, 'src'), { recursive: true })
-  await fs.writeFile(
-    path.join(source, 'src', 'app.ts'),
-    'export const value = 1\n',
-    'utf8'
-  )
+  await fs.writeFile(path.join(source, 'src', 'app.ts'), 'export const value = 1\n', 'utf8')
   await execFileAsync('git', ['add', '.'], { cwd: source })
   await execFileAsync('git', ['commit', '-m', 'base'], { cwd: source })
   await execFileAsync('git', ['branch', '-M', 'main'], { cwd: source })
@@ -139,8 +135,7 @@ function octokitWithSetupDeclaration(
         ...(ref !== undefined ? { ref } : {})
       })
       const content = files[path]
-      if (content === undefined)
-        return githubJson({ message: 'Not Found' }, 404)
+      if (content === undefined) return githubJson({ message: 'Not Found' }, 404)
       return githubFile(content, path)
     }
     if (tail.startsWith('/commits/')) {
@@ -202,8 +197,7 @@ test(
       const { head_sha } = await createGitFixture(root)
       process.env['GITHUB_SERVER_URL'] = `file://${root}`
       const { octokit, contentRequests } = octokitWithSetupDeclaration(head_sha)
-      const { prepareIssueReviewInput } =
-        await import('../../src/reviews/issues/prepare-input.js')
+      const { prepareIssueReviewInput } = await import('../../src/reviews/issues/prepare-input.js')
       const prepared = await prepareIssueReviewInput({
         run_id: 'run-issue-auth',
         octokit,
@@ -223,8 +217,7 @@ test(
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined)
-        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }
@@ -264,8 +257,7 @@ test(
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined)
-        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }
@@ -325,8 +317,7 @@ test(
       }
       const { preparePullRequestReviewInput } =
         await import('../../src/reviews/pull-requests/prepare-input.js')
-      const { fullReviewWindow } =
-        await import('../../src/reviews/pull-requests/review-window.js')
+      const { fullReviewWindow } = await import('../../src/reviews/pull-requests/review-window.js')
       const prepared = await preparePullRequestReviewInput({
         run_id: 'run-pr-auth',
         octokit,
@@ -349,8 +340,7 @@ test(
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined)
-        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }

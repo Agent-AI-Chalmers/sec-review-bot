@@ -5,9 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const require = createRequire(
-  new URL('../../contracts/codegen/package.json', import.meta.url)
-)
+const require = createRequire(new URL('../../contracts/codegen/package.json', import.meta.url))
 const ts = require('typescript')
 const codegen = 'contracts/codegen'
 
@@ -24,12 +22,10 @@ export function checkBoundaries(
       manifest: JSON.parse(read(file))
     }))
     .sort((a, b) => b.directory.length - a.directory.length)
-  const owner = (file) =>
-    packages.find(({ directory }) => file.startsWith(`${directory}/`))
+  const owner = (file) => packages.find(({ directory }) => file.startsWith(`${directory}/`))
   const errors = []
   const allowed = (from, to) =>
-    from === to ||
-    (from.startsWith('contracts/') && from.endsWith('/tools') && to === codegen)
+    from === to || (from.startsWith('contracts/') && from.endsWith('/tools') && to === codegen)
   for (const { directory, manifest } of packages) {
     for (const field of [
       'dependencies',
@@ -38,13 +34,9 @@ export function checkBoundaries(
       'optionalDependencies'
     ]) {
       for (const [name, version] of Object.entries(manifest[field] ?? {})) {
-        const target = packages.find(
-          ({ manifest: candidate }) => candidate.name === name
-        )
+        const target = packages.find(({ manifest: candidate }) => candidate.name === name)
         if (target && !allowed(directory, target.directory)) {
-          errors.push(
-            `${directory}/package.json: forbidden ${field} dependency on ${name}`
-          )
+          errors.push(`${directory}/package.json: forbidden ${field} dependency on ${name}`)
         }
         if (/^(file:|link:)/.test(version)) {
           errors.push(
@@ -59,10 +51,7 @@ export function checkBoundaries(
     const from = owner(file)
     if (!from) continue
     const absoluteFile = path.join(root, file)
-    const configFile = ts.findConfigFile(
-      path.dirname(absoluteFile),
-      ts.sys.fileExists
-    )
+    const configFile = ts.findConfigFile(path.dirname(absoluteFile), ts.sys.fileExists)
     if (configFile && !configs.has(configFile)) {
       const config = ts.readConfigFile(configFile, ts.sys.readFile)
       const parsed = ts.parseJsonConfigFileContent(
@@ -72,12 +61,7 @@ export function checkBoundaries(
       )
       configs.set(configFile, parsed.options)
     }
-    const source = ts.createSourceFile(
-      file,
-      read(file),
-      ts.ScriptTarget.Latest,
-      true
-    )
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true)
     const visit = (node) => {
       // Inspect literal module/file references through the AST, including require(),
       // import types, re-exports, dynamic imports, and new URL(..., import.meta.url).
@@ -85,16 +69,12 @@ export function checkBoundaries(
         const value = node.text
         let targetFile
         if (value.startsWith('.')) {
-          targetFile = path.posix.normalize(
-            path.posix.join(path.posix.dirname(file), value)
-          )
+          targetFile = path.posix.normalize(path.posix.join(path.posix.dirname(file), value))
         } else {
           const target = packages.find(
-            ({ manifest }) =>
-              value === manifest.name || value.startsWith(`${manifest.name}/`)
+            ({ manifest }) => value === manifest.name || value.startsWith(`${manifest.name}/`)
           )
-          if (target)
-            targetFile = `${target.directory}/${value.slice(target.manifest.name.length)}`
+          if (target) targetFile = `${target.directory}/${value.slice(target.manifest.name.length)}`
         }
         // Resolve tsconfig aliases as well as package names and relative paths.
         if (!targetFile && configFile) {
@@ -105,19 +85,12 @@ export function checkBoundaries(
             ts.sys
           ).resolvedModule
           if (resolved)
-            targetFile = path
-              .relative(root, resolved.resolvedFileName)
-              .split(path.sep)
-              .join('/')
+            targetFile = path.relative(root, resolved.resolvedFileName).split(path.sep).join('/')
         }
         const to = targetFile && owner(targetFile)
         if (to && !allowed(from.directory, to.directory)) {
-          const { line } = source.getLineAndCharacterOfPosition(
-            node.getStart(source)
-          )
-          errors.push(
-            `${file}:${line + 1}: forbidden reference to ${value} (${to.directory})`
-          )
+          const { line } = source.getLineAndCharacterOfPosition(node.getStart(source))
+          errors.push(`${file}:${line + 1}: forbidden reference to ${value} (${to.directory})`)
         }
       }
       ts.forEachChild(node, visit)
@@ -127,10 +100,7 @@ export function checkBoundaries(
   return errors
 }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = execFileSync(
     'git',
     ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],

@@ -12,10 +12,7 @@ const sources = Object.fromEntries(
   await Promise.all(
     files.map(
       async (file) =>
-        [
-          `browser/${file}`,
-          await readFile(path.join(browserDirectory, file), 'utf8')
-        ] as const
+        [`browser/${file}`, await readFile(path.join(browserDirectory, file), 'utf8')] as const
     )
   )
 )

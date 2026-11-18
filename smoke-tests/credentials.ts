@@ -10,7 +10,5 @@ function requiredEnv(name: string): string {
 export const serviceToken = requiredEnv('REVIEW_RUNS_SERVICE_TOKEN')
 export const readToken = requiredEnv('REVIEW_RUNS_READ_TOKEN')
 export const executionToken = requiredEnv('EXECUTION_API_TOKEN')
-export const catalogOperatorToken = requiredEnv(
-  'AGENT_MEMORY_CATALOG_OPERATOR_TOKEN'
-)
+export const catalogOperatorToken = requiredEnv('AGENT_MEMORY_CATALOG_OPERATOR_TOKEN')
 export const uiAccessToken = requiredEnv('CONTROL_PLANE_UI_ACCESS_TOKEN')

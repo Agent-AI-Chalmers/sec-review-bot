@@ -1,10 +1,6 @@
 import React from 'react'
 import { Tooltip } from '@mantine/core'
-import {
-  IconBrandGithub,
-  IconBrandGitlab,
-  IconSourceCode
-} from '@tabler/icons-react'
+import { IconBrandGithub, IconBrandGitlab, IconSourceCode } from '@tabler/icons-react'
 
 import { ICON_SIZE } from '../../shared/design.js'
 

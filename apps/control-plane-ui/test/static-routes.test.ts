@@ -32,9 +32,7 @@ test('BFF serves built assets and falls back to index.html for unknown paths', a
 
     const fallback = await fetch(`${base}/runs/unknown`)
     expect(fallback.status).toBe(200)
-    expect(fallback.headers.get('content-type')).toBe(
-      'text/html; charset=utf-8'
-    )
+    expect(fallback.headers.get('content-type')).toBe('text/html; charset=utf-8')
     expect(await fallback.text()).toBe('<html>app</html>')
   } finally {
     await Promise.all([

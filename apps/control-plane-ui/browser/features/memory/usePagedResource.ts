@@ -18,9 +18,7 @@ export interface PagedResource<Filter, Cursor, Page> {
   pageNumber: number
   openNext: (cursor: Cursor) => Promise<void>
   openPrevious: () => Promise<void>
-  openFirst: (
-    changes?: Partial<Omit<PageQuery<Filter, Cursor>, 'trail'>>
-  ) => Promise<void>
+  openFirst: (changes?: Partial<Omit<PageQuery<Filter, Cursor>, 'trail'>>) => Promise<void>
 }
 
 /**
@@ -33,10 +31,7 @@ export interface PagedResource<Filter, Cursor, Page> {
  */
 export function usePagedResource<Filter, Cursor, Page>(
   initial: Omit<PageQuery<Filter, Cursor>, 'trail'>,
-  loadPage: (
-    query: PageQuery<Filter, Cursor>,
-    signal: AbortSignal
-  ) => Promise<Page>
+  loadPage: (query: PageQuery<Filter, Cursor>, signal: AbortSignal) => Promise<Page>
 ): PagedResource<Filter, Cursor, Page> {
   const requested = React.useRef<PageQuery<Filter, Cursor>>({
     ...initial,
@@ -57,8 +52,7 @@ export function usePagedResource<Filter, Cursor, Page>(
     pageNumber: query.trail.length + 1,
     openNext: (cursor) => open({ ...query, trail: [...query.trail, cursor] }),
     openPrevious: async (): Promise<void> => {
-      if (query.trail.length > 0)
-        await open({ ...query, trail: query.trail.slice(0, -1) })
+      if (query.trail.length > 0) await open({ ...query, trail: query.trail.slice(0, -1) })
     },
     openFirst: (changes = {}) => open({ ...query, ...changes, trail: [] })
   }

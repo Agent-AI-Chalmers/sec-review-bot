@@ -59,17 +59,13 @@ interface LinkedPullRequest {
 
 function requireText(value: string, label: string): void {
   if (value.trim() === '') {
-    throw new IssueContextExtractionError(
-      `Issue webhook payload is missing ${label}.`
-    )
+    throw new IssueContextExtractionError(`Issue webhook payload is missing ${label}.`)
   }
 }
 
 function requirePositiveInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new IssueContextExtractionError(
-      `Issue webhook payload is missing ${label}.`
-    )
+    throw new IssueContextExtractionError(`Issue webhook payload is missing ${label}.`)
   }
 }
 
@@ -132,15 +128,11 @@ function isSameRepositoryPullRequestSource(
   }
 ): boolean {
   const { owner_login, repo_name } = context
-  const repositoryUrl = asString(source_issue.repository_url)
-    .trim()
-    .toLowerCase()
+  const repositoryUrl = asString(source_issue.repository_url).trim().toLowerCase()
   if (!repositoryUrl) {
     return false
   }
-  return repositoryUrl.endsWith(
-    `/repos/${owner_login.toLowerCase()}/${repo_name.toLowerCase()}`
-  )
+  return repositoryUrl.endsWith(`/repos/${owner_login.toLowerCase()}/${repo_name.toLowerCase()}`)
 }
 
 export async function fetchTimelineLinkedPullRequests(
@@ -195,8 +187,7 @@ export async function fetchTimelineLinkedPullRequests(
         title: asString(source_issue.title),
         body: asString(source_issue.body, '').trim() || null,
         state: asString(source_issue.state),
-        author_login:
-          asString(asRecord(source_issue.user).login, '').trim() || null,
+        author_login: asString(asRecord(source_issue.user).login, '').trim() || null,
         html_url: asString(source_issue.html_url),
         api_url: asString(source_issue.url),
         base_ref: asString(asRecord(pullRequest.base).ref, '').trim() || null,

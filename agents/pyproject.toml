@@ -35,11 +35,7 @@ typecheck = [
   "types-PyYAML>=6.0.12.20260906",
   "types-jsonschema>=4.26.0.20261006"
 ]
-dev = [
-  { include-group = "test" },
-  { include-group = "lint" },
-  { include-group = "typecheck" }
-]
+dev = [{ include-group = "test" }, { include-group = "lint" }, { include-group = "typecheck" }]
 
 [project.scripts]
 sec-review-execution-worker = "sec_review_agents.entrypoints.execution_worker.main:main"

@@ -34,11 +34,7 @@ function layoutVersions(versions: VersionGraphItem[]): {
   const items = new Map(versions.map((item) => [item.version, item]))
   const children = new Map<number, VersionGraphItem[]>()
   for (const item of versions) {
-    if (
-      item.predecessor_version === null ||
-      !items.has(item.predecessor_version)
-    )
-      continue
+    if (item.predecessor_version === null || !items.has(item.predecessor_version)) continue
     const siblings = children.get(item.predecessor_version) ?? []
     siblings.push(item)
     children.set(item.predecessor_version, siblings)
@@ -47,25 +43,19 @@ function layoutVersions(versions: VersionGraphItem[]): {
     siblings.sort((left, right) => left.version - right.version)
 
   const roots = versions
-    .filter(
-      (item) =>
-        item.predecessor_version === null ||
-        !items.has(item.predecessor_version)
-    )
+    .filter((item) => item.predecessor_version === null || !items.has(item.predecessor_version))
     .sort((left, right) => left.version - right.version)
   const xByVersion = new Map<number, number>()
   const visited = new Set<number>()
   let nextLeaf = 0
   const place = (item: VersionGraphItem): number => {
-    if (visited.has(item.version))
-      return xByVersion.get(item.version) ?? nextLeaf++
+    if (visited.has(item.version)) return xByVersion.get(item.version) ?? nextLeaf++
     visited.add(item.version)
     const descendants = children.get(item.version) ?? []
     const x =
       descendants.length === 0
         ? nextLeaf++
-        : descendants.reduce((sum, child) => sum + place(child), 0) /
-          descendants.length
+        : descendants.reduce((sum, child) => sum + place(child), 0) / descendants.length
     xByVersion.set(item.version, x)
     return x
   }
@@ -75,29 +65,20 @@ function layoutVersions(versions: VersionGraphItem[]): {
     .sort((left, right) => left.version - right.version)
     .forEach(place)
 
-  const newestFirst = versions.toSorted(
-    (left, right) => right.version - left.version
-  )
+  const newestFirst = versions.toSorted((left, right) => right.version - left.version)
   const yByVersion = new Map(
-    newestFirst.map((item, index) => [
-      item.version,
-      PADDING + index * (NODE_HEIGHT + ROW_GAP)
-    ])
+    newestFirst.map((item, index) => [item.version, PADDING + index * (NODE_HEIGHT + ROW_GAP)])
   )
   const laneCount = Math.max(1, Math.ceil(nextLeaf))
   return {
     nodes: versions.map((item) => ({
       ...item,
-      x:
-        PADDING +
-        (xByVersion.get(item.version) ?? 0) * (NODE_WIDTH + COLUMN_GAP),
+      x: PADDING + (xByVersion.get(item.version) ?? 0) * (NODE_WIDTH + COLUMN_GAP),
       y: yByVersion.get(item.version) ?? PADDING
     })),
     width: PADDING * 2 + laneCount * NODE_WIDTH + (laneCount - 1) * COLUMN_GAP,
     height:
-      PADDING * 2 +
-      newestFirst.length * NODE_HEIGHT +
-      Math.max(0, newestFirst.length - 1) * ROW_GAP
+      PADDING * 2 + newestFirst.length * NODE_HEIGHT + Math.max(0, newestFirst.length - 1) * ROW_GAP
   }
 }
 
@@ -134,9 +115,7 @@ export function VersionGraph({
 }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
-  const [selectedVersion, setSelectedVersion] = React.useState(
-    activeVersion ?? 0
-  )
+  const [selectedVersion, setSelectedVersion] = React.useState(activeVersion ?? 0)
   const selectionRef = React.useRef<HTMLDivElement>(null)
   const [panning, setPanning] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -152,8 +131,7 @@ export function VersionGraph({
   const layout = React.useMemo(() => layoutVersions(versions), [versions])
   const nodes = new Map(layout.nodes.map((item) => [item.version, item]))
   const activeLineage = new Set<number>()
-  let lineageCursor =
-    activeVersion === undefined ? undefined : nodes.get(activeVersion)
+  let lineageCursor = activeVersion === undefined ? undefined : nodes.get(activeVersion)
   while (lineageCursor && !activeLineage.has(lineageCursor.version)) {
     activeLineage.add(lineageCursor.version)
     lineageCursor =
@@ -173,13 +151,10 @@ export function VersionGraph({
     // Refreshes replace the rows, but only an explicit navigation changes the
     // requested position. Preserve the reader's pan/scroll through data updates.
     if (positioned.current === requestedPosition) return
-    const target = layout.nodes.find(
-      (item) => item.version === navigationTarget
-    )
+    const target = layout.nodes.find((item) => item.version === navigationTarget)
     if (navigationTarget !== undefined && !target) return
     positioned.current = requestedPosition
-    const current =
-      target ?? layout.nodes.find((item) => item.version === activeVersion)
+    const current = target ?? layout.nodes.find((item) => item.version === activeVersion)
     viewport.scrollLeft = Math.max(
       0,
       current
@@ -198,32 +173,19 @@ export function VersionGraph({
   }, [requestedPosition, navigationTarget, layout.nodes, activeVersion])
 
   const versionNumbers = versions.map((item) => item.version)
-  const rangeStart = versionNumbers.length
-    ? String(Math.min(...versionNumbers))
-    : '—'
-  const rangeEnd = versionNumbers.length
-    ? String(Math.max(...versionNumbers))
-    : '—'
+  const rangeStart = versionNumbers.length ? String(Math.min(...versionNumbers)) : '—'
+  const rangeEnd = versionNumbers.length ? String(Math.max(...versionNumbers)) : '—'
 
   return (
     <div className="version-graph-section">
       <div className="version-graph-frame">
-        <Group
-          className="version-graph-toolbar"
-          justify="space-between"
-          gap="xs"
-        >
+        <Group className="version-graph-toolbar" justify="space-between" gap="xs">
           <Group gap="xs">
             <Text size="sm" c="var(--muted)">
               {t('versionGraphRange', { from: rangeStart, to: rangeEnd })}
             </Text>
             <Tooltip label={windowHelp} multiline w={260}>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                aria-label={windowHelp}
-              >
+              <ActionIcon variant="subtle" color="gray" size="sm" aria-label={windowHelp}>
                 <IconInfoCircle size={ICON_SIZE.sm} />
               </ActionIcon>
             </Tooltip>
@@ -264,13 +226,9 @@ export function VersionGraph({
           onPointerMove={(event) => {
             if (!panStart.current) return
             event.currentTarget.scrollLeft =
-              panStart.current.scrollLeft +
-              panStart.current.pointerX -
-              event.clientX
+              panStart.current.scrollLeft + panStart.current.pointerX - event.clientX
             event.currentTarget.scrollTop =
-              panStart.current.scrollTop +
-              panStart.current.pointerY -
-              event.clientY
+              panStart.current.scrollTop + panStart.current.pointerY - event.clientY
           }}
           onPointerUp={(event) => {
             if (!panStart.current) return
@@ -279,10 +237,7 @@ export function VersionGraph({
             event.currentTarget.releasePointerCapture(event.pointerId)
           }}
         >
-          <div
-            className="version-graph"
-            style={{ width: layout.width, height: layout.height }}
-          >
+          <div className="version-graph" style={{ width: layout.width, height: layout.height }}>
             <svg
               className="version-graph-edges"
               width={layout.width}
@@ -303,8 +258,7 @@ export function VersionGraph({
                     key={`${item.version}-${predecessor.version}`}
                     d={`M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`}
                     data-active-line={
-                      activeLineage.has(item.version) &&
-                      activeLineage.has(predecessor.version)
+                      activeLineage.has(item.version) && activeLineage.has(predecessor.version)
                         ? 'true'
                         : undefined
                     }
@@ -324,21 +278,14 @@ export function VersionGraph({
                   height: NODE_HEIGHT
                 }}
                 data-current={
-                  activeVersion !== undefined && item.version === activeVersion
-                    ? true
-                    : undefined
+                  activeVersion !== undefined && item.version === activeVersion ? true : undefined
                 }
                 data-selected={item.version === selected?.version || undefined}
-                data-highlighted={
-                  item.version === highlightedVersion || undefined
-                }
+                data-highlighted={item.version === highlightedVersion || undefined}
                 data-version-node={item.version}
                 onClick={() => {
                   setSelectedVersion(item.version)
-                  if (
-                    window.matchMedia(`(max-width: ${BREAKPOINTS.compact}px)`)
-                      .matches
-                  ) {
+                  if (window.matchMedia(`(max-width: ${BREAKPOINTS.compact}px)`).matches) {
                     requestAnimationFrame(() => {
                       selectionRef.current?.scrollIntoView({ block: 'nearest' })
                       selectionRef.current?.focus({ preventScroll: true })
@@ -346,16 +293,11 @@ export function VersionGraph({
                   }
                 }}
                 onAnimationEnd={(event) => {
-                  if (
-                    event.currentTarget === event.target &&
-                    item.version === highlightedVersion
-                  )
+                  if (event.currentTarget === event.target && item.version === highlightedVersion)
                     onHighlightEnd()
                 }}
               >
-                <strong>
-                  {t('versionReference', { version: String(item.version) })}
-                </strong>
+                <strong>{t('versionReference', { version: String(item.version) })}</strong>
                 <span>
                   {item.source.kind === 'learning'
                     ? t('sourceLearning')
@@ -430,8 +372,7 @@ export function VersionGraph({
                   />
                 </>
               )}
-              {activeVersion !== undefined &&
-              selected.version === activeVersion ? (
+              {activeVersion !== undefined && selected.version === activeVersion ? (
                 <div className="memory-current-action memory-current-indicator">
                   <IconHistory size={ICON_SIZE.sm} />
                   {t('alreadyCurrent')}

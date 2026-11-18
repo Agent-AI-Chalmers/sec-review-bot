@@ -8,12 +8,10 @@ export function integerEnv(
   if (raw === undefined) return defaultValue
 
   const value = raw.trim()
-  if (!/^[+-]?\d+$/.test(value))
-    throw new Error(`${name} must be a decimal integer.`)
+  if (!/^[+-]?\d+$/.test(value)) throw new Error(`${name} must be a decimal integer.`)
 
   const parsed = Number(value)
-  if (!Number.isSafeInteger(parsed))
-    throw new Error(`${name} must be a safe integer.`)
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${name} must be a safe integer.`)
   if (parsed < minimum) throw new Error(`${name} must be at least ${minimum}.`)
   if (parsed > maximum) throw new Error(`${name} must be at most ${maximum}.`)
   return parsed

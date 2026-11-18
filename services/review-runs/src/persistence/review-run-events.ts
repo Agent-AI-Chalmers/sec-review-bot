@@ -41,10 +41,7 @@ export interface ReviewRunEventRow {
 
 /** Append one transition. Callers run this on the same client as the snapshot UPDATE, so the
  * log and the state can never diverge: a rolled-back transition leaves no event. */
-export async function appendEvent(
-  client: PoolClient,
-  args: AppendEventArgs
-): Promise<string> {
+export async function appendEvent(client: PoolClient, args: AppendEventArgs): Promise<string> {
   const result = await client.query<{ event_id: string }>(
     `INSERT INTO review_run_events
        (run_id, connector_id, axis, step_key, from_status, to_status, reason_code)
@@ -61,8 +58,7 @@ export async function appendEvent(
     ]
   )
   const event = result.rows[0]
-  if (event === undefined)
-    throw new Error('Appending a coordination event returned no id.')
+  if (event === undefined) throw new Error('Appending a coordination event returned no id.')
   return event.event_id
 }
 

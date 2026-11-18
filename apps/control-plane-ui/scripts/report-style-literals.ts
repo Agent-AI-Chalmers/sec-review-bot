@@ -5,9 +5,7 @@ import { findStyleLiterals, type StyleLiteralKind } from './style-literals.js'
 
 const packageRoot = path.resolve(import.meta.dirname, '..')
 const stylesDirectory = path.join(packageRoot, 'browser/styles')
-const files = (await readdir(stylesDirectory))
-  .filter((file) => file.endsWith('.css'))
-  .sort()
+const files = (await readdir(stylesDirectory)).filter((file) => file.endsWith('.css')).sort()
 const stylesheets = Object.fromEntries(
   await Promise.all(
     files.map(
@@ -26,12 +24,8 @@ for (const kind of kinds) {
   const matches = findings.filter((finding) => finding.kind === kind)
   console.log(`\n${kind}: ${matches.length}`)
   for (const finding of matches) {
-    console.log(
-      `  ${finding.file}:${finding.line} ${finding.property}: ${finding.value}`
-    )
+    console.log(`  ${finding.file}:${finding.line} ${finding.property}: ${finding.value}`)
   }
 }
 
-console.log(
-  `\nStyle literal report completed with ${findings.length} finding(s).`
-)
+console.log(`\nStyle literal report completed with ${findings.length} finding(s).`)

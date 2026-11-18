@@ -106,10 +106,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       expect(method).toBe('POST')
       posts += 1
       expect.assert(
-        body &&
-          typeof body === 'object' &&
-          'body' in body &&
-          typeof body.body === 'string'
+        body && typeof body === 'object' && 'body' in body && typeof body.body === 'string'
       )
       const comment = {
         id: posts,
@@ -154,9 +151,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       await publish(nextToken)
       release.resolve()
       await oldRejected
-      expect(
-        await reviewRunsClient.renewPublicationClaim(runId, firstToken)
-      ).toBe(false)
+      expect(await reviewRunsClient.renewPublicationClaim(runId, firstToken)).toBe(false)
       expect(posts).toBe(1)
       expect(comments).toHaveLength(1)
       expect(step?.status).toBe('succeeded')

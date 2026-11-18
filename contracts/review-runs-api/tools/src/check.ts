@@ -12,8 +12,7 @@ import { generatedArtifacts as stateMachines } from './generate-state-machines.j
 import { generatedArtifacts as types } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
-const REGENERATE_COMMAND =
-  'pnpm --dir contracts/review-runs-api/tools run generate'
+const REGENERATE_COMMAND = 'pnpm --dir contracts/review-runs-api/tools run generate'
 
 export interface StaleArtifact {
   /** Path relative to the repository root. */
@@ -35,10 +34,7 @@ export async function staleGeneratedArtifacts(): Promise<StaleArtifact[]> {
   return stale
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.filename === path.resolve(process.argv[1])
-) {
+if (process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1])) {
   const stale = await staleGeneratedArtifacts()
   if (stale.length > 0) {
     for (const { output, command } of stale) {

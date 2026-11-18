@@ -16,8 +16,7 @@ for (const language of ['en', 'zh'] as const) {
     const detail = {
       label: language === 'en' ? 'Awaiting input' : '等待输入',
       summary: language === 'en' ? 'Short state hint.' : '简短状态提示。',
-      description:
-        language === 'en' ? 'Full lifecycle explanation.' : '完整生命周期说明。'
+      description: language === 'en' ? 'Full lifecycle explanation.' : '完整生命周期说明。'
     }
     machine.details.pending = detail
 

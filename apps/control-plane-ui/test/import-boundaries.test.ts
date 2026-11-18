@@ -11,8 +11,7 @@ async function sourceFiles(directory = sourceRoot): Promise<string[]> {
   for (const entry of entries) {
     const entryPath = path.join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await sourceFiles(entryPath)))
-    else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
-      files.push(entryPath)
+    else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) files.push(entryPath)
   }
   return files
 }
@@ -26,8 +25,7 @@ function resolveLocalImport(
   const base = path.resolve(path.dirname(from), specifier.replace(/\.js$/, ''))
   for (const extension of ['.ts', '.tsx']) {
     const candidate = `${base}${extension}`
-    if (candidate.startsWith(sourceRoot) && knownFiles.has(candidate))
-      return candidate
+    if (candidate.startsWith(sourceRoot) && knownFiles.has(candidate)) return candidate
   }
   return null
 }
@@ -50,10 +48,7 @@ async function localImportGraph(): Promise<Map<string, string[]>> {
       if (resolved) imports.push(resolved)
     }
     const visit = (node: ts.Node): void => {
-      if (
-        ts.isImportDeclaration(node) &&
-        ts.isStringLiteral(node.moduleSpecifier)
-      ) {
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         recordImport(node.moduleSpecifier.text)
       } else if (
         ts.isCallExpression(node) &&
@@ -71,11 +66,7 @@ async function localImportGraph(): Promise<Map<string, string[]>> {
   return graph
 }
 
-function reaches(
-  graph: Map<string, string[]>,
-  start: string,
-  target: string
-): boolean {
+function reaches(graph: Map<string, string[]>, start: string, target: string): boolean {
   const pending = [start]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -101,16 +92,14 @@ test('route modules do not create a dependency cycle through App', async () => {
   expect.assert(memoryModules.length > 0)
   expect(reaches(graph, app, memoryPage)).toBe(true)
   for (const module of routeModules) {
-    expect(
-      reaches(graph, module, app),
-      `${path.basename(module)} must not depend on App.tsx`
-    ).toBe(false)
+    expect(reaches(graph, module, app), `${path.basename(module)} must not depend on App.tsx`).toBe(
+      false
+    )
   }
   for (const module of memoryModules) {
-    expect(
-      reaches(graph, module, app),
-      `${path.basename(module)} must not depend on App.tsx`
-    ).toBe(false)
+    expect(reaches(graph, module, app), `${path.basename(module)} must not depend on App.tsx`).toBe(
+      false
+    )
   }
 })
 

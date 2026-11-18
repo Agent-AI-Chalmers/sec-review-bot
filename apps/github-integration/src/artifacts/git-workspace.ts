@@ -50,13 +50,9 @@ function shellSingleQuote(value: string) {
   return `'${value.replace(/'/g, "'\\''")}'`
 }
 
-async function createGitAskPassAuth(
-  git_auth_token: string
-): Promise<GitAskPassAuth> {
+async function createGitAskPassAuth(git_auth_token: string): Promise<GitAskPassAuth> {
   // Keep the installation token out of git argv; argv can be visible to other local processes.
-  const authDir = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'sec-review-git-auth-')
-  )
+  const authDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-auth-'))
   await fs.chmod(authDir, 0o700)
   const tokenPath = path.join(authDir, 'token')
   const askPassPath = path.join(authDir, 'askpass.sh')
@@ -196,15 +192,11 @@ export function withConfiguredGitFetchProxy(
   }
 }
 
-async function requireWorkspaceCommand(
-  command: string,
-  args: string[]
-): Promise<void> {
+async function requireWorkspaceCommand(command: string, args: string[]): Promise<void> {
   try {
     await execFileAsync(command, args)
   } catch (error) {
-    const cause =
-      error instanceof Error && error.message ? ` ${error.message}` : ''
+    const cause = error instanceof Error && error.message ? ` ${error.message}` : ''
     throw new Error(
       `GitHub integration workspace preparation requires '${command}' in PATH.${cause}`,
       { cause: error }
@@ -225,38 +217,23 @@ async function initializeWorkspaceGitRepository({
   await fs.mkdir(workspace_path, { recursive: true })
   await runGitCommand(workspace_path, ['init'])
   await runGitCommand(workspace_path, ['config', 'user.name', 'sec-review-bot'])
-  await runGitCommand(workspace_path, [
-    'config',
-    'user.email',
-    'sec-review-bot@localhost'
-  ])
+  await runGitCommand(workspace_path, ['config', 'user.email', 'sec-review-bot@localhost'])
 }
 
-async function sanitizeMaterializedGitWorkspace(
-  workspace_path: string
-): Promise<void> {
+async function sanitizeMaterializedGitWorkspace(workspace_path: string): Promise<void> {
   // The agent needs real git objects for diffs, but not remotes, credentials, or fetch metadata.
-  await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(
-    () => {}
-  )
+  await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(() => {})
   await fs.rm(path.join(workspace_path, '.git', 'FETCH_HEAD'), { force: true })
   await fs.rm(path.join(workspace_path, '.git', 'ORIG_HEAD'), { force: true })
   await fs.rm(path.join(workspace_path, '.git', 'logs'), {
     recursive: true,
     force: true
   })
-  await runGitCommand(workspace_path, [
-    'reflog',
-    'expire',
-    '--expire=now',
-    '--all'
-  ]).catch(() => {})
+  await runGitCommand(workspace_path, ['reflog', 'expire', '--expire=now', '--all']).catch(() => {})
   await runGitCommand(workspace_path, ['gc', '--prune=now'])
 }
 
-async function compactWorkspaceGitObjectsBeforeSnapshot(
-  workspace_path: string
-): Promise<void> {
+async function compactWorkspaceGitObjectsBeforeSnapshot(workspace_path: string): Promise<void> {
   const gitDir = path.join(workspace_path, '.git')
   try {
     const stat = await fs.stat(gitDir)
@@ -330,16 +307,9 @@ async function materializeWorkspaceFromRealGitHistory({
     await initializeWorkspaceGitRepository({
       workspace_path: materialized_path
     })
-    await runGitCommand(materialized_path, [
-      'remote',
-      'add',
-      'origin',
-      git_remote_url
-    ])
+    await runGitCommand(materialized_path, ['remote', 'add', 'origin', git_remote_url])
 
-    const auth = git_auth_token
-      ? await createGitAskPassAuth(git_auth_token)
-      : null
+    const auth = git_auth_token ? await createGitAskPassAuth(git_auth_token) : null
     try {
       const fetchArgs = [
         'fetch',
@@ -366,9 +336,7 @@ async function materializeWorkspaceFromRealGitHistory({
 
     const head_ref = refs[refs.length - 1]
     if (!head_ref) {
-      throw new Error(
-        'materializeWorkspaceFromRealGitHistory requires at least one ref.'
-      )
+      throw new Error('materializeWorkspaceFromRealGitHistory requires at least one ref.')
     }
     await runGitCommand(materialized_path, ['checkout', '--detach', head_ref])
     // Fetching by SHA leaves no branch pointing at the fetched commits, and the
@@ -417,49 +385,34 @@ export async function materializeWorkspaceWithCommitHistory({
 }): Promise<void> {
   const normalizedRefs = refs
     .map((item) => String(item).trim())
-    .filter(
-      (item, index, array) => item !== '' && array.indexOf(item) === index
-    )
+    .filter((item, index, array) => item !== '' && array.indexOf(item) === index)
 
   if (normalizedRefs.length === 0) {
-    throw new Error(
-      'materializeWorkspaceWithCommitHistory requires at least one ref.'
-    )
+    throw new Error('materializeWorkspaceWithCommitHistory requires at least one ref.')
   }
 
   for (const ref of normalizedRefs) {
     if (ref.startsWith('-')) {
-      throw new Error(
-        'materializeWorkspaceWithCommitHistory refs must not start with "-".'
-      )
+      throw new Error('materializeWorkspaceWithCommitHistory refs must not start with "-".')
     }
   }
 
   if (!git_remote_url || git_remote_url.trim() === '') {
-    throw new Error(
-      'materializeWorkspaceWithCommitHistory requires git_remote_url.'
-    )
+    throw new Error('materializeWorkspaceWithCommitHistory requires git_remote_url.')
   }
   // PR and repository reviews rely on real commit relationships; snapshot
   // archives must not be silently promoted into synthetic git history.
   const normalizedWindowBaseSha = window_base_sha?.trim() || undefined
-  if (
-    normalizedWindowBaseSha !== undefined &&
-    !normalizedRefs.includes(normalizedWindowBaseSha)
-  ) {
+  if (normalizedWindowBaseSha !== undefined && !normalizedRefs.includes(normalizedWindowBaseSha)) {
     // A window base that is not among the refs never gets pinned, so it could be
     // pruned by sanitize and the base ref would be absent while callers assume it exists.
-    throw new Error(
-      'materializeWorkspaceWithCommitHistory window_base_sha must be one of refs.'
-    )
+    throw new Error('materializeWorkspaceWithCommitHistory window_base_sha must be one of refs.')
   }
   await materializeWorkspaceFromRealGitHistory({
     workspace_path,
     git_remote_url: git_remote_url.trim(),
     refs: normalizedRefs,
-    ...(normalizedWindowBaseSha
-      ? { window_base_sha: normalizedWindowBaseSha }
-      : {}),
+    ...(normalizedWindowBaseSha ? { window_base_sha: normalizedWindowBaseSha } : {}),
     ...(git_auth_token ? { git_auth_token } : {})
   })
 }
@@ -501,11 +454,7 @@ const WORKSPACE_DIFF_ARGS = [
 
 const WORKSPACE_GIT_CONFIG = ['core.pager=cat', 'diff.noprefix=false']
 
-function requireComparableRefs(
-  base_sha: string,
-  head_sha: string,
-  caller: string
-): void {
+function requireComparableRefs(base_sha: string, head_sha: string, caller: string): void {
   for (const [label, value] of [
     ['base_sha', base_sha],
     ['head_sha', head_sha]
@@ -614,9 +563,7 @@ function parseNameStatusZ(output: string): {
  * file reports `-` for both counts, which is not a line count; those become 0 so the list stays
  * numeric while the patch keeps the authoritative placeholder.
  */
-function parseNumstatZ(
-  output: string
-): Map<string, { additions: number; deletions: number }> {
+function parseNumstatZ(output: string): Map<string, { additions: number; deletions: number }> {
   const counts = new Map<string, { additions: number; deletions: number }>()
   const fields = output.split('\0')
   let index = 0
@@ -629,11 +576,9 @@ function parseNumstatZ(
     // inside the path itself. Splitting on every tab would truncate a path like `file\tname.txt`
     // to `file`, and its counts would never match the name-status entry.
     const first_tab = record.indexOf('\t')
-    const second_tab =
-      first_tab === -1 ? -1 : record.indexOf('\t', first_tab + 1)
+    const second_tab = first_tab === -1 ? -1 : record.indexOf('\t', first_tab + 1)
     const added = first_tab === -1 ? '' : record.slice(0, first_tab)
-    const removed =
-      second_tab === -1 ? '' : record.slice(first_tab + 1, second_tab)
+    const removed = second_tab === -1 ? '' : record.slice(first_tab + 1, second_tab)
     const inline_path = second_tab === -1 ? '' : record.slice(second_tab + 1)
     const counts_for_file = {
       additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
@@ -794,10 +739,7 @@ export async function exportWorkspaceWindow({
         deletions: entry.deletions,
         // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
         // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
-        patch:
-          file_patch === undefined || file_patch.includes('Binary files')
-            ? null
-            : file_patch
+        patch: file_patch === undefined || file_patch.includes('Binary files') ? null : file_patch
       }
     })
   }
@@ -898,13 +840,7 @@ export async function createWorkspaceSnapshotTar({
   try {
     await execFileAsync(
       'tar',
-      [
-        '-cf',
-        tempPath,
-        '-C',
-        path.dirname(workspace_path),
-        path.basename(workspace_path)
-      ],
+      ['-cf', tempPath, '-C', path.dirname(workspace_path), path.basename(workspace_path)],
       { timeout: configuredGitTimeoutMs() }
     )
     await fs.rename(tempPath, tar_path)

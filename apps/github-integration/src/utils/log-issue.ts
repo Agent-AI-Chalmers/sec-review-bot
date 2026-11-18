@@ -16,9 +16,7 @@ function displayString(value: unknown): string {
 }
 
 function displayNumber(value: unknown): number | string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : '(missing)'
+  return typeof value === 'number' && Number.isFinite(value) ? value : '(missing)'
 }
 
 export function logIssuePayload(payload: unknown): void {
@@ -37,14 +35,9 @@ export function logIssuePayload(payload: unknown): void {
   const labels = Array.isArray(issue.labels)
     ? issue.labels
         .map((label: unknown) =>
-          typeof label === 'object' && label !== null && 'name' in label
-            ? label.name
-            : undefined
+          typeof label === 'object' && label !== null && 'name' in label ? label.name : undefined
         )
-        .filter(
-          (label): label is string =>
-            typeof label === 'string' && label.length > 0
-        )
+        .filter((label): label is string => typeof label === 'string' && label.length > 0)
     : []
 
   logInfo('webhook_received_completed', {

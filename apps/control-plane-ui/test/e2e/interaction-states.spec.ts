@@ -5,9 +5,7 @@ import { expect, openAuthenticatedRuns, test } from './fixtures.js'
 async function tabTo(page: Page, target: Locator): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await page.keyboard.press('Tab')
-    if (
-      await target.evaluate((element) => element === document.activeElement)
-    ) {
+    if (await target.evaluate((element) => element === document.activeElement)) {
       return
     }
   }
@@ -35,9 +33,7 @@ test.beforeEach(async ({ fixtureRuntime }) => {
   )
 })
 
-test('primary links and commands expose visible keyboard focus', async ({
-  page
-}) => {
+test('primary links and commands expose visible keyboard focus', async ({ page }) => {
   await openAuthenticatedRuns(page)
 
   const runsLink = page.getByRole('link', { name: 'Runs', exact: true })
@@ -49,13 +45,9 @@ test('primary links and commands expose visible keyboard focus', async ({
   await expectVisibleKeyboardFocus(jump)
 })
 
-test('disabled and loading button states match their behavior', async ({
-  page
-}) => {
+test('disabled and loading button states match their behavior', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await expect(
-    page.getByRole('button', { name: 'Previous page' })
-  ).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Previous page' })).toBeDisabled()
 
   let releaseRequest: (() => void) | undefined
   const requestGate = new Promise<void>((resolve) => {

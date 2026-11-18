@@ -1,13 +1,5 @@
 import React from 'react'
-import {
-  Button,
-  Checkbox,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  TextInput
-} from '@mantine/core'
+import { Button, Checkbox, Group, Paper, Stack, Text, TextInput } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconSearch } from '@tabler/icons-react'
 
@@ -21,10 +13,7 @@ import {
 import { rolePresentation, TRAJECTORY_ROLES } from './trajectory-roles.js'
 import { messageKey } from './trajectory-navigation.js'
 import { TrajectoryMessage } from './TrajectoryMessage.js'
-import {
-  TrajectoryMinimap,
-  type MinimapPlacement
-} from './TrajectoryMinimap.js'
+import { TrajectoryMinimap, type MinimapPlacement } from './TrajectoryMinimap.js'
 import { TokenUsagePopover } from './TokenUsagePopover.js'
 
 export function TrajectoryTimeline({
@@ -36,17 +25,10 @@ export function TrajectoryTimeline({
 }): React.JSX.Element {
   const t = useMessages()
   const timelineId = React.useId()
-  const narrowTrajectory = useMediaQuery(
-    `(max-width: ${BREAKPOINTS.rail}px)`,
-    false,
-    {
-      getInitialValueInEffect: false
-    }
-  )
-  const document = React.useMemo(
-    () => buildTrajectoryDocument(events),
-    [events]
-  )
+  const narrowTrajectory = useMediaQuery(`(max-width: ${BREAKPOINTS.rail}px)`, false, {
+    getInitialValueInEffect: false
+  })
+  const document = React.useMemo(() => buildTrajectoryDocument(events), [events])
   const [query, setQuery] = React.useState('')
   const [roles, setRoles] = React.useState<TrajectoryRole[]>(TRAJECTORY_ROLES)
   const [force, setForce] = React.useState(0)
@@ -55,16 +37,13 @@ export function TrajectoryTimeline({
     () =>
       document.messages.filter(
         (message) =>
-          roles.includes(message.role) &&
-          message.searchable.includes(query.trim().toLowerCase())
+          roles.includes(message.role) && message.searchable.includes(query.trim().toLowerCase())
       ),
     [document.messages, query, roles]
   )
   const toggleRole = (role: TrajectoryRole): void =>
     setRoles((current) =>
-      current.includes(role)
-        ? current.filter((item) => item !== role)
-        : [...current, role]
+      current.includes(role) ? current.filter((item) => item !== role) : [...current, role]
     )
   return (
     <Stack gap="md">
@@ -91,9 +70,9 @@ export function TrajectoryTimeline({
                   total: String(document.messages.length)
                 })}
               </Text>
-              {Object.values(document.totalUsage).some(
-                (value) => value !== undefined
-              ) && <TokenUsagePopover usage={document.totalUsage} />}
+              {Object.values(document.totalUsage).some((value) => value !== undefined) && (
+                <TokenUsagePopover usage={document.totalUsage} />
+              )}
             </Group>
           </Stack>
           <Group gap="xs" wrap="wrap">
@@ -121,12 +100,7 @@ export function TrajectoryTimeline({
         </Group>
       </Paper>
       <div className="trajectory-layout">
-        <Stack
-          id={timelineId}
-          gap="sm"
-          className="trajectory-timeline"
-          ref={timelineRef}
-        >
+        <Stack id={timelineId} gap="sm" className="trajectory-timeline" ref={timelineRef}>
           {filtered.map((message) => (
             <TrajectoryMessage
               key={messageKey(message)}

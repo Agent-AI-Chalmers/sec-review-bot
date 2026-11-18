@@ -86,16 +86,11 @@ export function nearestSegment(
   if (low === 0) return 0
   const previous = segments[low - 1]
   const previousDistance = Math.abs(previous.top + previous.height / 2 - center)
-  const candidateDistance = Math.abs(
-    candidate.top + candidate.height / 2 - center
-  )
+  const candidateDistance = Math.abs(candidate.top + candidate.height / 2 - center)
   return previousDistance <= candidateDistance ? low - 1 : low
 }
 
-export function sameSegments(
-  left: MinimapSegment[],
-  right: MinimapSegment[]
-): boolean {
+export function sameSegments(left: MinimapSegment[], right: MinimapSegment[]): boolean {
   if (left.length !== right.length) return false
   return left.every((segment, index) => {
     const other = right[index]

@@ -13,10 +13,7 @@ test('transitions sharing a state pair retain distinct explanations in every lan
     for (const machine of STATE_MACHINES_BY_LANGUAGE[language]) {
       for (const body of [machine, machine.step]) {
         if (body === undefined) continue
-        const groups = Map.groupBy(
-          body.transitions,
-          (edge) => `${edge.from}->${edge.to}`
-        )
+        const groups = Map.groupBy(body.transitions, (edge) => `${edge.from}->${edge.to}`)
         for (const edges of groups.values()) {
           if (edges.length < 2) continue
           const labels: string[] = edges.map((edge) => edgeLabel(body, edge))

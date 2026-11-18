@@ -9,8 +9,7 @@ import { ExecutionStatisticsStore } from '../../src/statistics/execution-statist
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
-  if (value === undefined)
-    throw new Error('A disposable test database is required.')
+  if (value === undefined) throw new Error('A disposable test database is required.')
   return value
 }
 
@@ -100,20 +99,14 @@ test('statistics settle only after two identical reads and persist relational gr
     expect(await statistics.recordFailure(third, 8, 0)).toBe('pending')
     const failuresBeforeRateLimit = await observer.query<{
       consecutive_failure_count: number
-    }>(
-      'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
-      [runId]
-    )
+    }>('SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1', [runId])
     expect(failuresBeforeRateLimit.rows[0]?.consecutive_failure_count).toBe(1)
     const fourth = await statistics.claimNext()
     expect.assert(fourth)
     expect(await statistics.recordRateLimit(fourth, 0)).toBe('pending')
     const failuresAfterRateLimit = await observer.query<{
       consecutive_failure_count: number
-    }>(
-      'SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1',
-      [runId]
-    )
+    }>('SELECT consecutive_failure_count FROM execution_statistics WHERE run_id=$1', [runId])
     expect(failuresAfterRateLimit.rows[0]?.consecutive_failure_count).toBe(1)
     const fifth = await statistics.claimNext()
     expect.assert(fifth)
@@ -262,14 +255,10 @@ test('an empty observation set waits for the full window instead of settling as 
 
     const first = await statistics.claimNext()
     expect.assert(first)
-    expect(await statistics.recordSnapshot(first, emptySnapshot, 0)).toBe(
-      'pending'
-    )
+    expect(await statistics.recordSnapshot(first, emptySnapshot, 0)).toBe('pending')
     const second = await statistics.claimNext()
     expect.assert(second)
-    expect(await statistics.recordSnapshot(second, emptySnapshot, 0)).toBe(
-      'pending'
-    )
+    expect(await statistics.recordSnapshot(second, emptySnapshot, 0)).toBe('pending')
 
     await observer.query(
       `UPDATE execution_statistics
@@ -279,9 +268,7 @@ test('an empty observation set waits for the full window instead of settling as 
     )
     const final = await statistics.claimNext()
     expect.assert(final)
-    expect(await statistics.recordSnapshot(final, emptySnapshot, 0)).toBe(
-      'no_observations'
-    )
+    expect(await statistics.recordSnapshot(final, emptySnapshot, 0)).toBe('no_observations')
 
     const persisted = await observer.query<{
       status: string
@@ -345,9 +332,7 @@ test('rate limiting concludes at the reconciliation deadline without spending fa
       [runId]
     )
 
-    expect(await statistics.recordRateLimit(claimed, 30_000)).toBe(
-      'unavailable'
-    )
+    expect(await statistics.recordRateLimit(claimed, 30_000)).toBe('unavailable')
     const persisted = await observer.query<{
       status: string
       ingestion_status: string
@@ -401,10 +386,7 @@ test('statistics cannot exist without their execution', async () => {
       )
     ).rejects.toSatisfy(
       (error: unknown) =>
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23503'
+        typeof error === 'object' && error !== null && 'code' in error && error.code === '23503'
     )
     await observer.query(
       `INSERT INTO executions (run_id,connector_id,status)
@@ -466,9 +448,7 @@ test('task phases and feedback retries survive snapshot persistence and read pro
         metadata: {
           sec_review_agent: agent,
           sec_review_agent_phase: phase,
-          ...(retry === null
-            ? {}
-            : { sec_review_feedback_retry_index: String(retry) }),
+          ...(retry === null ? {} : { sec_review_feedback_retry_index: String(retry) }),
           ls_provider: 'probe'
         },
         usageDetails: { input: 1, output: 1, total: 2 }
@@ -479,9 +459,7 @@ test('task phases and feedback retries survive snapshot persistence and read pro
       expect.assert(work)
       expect(await statistics.recordSnapshot(work, snapshot, 0)).toBe(expected)
     }
-    const read = (
-      await reviewStore.queries.getExecutionStatistics([runId])
-    ).get(runId)
+    const read = (await reviewStore.queries.getExecutionStatistics([runId])).get(runId)
     expect.assert(read)
     expect(read.token_usage.total_tokens).toBe(10)
     expect(

@@ -60,9 +60,7 @@ async function overlapBehindLock<T>(
   try {
     await holder.query('begin')
     await holder.query(lockSql)
-    const pid = (
-      await holder.query<{ pid: number }>('select pg_backend_pid() as pid')
-    ).rows[0]?.pid
+    const pid = (await holder.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]?.pid
     expect.assert(pid !== undefined)
     started.push(...attempts.map((attempt) => attempt()))
     await waitUntilBlocked(pid, attempts.length)
@@ -121,8 +119,7 @@ test('an overlapping retry of an automation change replays instead of conflictin
       'neither attempt may fail'
     ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
-      (result) =>
-        (result as PromiseFulfilledResult<{ created: boolean }>).value.created
+      (result) => (result as PromiseFulfilledResult<{ created: boolean }>).value.created
     )
     expect(created.toSorted()).toStrictEqual([false, true])
   })
@@ -146,9 +143,7 @@ test('an overlapping retry of a restore replays instead of conflicting', async (
         actor
       ]
     )
-    await pool.query(
-      'update memory_tree_state set active_version=1 where singleton=true'
-    )
+    await pool.query('update memory_tree_state set active_version=1 where singleton=true')
     const restore = {
       operation_id: 'restore-1',
       expected_active_version: 1,
@@ -158,18 +153,14 @@ test('an overlapping retry of a restore replays instead of conflicting', async (
     const results = await overlapBehindLock(
       pool,
       'select 1 from memory_tree_state where singleton=true for update',
-      [
-        () => store.restoreMemoryTree(restore),
-        () => store.restoreMemoryTree(restore)
-      ]
+      [() => store.restoreMemoryTree(restore), () => store.restoreMemoryTree(restore)]
     )
     expect(
       results.map((result) => result.status),
       'neither attempt may fail'
     ).toStrictEqual(['fulfilled', 'fulfilled'])
     const created = results.map(
-      (result) =>
-        (result as PromiseFulfilledResult<{ created: boolean }>).value.created
+      (result) => (result as PromiseFulfilledResult<{ created: boolean }>).value.created
     )
     expect(created.toSorted()).toStrictEqual([false, true])
   })

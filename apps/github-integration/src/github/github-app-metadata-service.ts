@@ -23,17 +23,10 @@ export function setGitHubAppMetadata(
   } = {}
 ): void {
   const slug =
-    typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
-      ? metadata.slug.trim()
-      : null
+    typeof metadata.slug === 'string' && metadata.slug.trim() !== '' ? metadata.slug.trim() : null
   const name =
-    typeof metadata.name === 'string' && metadata.name.trim() !== ''
-      ? metadata.name.trim()
-      : null
-  const id =
-    typeof metadata.id === 'number' && Number.isInteger(metadata.id)
-      ? metadata.id
-      : null
+    typeof metadata.name === 'string' && metadata.name.trim() !== '' ? metadata.name.trim() : null
+  const id = typeof metadata.id === 'number' && Number.isInteger(metadata.id) ? metadata.id : null
 
   github_app_metadata = {
     id,
@@ -49,9 +42,7 @@ export function getGitHubAppMetadata(): GitHubAppMetadata {
 
 /** Normalize a GitHub login for comparison. GitHub logins are case-insensitive. */
 export function normalizeLogin(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== ''
-    ? value.trim().toLowerCase()
-    : null
+  return typeof value === 'string' && value.trim() !== '' ? value.trim().toLowerCase() : null
 }
 
 /** The login this app posts as, normalized, or null when the app metadata has not been loaded.

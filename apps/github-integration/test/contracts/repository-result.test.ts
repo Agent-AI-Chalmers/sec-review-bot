@@ -30,15 +30,11 @@ test('repository result rejects malformed delivery file changes before draft PR 
     status: 'deleted'
   })
 
-  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
-    /duplicate file change entries/
-  )
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(/duplicate file change entries/)
 })
 
 test('repository result parser accepts the shared v1 repository result fixture', () => {
-  const result = parseRepositoryWorkflowResult(
-    contractFixture('repository-review-result.json')
-  )
+  const result = parseRepositoryWorkflowResult(contractFixture('repository-review-result.json'))
 
   expect(result.api_version).toBe('v1')
   expect(result.case_results.at(0)?.case_id).toBe('case-1')
@@ -59,9 +55,7 @@ test('repository result rejects duplicate delivery identities', () => {
   const result = validRepositoryResult()
   result.deliveries.push(structuredClone(result.deliveries[0]))
 
-  expect(() => parseRepositoryWorkflowResult(result)).toThrow(
-    /duplicate delivery_id/
-  )
+  expect(() => parseRepositoryWorkflowResult(result)).toThrow(/duplicate delivery_id/)
 })
 
 test('repository result rejects malformed v1 result before draft PR publishing', () => {

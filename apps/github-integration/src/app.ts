@@ -10,10 +10,7 @@ import {
   webhook_max_body_bytes,
   webhook_path
 } from './config.js'
-import {
-  currentAppBotLogin,
-  setGitHubAppMetadata
-} from './github/github-app-metadata-service.js'
+import { currentAppBotLogin, setGitHubAppMetadata } from './github/github-app-metadata-service.js'
 import { createAppHttpHandler } from './ingress/http/app-http-handler.js'
 import { handleRepositoryReviewDispatch } from './ingress/github/actions/repository-review-http-handler.js'
 import { handleIssueCommentCreated } from './ingress/github/webhooks/issue-comment-created.js'
@@ -56,10 +53,7 @@ app.octokit.log.debug(`Authenticated as '${data.name}'`)
 app.webhooks.on('issue_comment.created', handleIssueCommentCreated)
 app.webhooks.on('issues.opened', handleIssueOpened)
 app.webhooks.on('pull_request.opened', handlePullRequestOpened)
-app.webhooks.on(
-  'pull_request.ready_for_review',
-  handlePullRequestReadyForReview
-)
+app.webhooks.on('pull_request.ready_for_review', handlePullRequestReadyForReview)
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
 const publicationCoordinator = startPublicationCoordinator({ app })
 const preparationCoordinator = startPreparationCoordinator({ app })

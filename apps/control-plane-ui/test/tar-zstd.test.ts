@@ -8,9 +8,9 @@ import { validateRestrictedPaxTar } from '../server/artifacts/tar-zstd.js'
 import { TAR_ZSTD_CORPUS_ROOT as corpus } from './contract-fixtures.js'
 
 test('restricted PAX reader matches the shared corpus', () => {
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')
-  ) as { corpus: Array<{ file: string; expected: 'valid' | 'invalid' }> }
+  const manifest = JSON.parse(fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')) as {
+    corpus: Array<{ file: string; expected: 'valid' | 'invalid' }>
+  }
 
   for (const item of manifest.corpus) {
     const read = (): void =>
@@ -27,9 +27,7 @@ test('restricted PAX reader matches the shared corpus', () => {
 
 test('restricted PAX reader returns the validated canonical header', () => {
   const entries = validateRestrictedPaxTar(
-    zstdDecompressSync(
-      fs.readFileSync(path.join(corpus, 'valid-ustar.tar.zst'))
-    )
+    zstdDecompressSync(fs.readFileSync(path.join(corpus, 'valid-ustar.tar.zst')))
   )
 
   expect(entries).toStrictEqual([

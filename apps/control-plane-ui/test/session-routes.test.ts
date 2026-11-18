@@ -53,13 +53,9 @@ test('BFF bounds browser sessions by evicting the oldest login', async () => {
     const second = await loginCookie(base)
     const third = await loginCookie(base)
 
-    expect(
-      (await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status
-    ).toBe(401)
+    expect((await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status).toBe(401)
     for (const cookie of [second, third])
-      expect(
-        (await fetch(`${base}/api/runs`, { headers: { cookie } })).status
-      ).toBe(200)
+      expect((await fetch(`${base}/api/runs`, { headers: { cookie } })).status).toBe(200)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -98,9 +94,7 @@ test('BFF sign-out expires the session cookie it issued', async () => {
     })
     const cookie = login.headers.get('set-cookie')
     expect.assert(cookie !== null)
-    expect(
-      (await fetch(`${base}/api/runs`, { headers: { cookie } })).status
-    ).toBe(200)
+    expect((await fetch(`${base}/api/runs`, { headers: { cookie } })).status).toBe(200)
 
     // A browser attaches `Origin` to a non-GET request, even same-origin; sign-out is
     // refused without it (see the cross-site test below).
@@ -116,10 +110,7 @@ test('BFF sign-out expires the session cookie it issued', async () => {
 
     // The cleared value must not authenticate, even if a client replays it verbatim.
     const replayed = cleared ?? ''
-    expect(
-      (await fetch(`${base}/api/runs`, { headers: { cookie: replayed } }))
-        .status
-    ).toBe(401)
+    expect((await fetch(`${base}/api/runs`, { headers: { cookie: replayed } })).status).toBe(401)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -195,9 +186,7 @@ test('BFF refuses a cross-site sign-out', async () => {
 
     // A request that carries neither `Origin` nor `Referer` is also refused, since an
     // attacker can omit both.
-    expect(
-      (await fetch(`${base}/api/session`, { method: 'DELETE' })).status
-    ).toBe(403)
+    expect((await fetch(`${base}/api/session`, { method: 'DELETE' })).status).toBe(403)
 
     // `Referer` alone is enough, so a same-origin caller that could not set `Origin`
     // still signs out.

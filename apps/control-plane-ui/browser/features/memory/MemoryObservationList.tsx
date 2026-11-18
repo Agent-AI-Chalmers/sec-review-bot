@@ -39,8 +39,7 @@ export function MemoryObservationList({
 }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
-  const [selectedObservation, setSelectedObservation] =
-    React.useState<Observation>()
+  const [selectedObservation, setSelectedObservation] = React.useState<Observation>()
 
   // Reveal a requested observation: scroll to, focus, and highlight its row.
   const targetLoaded =
@@ -57,15 +56,12 @@ export function MemoryObservationList({
     })
     return (): void => cancelAnimationFrame(frame)
   }, [highlightedObservation, targetLoaded])
-  const targetMissing =
-    highlightedObservation !== undefined && !targetLoaded && !loading && !error
+  const targetMissing = highlightedObservation !== undefined && !targetLoaded && !loading && !error
 
   const filterBanner = versionFilter !== undefined && (
     <Alert color="gray" mb="md">
       <Group justify="space-between" gap="xs">
-        <span>
-          {t('observationsForVersion', { version: String(versionFilter) })}
-        </span>
+        <span>{t('observationsForVersion', { version: String(versionFilter) })}</span>
         <Button size="xs" variant="subtle" onClick={onClearVersionFilter}>
           {t('showAllObservations')}
         </Button>
@@ -95,16 +91,12 @@ export function MemoryObservationList({
           {t('observationNotFound')}
         </Alert>
       )}
-      {loading && observations.length === 0 && (
-        <LoadingState message={t('loading')} />
-      )}
+      {loading && observations.length === 0 && <LoadingState message={t('loading')} />}
       <div className="memory-table">
         <Table striped>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th className="memory-observation-index">
-                {t('observation')}
-              </Table.Th>
+              <Table.Th className="memory-observation-index">{t('observation')}</Table.Th>
               <Table.Th>{t('sourceRun')}</Table.Th>
               <Table.Th>{t('observationOutcome')}</Table.Th>
               <Table.Th>{t('created')}</Table.Th>
@@ -117,9 +109,7 @@ export function MemoryObservationList({
                 key={item.observation_id}
                 data-observation-row={item.observation_id}
                 tabIndex={-1}
-                data-highlighted={
-                  item.observation_id === highlightedObservation || undefined
-                }
+                data-highlighted={item.observation_id === highlightedObservation || undefined}
                 onAnimationEnd={(event) => {
                   if (
                     event.currentTarget === event.target &&
@@ -129,10 +119,7 @@ export function MemoryObservationList({
                 }}
               >
                 {/* This is deliberately a display index, not an extraction identity. */}
-                <Table.Td
-                  data-label={t('observation')}
-                  className="memory-observation-index"
-                >
+                <Table.Td data-label={t('observation')} className="memory-observation-index">
                   {index + 1}
                 </Table.Td>
                 <Table.Td data-label={t('sourceRun')}>

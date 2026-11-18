@@ -6,9 +6,7 @@ import { api, apiPost } from '../../browser/shared/api-client.js'
 import { renderComponent } from './render.js'
 
 vi.mock('../../browser/shared/api-client.js', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../browser/shared/api-client.js')
-  >()),
+  ...(await importOriginal<typeof import('../../browser/shared/api-client.js')>()),
   api: vi.fn(),
   apiPost: vi.fn()
 }))
@@ -32,9 +30,7 @@ vi.mock('../../browser/features/workspace/FileWorkspace.js', () => ({
     <textarea
       aria-label="Memory content"
       value={files['MEMORY.md']}
-      onChange={(event) =>
-        onFilesChange({ 'MEMORY.md': event.currentTarget.value })
-      }
+      onChange={(event) => onFilesChange({ 'MEMORY.md': event.currentTarget.value })}
     />
   )
 }))
@@ -56,8 +52,7 @@ test.each([
         treeReads++
         return { version: currentVersion }
       }
-      if (path === '/memory/tree/automation')
-        return { state: 'paused', version: 1 }
+      if (path === '/memory/tree/automation') return { state: 'paused', version: 1 }
       if (path.endsWith('/content')) {
         const version = currentVersion
         if (delayedLoad && version === baseVersion) {
@@ -100,9 +95,9 @@ test.each([
     await waitFor(() => expect(treeReads).toBeGreaterThan(readsBefore))
     const commit = screen.getByRole('button', { name: 'Commit version' })
     fireEvent.click(commit)
-    await within(
-      screen.getByRole('dialog', { name: 'Edit memory files' })
-    ).findByText('The edit could not be committed.')
+    await within(screen.getByRole('dialog', { name: 'Edit memory files' })).findByText(
+      'The edit could not be committed.'
+    )
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String) as unknown,
       expected_active_version: baseVersion,
@@ -131,13 +126,9 @@ test.each([
     const discard = await screen.findByRole('dialog', {
       name: 'Discard memory changes?'
     })
-    fireEvent.click(
-      within(discard).getByRole('button', { name: 'Discard changes' })
-    )
+    fireEvent.click(within(discard).getByRole('button', { name: 'Discard changes' }))
     await waitFor(() =>
-      expect(
-        screen.queryByRole('textbox', { name: 'Memory content' })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Memory content' })).not.toBeInTheDocument()
     )
     fireEvent.click(edit)
     const reopened = await screen.findByRole('textbox', {

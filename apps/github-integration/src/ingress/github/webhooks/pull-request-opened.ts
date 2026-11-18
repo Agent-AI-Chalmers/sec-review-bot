@@ -21,10 +21,7 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
-import {
-  type TriggerConfigHandlerDeps,
-  type WebhookHandlerArgs
-} from './handler-deps.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type PullRequestOpenedWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.opened'>,
@@ -40,11 +37,7 @@ interface HandlerDeps extends TriggerConfigHandlerDeps {
     trusted_default_branch: { default_branch: string; head_sha: string }
     event_type: 'opened'
     delivery_id: string
-    on_admitted?: (admission: {
-      run_id: string
-      status: string
-      replayed: boolean
-    }) => void
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   }) => Promise<unknown>
 }
 

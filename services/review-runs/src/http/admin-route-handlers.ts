@@ -10,10 +10,7 @@ export function buildAdminRouteHandlers(store: ReviewRunStore) {
     abandonBlockedPreparation: async (request) => {
       const { runId } = request.params
       const { reason } = request.body
-      return await store.operatorDecisions.abandonBlockedPreparation(
-        runId,
-        reason
-      )
+      return await store.operatorDecisions.abandonBlockedPreparation(runId, reason)
     },
 
     giveUpDisconnectedRun: async (request) => {

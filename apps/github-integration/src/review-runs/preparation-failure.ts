@@ -30,10 +30,7 @@ function isRateLimited(error: unknown): boolean {
   return (
     headers['retry-after'] !== undefined ||
     headers['x-ratelimit-remaining'] === '0' ||
-    [info.message, info.response?.data?.message]
-      .join(' ')
-      .toLowerCase()
-      .includes('rate limit')
+    [info.message, info.response?.data?.message].join(' ').toLowerCase().includes('rate limit')
   )
 }
 
@@ -43,8 +40,7 @@ export function classifyPreparationFailure(
   deterministic = false
 ): PreparationFailureClassification {
   const code = errorCode(error)
-  if (deterministic || error instanceof InvalidPreparationInputError)
-    return { retry: false, code }
+  if (deterministic || error instanceof InvalidPreparationInputError) return { retry: false, code }
   const status = asErrorWithResponse(error).status
   const retry =
     status === undefined ||
@@ -53,7 +49,5 @@ export function classifyPreparationFailure(
     status === 409 ||
     status === 429 ||
     (status === 403 && isRateLimited(error))
-  return retry
-    ? { retry, code, retryAfterMs: retryAfterMs(error, attempt) }
-    : { retry, code }
+  return retry ? { retry, code, retryAfterMs: retryAfterMs(error, attempt) } : { retry, code }
 }

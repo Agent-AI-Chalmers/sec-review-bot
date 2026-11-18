@@ -19,9 +19,7 @@ function octokitReturning(result: unknown): Octokit {
 }
 
 test('returns the trimmed installation token', async () => {
-  const token = await getInstallationAccessToken(
-    octokitReturning({ token: '  ghs_abc123  ' })
-  )
+  const token = await getInstallationAccessToken(octokitReturning({ token: '  ghs_abc123  ' }))
   expect(token).toBe('ghs_abc123')
 })
 

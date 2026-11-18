@@ -24,16 +24,10 @@ export interface ManualCommandAuthorizationDecision {
   sender_login: string | null
   permission: RepositoryPermission
   required_permission: 'write'
-  reason:
-    | 'allowed'
-    | 'missing-sender'
-    | 'insufficient-permission'
-    | 'permission-lookup-failed'
+  reason: 'allowed' | 'missing-sender' | 'insufficient-permission' | 'permission-lookup-failed'
 }
 
-export function normalizeRepositoryPermission(
-  value: unknown
-): RepositoryPermission {
+export function normalizeRepositoryPermission(value: unknown): RepositoryPermission {
   if (
     value === 'none' ||
     value === 'read' ||
@@ -60,9 +54,7 @@ export async function authorizeManualCommentCommand({
   sender_login: string | undefined
 }): Promise<ManualCommandAuthorizationDecision> {
   const normalizedSender =
-    typeof sender_login === 'string' && sender_login.trim() !== ''
-      ? sender_login.trim()
-      : null
+    typeof sender_login === 'string' && sender_login.trim() !== '' ? sender_login.trim() : null
 
   if (!normalizedSender) {
     return {

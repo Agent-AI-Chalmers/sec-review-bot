@@ -19,17 +19,15 @@ test('preparation retries a transient GitHub response with bounded backoff', () 
 })
 
 test('preparation does not retry a deterministic setup failure', () => {
-  expect(
-    classifyPreparationFailure(new Error('invalid setup declaration'), 1, true)
-  ).toStrictEqual({ retry: false, code: null })
+  expect(classifyPreparationFailure(new Error('invalid setup declaration'), 1, true)).toStrictEqual(
+    { retry: false, code: null }
+  )
 })
 
 test('preparation does not retry malformed durable connector input', () => {
   expect(
     classifyPreparationFailure(
-      new InvalidPreparationInputError(
-        'Unsupported preparation input version.'
-      ),
+      new InvalidPreparationInputError('Unsupported preparation input version.'),
       4
     )
   ).toStrictEqual({ retry: false, code: null })

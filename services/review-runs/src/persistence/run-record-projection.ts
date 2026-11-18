@@ -1,7 +1,4 @@
-import type {
-  ReviewRunWorkflow,
-  ExecutionArtifactStorage
-} from '../contracts.js'
+import type { ReviewRunWorkflow, ExecutionArtifactStorage } from '../contracts.js'
 import type { Pool, PoolClient } from 'pg'
 import {
   normalizeArtifactStorage,
@@ -48,9 +45,7 @@ export interface ReviewRunRow {
     workflow_result: unknown
   }
   publication: AxisRowColumns<PublicationStatus>
-  preparation: AxisRowColumns<
-    'pending' | 'preparing' | 'submitted' | 'failed' | null
-  > & {
+  preparation: AxisRowColumns<'pending' | 'preparing' | 'submitted' | 'failed' | null> & {
     missing: boolean
     attempt_count: number | null
     disconnect_reason: string | null
@@ -228,10 +223,7 @@ export function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     failure_message: publicationFailure
       ? publication.failure_message
       : (execution.failure_message ?? preparation.failure_message),
-    artifact_storage: normalizeArtifactStorage(
-      execution.artifact_storage,
-      `run ${trunk.run_id}`
-    ),
+    artifact_storage: normalizeArtifactStorage(execution.artifact_storage, `run ${trunk.run_id}`),
     notices: row.notices,
     ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
     ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})

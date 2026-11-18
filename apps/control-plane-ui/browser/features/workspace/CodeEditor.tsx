@@ -25,11 +25,7 @@ export function CodeEditor({
   React.useEffect(() => {
     if (!hostRef.current) return
     const languageExtension: Extension[] =
-      language === 'markdown'
-        ? [markdown()]
-        : language === 'json'
-          ? [json()]
-          : []
+      language === 'markdown' ? [markdown()] : language === 'json' ? [json()] : []
     const view = new EditorView({
       doc: value,
       parent: hostRef.current,
@@ -41,8 +37,7 @@ export function CodeEditor({
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !readOnly)
-            onChangeRef.current(update.state.doc.toString())
+          if (update.docChanged && !readOnly) onChangeRef.current(update.state.doc.toString())
         })
       ]
     })

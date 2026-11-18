@@ -33,15 +33,9 @@ const bundleArtifact = {
  * the run and memory artifact kinds.
  */
 test('a execution archive resolves to the object it names', () => {
-  const published = publishedExecutionArchive(
-    runBody(bundleArtifact),
-    'run-1',
-    BUCKET
-  )
+  const published = publishedExecutionArchive(runBody(bundleArtifact), 'run-1', BUCKET)
   expect(published.kind).toBe('available')
-  expect(
-    published.kind === 'available' ? published.artifact : null
-  ).toStrictEqual({
+  expect(published.kind === 'available' ? published.artifact : null).toStrictEqual({
     digest: DIGEST,
     key: 'runs/run-1/artifacts/execution-archive.v1.tar.zst',
     maximumSize: 128 * 1024 * 1024,
@@ -50,9 +44,9 @@ test('a execution archive resolves to the object it names', () => {
 })
 
 test('a run body for another run never resolves an artifact', () => {
-  expect(
-    publishedExecutionArchive(runBody(bundleArtifact), 'run-2', BUCKET)
-  ).toStrictEqual({ kind: 'invalid' })
+  expect(publishedExecutionArchive(runBody(bundleArtifact), 'run-2', BUCKET)).toStrictEqual({
+    kind: 'invalid'
+  })
 })
 
 test('a run that has not published an artifact resolves nothing', () => {
@@ -70,16 +64,16 @@ test('a reference naming a different object is invalid', () => {
     ...bundleArtifact,
     uri: `s3://${BUCKET}/runs/run-1/artifacts/other.v1.tar.zst`
   }
-  expect(
-    publishedExecutionArchive(runBody(elsewhere), 'run-1', BUCKET)
-  ).toStrictEqual({ kind: 'invalid' })
+  expect(publishedExecutionArchive(runBody(elsewhere), 'run-1', BUCKET)).toStrictEqual({
+    kind: 'invalid'
+  })
   const wrongBucket = {
     ...bundleArtifact,
     uri: 's3://other-bucket/runs/run-1/artifacts/execution-archive.v1.tar.zst'
   }
-  expect(
-    publishedExecutionArchive(runBody(wrongBucket), 'run-1', BUCKET)
-  ).toStrictEqual({ kind: 'invalid' })
+  expect(publishedExecutionArchive(runBody(wrongBucket), 'run-1', BUCKET)).toStrictEqual({
+    kind: 'invalid'
+  })
 })
 
 test('malformed fields are invalid rather than unavailable', () => {
@@ -99,9 +93,9 @@ test('malformed fields are invalid rather than unavailable', () => {
 
 test('an object over the serving budget is reported as too large', () => {
   const oversized = { ...bundleArtifact, size_bytes: 128 * 1024 * 1024 + 1 }
-  expect(
-    publishedExecutionArchive(runBody(oversized), 'run-1', BUCKET)
-  ).toStrictEqual({ kind: 'too_large' })
+  expect(publishedExecutionArchive(runBody(oversized), 'run-1', BUCKET)).toStrictEqual({
+    kind: 'too_large'
+  })
 })
 
 test('a memory tree must name the key its digest derives', () => {
@@ -131,9 +125,7 @@ test('a trajectory reference stays inside its published prefix', () => {
     media_type: 'application/zstd',
     size_bytes: 64
   }
-  expect(catalogArtifactReference(artifact, 'trajectory').kind).toBe(
-    'available'
-  )
+  expect(catalogArtifactReference(artifact, 'trajectory').kind).toBe('available')
   expect(
     catalogArtifactReference(
       {

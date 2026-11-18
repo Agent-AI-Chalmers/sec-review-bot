@@ -23,15 +23,9 @@ test('allows package-local imports and contract tools using codegen', () => {
 
 test('rejects dependencies on another application or service regardless of version protocol', () => {
   for (const version of ['workspace:*', '*', '1.0.0']) {
-    assert.equal(
-      check('', { devDependencies: { '@test/api': version } }).length,
-      1
-    )
+    assert.equal(check('', { devDependencies: { '@test/api': version } }).length, 1)
   }
-  assert.equal(
-    check('', { dependencies: { alias: 'file:../../services/api' } }).length,
-    1
-  )
+  assert.equal(check('', { dependencies: { alias: 'file:../../services/api' } }).length, 1)
 })
 
 test('rejects static, type-only, re-export, dynamic, require and URL references across packages', () => {
@@ -56,14 +50,8 @@ test('rejects cross-package references in tests as well as production code', () 
     'services/review-runs/test/integration/cross-package.test.ts':
       "require('../../../../apps/github-integration/src/review-runs/client.ts')"
   }
-  assert.equal(
-    checkBoundaries(Object.keys(files), (file) => files[file]).length,
-    1
-  )
+  assert.equal(checkBoundaries(Object.keys(files), (file) => files[file]).length, 1)
   files['services/review-runs/test/integration/cross-package.test.ts'] =
     "require('../../../../apps/github-integration/src/app.ts')"
-  assert.equal(
-    checkBoundaries(Object.keys(files), (file) => files[file]).length,
-    1
-  )
+  assert.equal(checkBoundaries(Object.keys(files), (file) => files[file]).length, 1)
 })

@@ -38,8 +38,7 @@ async function bundle(
         uid: 0,
         gid: 0
       }
-      const done = (error?: Error | null): void =>
-        error ? reject(error) : resolve()
+      const done = (error?: Error | null): void => (error ? reject(error) : resolve())
       if (body === undefined) pack.entry(header, done)
       else pack.entry(header, body, done)
     })
@@ -81,12 +80,10 @@ test('execution archive reader exposes text and marks binary files unpreviewable
   )
 
   expect(view.files['result.json']).toBe('{"status":"completed"}')
-  expect(view.files['artifact-tree/unit-1/review.jsonl']).toBe(
-    '{"event":"message"}\n'
-  )
-  expect(
-    view.unpreviewableFiles['artifact-tree/unit-1/evidence.bin']
-  ).toStrictEqual({ sizeBytes: 3 })
+  expect(view.files['artifact-tree/unit-1/review.jsonl']).toBe('{"event":"message"}\n')
+  expect(view.unpreviewableFiles['artifact-tree/unit-1/evidence.bin']).toStrictEqual({
+    sizeBytes: 3
+  })
 })
 
 test('execution archive reader rejects another run and unsafe archive paths', async () => {
@@ -125,10 +122,7 @@ test('execution archive reader rejects links and missing manifest entries', asyn
     )
   ).rejects.toThrow(/invalid_execution_archive/)
   await expect(
-    readExecutionArchive(
-      await bundle([{ name: 'result.json', body: '{}' }]),
-      'run-1'
-    )
+    readExecutionArchive(await bundle([{ name: 'result.json', body: '{}' }]), 'run-1')
   ).rejects.toThrow(/invalid_execution_archive/)
 })
 
@@ -142,9 +136,7 @@ test('execution archive reader matches the shared profile corpus', async () => {
     'v1',
     'corpus'
   )
-  const manifest = JSON.parse(
-    await readFile(path.join(corpus, 'manifest.json'), 'utf8')
-  ) as {
+  const manifest = JSON.parse(await readFile(path.join(corpus, 'manifest.json'), 'utf8')) as {
     corpus: Array<{
       file: string
       expected: 'valid' | 'invalid'
@@ -153,13 +145,9 @@ test('execution archive reader matches the shared profile corpus', async () => {
   }
 
   for (const item of manifest.corpus) {
-    const read = readExecutionArchive(
-      await readFile(path.join(corpus, item.file)),
-      item.runId
-    )
+    const read = readExecutionArchive(await readFile(path.join(corpus, item.file)), item.runId)
     if (item.expected === 'valid') await read
-    else
-      await expect(read, item.file).rejects.toThrow(/invalid_execution_archive/)
+    else await expect(read, item.file).rejects.toThrow(/invalid_execution_archive/)
   }
 })
 

@@ -1,14 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Badge,
-  Drawer,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  UnstyledButton
-} from '@mantine/core'
+import { Badge, Drawer, Group, Paper, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconChevronRight } from '@tabler/icons-react'
 
 import type { ParkedRun } from '../api.js'
@@ -19,11 +11,7 @@ import { ICON_SIZE } from '../../../shared/design.js'
 import { useNow } from '../../../shared/useNow.js'
 
 /** The operator queue for runs whose coordination stopped without concluding. */
-export function ParkedRuns({
-  blocked
-}: {
-  blocked: ParkedRun[]
-}): React.JSX.Element | null {
+export function ParkedRuns({ blocked }: { blocked: ParkedRun[] }): React.JSX.Element | null {
   const t = useMessages()
   const now = useNow()
   const [opened, setOpened] = React.useState(false)
@@ -51,12 +39,7 @@ export function ParkedRuns({
           aria-expanded={opened}
         >
           <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
-            <Group
-              className="parked-runs-summary-copy"
-              gap="sm"
-              align="center"
-              wrap="nowrap"
-            >
+            <Group className="parked-runs-summary-copy" gap="sm" align="center" wrap="nowrap">
               <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
               <Stack gap={2} className="parked-runs-summary-text">
                 <Group gap="xs" wrap="nowrap">
@@ -95,45 +78,39 @@ export function ParkedRuns({
             </Text>
           </Stack>
           <Stack gap="xl">
-            {(['preparation', 'execution', 'publication'] as const).map(
-              (axis) => {
-                const runs = blocked.filter((block) => block.axis === axis)
-                if (runs.length === 0) return null
-                return (
-                  <Stack gap="sm" key={axis}>
-                    <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-                      {axisLabel(axis, t)}
-                    </Text>
-                    {runs.map((block) => {
-                      const wait = now - Date.parse(block.parked_at)
-                      return (
-                        <UnstyledButton
-                          key={block.run_id}
-                          component={Link}
-                          to={`/runs/${encodeURIComponent(block.run_id)}`}
-                          className="parked-run-row"
-                        >
-                          <Text
-                            size="sm"
-                            ff="monospace"
-                            className="parked-run-id"
-                          >
-                            {block.run_id}
+            {(['preparation', 'execution', 'publication'] as const).map((axis) => {
+              const runs = blocked.filter((block) => block.axis === axis)
+              if (runs.length === 0) return null
+              return (
+                <Stack gap="sm" key={axis}>
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                    {axisLabel(axis, t)}
+                  </Text>
+                  {runs.map((block) => {
+                    const wait = now - Date.parse(block.parked_at)
+                    return (
+                      <UnstyledButton
+                        key={block.run_id}
+                        component={Link}
+                        to={`/runs/${encodeURIComponent(block.run_id)}`}
+                        className="parked-run-row"
+                      >
+                        <Text size="sm" ff="monospace" className="parked-run-id">
+                          {block.run_id}
+                        </Text>
+                        {Number.isFinite(wait) && (
+                          <Text size="xs" c="dimmed">
+                            {t('parkedAge', {
+                              duration: formatDuration(Math.max(0, wait), t)
+                            })}
                           </Text>
-                          {Number.isFinite(wait) && (
-                            <Text size="xs" c="dimmed">
-                              {t('parkedAge', {
-                                duration: formatDuration(Math.max(0, wait), t)
-                              })}
-                            </Text>
-                          )}
-                        </UnstyledButton>
-                      )
-                    })}
-                  </Stack>
-                )
-              }
-            )}
+                        )}
+                      </UnstyledButton>
+                    )
+                  })}
+                </Stack>
+              )
+            })}
           </Stack>
         </Stack>
       </Drawer>

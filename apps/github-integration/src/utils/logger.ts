@@ -21,15 +21,12 @@ function timestamp(): string {
 
 function formatScalar(value: unknown): string {
   if (value == null) return 'null'
-  if (typeof value === 'number' || typeof value === 'boolean')
-    return String(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
 
   const text =
     typeof value === 'string'
       ? value
-      : typeof value === 'bigint' ||
-          typeof value === 'symbol' ||
-          typeof value === 'function'
+      : typeof value === 'bigint' || typeof value === 'symbol' || typeof value === 'function'
         ? String(value)
         : JSON.stringify(value)
   return /\s/.test(text) ? JSON.stringify(text) : text
@@ -75,8 +72,7 @@ function formatFields(fields: LogFields) {
 }
 
 function shouldColorize(level: LogLevel): boolean {
-  const noColor =
-    typeof process.env.NO_COLOR === 'string' && process.env.NO_COLOR !== ''
+  const noColor = typeof process.env.NO_COLOR === 'string' && process.env.NO_COLOR !== ''
   if (noColor) {
     return false
   }
@@ -109,17 +105,11 @@ function formatLevelLabel(level: LogLevel): string {
   return `[${color}${padded}${ANSI_RESET}]`
 }
 
-export function logEvent(
-  level: LogLevel,
-  event: string,
-  fields: LogFields = {}
-): void {
+export function logEvent(level: LogLevel, event: string, fields: LogFields = {}): void {
   const levelLabel = formatLevelLabel(level)
-  const eventLabel =
-    event.length >= EVENT_WIDTH ? `${event} ` : `${event.padEnd(EVENT_WIDTH)} `
+  const eventLabel = event.length >= EVENT_WIDTH ? `${event} ` : `${event.padEnd(EVENT_WIDTH)} `
   const renderedFields = formatFields(fields)
-  const line =
-    `${timestamp()} ${levelLabel} ${eventLabel}${renderedFields}`.trimEnd()
+  const line = `${timestamp()} ${levelLabel} ${eventLabel}${renderedFields}`.trimEnd()
 
   if (level === 'error') {
     console.error(line)

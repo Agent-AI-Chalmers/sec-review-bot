@@ -34,9 +34,7 @@ test('a non-synchronize event always uses the full pull request window', async (
   // the patch and the file list describe different changes.
   expect(calls).toStrictEqual(['full'])
   expect(result.window.kind).toBe('full')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['whole-pr.ts'])
   expect(result.window.reason).toBe('pull-request-scope')
 })
 
@@ -55,9 +53,7 @@ test('a synchronize with a usable push window keeps the push window', async () =
 
   expect(result.window.kind).toBe('push')
   expect(result.window.reason).toBe('synchronize-scope')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['pushed.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['pushed.ts'])
 })
 
 test('a synchronize without a previous head falls back to the full window', async () => {
@@ -75,14 +71,10 @@ test('a synchronize without a previous head falls back to the full window', asyn
   // which is the inconsistency this resolver exists to prevent.
   expect(result.window.kind).toBe('full')
   expect(result.window.reason).toBe('synchronize-previous-head-missing')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['whole-pr.ts'])
 })
 
-function httpError(
-  status: number
-): Error & { status: number; response: unknown } {
+function httpError(status: number): Error & { status: number; response: unknown } {
   return Object.assign(new Error(`HTTP ${status}`), {
     status,
     response: {
@@ -114,9 +106,7 @@ test('an unreachable previous head falls back instead of failing the run', async
   expect(full_calls).toBe(1)
   expect(result.window.kind).toBe('full')
   expect(result.window.reason).toBe('synchronize-previous-head-unreachable')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['whole-pr.ts'])
 })
 
 test('a synchronize that changed no files falls back to the full window', async () => {
@@ -135,9 +125,7 @@ test('a synchronize that changed no files falls back to the full window', async 
 
   expect(result.window.kind).toBe('full')
   expect(result.window.reason).toBe('synchronize-no-files-changed')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['whole-pr.ts'])
 })
 
 test('compare failures other than 404 propagate instead of triggering a full review', async () => {
@@ -213,7 +201,5 @@ test('a force-pushed previous head falls back instead of reviewing a broken wind
   expect(full_calls).toBe(1)
   expect(result.window.kind).toBe('full')
   expect(result.window.reason).toBe('synchronize-previous-head-not-ancestor')
-  expect(
-    result.files.map((item: PullRequestFile) => item.filename)
-  ).toStrictEqual(['whole-pr.ts'])
+  expect(result.files.map((item: PullRequestFile) => item.filename)).toStrictEqual(['whole-pr.ts'])
 })

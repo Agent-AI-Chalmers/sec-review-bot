@@ -15,14 +15,11 @@ import {
   contractFixtureNames
 } from './contract-fixtures.js'
 
-const document = parse(
-  readFileSync(path.join(CATALOG_CONTRACT_ROOT, 'openapi.yaml'), 'utf8')
-) as { components: { schemas: Record<string, object> } }
+const document = parse(readFileSync(path.join(CATALOG_CONTRACT_ROOT, 'openapi.yaml'), 'utf8')) as {
+  components: { schemas: Record<string, object> }
+}
 const defs = JSON.parse(
-  JSON.stringify(document.components.schemas).replaceAll(
-    '#/components/schemas/',
-    '#/$defs/'
-  )
+  JSON.stringify(document.components.schemas).replaceAll('#/components/schemas/', '#/$defs/')
 ) as Record<string, object>
 const manifest = contractFixtureManifest()
 
@@ -33,12 +30,12 @@ test('shared fixtures cover every schema and all files exactly once', () => {
   ]
   expect(new Set(names).size).toBe(names.length)
   expect(names.sort()).toStrictEqual(contractFixtureNames())
-  expect(
-    [...new Set(Object.values(manifest.schema_fixtures))].sort()
-  ).toStrictEqual(Object.keys(defs).sort())
-  expect(
-    [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort()
-  ).toStrictEqual(Object.keys(defs).sort())
+  expect([...new Set(Object.values(manifest.schema_fixtures))].sort()).toStrictEqual(
+    Object.keys(defs).sort()
+  )
+  expect([...new Set(Object.values(manifest.invalid_schema_fixtures))].sort()).toStrictEqual(
+    Object.keys(defs).sort()
+  )
 })
 
 test('response object validation accepts and rejects the shared schema cases', async () => {
@@ -140,15 +137,11 @@ test('actual write routes reject shared malformed requests before reaching the s
     },
     changeMemoryTreeAutomation: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-automation-operation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-automation-operation-result.json'))
     },
     restoreMemoryTree: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-restore-operation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-restore-operation-result.json'))
     },
     abandonVersionPublications: () => {
       calls++
@@ -156,15 +149,11 @@ test('actual write routes reject shared malformed requests before reaching the s
     },
     reserveExtractionPublication: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-extraction-publication.json')
-      )
+      return Promise.resolve(contractFixture('valid-extraction-publication.json'))
     },
     createMemoryTreeVersion: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-version-creation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-version-creation-result.json'))
     },
     reserveVersionPublication: () => {
       calls++
@@ -178,28 +167,12 @@ test('actual write routes reject shared malformed requests before reaching the s
   })
   const routes = [
     ['ExtractionRegistration', '/v1/extractions', 'worker'],
-    [
-      'MemoryTreeAutomationOperation',
-      '/v1/memory-tree/automation/pause',
-      'operator'
-    ],
+    ['MemoryTreeAutomationOperation', '/v1/memory-tree/automation/pause', 'operator'],
     ['MemoryTreeRestoreOperation', '/v1/memory-tree/restore', 'operator'],
-    [
-      'AutomaticVersionPublicationOwner',
-      '/v1/memory-tree/versions/publications/abandon',
-      'worker'
-    ],
-    [
-      'ExtractionPublicationIntent',
-      '/v1/extractions/publications/reserve',
-      'worker'
-    ],
+    ['AutomaticVersionPublicationOwner', '/v1/memory-tree/versions/publications/abandon', 'worker'],
+    ['ExtractionPublicationIntent', '/v1/extractions/publications/reserve', 'worker'],
     ['MemoryTreeVersionCreation', '/v1/memory-tree/versions', 'worker'],
-    [
-      'MemoryTreeVersionCreation',
-      '/v1/memory-tree/versions/publications/reserve',
-      'worker'
-    ]
+    ['MemoryTreeVersionCreation', '/v1/memory-tree/versions/publications/reserve', 'worker']
   ] as const
   try {
     for (const [schema, url, token] of routes) {

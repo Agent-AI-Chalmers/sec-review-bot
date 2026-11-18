@@ -22,8 +22,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     EXECUTION_API_URL: 'http://127.0.0.1:1',
     EXECUTION_API_TOKEN: 'unused'
   })
-  const { startReviewRunsServer } =
-    await import('../../src/runtime/server-runtime.js')
+  const { startReviewRunsServer } = await import('../../src/runtime/server-runtime.js')
   const base = `http://127.0.0.1:${port}`
   const readAuth = {
     authorization: `Bearer ${token}`,
@@ -46,51 +45,35 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     // The query filters are validated by the contract (glue mounts it as the route schema),
     // so the envelope's stable part is the status and code; the message comes from the schema
     // validator and is deliberately not pinned here.
-    const invalidExecutionStatus = await fetch(
-      `${base}/v1/runs?execution_status=typo`,
-      {
-        headers: readAuth
-      }
-    )
+    const invalidExecutionStatus = await fetch(`${base}/v1/runs?execution_status=typo`, {
+      headers: readAuth
+    })
     expect(invalidExecutionStatus.status).toBe(400)
-    expect(
-      ((await invalidExecutionStatus.json()) as { code?: string }).code
-    ).toBe('INVALID_QUERY')
-    const invalidPublicationStatus = await fetch(
-      `${base}/v1/runs?publication_status=typo`,
-      {
-        headers: readAuth
-      }
-    )
+    expect(((await invalidExecutionStatus.json()) as { code?: string }).code).toBe('INVALID_QUERY')
+    const invalidPublicationStatus = await fetch(`${base}/v1/runs?publication_status=typo`, {
+      headers: readAuth
+    })
     expect(invalidPublicationStatus.status).toBe(400)
-    expect(
-      ((await invalidPublicationStatus.json()) as { code?: string }).code
-    ).toBe('INVALID_QUERY')
-    const invalidPreparationStatus = await fetch(
-      `${base}/v1/runs?preparation_status=typo`,
-      {
-        headers: readAuth
-      }
+    expect(((await invalidPublicationStatus.json()) as { code?: string }).code).toBe(
+      'INVALID_QUERY'
     )
+    const invalidPreparationStatus = await fetch(`${base}/v1/runs?preparation_status=typo`, {
+      headers: readAuth
+    })
     expect(invalidPreparationStatus.status).toBe(400)
-    expect(
-      ((await invalidPreparationStatus.json()) as { code?: string }).code
-    ).toBe('INVALID_QUERY')
-    const invalidSourcePlatform = await fetch(
-      `${base}/v1/runs?source_platform=gitlab`,
-      { headers: readAuth }
+    expect(((await invalidPreparationStatus.json()) as { code?: string }).code).toBe(
+      'INVALID_QUERY'
     )
+    const invalidSourcePlatform = await fetch(`${base}/v1/runs?source_platform=gitlab`, {
+      headers: readAuth
+    })
     expect(invalidSourcePlatform.status).toBe(400)
-    expect(
-      ((await invalidSourcePlatform.json()) as { code?: string }).code
-    ).toBe('INVALID_QUERY')
+    expect(((await invalidSourcePlatform.json()) as { code?: string }).code).toBe('INVALID_QUERY')
     const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, {
       headers: readAuth
     })
     expect(invalidWorkflow.status).toBe(400)
-    expect(((await invalidWorkflow.json()) as { code?: string }).code).toBe(
-      'INVALID_QUERY'
-    )
+    expect(((await invalidWorkflow.json()) as { code?: string }).code).toBe('INVALID_QUERY')
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, {
       headers: readAuth
     })
@@ -101,9 +84,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       headers: readAuth
     })
     expect(unknownParameter.status).toBe(400)
-    expect(((await unknownParameter.json()) as { code?: string }).code).toBe(
-      'INVALID_QUERY'
-    )
+    expect(((await unknownParameter.json()) as { code?: string }).code).toBe('INVALID_QUERY')
 
     // A write request whose body the contract rejects — here an admission missing its required
     // `workflow` — is a 400 from the route's own schema, the same `InvalidRequest` envelope the
@@ -120,10 +101,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     expect(missingWorkflow.status).toBe(400)
 
     const runIds: string[] = []
-    for (const ingressKey of [
-      `delivery:${randomUUID()}`,
-      `delivery:${randomUUID()}`
-    ]) {
+    for (const ingressKey of [`delivery:${randomUUID()}`, `delivery:${randomUUID()}`]) {
       const admitted = await fetch(`${base}/v1/runs`, {
         method: 'POST',
         headers: mutationAuth,
@@ -171,9 +149,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     // The coordination event log is the operator timeline the console renders. Its read path
     // is new, so pin the whole HTTP surface: authentication, the admission events, oldest-first
     // ordering, and a run id this connector cannot see reading as 404 rather than empty.
-    const unauthorizedEvents = await fetch(
-      `${base}/v1/runs/${runIds[0]}/events`
-    )
+    const unauthorizedEvents = await fetch(`${base}/v1/runs/${runIds[0]}/events`)
     expect(unauthorizedEvents.status).toBe(401)
     const events = await fetch(`${base}/v1/runs/${runIds[0]}/events`, {
       headers: readAuth
@@ -191,34 +167,26 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     }
     expect(eventsBody.run_id).toBe(runIds[0])
     // Admission writes one event per axis inside the admitting transaction.
-    expect(
-      eventsBody.events.map((event) => `${event.axis}:${event.to_status}`)
-    ).toStrictEqual([
+    expect(eventsBody.events.map((event) => `${event.axis}:${event.to_status}`)).toStrictEqual([
       'execution:pending',
       'preparation:preparing',
       'publication:pending'
     ])
-    const occurredAt = eventsBody.events.map((event) =>
-      Date.parse(event.occurred_at)
-    )
+    const occurredAt = eventsBody.events.map((event) => Date.parse(event.occurred_at))
     expect(occurredAt, 'events are returned oldest first').toStrictEqual(
       [...occurredAt].sort((left, right) => left - right)
     )
-    const unknownRunEvents = await fetch(
-      `${base}/v1/runs/${randomUUID()}/events`,
-      { headers: readAuth }
-    )
+    const unknownRunEvents = await fetch(`${base}/v1/runs/${randomUUID()}/events`, {
+      headers: readAuth
+    })
     expect(unknownRunEvents.status).toBe(404)
     expect(await unknownRunEvents.json()).toStrictEqual({
       error: 'run_not_found'
     })
     // The path parameter is contract-validated like every other run id.
-    const malformedRunEvents = await fetch(
-      `${base}/v1/runs/not-a-uuid/events`,
-      {
-        headers: readAuth
-      }
-    )
+    const malformedRunEvents = await fetch(`${base}/v1/runs/not-a-uuid/events`, {
+      headers: readAuth
+    })
     expect(malformedRunEvents.status).toBe(400)
 
     // The created-at range was accepted by the API but never covered, so a broken
@@ -228,9 +196,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, {
       headers: readAuth
     })
-    expect(
-      ((await boundedAbove.json()) as { runs: unknown[] }).runs
-    ).toHaveLength(2)
+    expect(((await boundedAbove.json()) as { runs: unknown[] }).runs).toHaveLength(2)
     const notYet = await fetch(`${base}/v1/runs?from=${future}`, {
       headers: readAuth
     })
@@ -246,9 +212,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       headers: readAuth
     })
     expect(invalidFrom.status).toBe(400)
-    expect(((await invalidFrom.json()) as { code?: string }).code).toBe(
-      'INVALID_QUERY'
-    )
+    expect(((await invalidFrom.json()) as { code?: string }).code).toBe('INVALID_QUERY')
 
     // The event log belongs to the run trunk, so a run whose axis row is unrepresentable still
     // has a readable history. Before this used the full record projection, which reports that
@@ -256,9 +220,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const corruptRunId = runIds[1]
     const writePool = new Pool({ connectionString: databaseUrl() })
     try {
-      await writePool.query('DELETE FROM executions WHERE run_id=$1', [
-        corruptRunId
-      ])
+      await writePool.query('DELETE FROM executions WHERE run_id=$1', [corruptRunId])
       const corruptDetail = await fetch(`${base}/v1/runs/${corruptRunId}`, {
         headers: readAuth
       })
@@ -266,14 +228,10 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         corruptDetail.status,
         'the record read still treats the corrupt run as unrepresentable'
       ).toBe(404)
-      const corruptEvents = await fetch(
-        `${base}/v1/runs/${corruptRunId}/events`,
-        { headers: readAuth }
-      )
-      expect(
-        corruptEvents.status,
-        'the event log stays readable for a corrupt run'
-      ).toBe(200)
+      const corruptEvents = await fetch(`${base}/v1/runs/${corruptRunId}/events`, {
+        headers: readAuth
+      })
+      expect(corruptEvents.status, 'the event log stays readable for a corrupt run').toBe(200)
       const corruptBody = (await corruptEvents.json()) as {
         run_id: string
         events: unknown[]

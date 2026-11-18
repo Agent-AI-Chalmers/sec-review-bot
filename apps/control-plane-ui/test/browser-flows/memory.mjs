@@ -35,40 +35,31 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     const racePage = await context.newPage()
     let aCancelled = false
     racePage.on('requestfailed', (request) => {
-      if (request.url().endsWith('/memory/versions/1/trajectory/content'))
-        aCancelled = true
+      if (request.url().endsWith('/memory/versions/1/trajectory/content')) aCancelled = true
     })
-    await racePage.route(
-      '**/api/memory/versions/1/trajectory/content',
-      async (route) => {
-        aRequested.resolve()
-        try {
-          await aGate.promise
-          await route.fulfill({
-            json: trajectoryResponse('Trajectory target A')
-          })
-        } finally {
-          aSettled.resolve()
-        }
+    await racePage.route('**/api/memory/versions/1/trajectory/content', async (route) => {
+      aRequested.resolve()
+      try {
+        await aGate.promise
+        await route.fulfill({
+          json: trajectoryResponse('Trajectory target A')
+        })
+      } finally {
+        aSettled.resolve()
       }
-    )
-    await racePage.route(
-      '**/api/memory/versions/2/trajectory/content',
-      async (route) => {
-        bRequested.resolve()
-        await bGate.promise
-        await route.fulfill({ json: trajectoryResponse('Trajectory target B') })
-      }
-    )
+    })
+    await racePage.route('**/api/memory/versions/2/trajectory/content', async (route) => {
+      bRequested.resolve()
+      await bGate.promise
+      await route.fulfill({ json: trajectoryResponse('Trajectory target B') })
+    })
     try {
       await racePage.goto(`${base}/memory/versions/1/trajectory`, {
         waitUntil: 'domcontentloaded'
       })
       // Loading UI alone does not prove A has reached the network interceptor.
       await aRequested.promise
-      await expect(
-        racePage.getByText('Loading…', { exact: true })
-      ).toBeVisible()
+      await expect(racePage.getByText('Loading…', { exact: true })).toBeVisible()
       await racePage.evaluate(() => {
         globalThis.history.pushState({}, '', '/memory/versions/2/trajectory')
         globalThis.dispatchEvent(new globalThis.PopStateEvent('popstate'))
@@ -82,19 +73,11 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
         })
         .toBe(true)
       // B remains blocked while the cancelled request settles; no elapsed-time guess.
-      await expect(
-        racePage.getByText('Loading…', { exact: true })
-      ).toBeVisible()
-      await expect(
-        racePage.getByText('Trajectory target A', { exact: true })
-      ).toHaveCount(0)
+      await expect(racePage.getByText('Loading…', { exact: true })).toBeVisible()
+      await expect(racePage.getByText('Trajectory target A', { exact: true })).toHaveCount(0)
       bGate.resolve()
-      await expect(
-        racePage.getByText('Trajectory target B', { exact: true })
-      ).toBeVisible()
-      await expect(
-        racePage.getByText('Trajectory target A', { exact: true })
-      ).toHaveCount(0)
+      await expect(racePage.getByText('Trajectory target B', { exact: true })).toBeVisible()
+      await expect(racePage.getByText('Trajectory target A', { exact: true })).toHaveCount(0)
       await expect(racePage.getByRole('alert')).toHaveCount(0)
     } finally {
       aGate.resolve()
@@ -104,14 +87,12 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     }
 
     const trajectoryFailurePage = await context.newPage()
-    await trajectoryFailurePage.route(
-      '**/api/memory/versions/1/trajectory/content',
-      (route) =>
-        route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: '{"error":"memory_catalog_unavailable"}'
-        })
+    await trajectoryFailurePage.route('**/api/memory/versions/1/trajectory/content', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"memory_catalog_unavailable"}'
+      })
     )
     await trajectoryFailurePage.goto(`${base}/memory/versions/1/trajectory`, {
       waitUntil: 'domcontentloaded'
@@ -126,16 +107,9 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       const stateRect = state.getBoundingClientRect()
       const alertRect = alert.getBoundingClientRect()
       return (
-        Math.abs(
-          alertRect.left +
-            alertRect.width / 2 -
-            (stateRect.left + stateRect.width / 2)
-        ) < 1 &&
-        Math.abs(
-          alertRect.top +
-            alertRect.height / 2 -
-            (stateRect.top + stateRect.height / 2)
-        ) < 1
+        Math.abs(alertRect.left + alertRect.width / 2 - (stateRect.left + stateRect.width / 2)) <
+          1 &&
+        Math.abs(alertRect.top + alertRect.height / 2 - (stateRect.top + stateRect.height / 2)) < 1
       )
     })
     assert.strictEqual(
@@ -146,14 +120,12 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     await trajectoryFailurePage.close()
 
     const memoryFilesFailurePage = await context.newPage()
-    await memoryFilesFailurePage.route(
-      '**/api/memory/versions/1/content',
-      (route) =>
-        route.fulfill({
-          status: 422,
-          contentType: 'application/json',
-          body: '{"error":"invalid_memory_tree_artifact"}'
-        })
+    await memoryFilesFailurePage.route('**/api/memory/versions/1/content', (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: '{"error":"invalid_memory_tree_artifact"}'
+      })
     )
     await memoryFilesFailurePage.goto(`${base}/memory/versions/1/tree`, {
       waitUntil: 'domcontentloaded'
@@ -187,14 +159,10 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       await partialFailurePage
         .getByText('Memory overview could not be loaded.', { exact: true })
         .waitFor()
-      await partialFailurePage
-        .getByText('Auto-update', { exact: true })
-        .waitFor()
+      await partialFailurePage.getByText('Auto-update', { exact: true }).waitFor()
       await partialFailurePage.getByText('Versions', { exact: true }).click()
       await partialFailurePage.locator('.version-graph-node').first().waitFor()
-      await partialFailurePage
-        .getByText('Observations', { exact: true })
-        .click()
+      await partialFailurePage.getByText('Observations', { exact: true }).click()
       await partialFailurePage.locator('tbody tr').first().waitFor()
       assert.ok(
         (await partialFailurePage.locator('tbody tr').count()) > 0,
@@ -202,9 +170,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       )
       await partialFailurePage.unroute('**/api/memory/overview*')
       await partialFailurePage.getByText('Versions', { exact: true }).click()
-      const loadedVersionCount = await partialFailurePage
-        .locator('.version-graph-node')
-        .count()
+      const loadedVersionCount = await partialFailurePage.locator('.version-graph-node').count()
       await partialFailurePage.route('**/api/memory/versions*', (route) =>
         route.fulfill({
           status: 503,
@@ -212,9 +178,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
           body: '{"error":"memory_catalog_unavailable"}'
         })
       )
-      await partialFailurePage
-        .getByRole('button', { name: 'Refresh', exact: true })
-        .click()
+      await partialFailurePage.getByRole('button', { name: 'Refresh', exact: true }).click()
       await partialFailurePage
         .getByText('Version history could not be loaded.', { exact: true })
         .waitFor()
@@ -244,16 +208,12 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       await unknownCurrentPage.getByText('Versions', { exact: true }).click()
       await unknownCurrentPage.locator('.version-graph-node').first().waitFor()
       assert.strictEqual(
-        await unknownCurrentPage
-          .locator('.version-graph-node[data-current]')
-          .count(),
+        await unknownCurrentPage.locator('.version-graph-node[data-current]').count(),
         0,
         'unknown current version must not mark any graph node as current'
       )
       assert.strictEqual(
-        await unknownCurrentPage
-          .getByRole('button', { name: 'Set current', exact: true })
-          .count(),
+        await unknownCurrentPage.getByRole('button', { name: 'Set current', exact: true }).count(),
         0,
         'unknown current version must not expose set-current in the graph'
       )
@@ -272,16 +232,12 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
         'unknown current version must not mark any list row as current'
       )
       assert.strictEqual(
-        await unknownCurrentPage
-          .getByRole('button', { name: 'Set current', exact: true })
-          .count(),
+        await unknownCurrentPage.getByRole('button', { name: 'Set current', exact: true }).count(),
         0,
         'unknown current version must not expose set-current in the list'
       )
       assert.strictEqual(
-        await unknownCurrentPage
-          .getByText('Already current', { exact: true })
-          .count(),
+        await unknownCurrentPage.getByText('Already current', { exact: true }).count(),
         0,
         'unknown current version must not invent an already-current state'
       )
@@ -341,13 +297,11 @@ export async function runMemoryChineseFlow({ page, base, name }) {
             if (!container || !label || !link) return false
             return (
               Number.parseFloat(getComputedStyle(container).columnGap) > 0 &&
-              getComputedStyle(label).fontSize ===
-                getComputedStyle(link).fontSize
+              getComputedStyle(label).fontSize === getComputedStyle(link).fontSize
             )
           }),
         {
-          message:
-            'Chinese incorporated version text must share typography and a real gap'
+          message: 'Chinese incorporated version text must share typography and a real gap'
         }
       )
       .toBe(true)
@@ -376,14 +330,11 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
     '/api/memory/observations',
     '/api/memory/overview'
   ]
-  const memoryRequestCounts = Object.fromEntries(
-    memoryEndpoints.map((endpoint) => [endpoint, 0])
-  )
+  const memoryRequestCounts = Object.fromEntries(memoryEndpoints.map((endpoint) => [endpoint, 0]))
   const countMemoryRequest = (request) => {
     const pathname = new URL(request.url()).pathname
     const endpoint = memoryEndpoints.find(
-      (candidate) =>
-        pathname === candidate || pathname.startsWith(`${candidate}/`)
+      (candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`)
     )
     if (endpoint !== undefined) memoryRequestCounts[endpoint] += 1
   }
@@ -395,14 +346,9 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
     0,
     `${name} run navigation must not appear on the memory page`
   )
-  await page
-    .getByRole('button', { name: 'Refresh', exact: true })
-    .waitFor({ state: 'visible' })
+  await page.getByRole('button', { name: 'Refresh', exact: true }).waitFor({ state: 'visible' })
   await waitUntil(
-    async () =>
-      !(await page
-        .getByRole('button', { name: 'Refresh', exact: true })
-        .isDisabled()),
+    async () => !(await page.getByRole('button', { name: 'Refresh', exact: true }).isDisabled()),
     `${name} memory refresh must settle`
   )
   await page.getByText('Overview', { exact: true }).waitFor()
@@ -441,20 +387,13 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
   page.off('request', countMemoryRequest)
 }
 
-export async function runMemoryVersionFlow({
-  page,
-  name,
-  viewport,
-  screenshotPath
-}) {
+export async function runMemoryVersionFlow({ page, name, viewport, screenshotPath }) {
   await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByText('Versions', { exact: true }).click()
   await expect(page.locator('[data-version-node="56"]')).toBeVisible()
   const versionGraphLayout = await page.evaluate(() => {
     const box = (version) => {
-      const node = document.querySelector(
-        `.version-graph-node[data-version-node="${version}"]`
-      )
+      const node = document.querySelector(`.version-graph-node[data-version-node="${version}"]`)
       if (node === null) return null
       const bounds = node.getBoundingClientRect()
       return { x: bounds.x, y: bounds.y }
@@ -484,8 +423,7 @@ export async function runMemoryVersionFlow({
     })
     assert.ok(
       graphCentering !== null &&
-        Math.abs(graphCentering.viewportCenter - graphCentering.graphCenter) <
-          2,
+        Math.abs(graphCentering.viewportCenter - graphCentering.graphCenter) < 2,
       `${name} a graph narrower than its viewport must start centered: ${JSON.stringify(graphCentering)}`
     )
   }
@@ -496,9 +434,7 @@ export async function runMemoryVersionFlow({
   )
   if (name === 'desktop')
     assert.strictEqual(
-      await page
-        .locator('.version-graph-node[data-current]')
-        .getAttribute('data-version-node'),
+      await page.locator('.version-graph-node[data-current]').getAttribute('data-version-node'),
       '59',
       `${name} initial graph must distinguish the active version from the newest version`
     )
@@ -519,9 +455,7 @@ export async function runMemoryVersionFlow({
   if (viewport.width <= 600) {
     const list = page.locator('.memory-table:visible')
     assert.ok(
-      await list.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth
-      ),
+      await list.evaluate((element) => element.scrollWidth <= element.clientWidth),
       `${name} mobile versions must keep identity and actions inside each card`
     )
   } else {
@@ -555,8 +489,7 @@ export async function runMemoryVersionFlow({
           iconOffset:
             icon === null
               ? null
-              : icon.getBoundingClientRect().left -
-                button.getBoundingClientRect().left
+              : icon.getBoundingClientRect().left - button.getBoundingClientRect().left
         }
       })
     )
@@ -566,27 +499,16 @@ export async function runMemoryVersionFlow({
           (layout) =>
             Math.abs(layout.left - currentActionLayout[0].left) < 2 &&
             layout.width === currentActionLayout[0].width &&
-            Math.abs(
-              (layout.iconOffset ?? 0) -
-                (currentActionLayout[0].iconOffset ?? 0)
-            ) < 2
+            Math.abs((layout.iconOffset ?? 0) - (currentActionLayout[0].iconOffset ?? 0)) < 2
         ),
       `${name} set-current and already-current actions must keep the same geometry: ${JSON.stringify(currentActionLayout)}`
     )
   }
 }
 
-export async function runMemoryFilesFlow({
-  page,
-  context,
-  base,
-  name,
-  viewport
-}) {
+export async function runMemoryFilesFlow({ page, context, base, name, viewport }) {
   await openVersionList(page)
-  await page
-    .getByRole('combobox', { name: 'Rows per page', exact: true })
-    .click()
+  await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()
   const versionTwoRow = page.locator('tbody tr').filter({
     has: page.locator('.memory-version-cell', { hasText: /^2$/ })
@@ -601,10 +523,7 @@ export async function runMemoryFilesFlow({
   })
   if (viewport.width >= 768) {
     const splitterBox = await treeSplitter.boundingBox()
-    assert.ok(
-      splitterBox !== null,
-      `${name} file tree splitter must be visible`
-    )
+    assert.ok(splitterBox !== null, `${name} file tree splitter must be visible`)
     const filePane = treeDialog.locator('.file-workspace-sidebar')
     const originalWidth = (await filePane.boundingBox())?.width ?? 0
     await page.mouse.move(
@@ -646,17 +565,11 @@ export async function runMemoryFilesFlow({
       `${name} file tree splitter must stay hidden in the stacked layout`
     )
   }
-  await treeDialog
-    .getByRole('link', { name: 'Authentication comparisons' })
-    .click()
-  await treeDialog
-    .getByText('Constant-time comparison', { exact: true })
-    .waitFor()
+  await treeDialog.getByRole('link', { name: 'Authentication comparisons' }).click()
+  await treeDialog.getByText('Constant-time comparison', { exact: true }).waitFor()
   await treeDialog.getByRole('button', { name: 'MEMORY.md' }).click()
   await treeDialog.getByText('Source', { exact: true }).click()
-  await treeDialog
-    .getByText('# Security Review Experience Memory', { exact: false })
-    .waitFor()
+  await treeDialog.getByText('# Security Review Experience Memory', { exact: false }).waitFor()
   await treeDialog.locator('.mantine-Modal-close').click()
 
   await versionTwoRow.getByRole('button', { name: 'Changes' }).click()
@@ -664,21 +577,16 @@ export async function runMemoryFilesFlow({
     name: /Compare version 2 with version 1/
   })
   await diffDialog.locator('.memory-diff-editor .cm-editor').first().waitFor()
-  const diffTitleLayout = await diffDialog
-    .locator('.memory-diff-title')
-    .evaluate((title) => ({
-      parts: [...title.children].map((part) => part.textContent),
-      gap: Number.parseFloat(getComputedStyle(title).columnGap)
-    }))
+  const diffTitleLayout = await diffDialog.locator('.memory-diff-title').evaluate((title) => ({
+    parts: [...title.children].map((part) => part.textContent),
+    gap: Number.parseFloat(getComputedStyle(title).columnGap)
+  }))
   assert.deepStrictEqual(
     diffTitleLayout.parts,
     ['Compare', 'version 2', 'with', 'version 1'],
     `${name} version diff title must render semantic parts in language order`
   )
-  assert.ok(
-    diffTitleLayout.gap > 0,
-    `${name} version diff title spacing must come from layout gap`
-  )
+  assert.ok(diffTitleLayout.gap > 0, `${name} version diff title spacing must come from layout gap`)
   assert.strictEqual(
     await diffDialog.getByText('Preview', { exact: true }).count(),
     0,
@@ -694,9 +602,7 @@ export async function runMemoryFilesFlow({
     `${name} version diff must mark changed files`
   )
   assert.strictEqual(
-    await diffDialog
-      .getByRole('link', { name: 'Open in new page' })
-      .getAttribute('href'),
+    await diffDialog.getByRole('link', { name: 'Open in new page' }).getAttribute('href'),
     '/memory/versions/2/diff',
     `${name} version diff must expose a stable full-page URL`
   )
@@ -707,19 +613,12 @@ export async function runMemoryFilesFlow({
   await diffPage.goto(`${base}/memory/versions/2/diff`, {
     waitUntil: 'networkidle'
   })
-  await diffPage
-    .getByRole('heading', { name: 'Compare version 2 with version 1' })
-    .waitFor()
+  await diffPage.getByRole('heading', { name: 'Compare version 2 with version 1' }).waitFor()
   await diffPage.locator('.memory-diff-editor .cm-editor').first().waitFor()
   await diffPage.close()
 }
 
-export async function runMemoryTrajectoryFlow({
-  page,
-  name,
-  viewport,
-  waitUntil
-}) {
+export async function runMemoryTrajectoryFlow({ page, name, viewport, waitUntil }) {
   await openVersionList(page)
   await page.getByRole('button', { name: 'Trajectory' }).first().click()
   const maintenanceDialog = page.getByRole('dialog', {
@@ -749,17 +648,13 @@ export async function runMemoryTrajectoryFlow({
     }
   })
   assert.ok(
-    trajectoryLayout !== null &&
-      trajectoryLayout.layoutWidth >= trajectoryLayout.bodyWidth - 48,
+    trajectoryLayout !== null && trajectoryLayout.layoutWidth >= trajectoryLayout.bodyWidth - 48,
     `${name} trajectory layout must fill the modal content width`
   )
   assert.ok(
     trajectoryLayout !== null &&
       trajectoryLayout.timelineWidth >=
-        trajectoryLayout.layoutWidth -
-          trajectoryLayout.minimapWidth -
-          trajectoryLayout.gap -
-          1,
+        trajectoryLayout.layoutWidth - trajectoryLayout.minimapWidth - trajectoryLayout.gap - 1,
     `${name} trajectory timeline must fill the column next to the minimap`
   )
   assert.strictEqual(
@@ -773,18 +668,12 @@ export async function runMemoryTrajectoryFlow({
         const minimap = dialog.querySelector('.trajectory-minimap')
         if (minimap === null) return true
         let scroller = minimap.parentElement
-        while (
-          scroller !== null &&
-          !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)
-        )
+        while (scroller !== null && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
           scroller = scroller.parentElement
         if (scroller === null) return false
         const rail = minimap.getBoundingClientRect()
         const port = scroller.getBoundingClientRect()
-        return (
-          Math.abs(rail.top + rail.height / 2 - (port.top + port.height / 2)) <
-          8
-        )
+        return Math.abs(rail.top + rail.height / 2 - (port.top + port.height / 2)) < 8
       }),
     `${name} trajectory rail must center in the modal scrollport`
   )
@@ -792,8 +681,7 @@ export async function runMemoryTrajectoryFlow({
     .getByPlaceholder('Search messages, tools, and arguments')
     .fill('current memory')
   await waitUntil(
-    async () =>
-      (await maintenanceDialog.locator('.trajectory-message').count()) === 1,
+    async () => (await maintenanceDialog.locator('.trajectory-message').count()) === 1,
     `${name} trajectory search must filter messages`
   )
   assert.strictEqual(
@@ -809,9 +697,7 @@ export async function runMemoryTrajectoryFlow({
     /^\/memory\/versions\/\d+\/trajectory$/,
     `${name} trajectory modal must expose a dedicated page`
   )
-  await maintenanceDialog
-    .getByPlaceholder('Search messages, tools, and arguments')
-    .fill('')
+  await maintenanceDialog.getByPlaceholder('Search messages, tools, and arguments').fill('')
   await maintenanceDialog.getByRole('button', { name: 'Expand all' }).click()
   await maintenanceDialog.getByRole('button', { name: 'Collapse all' }).click()
   await maintenanceDialog.locator('.mantine-Modal-close').click()
@@ -831,13 +717,10 @@ export async function runMemoryTrajectoryFlow({
   })
   await observationsTab.click()
   await waitUntil(
-    async () =>
-      (await observationsTab.getAttribute('aria-selected')) === 'true',
+    async () => (await observationsTab.getAttribute('aria-selected')) === 'true',
     `${name} observations tab did not become active`
   )
-  const observationIndex = page
-    .locator('tbody .memory-observation-index')
-    .first()
+  const observationIndex = page.locator('tbody .memory-observation-index').first()
   await observationIndex.waitFor()
   assert.strictEqual(
     (await observationIndex.textContent())?.trim(),
@@ -853,23 +736,16 @@ export async function runMemoryTrajectoryFlow({
     /^\/runs\/[0-9a-f-]+$/,
     `${name} every observation must link to its source run`
   )
-  await page
-    .getByRole('combobox', { name: 'Rows per page', exact: true })
-    .click()
+  await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()
   // Several fixture observations were consumed by the same version.
-  const incorporatedVersion = page
-    .getByRole('button', { name: 'version 2', exact: true })
-    .first()
+  const incorporatedVersion = page.getByRole('button', { name: 'version 2', exact: true }).first()
   await incorporatedVersion.click()
-  const linkedVersionNode = page.locator(
-    '.version-graph-node[data-version-node="2"]'
-  )
+  const linkedVersionNode = page.locator('.version-graph-node[data-version-node="2"]')
   await waitUntil(
     async () =>
-      (await page
-        .getByRole('tab', { name: 'Versions' })
-        .getAttribute('aria-selected')) === 'true' &&
+      (await page.getByRole('tab', { name: 'Versions' }).getAttribute('aria-selected')) ===
+        'true' &&
       (await page.getByRole('radio', { name: 'Graph' }).isChecked()) &&
       (await linkedVersionNode.evaluate(
         (node) =>
@@ -881,8 +757,7 @@ export async function runMemoryTrajectoryFlow({
   )
   await observationsTab.click()
   await waitUntil(
-    async () =>
-      (await observationsTab.getAttribute('aria-selected')) === 'true',
+    async () => (await observationsTab.getAttribute('aria-selected')) === 'true',
     `${name} observations tab did not become active again`
   )
   assert.strictEqual(
@@ -914,14 +789,10 @@ export async function runMemoryTrajectoryFlow({
 
 export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
   await openVersionList(page)
-  await page
-    .getByRole('combobox', { name: 'Rows per page', exact: true })
-    .click()
+  await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()
   const currentVersion = (
-    (await page
-      .locator('tr[aria-current="true"] .memory-version-cell')
-      .textContent()) ?? ''
+    (await page.locator('tr[aria-current="true"] .memory-version-cell').textContent()) ?? ''
   ).trim()
   if (currentVersion !== '1') {
     const versionOneRow = page.locator('tbody tr').filter({
@@ -937,24 +808,19 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
   await waitUntil(
     async () =>
       (
-        (await page
-          .locator('tr[aria-current="true"] .memory-version-cell')
-          .textContent()) ?? ''
+        (await page.locator('tr[aria-current="true"] .memory-version-cell').textContent()) ?? ''
       ).trim() === '1',
     `${name} restoring version 1 must move the active pointer to version 1`
   )
   const versionBefore = Number(
-    (
-      (await page
-        .locator('tbody tr:first-child .memory-version-cell')
-        .textContent()) ?? ''
-    ).match(/^\d+/)?.[0]
+    ((await page.locator('tbody tr:first-child .memory-version-cell').textContent()) ?? '').match(
+      /^\d+/
+    )?.[0]
   )
   await page.getByRole('button', { name: 'Edit current memory' }).click()
   const editDialog = page.getByRole('dialog', { name: 'Edit memory files' })
   await editDialog.getByRole('button', { name: 'MEMORY.md' }).waitFor()
-  const editorHeight =
-    (await editDialog.getByLabel('Workspace editor').boundingBox())?.height ?? 0
+  const editorHeight = (await editDialog.getByLabel('Workspace editor').boundingBox())?.height ?? 0
   assert.ok(
     editorHeight >= (viewport.width >= 768 ? 360 : 300),
     `${name} memory editor must fill the available workspace height: ${editorHeight}`
@@ -984,9 +850,7 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
     .getByRole('dialog', { name: 'Delete file' })
     .getByRole('button', { name: 'Delete' })
     .click()
-  await editDialog
-    .getByRole('button', { name: 'renamed.md' })
-    .waitFor({ state: 'hidden' })
+  await editDialog.getByRole('button', { name: 'renamed.md' }).waitFor({ state: 'hidden' })
   assert.strictEqual(
     await editDialog.getByRole('button', { name: 'renamed.md' }).count(),
     0,
@@ -996,9 +860,7 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
   const discardDialog = page.getByRole('dialog', {
     name: 'Discard memory changes?'
   })
-  await discardDialog
-    .getByText('Your edits have not been committed and will be lost.')
-    .waitFor()
+  await discardDialog.getByText('Your edits have not been committed and will be lost.').waitFor()
   await discardDialog.getByRole('button', { name: 'Continue editing' }).click()
   const editRequests = []
   await page.route('**/api/memory/edit', async (route) => {
@@ -1014,14 +876,9 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
     }
   })
   await editDialog.getByRole('button', { name: 'Commit version' }).click()
-  await page
-    .getByText('The edit could not be committed.', { exact: true })
-    .waitFor()
+  await page.getByText('The edit could not be committed.', { exact: true }).waitFor()
   await editDialog.getByRole('button', { name: 'Commit version' }).click()
-  await waitUntil(
-    async () => editRequests.length === 2,
-    `${name} edit retry must be submitted`
-  )
+  await waitUntil(async () => editRequests.length === 2, `${name} edit retry must be submitted`)
   assert.deepStrictEqual(
     editRequests[0],
     editRequests[1],
@@ -1031,18 +888,12 @@ export async function runMemoryEditFlow({ page, name, viewport, waitUntil }) {
   await waitUntil(
     async () =>
       (
-        (await page
-          .locator('tbody tr:first-child .memory-version-cell')
-          .textContent()) ?? ''
+        (await page.locator('tbody tr:first-child .memory-version-cell').textContent()) ?? ''
       ).startsWith(String(versionBefore + 1)),
     `${name} committed memory version must become current`
   )
   assert.strictEqual(
-    (
-      await page
-        .locator('tbody tr:first-child .memory-predecessor-cell')
-        .textContent()
-    )?.trim(),
+    (await page.locator('tbody tr:first-child .memory-predecessor-cell').textContent())?.trim(),
     '1',
     `${name} a new version after restore must retain version 1 as its predecessor`
   )

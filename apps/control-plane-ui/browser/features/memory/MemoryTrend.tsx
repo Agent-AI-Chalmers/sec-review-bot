@@ -2,11 +2,7 @@ import React from 'react'
 import { useLanguage, useMessages } from '../../shared/i18n.js'
 import type { CatalogOverview } from './api-types.generated.js'
 
-export function MemoryTrend({
-  overview
-}: {
-  overview: CatalogOverview
-}): React.JSX.Element {
+export function MemoryTrend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -16,10 +12,7 @@ export function MemoryTrend({
     const element = scrollRef.current
     if (!element) return
     const measure = (): void => {
-      const next = Math.max(
-        320,
-        Math.round(element.getBoundingClientRect().width)
-      )
+      const next = Math.max(320, Math.round(element.getBoundingClientRect().width))
       setWidth((current) => (current === next ? current : next))
     }
     measure()
@@ -33,34 +26,22 @@ export function MemoryTrend({
   // A wide window can be almost entirely empty. Start at the first period with
   // activity (keeping one baseline point) so the default view is not a flat line.
   const firstActive = overview.trend_points.findIndex(
-    (point) =>
-      point.extracted_unit_count > 0 || point.units_with_observation_count > 0
+    (point) => point.extracted_unit_count > 0 || point.units_with_observation_count > 0
   )
   const trendPoints =
     firstActive > 0
       ? overview.trend_points.slice(Math.max(0, firstActive - 1))
       : overview.trend_points
-  const maximum = Math.max(
-    1,
-    ...trendPoints.map((point) => point.extracted_unit_count)
-  )
+  const maximum = Math.max(1, ...trendPoints.map((point) => point.extracted_unit_count))
   const point = (value: number, index: number): string => {
     const x =
       padding.left +
-      (trendPoints.length <= 1
-        ? plotWidth / 2
-        : (index / (trendPoints.length - 1)) * plotWidth)
+      (trendPoints.length <= 1 ? plotWidth / 2 : (index / (trendPoints.length - 1)) * plotWidth)
     const y = padding.top + plotHeight - (value / maximum) * plotHeight
     return `${x},${y}`
   }
-  const labels = [
-    0,
-    Math.floor((trendPoints.length - 1) / 2),
-    trendPoints.length - 1
-  ]
-    .filter(
-      (value, index, values) => value >= 0 && values.indexOf(value) === index
-    )
+  const labels = [0, Math.floor((trendPoints.length - 1) / 2), trendPoints.length - 1]
+    .filter((value, index, values) => value >= 0 && values.indexOf(value) === index)
     .map((index) => ({
       index,
       periodStart: trendPoints[index]?.period_start
@@ -89,28 +70,20 @@ export function MemoryTrend({
         })}
         <polyline
           points={trendPoints
-            .map((trendPoint, index) =>
-              point(trendPoint.extracted_unit_count, index)
-            )
+            .map((trendPoint, index) => point(trendPoint.extracted_unit_count, index))
             .join(' ')}
           className="memory-overview-line memory-overview-line-extracted"
         />
         <polyline
           points={trendPoints
-            .map((trendPoint, index) =>
-              point(trendPoint.units_with_observation_count, index)
-            )
+            .map((trendPoint, index) => point(trendPoint.units_with_observation_count, index))
             .join(' ')}
           className="memory-overview-line memory-overview-line-observed"
         />
         <text x={padding.left - 8} y={padding.top + 4} textAnchor="end">
           {maximum}
         </text>
-        <text
-          x={padding.left - 8}
-          y={padding.top + plotHeight + 4}
-          textAnchor="end"
-        >
+        <text x={padding.left - 8} y={padding.top + plotHeight + 4} textAnchor="end">
           0
         </text>
         {labels.map(({ index, periodStart }) => {
@@ -125,11 +98,7 @@ export function MemoryTrend({
               x={x}
               y={height - 8}
               textAnchor={
-                index === 0
-                  ? 'start'
-                  : index === trendPoints.length - 1
-                    ? 'end'
-                    : 'middle'
+                index === 0 ? 'start' : index === trendPoints.length - 1 ? 'end' : 'middle'
               }
             >
               {periodStart

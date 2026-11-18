@@ -1,11 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { ARTIFACT_BUCKET, type ArtifactStore } from '../artifacts/store.js'
-import {
-  RequestBodyTooLargeError,
-  readBoundedRequestBody,
-  sendJson
-} from '../http.js'
+import { RequestBodyTooLargeError, readBoundedRequestBody, sendJson } from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 import type { MemoryCatalogClient } from '../upstream/memory-catalog-client.js'
 import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
@@ -30,9 +26,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isIntegerAtLeast(value: unknown, minimum: number): value is number {
-  return (
-    typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum
-  )
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum
 }
 
 /** Validate browser input before constructing Catalog writes or uploading artifacts. */
@@ -48,8 +42,7 @@ function parseMemoryWriteCommand(
     return { error: 'invalid_request' }
   const operation_id = value.operation_id
   if (action === 'pause' || action === 'resume') {
-    if (!isIntegerAtLeast(value.expected_version, 0))
-      return { error: 'invalid_request' }
+    if (!isIntegerAtLeast(value.expected_version, 0)) return { error: 'invalid_request' }
     return {
       action,
       operation_id,
@@ -120,10 +113,7 @@ async function publishMemoryEdit({
     },
     source: { kind: 'manual', operation_id: command.operation_id }
   }
-  const reserved = await catalog.write(
-    '/v1/memory-tree/versions/publications/reserve',
-    intent
-  )
+  const reserved = await catalog.write('/v1/memory-tree/versions/publications/reserve', intent)
   if (reserved.status < 200 || reserved.status >= 300) {
     writeUpstreamResult(response, reserved, { cacheControl: 'no-store' })
     return
@@ -134,10 +124,7 @@ async function publishMemoryEdit({
     sendJson(response, 502, { error: 'memory_artifact_upload_failed' })
     return
   }
-  const confirmed = await catalog.write(
-    '/v1/memory-tree/versions/publications/confirm',
-    intent
-  )
+  const confirmed = await catalog.write('/v1/memory-tree/versions/publications/confirm', intent)
   if (confirmed.status < 200 || confirmed.status >= 300) {
     writeUpstreamResult(response, confirmed, { cacheControl: 'no-store' })
     return
@@ -194,13 +181,10 @@ export function createMemoryWriteRoutes({
       switch (command.action) {
         case 'pause':
         case 'resume': {
-          const upstream = await catalog.write(
-            `/v1/memory-tree/automation/${command.action}`,
-            {
-              operation_id: command.operation_id,
-              expected_version: command.expected_version
-            }
-          )
+          const upstream = await catalog.write(`/v1/memory-tree/automation/${command.action}`, {
+            operation_id: command.operation_id,
+            expected_version: command.expected_version
+          })
           writeUpstreamResult(response, upstream, { cacheControl: 'no-store' })
           return
         }
@@ -221,15 +205,11 @@ export function createMemoryWriteRoutes({
     }
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.method !== 'POST') return false
-    const match =
-      /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
-        request.url ?? ''
-      )
+    const match = /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
+      request.url ?? ''
+    )
     if (match === null) return false
     await writeMemory(request, response, match[1] ?? match[2])
     return true

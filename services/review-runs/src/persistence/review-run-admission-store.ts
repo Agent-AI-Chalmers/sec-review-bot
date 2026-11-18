@@ -5,23 +5,14 @@ import type { Pool, PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
 
 import { transaction } from '../database/transaction.js'
-import type {
-  CreateReviewRunArgs,
-  ReviewRunAdmission,
-  ReviewRunRecord
-} from '../shapes.js'
+import type { CreateReviewRunArgs, ReviewRunAdmission, ReviewRunRecord } from '../shapes.js'
 import { appendEvent } from './review-run-events.js'
-import {
-  RUN_SELECT,
-  rowToRecord,
-  type ReviewRunRow
-} from './run-record-projection.js'
+import { RUN_SELECT, rowToRecord, type ReviewRunRow } from './run-record-projection.js'
 
 type IdempotentAdmissionArgs = CreateReviewRunArgs &
   Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
 
-const INGRESS_IDENTITY_CONSTRAINT =
-  'review_runs_connector_id_ingress_kind_ingress_key_key'
+const INGRESS_IDENTITY_CONSTRAINT = 'review_runs_connector_id_ingress_kind_ingress_key_key'
 
 export class ReviewRunAdmissionStore {
   /** The pool, guarded by the database's readiness check. */
@@ -36,10 +27,7 @@ export class ReviewRunAdmissionStore {
   ) {}
 
   async create(run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
-    return await transaction(
-      this.pool,
-      async (client) => await this.insertWith(client, run)
-    )
+    return await transaction(this.pool, async (client) => await this.insertWith(client, run))
   }
 
   async admit(run: IdempotentAdmissionArgs): Promise<ReviewRunAdmission> {
@@ -108,9 +96,7 @@ export class ReviewRunAdmissionStore {
       [
         run.run_id,
         this.connectorId,
-        run.execution_input === undefined
-          ? null
-          : JSON.stringify(run.execution_input)
+        run.execution_input === undefined ? null : JSON.stringify(run.execution_input)
       ]
     )
     await client.query(
@@ -152,15 +138,11 @@ export class ReviewRunAdmissionStore {
       toStatus: 'pending'
     })
     const record = await this.getWith(client, run.run_id)
-    if (record === null)
-      throw new Error(`Execution run was not persisted: ${run.run_id}`)
+    if (record === null) throw new Error(`Execution run was not persisted: ${run.run_id}`)
     return { record, created: true, preparation_token: preparationToken }
   }
 
-  private async getWith(
-    client: PoolClient,
-    runId: string
-  ): Promise<ReviewRunRecord | null> {
+  private async getWith(client: PoolClient, runId: string): Promise<ReviewRunRecord | null> {
     const result = await client.query<ReviewRunRow>(
       `${RUN_SELECT}
        WHERE r.run_id=$1 AND r.connector_id=$2`,

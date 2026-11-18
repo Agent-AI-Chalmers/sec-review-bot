@@ -3,20 +3,12 @@ import type { RepositoryDelivery } from './result.js'
 
 function isDocumentationPath(value: string): boolean {
   const lower = value.toLowerCase()
-  return (
-    lower === 'readme.md' ||
-    lower.endsWith('/readme.md') ||
-    lower.endsWith('.md')
-  )
+  return lower === 'readme.md' || lower.endsWith('/readme.md') || lower.endsWith('.md')
 }
 
 function primaryFileForDeliveryTitle(delivery: RepositoryDelivery): string {
   const changed_files = fileChangePaths(delivery.file_changes)
-  return (
-    changed_files.find((item) => !isDocumentationPath(item)) ??
-    changed_files[0] ??
-    ''
-  )
+  return changed_files.find((item) => !isDocumentationPath(item)) ?? changed_files[0] ?? ''
 }
 
 function titleDisambiguator(delivery: RepositoryDelivery) {
@@ -34,9 +26,7 @@ function deliveryTitleSuffix(delivery: RepositoryDelivery): string {
   return ` (${[disambiguator, related].filter(Boolean).join(' ')})`
 }
 
-export function buildDeliveryDraftPrTitle(
-  delivery: RepositoryDelivery
-): string {
+export function buildDeliveryDraftPrTitle(delivery: RepositoryDelivery): string {
   const primaryFile = primaryFileForDeliveryTitle(delivery)
   const suffix = deliveryTitleSuffix(delivery)
   if (primaryFile) {

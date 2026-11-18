@@ -33,9 +33,7 @@ interface ResourceState<T> {
  * The hook does not start a load by itself: the caller's scheduler owns when a query runs,
  * so a route that refreshes through `useRefresh` does not issue its queries twice.
  */
-export function useResource<T>(
-  load: (signal: AbortSignal) => Promise<T>
-): Resource<T> {
+export function useResource<T>(load: (signal: AbortSignal) => Promise<T>): Resource<T> {
   const [state, setState] = React.useState<ResourceState<T>>({
     data: undefined,
     error: undefined,

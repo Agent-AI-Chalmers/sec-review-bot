@@ -154,13 +154,8 @@ export async function verifyRecovery(runId: string): Promise<void> {
     })
     const { run } = (await response.json()) as ObservedRun
     if (run.execution.status === 'failed') break
-    assert.ok(
-      Date.now() < deadline,
-      `Execution did not become failed: ${run.execution.status}`
-    )
+    assert.ok(Date.now() < deadline, `Execution did not become failed: ${run.execution.status}`)
     await setTimeout(250)
   }
-  console.error(
-    'ok: Restarted Review Runs observed the execution terminated while it was offline'
-  )
+  console.error('ok: Restarted Review Runs observed the execution terminated while it was offline')
 }

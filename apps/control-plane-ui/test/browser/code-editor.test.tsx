@@ -25,7 +25,5 @@ test('long editor lines wrap within a narrow workspace', async () => {
       return line?.getBoundingClientRect().height ?? 0
     })
     .toBeGreaterThan(40)
-  expect(content.element().scrollWidth).toBeLessThanOrEqual(
-    content.element().clientWidth + 1
-  )
+  expect(content.element().scrollWidth).toBeLessThanOrEqual(content.element().clientWidth + 1)
 })

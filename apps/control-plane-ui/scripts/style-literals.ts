@@ -23,9 +23,7 @@ function literalKind(property: string): StyleLiteralKind | undefined {
   return undefined
 }
 
-export function findStyleLiterals(
-  stylesheets: Readonly<Record<string, string>>
-): StyleLiteral[] {
+export function findStyleLiterals(stylesheets: Readonly<Record<string, string>>): StyleLiteral[] {
   const findings: StyleLiteral[] = []
 
   for (const [file, source] of Object.entries(stylesheets)) {

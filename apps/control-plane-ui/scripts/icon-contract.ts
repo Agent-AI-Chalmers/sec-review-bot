@@ -22,9 +22,7 @@ function usesIconScale(attribute: ts.JsxAttribute): boolean {
   )
 }
 
-export function validateIconContract(
-  files: Readonly<Record<string, string>>
-): IconContractIssue[] {
+export function validateIconContract(files: Readonly<Record<string, string>>): IconContractIssue[] {
   const issues: IconContractIssue[] = []
 
   for (const [file, sourceText] of Object.entries(files)) {
@@ -39,19 +37,13 @@ export function validateIconContract(
     )
 
     const visit = (node: ts.Node): void => {
-      if (
-        ts.isImportDeclaration(node) &&
-        ts.isStringLiteral(node.moduleSpecifier)
-      ) {
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         const sourceModule = node.moduleSpecifier.text
         const bindings = node.importClause?.namedBindings
         if (bindings && ts.isNamedImports(bindings)) {
           for (const element of bindings.elements) {
             const importedName = element.propertyName?.text ?? element.name.text
-            if (
-              /^Icon[A-Z]/.test(importedName) &&
-              sourceModule !== '@tabler/icons-react'
-            ) {
+            if (/^Icon[A-Z]/.test(importedName) && sourceModule !== '@tabler/icons-react') {
               issues.push({
                 file,
                 line: lineOf(source, element),
@@ -67,8 +59,7 @@ export function validateIconContract(
         if (/^Icon(?:[A-Z]|$)/.test(tagName)) {
           const size = node.attributes.properties.find(
             (attribute): attribute is ts.JsxAttribute =>
-              ts.isJsxAttribute(attribute) &&
-              attribute.name.getText(source) === 'size'
+              ts.isJsxAttribute(attribute) && attribute.name.getText(source) === 'size'
           )
           if (!size || !usesIconScale(size)) {
             issues.push({
@@ -86,8 +77,5 @@ export function validateIconContract(
     visit(source)
   }
 
-  return issues.sort(
-    (left, right) =>
-      left.file.localeCompare(right.file) || left.line - right.line
-  )
+  return issues.sort((left, right) => left.file.localeCompare(right.file) || left.line - right.line)
 }

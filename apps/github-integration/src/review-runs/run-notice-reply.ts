@@ -24,17 +24,14 @@ function replyTarget(input: Record<string, unknown>): {
     source === null ||
     typeof source.owner_login !== 'string' ||
     typeof source.repo_name !== 'string' ||
-    (typeof source.issue_number !== 'number' &&
-      typeof source.pr_number !== 'number')
+    (typeof source.issue_number !== 'number' && typeof source.pr_number !== 'number')
   )
     return null
   return {
     owner_login: source.owner_login,
     repo_name: source.repo_name,
     issue_number:
-      typeof source.issue_number === 'number'
-        ? source.issue_number
-        : (source.pr_number as number)
+      typeof source.issue_number === 'number' ? source.issue_number : (source.pr_number as number)
   }
 }
 
@@ -90,8 +87,7 @@ export type RunNoticeAxis = 'preparation' | 'execution' | 'publication'
 const STAGE_SENTENCE: Record<RunNoticeAxis, string> = {
   preparation: 'Security review could not be started after automatic retries.',
   execution: 'Security review started but could not be completed.',
-  publication:
-    'Security review completed but its result could not be delivered.'
+  publication: 'Security review completed but its result could not be delivered.'
 }
 
 /** The summary issue that reports for a repository scan.
@@ -160,11 +156,7 @@ export async function sendRunNoticeReply(
     await assertRepositoryAccessible(octokit, scanScope)
     target = {
       ...scanScope,
-      issue_number: await ensureRepositorySummaryIssue(
-        octokit,
-        scanScope,
-        args.assert_notice_claim
-      )
+      issue_number: await ensureRepositorySummaryIssue(octokit, scanScope, args.assert_notice_claim)
     }
   }
 

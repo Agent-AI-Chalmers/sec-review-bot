@@ -43,18 +43,14 @@ test('run detail has no detectable WCAG A/AA violations', async ({ page }) => {
   await expectNoAccessibilityViolations(page)
 })
 
-test('memory workspace has no detectable WCAG A/AA violations', async ({
-  page
-}) => {
+test('memory workspace has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })
   await page.locator('main').waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
-test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', async ({
-  page
-}) => {
+test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })
   await page.getByRole('tab', { name: 'Versions' }).click()
@@ -62,9 +58,7 @@ test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', a
   await expectNoAccessibilityViolations(page)
 })
 
-test('memory loading state has no detectable WCAG A/AA violations', async ({
-  page
-}) => {
+test('memory loading state has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   let release!: () => void
   const ready = new Promise<void>((resolve) => {
@@ -76,42 +70,30 @@ test('memory loading state has no detectable WCAG A/AA violations', async ({
   })
   try {
     await page.goto('/memory', { waitUntil: 'domcontentloaded' })
-    await page
-      .getByRole('status')
-      .filter({ hasText: 'Loading…' })
-      .first()
-      .waitFor()
+    await page.getByRole('status').filter({ hasText: 'Loading…' }).first().waitFor()
     await expectNoAccessibilityViolations(page)
   } finally {
     release()
   }
 })
 
-test('trajectory viewer has no detectable WCAG A/AA violations', async ({
-  page
-}) => {
+test('trajectory viewer has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/viewer', { waitUntil: 'networkidle' })
   await page.locator('main').waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
-test('stable error state has no detectable WCAG A/AA violations', async ({
-  page
-}) => {
+test('stable error state has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/runs/fixture-artifact-load-error/files', {
     waitUntil: 'networkidle'
   })
-  await page
-    .getByText('The run files could not be opened.', { exact: true })
-    .waitFor()
+  await page.getByText('The run files could not be opened.', { exact: true }).waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
-test('populated memory files and observations keep readable text', async ({
-  page
-}) => {
+test('populated memory files and observations keep readable text', async ({ page }) => {
   await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
   await expect(page.locator('.memory-markdown')).toBeVisible()
   await expectNoAccessibilityViolations(page)
@@ -131,9 +113,7 @@ test('loaded trajectory tool calls keep readable text', async ({ page }) => {
         id: 'assistant',
         role: 'assistant',
         content: 'Inspect this file.',
-        tool_calls: [
-          { id: 'call', name: 'read_file', args: { path: 'MEMORY.md' } }
-        ]
+        tool_calls: [{ id: 'call', name: 'read_file', args: { path: 'MEMORY.md' } }]
       }
     })
   )

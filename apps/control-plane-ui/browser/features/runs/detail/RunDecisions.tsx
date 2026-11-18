@@ -5,12 +5,7 @@ import type { Run, RunEvent } from '../api.js'
 import { useMessages } from '../../../shared/i18n.js'
 import { ICON_SIZE } from '../../../shared/design.js'
 import { AdminRunActionDialog } from './AdminRunActionDialog.js'
-import {
-  canResumeRun,
-  failureCodeLabel,
-  formatDuration,
-  parkedSince
-} from '../format.js'
+import { canResumeRun, failureCodeLabel, formatDuration, parkedSince } from '../format.js'
 
 export function RunDecisions({
   run,
@@ -35,9 +30,7 @@ export function RunDecisions({
   // Abandoning stops an execution that is still moving, and leaves a finished one alone. Saying
   // so unconditionally would describe a stop that cannot happen - a run whose task already
   // completed has nothing left to stop.
-  const executionStillMovable = ['queued', 'running', 'uncertain'].includes(
-    run.execution.status
-  )
+  const executionStillMovable = ['queued', 'running', 'uncertain'].includes(run.execution.status)
   // Which axis parked this run, so the banner's wording follows one value instead of a chain of
   // ternaries that silently falls back to the preparation case for anything new. Preparation wins
   // when present because it always explains the others: it parks only by contradicting execution.
@@ -49,8 +42,7 @@ export function RunDecisions({
         : run.publication.status === 'disconnected'
           ? 'publication'
           : null
-  const parkedAt: string | null =
-    parkedAxis === null ? null : parkedSince(run, parkedAxis, events)
+  const parkedAt: string | null = parkedAxis === null ? null : parkedSince(run, parkedAxis, events)
   return (
     <>
       <AdminRunActionDialog
@@ -59,8 +51,7 @@ export function RunDecisions({
           action: 'abandon',
           title: 'abandonTitle',
           explainer: 'abandonExplainer',
-          ...(run.execution.status === 'succeeded' ||
-          run.execution.status === 'failed'
+          ...(run.execution.status === 'succeeded' || run.execution.status === 'failed'
             ? { extraExplainer: t('abandonExplainerKeepsResult') }
             : {}),
           confirmLabel: 'abandonConfirm',
@@ -138,10 +129,7 @@ export function RunDecisions({
               {parkedAt !== null && (
                 <Text size="xs" c="dimmed">
                   {t('parkedAge', {
-                    duration: formatDuration(
-                      Math.max(0, now - Date.parse(parkedAt)),
-                      t
-                    )
+                    duration: formatDuration(Math.max(0, now - Date.parse(parkedAt)), t)
                   })}
                 </Text>
               )}

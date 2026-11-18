@@ -2,9 +2,7 @@ import { expect, test, vi } from 'vitest'
 
 import { integerEnv } from '../../src/utils/env.js'
 
-test('integerEnv defaults only when the variable is unset', ({
-  onTestFinished
-}) => {
+test('integerEnv defaults only when the variable is unset', ({ onTestFinished }) => {
   onTestFinished(() => {
     vi.unstubAllEnvs()
   })
@@ -28,20 +26,15 @@ test.for([
     expected: 0
   },
   { name: 'upper boundary', value: '12', minimum: 1, maximum: 12, expected: 12 }
-])(
-  'integerEnv accepts $name',
-  ({ value, minimum, maximum, expected }, { onTestFinished }) => {
-    onTestFinished(() => {
-      vi.unstubAllEnvs()
-    })
-    vi.stubEnv('TEST_INTEGER_ENV', value)
-    expect(integerEnv('TEST_INTEGER_ENV', 7, minimum, maximum)).toBe(expected)
-  }
-)
+])('integerEnv accepts $name', ({ value, minimum, maximum, expected }, { onTestFinished }) => {
+  onTestFinished(() => {
+    vi.unstubAllEnvs()
+  })
+  vi.stubEnv('TEST_INTEGER_ENV', value)
+  expect(integerEnv('TEST_INTEGER_ENV', 7, minimum, maximum)).toBe(expected)
+})
 
-test('integerEnv rejects values above an explicit maximum', ({
-  onTestFinished
-}) => {
+test('integerEnv rejects values above an explicit maximum', ({ onTestFinished }) => {
   onTestFinished(() => {
     vi.unstubAllEnvs()
   })

@@ -17,10 +17,7 @@ import type { Run, RunEvent } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
 import { eventAxisLabel } from '../status.js'
 import { useNow } from '../../../shared/useNow.js'
-import {
-  STATE_MACHINES_BY_LANGUAGE,
-  type CoordinationAxis
-} from '../state-machines.generated.js'
+import { STATE_MACHINES_BY_LANGUAGE, type CoordinationAxis } from '../state-machines.generated.js'
 import { failureCodeLabel, formatDuration } from '../format.js'
 import {
   TRANSITIONS_PAGE_SIZE,
@@ -79,21 +76,15 @@ export function RunTransitions({
   const t = useMessages()
   const { language } = useLanguage()
   const [opened, setOpened] = React.useState(false)
-  const [axis, setAxis] = React.useState<CoordinationAxis>(() =>
-    latestTransitionAxis(events)
-  )
+  const [axis, setAxis] = React.useState<CoordinationAxis>(() => latestTransitionAxis(events))
   const [page, setPage] = React.useState(1)
   const [fit, setFit] = React.useState(initialFit)
   const now = useNow()
   const machines = STATE_MACHINES_BY_LANGUAGE[language]
-  const machine =
-    machines.find((candidate) => candidate.axis === axis) ?? machines[0]
+  const machine = machines.find((candidate) => candidate.axis === axis) ?? machines[0]
   if (machine === undefined) return null
   const transitionEvents = actualTransitions(events)
-  const totalPages = Math.max(
-    1,
-    Math.ceil(transitionEvents.length / TRANSITIONS_PAGE_SIZE)
-  )
+  const totalPages = Math.max(1, Math.ceil(transitionEvents.length / TRANSITIONS_PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const visibleEvents = transitionEvents.slice(
     (currentPage - 1) * TRANSITIONS_PAGE_SIZE,
@@ -141,12 +132,7 @@ export function RunTransitions({
               {t('stateMachineScrollHint')}
             </Text>
           )}
-          <StateMachineDiagram
-            machine={machine}
-            run={run}
-            events={events}
-            fit={fit}
-          />
+          <StateMachineDiagram machine={machine} run={run} events={events} fit={fit} />
           <Group
             justify="space-between"
             align="center"
@@ -175,10 +161,7 @@ export function RunTransitions({
                 const next = value === 'fit'
                 setFit(next)
                 try {
-                  localStorage.setItem(
-                    FIT_PREFERENCE_KEY,
-                    next ? 'fit' : 'actual'
-                  )
+                  localStorage.setItem(FIT_PREFERENCE_KEY, next ? 'fit' : 'actual')
                 } catch {
                   // Storage can be unavailable in privacy-restricted contexts.
                 }
@@ -201,21 +184,15 @@ export function RunTransitions({
               <ul className="run-transition-list">
                 {visibleEvents.map((event) => {
                   const explanation = transitionExplanation(event, language)
-                  const duration = transitionDuration(
-                    event,
-                    transitionEvents,
-                    run,
-                    now
-                  )
+                  const duration = transitionDuration(event, transitionEvents, run, now)
                   return (
                     <li className="run-transition" key={event.event_id}>
                       <Text size="xs" c="dimmed">
-                        {formatDate(event.occurred_at, language)} ·{' '}
-                        {eventAxisLabel(event, t)}
+                        {formatDate(event.occurred_at, language)} · {eventAxisLabel(event, t)}
                       </Text>
                       <Text size="sm">
-                        {stateLabelForEvent(event, event.from_status, language)}{' '}
-                        → {stateLabelForEvent(event, event.to_status, language)}
+                        {stateLabelForEvent(event, event.from_status, language)} →{' '}
+                        {stateLabelForEvent(event, event.to_status, language)}
                       </Text>
                       {explanation !== null && (
                         <Text size="xs" c="dimmed">
@@ -229,21 +206,14 @@ export function RunTransitions({
                               duration: formatDuration(duration.ms, t)
                             })}
                       </Text>
-                      {event.reason_code !== null && (
-                        <TransitionReason code={event.reason_code} />
-                      )}
+                      {event.reason_code !== null && <TransitionReason code={event.reason_code} />}
                     </li>
                   )
                 })}
               </ul>
             )}
             {totalPages > 1 && (
-              <Pagination
-                total={totalPages}
-                value={currentPage}
-                onChange={setPage}
-                size="sm"
-              />
+              <Pagination total={totalPages} value={currentPage} onChange={setPage} size="sm" />
             )}
           </div>
         </Stack>

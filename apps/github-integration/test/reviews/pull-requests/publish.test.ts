@@ -41,9 +41,7 @@ const stepStore = {
   failPublicationStep: async () => true
 } satisfies PublicationStepStore
 
-function pullRequestContext(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function pullRequestContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -67,10 +65,8 @@ function pullRequestContext(
     html_url: 'https://example.test/octo/example/pull/7',
     api_url: 'https://api.example.test/repos/octo/example/pulls/7',
     commits_url: 'https://api.example.test/repos/octo/example/pulls/7/commits',
-    review_comments_url:
-      'https://api.example.test/repos/octo/example/pulls/7/comments',
-    comments_url:
-      'https://api.example.test/repos/octo/example/issues/7/comments',
+    review_comments_url: 'https://api.example.test/repos/octo/example/pulls/7/comments',
+    comments_url: 'https://api.example.test/repos/octo/example/issues/7/comments',
     issue_url: 'https://api.example.test/repos/octo/example/issues/7',
     head_repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example',
@@ -79,9 +75,7 @@ function pullRequestContext(
   }
 }
 
-function review_record(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function review_record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     analysis: {
       verdict: 'confirmed-vulnerability',
@@ -128,9 +122,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     }
     if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
     if (pathname.endsWith('/reviews') && method === 'POST') {
-      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/reviews$/.exec(
-        pathname
-      )
+      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/reviews$/.exec(pathname)
       pullReviews.push({
         owner: match?.[1],
         repo: match?.[2],
@@ -189,17 +181,10 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     event: 'COMMENT',
     comments: []
   })
-  expect(reviewArgs.body).toMatch(
-    /<!-- sec-review-bot:pull-request-review-run:run-1 -->/
-  )
+  expect(reviewArgs.body).toMatch(/<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
   expect(reviewArgs.body).toMatch(/## PR Security Review/)
   expect(completed).toStrictEqual([
-    [
-      'run-1',
-      'test-claim',
-      'pull-request:review',
-      { id: 2, url: 'https://example.test/review/2' }
-    ]
+    ['run-1', 'test-claim', 'pull-request:review', { id: 2, url: 'https://example.test/review/2' }]
   ])
 })
 
@@ -377,9 +362,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
     setGitHubAppMetadata({ slug: 'web-sec-bot' })
   }
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual(['COMMENT'])
 })
 
 test('pull request publish falls back to comment when GitHub rejects own PR approval', async () => {
@@ -433,9 +416,10 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['APPROVE', 'COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual([
+    'APPROVE',
+    'COMMENT'
+  ])
 })
 
 test('pull request publish falls back to comment when own PR approval error is in response message', async () => {
@@ -489,9 +473,10 @@ test('pull request publish falls back to comment when own PR approval error is i
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['APPROVE', 'COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual([
+    'APPROVE',
+    'COMMENT'
+  ])
 })
 
 test('pull request publish leaves confirmed risks as non-blocking comments with inline suggestions', async () => {
@@ -749,8 +734,5 @@ test('an exhausted PR review step is concluded from the review already on the pu
       found: { remote: { id: 31, url: 'https://example.test/review/31' } }
     }
   ])
-  expect(
-    pullReviews,
-    'a settled step must never submit another review'
-  ).toStrictEqual([])
+  expect(pullReviews, 'a settled step must never submit another review').toStrictEqual([])
 })

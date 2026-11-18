@@ -33,14 +33,10 @@ export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
   return sender_login === expectedLogin
 }
 
-export function logSkippedSelfOriginatedEvent(
-  eventName: string,
-  payload: unknown
-): void {
+export function logSkippedSelfOriginatedEvent(eventName: string, payload: unknown): void {
   const appMetadata = getGitHubAppMetadata()
   const sender = asRecord(asRecord(payload).sender)
-  const sender_login =
-    typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
+  const sender_login = typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
   const knownBotLogin = appMetadata.bot_login ?? '(unknown-app-bot-login)'
 
   logInfo('workflow_skipped', {

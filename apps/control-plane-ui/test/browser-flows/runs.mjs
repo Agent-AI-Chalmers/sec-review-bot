@@ -28,23 +28,18 @@ export async function runRunsFlow({
   }
 
   const headerBox = await page.locator('header').boundingBox()
-  const titleBox = await page
-    .getByRole('heading', { name: 'Runs' })
-    .boundingBox()
+  const titleBox = await page.getByRole('heading', { name: 'Runs' }).boundingBox()
   assert.ok(
     headerBox !== null && headerBox.height <= 58,
     `${name} the header must keep its height (saw ${headerBox?.height})`
   )
   assert.ok(
-    headerBox !== null &&
-      titleBox !== null &&
-      titleBox.y >= headerBox.y + headerBox.height - 1,
+    headerBox !== null && titleBox !== null && titleBox.y >= headerBox.y + headerBox.height - 1,
     `${name} the header must not overlap the page content`
   )
 
   const rowAction = page.locator('tbody tr:first-child .row-action')
-  const rowActionOpacity = () =>
-    rowAction.evaluate((element) => getComputedStyle(element).opacity)
+  const rowActionOpacity = () => rowAction.evaluate((element) => getComputedStyle(element).opacity)
   assert.strictEqual(await rowActionOpacity(), '0')
   await page.locator('tbody tr:first-child').hover()
   await waitUntil(
@@ -64,20 +59,12 @@ export async function runRunsFlow({
     `${name} last activity must read as elapsed time`
   )
   assert.deepStrictEqual(
-    await page.$$eval('thead th', (cells) =>
-      cells.map((cell) => cell.textContent)
-    ),
+    await page.$$eval('thead th', (cells) => cells.map((cell) => cell.textContent)),
     expectedHeaders,
     `${name} run table headers changed`
   )
-  assert.strictEqual(
-    await page.locator('tbody tr:first-child .mantine-Badge-root').count(),
-    0
-  )
-  assert.strictEqual(
-    await page.locator('tbody tr:first-child .status-text').count(),
-    3
-  )
+  assert.strictEqual(await page.locator('tbody tr:first-child .mantine-Badge-root').count(), 0)
+  assert.strictEqual(await page.locator('tbody tr:first-child .status-text').count(), 3)
 
   const platformMark = page.locator('tbody tr:first-child .platform-mark')
   assert.strictEqual(await platformMark.locator('svg').count(), 1)

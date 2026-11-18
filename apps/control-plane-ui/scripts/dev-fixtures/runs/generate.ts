@@ -78,15 +78,9 @@ const RUN_COUNT = 62
 export const BASE_TIME = Date.now() - 20 * 60 * 1000
 const RUN_SPACING_MS = 3 * 60 * 60 * 1000
 
-const WORKFLOWS: readonly Workflow[] = [
-  'pull-request-review',
-  'issue-review',
-  'repository-review'
-]
+const WORKFLOWS: readonly Workflow[] = ['pull-request-review', 'issue-review', 'repository-review']
 
-type StatisticsGroup = NonNullable<
-  Run['execution_statistics']
->['groups'][number]
+type StatisticsGroup = NonNullable<Run['execution_statistics']>['groups'][number]
 
 const STATISTICS_GROUPS: Record<Workflow, StatisticsGroup[]> = {
   'issue-review': [
@@ -283,12 +277,8 @@ function executionStatisticsFor(
       input_tokens: sum((group) => group.token_usage.input_tokens),
       output_tokens: sum((group) => group.token_usage.output_tokens),
       total_tokens: sum((group) => group.token_usage.total_tokens),
-      cache_read_input_tokens: sum(
-        (group) => group.token_usage.cache_read_input_tokens
-      ),
-      cache_creation_input_tokens: sum(
-        (group) => group.token_usage.cache_creation_input_tokens
-      ),
+      cache_read_input_tokens: sum((group) => group.token_usage.cache_read_input_tokens),
+      cache_creation_input_tokens: sum((group) => group.token_usage.cache_creation_input_tokens),
       reasoning_tokens: sum((group) => group.token_usage.reasoning_tokens)
     },
     groups,
@@ -306,14 +296,10 @@ function executionStatisticsFor(
 function stepKeysFor(workflow: Workflow, index: number): string[] {
   if (workflow === 'pull-request-review') return ['pull-request:review']
   if (workflow === 'issue-review') {
-    return index % 3 === 0
-      ? ['issue:draft-pr', 'issue:summary-comment']
-      : ['issue:summary-comment']
+    return index % 3 === 0 ? ['issue:draft-pr', 'issue:summary-comment'] : ['issue:summary-comment']
   }
   return [
-    ...repositoryDeliveryIdsFor(index).map(
-      (deliveryId) => `repository:delivery:${deliveryId}`
-    ),
+    ...repositoryDeliveryIdsFor(index).map((deliveryId) => `repository:delivery:${deliveryId}`),
     'repository:summary-issue',
     'repository:summary-comment'
   ]
@@ -329,24 +315,21 @@ function repositoryDeliveryIdsFor(index: number): string[] {
 const REMOTE_ROOT = 'https://github.com/octo/example'
 
 function remoteUrlFor(stepKey: string, index: number): string {
-  if (stepKey.startsWith('issue:draft-pr'))
-    return `${REMOTE_ROOT}/pull/${200 + index}`
+  if (stepKey.startsWith('issue:draft-pr')) return `${REMOTE_ROOT}/pull/${200 + index}`
   if (stepKey === 'issue:summary-comment') {
     return `${REMOTE_ROOT}/issues/${100 + index}#issuecomment-${900 + index}`
   }
   if (stepKey === 'pull-request:review') {
     return `${REMOTE_ROOT}/pull/42#pullrequestreview-${1000 + index}`
   }
-  if (stepKey.startsWith('repository:delivery'))
-    return `${REMOTE_ROOT}/pull/${300 + index}`
+  if (stepKey.startsWith('repository:delivery')) return `${REMOTE_ROOT}/pull/${300 + index}`
   return `${REMOTE_ROOT}/issues/${50 + index}#issuecomment-${800 + index}`
 }
 
 // Ordered by lifecycle, then repeated with rotating workflows so the list shows
 // a realistic spread rather than one run per state.
 export const SCENARIOS = scenarioData as readonly Scenario[]
-const iso = (milliseconds: number): string =>
-  new Date(milliseconds).toISOString()
+const iso = (milliseconds: number): string => new Date(milliseconds).toISOString()
 
 /**
  * Deterministic pseudo-random ids in the shape Review Runs actually assigns
@@ -359,8 +342,7 @@ function runId(index: number): string {
     state = (state * 1664525 + 1013904223) >>> 0
     return state
   }
-  const block = (length: number): string =>
-    next().toString(16).padStart(8, '0').slice(0, length)
+  const block = (length: number): string => next().toString(16).padStart(8, '0').slice(0, length)
   return `${block(8)}-${block(4)}-4${block(3)}-${'89ab'.charAt(next() % 4)}${block(3)}-${block(8)}${block(4)}`
 }
 
@@ -368,10 +350,8 @@ function sourceFor(index: number): {
   platform: FixtureSourcePlatform
   connectorId: string
 } {
-  if (index % 17 === 0)
-    return { platform: 'unknown', connectorId: 'legacy-webhook:default' }
-  if (index % 5 === 0)
-    return { platform: 'gitlab', connectorId: 'gitlab-integration:default' }
+  if (index % 17 === 0) return { platform: 'unknown', connectorId: 'legacy-webhook:default' }
+  if (index % 5 === 0) return { platform: 'gitlab', connectorId: 'gitlab-integration:default' }
   return { platform: 'github', connectorId: 'github-integration:default' }
 }
 
@@ -388,10 +368,7 @@ function digest(index: number, position: number): string {
   )
 }
 
-function artifactFor(
-  run_id: string,
-  kind: ArtifactStatus | null
-): FixtureArtifact | null {
+function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifact | null {
   if (kind === null) return null
   if (kind === 'available') {
     return {
@@ -449,19 +426,12 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
         'preparation',
         'preparing',
         run.preparation.status,
-        run.preparation.finished_at ??
-          run.preparation.started_at ??
-          run.created_at,
-        run.preparation.status === 'failed'
-          ? run.preparation.failure_code
-          : null
+        run.preparation.finished_at ?? run.preparation.started_at ?? run.created_at,
+        run.preparation.status === 'failed' ? run.preparation.failure_code : null
       )
     )
   }
-  if (
-    run.execution.status === 'uncertain' ||
-    run.execution.status === 'disconnected'
-  ) {
+  if (run.execution.status === 'uncertain' || run.execution.status === 'disconnected') {
     // An unresolved submission never reached `queued`: Review Runs moves `pending` straight to
     // `uncertain` when the Execution Gateway call's acceptance could not be confirmed. The recovery then
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
@@ -486,9 +456,7 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
       )
     }
   } else if (run.execution.started_at !== null) {
-    events.push(
-      push('execution', 'pending', 'queued', run.execution.started_at)
-    )
+    events.push(push('execution', 'pending', 'queued', run.execution.started_at))
     if (run.execution.status !== 'queued') {
       events.push(
         push(
@@ -503,16 +471,12 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
   } else if (run.execution.status === 'skipped') {
     // The Execution Gateway was never called: execution was skipped because preparation failed, so no
     // failure reason rides on the execution axis.
-    events.push(
-      push('execution', 'pending', 'skipped', run.execution.updated_at)
-    )
+    events.push(push('execution', 'pending', 'skipped', run.execution.updated_at))
   }
   if (run.publication.started_at !== null) {
     // A started publication was claimed first; its steps run between the claim and the
     // conclusion, so the axis brackets them on the timeline.
-    events.push(
-      push('publication', 'pending', 'publishing', run.publication.started_at)
-    )
+    events.push(push('publication', 'pending', 'publishing', run.publication.started_at))
     if (run.publication.status !== 'publishing')
       events.push(
         push(
@@ -525,31 +489,16 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
       )
   } else if (run.publication.status === 'skipped') {
     events.push(
-      push(
-        'publication',
-        'pending',
-        'skipped',
-        run.publication.finished_at ?? run.created_at
-      )
+      push('publication', 'pending', 'skipped', run.publication.finished_at ?? run.created_at)
     )
   }
   events.push(
     ...stepEventsFor(run, stepsByRun.get(run.run_id) ?? []).map((event) =>
-      push(
-        'publication',
-        event.from,
-        event.to,
-        event.at,
-        event.reason,
-        event.step_key
-      )
+      push('publication', event.from, event.to, event.at, event.reason, event.step_key)
     )
   )
   // Ties keep insertion order, so a step's own transitions stay in the order they happened.
-  return events.sort(
-    (left, right) =>
-      Date.parse(left.occurred_at) - Date.parse(right.occurred_at)
-  )
+  return events.sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
 }
 
 interface StepTransition {
@@ -566,10 +515,7 @@ interface StepTransition {
  * Steps run in publication order, each a few seconds after the previous one. A step that spent
  * more than one attempt shows those attempts failing and being retried before its last state, so
  * the timeline explains its `attempt_count` instead of leaving it to the reader to infer. */
-function stepEventsFor(
-  run: FixtureRun,
-  steps: readonly FixtureStep[]
-): StepTransition[] {
+function stepEventsFor(run: FixtureRun, steps: readonly FixtureStep[]): StepTransition[] {
   if (run.publication.started_at === null) return []
   const start = Date.parse(run.publication.started_at)
   // Every step is created when the claim initializes the step set, like an axis at admission.
@@ -586,11 +532,7 @@ function stepEventsFor(
     return iso(clock)
   }
   for (const step of steps) {
-    const add = (
-      from: string,
-      to: string,
-      reason: string | null = null
-    ): void => {
+    const add = (from: string, to: string, reason: string | null = null): void => {
       transitions.push({
         step_key: step.step_key,
         from,
@@ -638,10 +580,7 @@ function stepEventsFor(
  * retry budget was exhausted, so it is derived with more than one attempt rather than the
  * one attempt a still-live preparation has.
  */
-function preparationFor(
-  scenario: Scenario,
-  createdAt: number
-): FixtureRun['preparation'] {
+function preparationFor(scenario: Scenario, createdAt: number): FixtureRun['preparation'] {
   const status = scenario.preparation_status
   // `pending` has not been claimed yet, so the phase has no start; every other state was
   // reached by a claim. `submitted` and `failed` are terminal, so they also have an end.
@@ -673,22 +612,14 @@ function preparationFor(
  * Steps advance in order, so everything before the publication's current position has
  * already succeeded and only the last one can still be running or have failed.
  */
-function stepsFor(
-  scenario: Scenario,
-  workflow: Workflow,
-  index: number
-): FixtureStep[] {
+function stepsFor(scenario: Scenario, workflow: Workflow, index: number): FixtureStep[] {
   const step = scenario.step
   if (step === null) return []
   const keys = stepKeysFor(workflow, index)
   const lastPosition = keys.length - 1
   return keys.map((step_key, position) => {
     const status: StepStatus =
-      position < lastPosition
-        ? 'succeeded'
-        : step === 'running'
-          ? 'running'
-          : step
+      position < lastPosition ? 'succeeded' : step === 'running' ? 'running' : step
     const failed = status === 'terminal_failed'
     return {
       step_key,
@@ -696,12 +627,9 @@ function stepsFor(
       // An attempt is spent by starting one, not by failing: `succeeded` and `failed` steps have
       // run once, and a step that exhausted its budget ran as many times as the budget allows.
       attempt_count: status === 'pending' ? 0 : failed ? 3 : 1,
-      remote_object_url:
-        status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
+      remote_object_url: status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
       failure_code: failed ? scenario.failure_code : null,
-      failure_message: failed
-        ? 'GitHub rejected the publication payload.'
-        : null
+      failure_message: failed ? 'GitHub rejected the publication payload.' : null
     }
   })
 }
@@ -760,9 +688,7 @@ function noticesFor(
   if (execution === 'disconnected') {
     const status = scenario.execution_attention_notice
     if (status === undefined) {
-      throw new Error(
-        'a disconnected fixture must name its attention notice stage'
-      )
+      throw new Error('a disconnected fixture must name its attention notice stage')
     }
     return [
       {
@@ -778,9 +704,7 @@ function noticesFor(
   if (publication === 'disconnected') {
     const status = scenario.publication_attention_notice
     if (status === undefined) {
-      throw new Error(
-        'a disconnected publication must name its attention notice stage'
-      )
+      throw new Error('a disconnected publication must name its attention notice stage')
     }
     // Same reasoning as the execution one: the run is parked, not failed, and the notice
     // reports that automation stopped — so it is an attention notice, not a failure report.
@@ -798,141 +722,125 @@ function noticesFor(
   return []
 }
 
-export const runs: FixtureRun[] = Array.from(
-  { length: RUN_COUNT },
-  (_, index) => {
-    const scenario = SCENARIOS[index % SCENARIOS.length]
-    // Rotate the workflow offset as scenarios advance, so every (scenario, workflow) pair occurs
-    // regardless of how many scenarios there are. A plain `index % len` freezes the pairing when
-    // the two lengths share a factor, which silently dropped some combinations from the fixtures.
-    const workflow =
-      WORKFLOWS[
-        (index + Math.floor(index / WORKFLOWS.length)) % WORKFLOWS.length
-      ]
-    const run_id = runId(index)
-    const source = sourceFor(index)
-    // An active run has necessarily been admitted a short time ago (it is still in flight), so
-    // its timeline is anchored near now rather than at the newest historical slot. Otherwise a
-    // running fixture would claim to have been executing for hours while also being polled just
-    // seconds ago.
-    const active = ['queued', 'running'].includes(scenario.execution_status)
-    const createdAt = active
-      ? Date.now() - (index % 5) * 60_000 - scenario.executionMs
-      : BASE_TIME - index * RUN_SPACING_MS
-    // `executionMs` is the execution phase's own duration, which is what the console shows. The
-    // phase cannot start before preparation ends, so the axis ends at preparation's end plus this
-    // duration. Previously the end was `createdAt + executionMs` while the start was capped at 60s,
-    // so every run displayed `executionMs - 60s` of execution - a 247s scenario read as 187s.
-    const executionStartedAt =
-      createdAt + Math.min(scenario.executionMs, 60_000)
-    const executionUpdatedAt = executionStartedAt + scenario.executionMs
-    const publicationUpdatedAt =
-      scenario.publicationMs === undefined
-        ? createdAt
-        : createdAt + scenario.publicationMs
-    // `pending` has not been submitted. `uncertain` and `disconnected` have a submission whose
-    // acceptance is unknown, so none of them has an execution start time to measure.
-    const executionNeverRan =
-      scenario.execution_status === 'pending' ||
-      scenario.execution_status === 'uncertain' ||
-      scenario.execution_status === 'disconnected' ||
-      scenario.execution_status === 'skipped'
-    // For an in-flight run the whole timeline is relative to "now", and `updated_at` is pinned a
-    // few seconds before it, so `started_at` must be relative to that same instant rather than to
-    // `createdAt + elapsed`: with a long `executionMs` the two formulas disagree and start drifts
-    // past the observation time. An active run has by definition been observed after it started.
-    // Execution starts right after preparation finishes, and ends `executionMs` later. Capping the
-    // start instead (as this used to) made every run report `executionMs - 60s` of execution time:
-    // a 247s scenario displayed as 187s, so the duration on screen was not the duration the
-    // scenario described. Preparation's own end keeps its cap, because it only has to be shorter
-    // than the phase after it, not equal to it.
-    const submittedAt = executionNeverRan
-      ? null
-      : active
-        ? Date.now() - Math.min(5_000, scenario.executionMs) - 1_000
-        : executionStartedAt
-    // Execution ends on a terminal state; `uncertain` is explicitly not terminal.
-    const executionFinished =
-      scenario.execution_status === 'succeeded' ||
-      scenario.execution_status === 'failed' ||
-      scenario.execution_status === 'skipped'
-    // Publication begins when its work is first claimed, i.e. once execution succeeded and the
-    // publication has moved past `pending`. A `skipped` publication never started.
-    const publicationFinished =
-      scenario.publication_status === 'published' ||
-      scenario.publication_status === 'failed' ||
-      scenario.publication_status === 'skipped'
-    // Uncertain and disconnected are mid-phase: the publication has been claimed and at least
-    // one step has run, so the phase has a start.
-    const publicationStarted =
-      scenario.publication_status === 'publishing' ||
-      scenario.publication_status === 'uncertain' ||
-      scenario.publication_status === 'disconnected' ||
-      scenario.publication_status === 'published' ||
-      scenario.publication_status === 'failed'
-    // The publication cannot start before execution ended. Halfway between those two instants
-    // keeps the fixture's own ordering honest without inventing a separate scenario field.
-    const publicationStartedAt = publicationStarted
-      ? Math.round((executionUpdatedAt + publicationUpdatedAt) / 2)
-      : null
-    const preparation = preparationFor(scenario, createdAt)
-    const execution = scenario.execution_status
-    return {
-      run_id,
-      workflow,
-      connector_id: source.connectorId,
-      source_platform: source.platform,
-      preparation,
-      created_at: iso(createdAt),
-      execution: {
-        status: execution,
-        started_at: submittedAt === null ? null : iso(submittedAt),
-        finished_at: executionFinished ? iso(executionUpdatedAt) : null,
-        // An active run is polled continuously, so its last observation is "just now"; a terminal
-        // run keeps the instant it finished. This lets the console show a realistic
-        // "observed Ns ago".
-        updated_at: iso(
-          scenario.execution_status === 'queued' ||
-            scenario.execution_status === 'running'
-            ? Date.now() - Math.min(5_000, scenario.executionMs)
-            : executionUpdatedAt
-        )
-      },
-      execution_statistics:
-        scenario.execution_status === 'succeeded'
-          ? executionStatisticsFor(
-              workflow,
-              executionUpdatedAt,
-              workflow === 'repository-review' || index % 2 === 0,
-              index
-            )
-          : null,
-      publication: {
-        status: scenario.publication_status,
-        started_at:
-          publicationStartedAt === null ? null : iso(publicationStartedAt),
-        // Every terminal publication outcome has an end; `skipped` is terminal without having
-        // started, and `pending`/`publishing` have not finished yet.
-        finished_at: publicationFinished ? iso(publicationUpdatedAt) : null,
-        updated_at: iso(publicationUpdatedAt)
-      },
-      failure_code: scenario.failure_code,
-      artifact_storage: artifactFor(run_id, scenario.artifact),
-      // A failed preparation queues the acknowledgement the connector delivers. Derived here rather
-      // than stored on the scenario: the notice is a consequence of the failure, not an independent
-      // choice the fixture should make.
-      // Any axis that ends a run queues a notice, so the fixture derives one from whichever axis
-      // actually failed. Modelling only the preparation case taught the console a narrower world
-      // than Review Runs produces.
-      notices: noticesFor(
-        scenario,
-        preparation,
-        execution,
-        scenario.publication_status
+export const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
+  const scenario = SCENARIOS[index % SCENARIOS.length]
+  // Rotate the workflow offset as scenarios advance, so every (scenario, workflow) pair occurs
+  // regardless of how many scenarios there are. A plain `index % len` freezes the pairing when
+  // the two lengths share a factor, which silently dropped some combinations from the fixtures.
+  const workflow = WORKFLOWS[(index + Math.floor(index / WORKFLOWS.length)) % WORKFLOWS.length]
+  const run_id = runId(index)
+  const source = sourceFor(index)
+  // An active run has necessarily been admitted a short time ago (it is still in flight), so
+  // its timeline is anchored near now rather than at the newest historical slot. Otherwise a
+  // running fixture would claim to have been executing for hours while also being polled just
+  // seconds ago.
+  const active = ['queued', 'running'].includes(scenario.execution_status)
+  const createdAt = active
+    ? Date.now() - (index % 5) * 60_000 - scenario.executionMs
+    : BASE_TIME - index * RUN_SPACING_MS
+  // `executionMs` is the execution phase's own duration, which is what the console shows. The
+  // phase cannot start before preparation ends, so the axis ends at preparation's end plus this
+  // duration. Previously the end was `createdAt + executionMs` while the start was capped at 60s,
+  // so every run displayed `executionMs - 60s` of execution - a 247s scenario read as 187s.
+  const executionStartedAt = createdAt + Math.min(scenario.executionMs, 60_000)
+  const executionUpdatedAt = executionStartedAt + scenario.executionMs
+  const publicationUpdatedAt =
+    scenario.publicationMs === undefined ? createdAt : createdAt + scenario.publicationMs
+  // `pending` has not been submitted. `uncertain` and `disconnected` have a submission whose
+  // acceptance is unknown, so none of them has an execution start time to measure.
+  const executionNeverRan =
+    scenario.execution_status === 'pending' ||
+    scenario.execution_status === 'uncertain' ||
+    scenario.execution_status === 'disconnected' ||
+    scenario.execution_status === 'skipped'
+  // For an in-flight run the whole timeline is relative to "now", and `updated_at` is pinned a
+  // few seconds before it, so `started_at` must be relative to that same instant rather than to
+  // `createdAt + elapsed`: with a long `executionMs` the two formulas disagree and start drifts
+  // past the observation time. An active run has by definition been observed after it started.
+  // Execution starts right after preparation finishes, and ends `executionMs` later. Capping the
+  // start instead (as this used to) made every run report `executionMs - 60s` of execution time:
+  // a 247s scenario displayed as 187s, so the duration on screen was not the duration the
+  // scenario described. Preparation's own end keeps its cap, because it only has to be shorter
+  // than the phase after it, not equal to it.
+  const submittedAt = executionNeverRan
+    ? null
+    : active
+      ? Date.now() - Math.min(5_000, scenario.executionMs) - 1_000
+      : executionStartedAt
+  // Execution ends on a terminal state; `uncertain` is explicitly not terminal.
+  const executionFinished =
+    scenario.execution_status === 'succeeded' ||
+    scenario.execution_status === 'failed' ||
+    scenario.execution_status === 'skipped'
+  // Publication begins when its work is first claimed, i.e. once execution succeeded and the
+  // publication has moved past `pending`. A `skipped` publication never started.
+  const publicationFinished =
+    scenario.publication_status === 'published' ||
+    scenario.publication_status === 'failed' ||
+    scenario.publication_status === 'skipped'
+  // Uncertain and disconnected are mid-phase: the publication has been claimed and at least
+  // one step has run, so the phase has a start.
+  const publicationStarted =
+    scenario.publication_status === 'publishing' ||
+    scenario.publication_status === 'uncertain' ||
+    scenario.publication_status === 'disconnected' ||
+    scenario.publication_status === 'published' ||
+    scenario.publication_status === 'failed'
+  // The publication cannot start before execution ended. Halfway between those two instants
+  // keeps the fixture's own ordering honest without inventing a separate scenario field.
+  const publicationStartedAt = publicationStarted
+    ? Math.round((executionUpdatedAt + publicationUpdatedAt) / 2)
+    : null
+  const preparation = preparationFor(scenario, createdAt)
+  const execution = scenario.execution_status
+  return {
+    run_id,
+    workflow,
+    connector_id: source.connectorId,
+    source_platform: source.platform,
+    preparation,
+    created_at: iso(createdAt),
+    execution: {
+      status: execution,
+      started_at: submittedAt === null ? null : iso(submittedAt),
+      finished_at: executionFinished ? iso(executionUpdatedAt) : null,
+      // An active run is polled continuously, so its last observation is "just now"; a terminal
+      // run keeps the instant it finished. This lets the console show a realistic
+      // "observed Ns ago".
+      updated_at: iso(
+        scenario.execution_status === 'queued' || scenario.execution_status === 'running'
+          ? Date.now() - Math.min(5_000, scenario.executionMs)
+          : executionUpdatedAt
       )
-    }
+    },
+    execution_statistics:
+      scenario.execution_status === 'succeeded'
+        ? executionStatisticsFor(
+            workflow,
+            executionUpdatedAt,
+            workflow === 'repository-review' || index % 2 === 0,
+            index
+          )
+        : null,
+    publication: {
+      status: scenario.publication_status,
+      started_at: publicationStartedAt === null ? null : iso(publicationStartedAt),
+      // Every terminal publication outcome has an end; `skipped` is terminal without having
+      // started, and `pending`/`publishing` have not finished yet.
+      finished_at: publicationFinished ? iso(publicationUpdatedAt) : null,
+      updated_at: iso(publicationUpdatedAt)
+    },
+    failure_code: scenario.failure_code,
+    artifact_storage: artifactFor(run_id, scenario.artifact),
+    // A failed preparation queues the acknowledgement the connector delivers. Derived here rather
+    // than stored on the scenario: the notice is a consequence of the failure, not an independent
+    // choice the fixture should make.
+    // Any axis that ends a run queues a notice, so the fixture derives one from whichever axis
+    // actually failed. Modelling only the preparation case taught the console a narrower world
+    // than Review Runs produces.
+    notices: noticesFor(scenario, preparation, execution, scenario.publication_status)
   }
-)
+})
 
 // The operator queue, shaped exactly as coordination would leave it. `EXECUTION_ALREADY_ADVANCED`
 // means an expired preparation lease could not be concluded because execution had already moved
@@ -965,9 +873,7 @@ export const stepsByRun = new Map<string, FixtureStep[]>(
 // fixtures would be a clean first-attempt success, and the difference between a step's history
 // and the publication's would not be visible.
 const retriedRun = runs.find(
-  (run) =>
-    run.publication.status === 'published' &&
-    (stepsByRun.get(run.run_id)?.length ?? 0) >= 2
+  (run) => run.publication.status === 'published' && (stepsByRun.get(run.run_id)?.length ?? 0) >= 2
 )
 if (retriedRun !== undefined) {
   const retriedStep = stepsByRun.get(retriedRun.run_id)![1]
@@ -975,8 +881,7 @@ if (retriedRun !== undefined) {
 }
 
 const BLOCKED_SCENARIO_INDEXES = SCENARIOS.map((scenario, index) =>
-  scenario.execution_status === 'succeeded' &&
-  scenario.publication_status === 'published'
+  scenario.execution_status === 'succeeded' && scenario.publication_status === 'published'
     ? index
     : -1
 )
@@ -989,16 +894,13 @@ export const parkedIndexes = new Set<number>()
 for (let position = 0; position < BLOCKED_RUN_COUNT; position += 1) {
   const scenarioIndex = BLOCKED_SCENARIO_INDEXES[position]
   if (scenarioIndex === undefined) break
-  const index = runs.findIndex(
-    (_, runIndex) => runIndex % SCENARIOS.length === scenarioIndex
-  )
+  const index = runs.findIndex((_, runIndex) => runIndex % SCENARIOS.length === scenarioIndex)
   if (index < 0) break
   const run = runs[index]
   blockedIndexes.add(index)
   run.preparation.status = 'disconnected'
   // A run in this state has necessarily been claimed at least once, so the phase has a start.
-  if (run.preparation.started_at === null)
-    run.preparation.started_at = run.created_at
+  if (run.preparation.started_at === null) run.preparation.started_at = run.created_at
   run.preparation.finished_at = null
   run.preparation.failure_code = null
   run.notices = []
@@ -1052,8 +954,7 @@ if (executionParkedIndex >= 0) {
 }
 
 const publicationParkedIndex = runs.findIndex(
-  (run, index) =>
-    !parkedIndexes.has(index) && run.publication.status === 'published'
+  (run, index) => !parkedIndexes.has(index) && run.publication.status === 'published'
 )
 if (publicationParkedIndex >= 0) {
   const run = runs[publicationParkedIndex]
@@ -1069,8 +970,7 @@ if (publicationParkedIndex >= 0) {
     lastStep.attempt_count = 3
     lastStep.remote_object_url = null
     lastStep.failure_code = 'GITHUB_TIMEOUT'
-    lastStep.failure_message =
-      'Reconciliation could not establish whether this step took effect.'
+    lastStep.failure_message = 'Reconciliation could not establish whether this step took effect.'
   }
   run.publication.status = 'disconnected'
   run.publication.finished_at = null
@@ -1099,10 +999,7 @@ interface Cursor {
 
 export function decodeCursor(value: string | null): Cursor | null {
   if (value === null) return null
-  const [createdAt, runId, extra] = Buffer.from(value, 'base64url')
-    .toString('utf8')
-    .split('|')
-  if (createdAt === undefined || runId === undefined || extra !== undefined)
-    return null
+  const [createdAt, runId, extra] = Buffer.from(value, 'base64url').toString('utf8').split('|')
+  if (createdAt === undefined || runId === undefined || extra !== undefined) return null
   return { createdAt, runId }
 }

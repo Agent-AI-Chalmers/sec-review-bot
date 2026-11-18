@@ -6,9 +6,7 @@ import {
 } from '../src/runtime/submission-recovery.js'
 import type { ReviewRunRecord } from '../src/shapes.js'
 
-function run(
-  input: Record<string, unknown> | null = { api_version: 'v1' }
-): ReviewRunRecord {
+function run(input: Record<string, unknown> | null = { api_version: 'v1' }): ReviewRunRecord {
   return {
     run_id: 'run-1',
     workflow: 'issue-review',
@@ -76,19 +74,14 @@ function store(overrides: Partial<FlatRecoveryStore> = {}): RecoveryStore {
   }
   return {
     executions: {
-      claimSubmissionRecovery: (runId, limit) =>
-        flat.claimSubmissionRecovery(runId, limit),
+      claimSubmissionRecovery: (runId, limit) => flat.claimSubmissionRecovery(runId, limit),
       disconnectExhaustedSubmissionRecovery: (runId, maxUnresolvedRecoveries) =>
-        flat.disconnectExhaustedSubmissionRecovery(
-          runId,
-          maxUnresolvedRecoveries
-        ),
+        flat.disconnectExhaustedSubmissionRecovery(runId, maxUnresolvedRecoveries),
       recordUnknownRecoveryOutcome: (runId, token) =>
         flat.recordUnknownRecoveryOutcome(runId, token)
     },
     submissionTransitions: {
-      completeSubmissionRecovery: (runId, token) =>
-        flat.completeSubmissionRecovery(runId, token),
+      completeSubmissionRecovery: (runId, token) => flat.completeSubmissionRecovery(runId, token),
       failSubmissionRecovery: (runId, token, error) =>
         flat.failSubmissionRecovery(runId, token, error)
     }
@@ -201,10 +194,7 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
   // The attempt is counted even though nothing is concluded: the budget is what eventually lets
   // an otherwise endless uncertainty end, so it has to advance on every unknown outcome.
   expect(counted).toStrictEqual(['claim-1'])
-  expect(
-    concluded,
-    'nothing may be concluded while the outcome is unknown'
-  ).toStrictEqual([])
+  expect(concluded, 'nothing may be concluded while the outcome is unknown').toStrictEqual([])
 })
 
 test('submission recovery records missing persisted input without calling Execution', async () => {
@@ -309,12 +299,7 @@ test('recovery does not replay when neither disconnection nor claim is available
   expect(result).toStrictEqual({ outcome: 'claim_unavailable' })
 })
 
-for (const outcome of [
-  'accepted',
-  'unknown',
-  'rejected',
-  'input_missing'
-] as const) {
+for (const outcome of ['accepted', 'unknown', 'rejected', 'input_missing'] as const) {
   test(`recovery reports claim loss when recording ${outcome} is refused`, async () => {
     const result = await recoverReviewRunSubmission(
       store({
@@ -331,8 +316,7 @@ for (const outcome of [
       run(outcome === 'input_missing' ? null : { api_version: 'v1' }),
       {
         async submit() {
-          if (outcome === 'unknown' || outcome === 'rejected')
-            throw new Error('remote outcome')
+          if (outcome === 'unknown' || outcome === 'rejected') throw new Error('remote outcome')
         },
         classifyError: (error) => ({
           uncertain: outcome === 'unknown',

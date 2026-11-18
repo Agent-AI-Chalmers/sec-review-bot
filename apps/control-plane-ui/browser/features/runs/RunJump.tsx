@@ -52,12 +52,7 @@ export function RunJump(): React.JSX.Element {
               style={{ flex: 1 }}
               onChange={(event) => setValue(event.currentTarget.value)}
             />
-            <ActionIcon
-              type="submit"
-              aria-label={t('goToRun')}
-              variant="filled"
-              size={36}
-            >
+            <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
               <IconArrowRight size={ICON_SIZE.md} />
             </ActionIcon>
           </Group>

@@ -69,13 +69,10 @@ for (const failure of ['metadata', 'storage'] as const) {
             maximumSize: 8
           },
           { idleTimeoutMs: 1000, filename: 'artifact.tar.zst' },
-          async () =>
-            expect.unreachable('an unverified artifact must not be served')
+          async () => expect.unreachable('an unverified artifact must not be served')
         )
       ).rejects.toThrow(
-        failure === 'metadata'
-          ? /artifact_identity_mismatch/
-          : /storage unavailable/
+        failure === 'metadata' ? /artifact_identity_mismatch/ : /storage unavailable/
       )
       await pendingOpen.promise
       await sinkDestroyed.promise
@@ -83,18 +80,11 @@ for (const failure of ['metadata', 'storage'] as const) {
       expect(fs.existsSync(path.dirname(filename))).toBe(true)
       releaseOpen.resolve()
       await completion
-      expect(
-        observedClose,
-        'rejection must wait for the sink to close'
-      ).toHaveBeenCalledTimes(1)
-      expect(
-        directoryExistedAtClose,
-        'the directory must survive until the sink closes'
-      ).toEqual([true])
-      expect(
-        closesBeforeRemoval,
-        'directory removal must start after the file closes'
-      ).toEqual([1])
+      expect(observedClose, 'rejection must wait for the sink to close').toHaveBeenCalledTimes(1)
+      expect(directoryExistedAtClose, 'the directory must survive until the sink closes').toEqual([
+        true
+      ])
+      expect(closesBeforeRemoval, 'directory removal must start after the file closes').toEqual([1])
       expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
       releaseOpen.resolve()

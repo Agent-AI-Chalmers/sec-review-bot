@@ -53,7 +53,9 @@
 
 ## 格式化与 Lint 职责
 
-Oxfmt 负责格式化，也负责契约投影的最终排版。生成器应直接产生能够通过格式检查的产物，无须再次改写；重复生成应保持相同字节。保留现有的 80 列风格及 fixtures 排除规则。
+<!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
+
+Oxfmt 负责格式化，也负责契约投影的最终排版。生成器应直接产生能够通过格式检查的产物，无须再次改写；重复生成应保持相同字节。Oxfmt 的 CLI 配置和生成器选项均显式设置 `printWidth: 100`，保留 fixtures 排除规则。
 
 <!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
 

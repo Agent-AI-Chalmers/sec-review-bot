@@ -51,11 +51,7 @@ export function fakeGitHub(respond: Handler): FakeGitHub {
     request: {
       fetch: async (input: string | URL | Request, init?: RequestInit) => {
         const url =
-          typeof input === 'string'
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
         const method = (init?.method ?? 'GET').toUpperCase()
         const rawBody = init?.body
         const body =
@@ -89,10 +85,7 @@ export function githubJson(body: unknown, status = 200): Response {
 }
 
 /** A `file` entry as `repos.getContent` returns it. */
-export function githubFile(
-  content: string,
-  path = '.sec-review/config.yml'
-): Response {
+export function githubFile(content: string, path = '.sec-review/config.yml'): Response {
   return githubJson({
     type: 'file',
     path,

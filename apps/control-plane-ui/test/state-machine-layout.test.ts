@@ -9,10 +9,7 @@ import {
   NODE_W,
   diagramGeometry
 } from '../browser/features/runs/detail/state-machine-geometry.js'
-import {
-  RETURN_EDGES,
-  STATE_LAYOUT
-} from '../browser/features/runs/detail/state-machine-layout.js'
+import { RETURN_EDGES, STATE_LAYOUT } from '../browser/features/runs/detail/state-machine-layout.js'
 import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
 
 test('every drawn state has its own cell, and no cell names an undeclared state', () => {
@@ -23,18 +20,13 @@ test('every drawn state has its own cell, and no cell names an undeclared state'
       `${machine.axis} layout must place exactly its states`
     ).toStrictEqual([...machine.states].sort())
     const cells = Object.values(layout).map(({ col, row }) => `${col}:${row}`)
-    expect(
-      new Set(cells).size,
-      `${machine.axis} states must not share a cell`
-    ).toBe(cells.length)
+    expect(new Set(cells).size, `${machine.axis} states must not share a cell`).toBe(cells.length)
   }
 })
 
 test('every listed return edge is a transition the contract declares', () => {
   for (const machine of STATE_MACHINES) {
-    const declared = new Set(
-      machine.transitions.map((edge) => `${edge.from}->${edge.to}`)
-    )
+    const declared = new Set(machine.transitions.map((edge) => `${edge.from}->${edge.to}`))
     for (const edge of RETURN_EDGES[machine.axis])
       expect.assert(
         declared.has(edge),
@@ -49,10 +41,9 @@ test('every declared transition is drawn on exactly one line', () => {
     const drawn = edges.flatMap((edge) => edge.transitions)
     expect(drawn).toHaveLength(machine.transitions.length)
     const pairs = edges.map((edge) => `${edge.from}->${edge.to}`)
-    expect(
-      new Set(pairs).size,
-      `${machine.axis} draws one state pair on more than one line`
-    ).toBe(pairs.length)
+    expect(new Set(pairs).size, `${machine.axis} draws one state pair on more than one line`).toBe(
+      pairs.length
+    )
   }
 })
 
@@ -70,10 +61,9 @@ test('no edge passes through a state it does not connect', () => {
             Math.abs(point.x - node.center.x) < NODE_W / 2 &&
             Math.abs(point.y - node.center.y) < NODE_H / 2
         )
-        expect(
-          hit,
-          `${machine.axis} ${edge.from}->${edge.to} passes through ${node.state}`
-        ).toBe(undefined)
+        expect(hit, `${machine.axis} ${edge.from}->${edge.to} passes through ${node.state}`).toBe(
+          undefined
+        )
       }
     }
   }

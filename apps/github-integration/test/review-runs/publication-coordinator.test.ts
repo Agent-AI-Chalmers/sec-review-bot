@@ -88,14 +88,11 @@ function unreachedPublicationSteps(): Pick<
     throw new Error(`the ${name} step should not be reached in this test`)
   }
   return {
-    initializePublicationSteps: async () =>
-      unreached('initializePublicationSteps'),
+    initializePublicationSteps: async () => unreached('initializePublicationSteps'),
     listPublicationSteps: async () => unreached('listPublicationSteps'),
-    requirePublicationStepClaim: async () =>
-      unreached('requirePublicationStepClaim'),
+    requirePublicationStepClaim: async () => unreached('requirePublicationStepClaim'),
     completePublicationStep: async () => unreached('completePublicationStep'),
-    settleExhaustedPublicationStep: async () =>
-      unreached('settleExhaustedPublicationStep'),
+    settleExhaustedPublicationStep: async () => unreached('settleExhaustedPublicationStep'),
     failPublicationStep: async () => unreached('failPublicationStep')
   }
 }
@@ -153,9 +150,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
       return true
     },
     failPublication: async () => {
-      throw new Error(
-        'A lease failure must not be converted into publication failure.'
-      )
+      throw new Error('A lease failure must not be converted into publication failure.')
     },
     connectorId: 'github-integration:test',
     ...unreachedPublicationSteps()
@@ -171,10 +166,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
 
   // The pass asks Review Runs to hold the claim, so a run that becomes publishable
   // mid-interval is picked up then instead of at the next poll.
-  expect.assert(
-    (claimWaits[0] ?? 0) > 0,
-    'a publication pass must ask for a bounded wait'
-  )
+  expect.assert((claimWaits[0] ?? 0) > 0, 'a publication pass must ask for a bounded wait')
   expect(installationLookups).toBe(0)
   expect(completionAttempts).toBe(0)
   // Nothing was asked of GitHub at all: a failed lease renewal stops the pass before any lookup.
@@ -324,19 +316,17 @@ test('a reconciliation that loses the step ends the publication instead of holdi
     // The two summary steps the repository path claims; neither has succeeded, so both are
     // candidates and the first one is the step this test exercises.
     listPublicationSteps: async () =>
-      ['repository:summary-issue', 'repository:summary-comment'].map(
-        (step_key) => ({
-          step_key,
-          status: 'pending' as const,
-          attempt_count: 3,
-          last_attempt_at: null,
-          unresolved_recovery_count: 0,
-          remote_object_id: null,
-          remote_object_url: null,
-          failure_code: null,
-          failure_message: null
-        })
-      ),
+      ['repository:summary-issue', 'repository:summary-comment'].map((step_key) => ({
+        step_key,
+        status: 'pending' as const,
+        attempt_count: 3,
+        last_attempt_at: null,
+        unresolved_recovery_count: 0,
+        remote_object_id: null,
+        remote_object_url: null,
+        failure_code: null,
+        failure_message: null
+      })),
     // The publish path reaches the claim first; refusing it with the exhaustion code is what
     // enters reconciliation, and the reconciliation then loses the settlement. Review Runs
     // answers a refusal with a 409, which is what tells this code apart from the same code on a
@@ -476,9 +466,7 @@ test('a publication that cannot complete names the steps that kept it from compl
 
   expect(messages).toHaveLength(1)
   expect(messages[0] ?? '').toMatch(/^PUBLICATION_STEPS_INCOMPLETE: /)
-  expect(messages[0] ?? '').toMatch(
-    /repository:delivery:gone \(uncertain, GITHUB_TIMEOUT\)/
-  )
+  expect(messages[0] ?? '').toMatch(/repository:delivery:gone \(uncertain, GITHUB_TIMEOUT\)/)
   expect(messages[0] ?? '').not.toMatch(/repository:summary-issue/)
 })
 
@@ -536,8 +524,7 @@ test('a refused conclusion is logged as left for the operator when a step is par
         if (publishThrows) throw new Error('GitHub answered 502 Bad Gateway')
       },
       listPublicationSteps: async () => {
-        if (stepStatus === 'unreadable')
-          throw new Error('Review Runs unreachable')
+        if (stepStatus === 'unreadable') throw new Error('Review Runs unreachable')
         return [
           {
             step_key: 'repository:delivery:gone',
@@ -582,32 +569,22 @@ test('a refused conclusion is logged as left for the operator when a step is par
         line.includes('repository:delivery:gone')
     )
   )
-  expect.assert(
-    !parked.some((line) => line.includes('review_publication_claim_lost'))
-  )
+  expect.assert(!parked.some((line) => line.includes('review_publication_claim_lost')))
 
   const lost = await run('pending')
-  expect.assert(
-    lost.some((line) => line.includes('review_publication_claim_lost'))
-  )
-  expect.assert(
-    !lost.some((line) => line.includes('review_publication_left_for_operator'))
-  )
+  expect.assert(lost.some((line) => line.includes('review_publication_claim_lost')))
+  expect.assert(!lost.some((line) => line.includes('review_publication_left_for_operator')))
 
   // A publish error is the diagnosis; a refused conclusion only explains why the run did not
   // change, so it must not replace the error in the log.
   const thrown = await run('disconnected', true)
   expect.assert(
     thrown.some(
-      (line) =>
-        line.includes('review_publication_failed') &&
-        line.includes('502 Bad Gateway')
+      (line) => line.includes('review_publication_failed') && line.includes('502 Bad Gateway')
     ),
     'the publish error is logged even though its conclusion was refused'
   )
-  expect.assert(
-    thrown.some((line) => line.includes('review_publication_left_for_operator'))
-  )
+  expect.assert(thrown.some((line) => line.includes('review_publication_left_for_operator')))
 
   // When the steps cannot be read the lost-claim warning stays, and the read failure says why
   // the refusal could not be explained.
@@ -619,7 +596,5 @@ test('a refused conclusion is logged as left for the operator when a step is par
         line.includes('Review Runs unreachable')
     )
   )
-  expect.assert(
-    unreadable.some((line) => line.includes('review_publication_claim_lost'))
-  )
+  expect.assert(unreadable.some((line) => line.includes('review_publication_claim_lost')))
 })

@@ -126,9 +126,7 @@ function buildHarness({
   return { store, octokit, settles, postedComments }
 }
 
-async function runPublish(
-  harness: ReturnType<typeof buildHarness>
-): Promise<void> {
+async function runPublish(harness: ReturnType<typeof buildHarness>): Promise<void> {
   await handleIssueReviewRun({
     run: {
       run_id: RUN_ID,
@@ -183,8 +181,7 @@ test('an exhausted comment step with no comment on GitHub stays a failure', asyn
     return (
       error instanceof Error &&
       'code' in error &&
-      error.code ===
-        EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+      error.code === EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
     )
   })
   expect(
@@ -239,10 +236,7 @@ test('every outcome names whether the step was written, so a caller need not inf
   // The write path decides whether the step is `succeeded`, `terminal_failed`, or untouched. The
   // outcome says which, and names the recorded state in the schema's own words, so a caller never
   // has to know which branch of `settleExhaustedStep` wrote.
-  const settledWith = async (
-    accepted: boolean,
-    found: { id: number; url: string } | null
-  ) =>
+  const settledWith = async (accepted: boolean, found: { id: number; url: string } | null) =>
     await settleExhaustedStep({
       store: {
         listPublicationSteps: async () => [],
@@ -286,8 +280,7 @@ test('a reconciliation that cannot reach GitHub records the failure but settles 
   // that is what spends the step's reconciliation budget, so a remote that keeps failing parks the
   // step for an operator instead of being retried forever.
   let settled = false
-  const failures: Array<{ code: string | null | undefined; retry: unknown }> =
-    []
+  const failures: Array<{ code: string | null | undefined; retry: unknown }> = []
   const result = await settleExhaustedStep({
     store: {
       listPublicationSteps: async () => [],
@@ -415,19 +408,14 @@ test('a lookup failure whose recording did not complete is reported again agains
     }
   })
   expect.assert(result.outcome === 'lookup_failed')
-  expect(
-    reported,
-    'retried once, against the same count both times'
-  ).toStrictEqual([1, 1])
+  expect(reported, 'retried once, against the same count both times').toStrictEqual([1, 1])
   expect(String(result.error)).toMatch(/502/)
   expect(result.recording).toBe('unknown')
   expect(result.expectedUnresolvedRecoveryCount).toBe(1)
 })
 
 test('a frozen lookup error is returned unchanged with explicit recording state', async () => {
-  const error = Object.freeze(
-    Object.assign(new Error('GitHub unavailable'), { status: 502 })
-  )
+  const error = Object.freeze(Object.assign(new Error('GitHub unavailable'), { status: 502 }))
   for (const accepted of [true, false]) {
     const result = await settleExhaustedStep({
       store: {

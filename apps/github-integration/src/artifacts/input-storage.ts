@@ -45,8 +45,7 @@ function matchesReference(
 ) {
   return (
     response.ContentLength === reference.size_bytes &&
-    response.Metadata?.['sha256'] ===
-      reference.digest.replace(/^sha256:/, '') &&
+    response.Metadata?.['sha256'] === reference.digest.replace(/^sha256:/, '') &&
     response.Metadata?.['media-type'] === reference.media_type
   )
 }
@@ -58,15 +57,12 @@ async function existingObjectMatches(
   reference: InputBundleArtifactRef
 ): Promise<boolean | undefined> {
   try {
-    const response = await client.send(
-      new HeadObjectCommand({ Bucket: bucket, Key: key })
-    )
+    const response = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
     return matchesReference(response, reference)
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-            ?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
         : undefined
     if (status === 403 || status === 404) {
       // A narrowly scoped LIST can establish absence even when HEAD returns 403.
@@ -91,18 +87,12 @@ export function publishedInputBundleReference(
   runId: string
 ): InputBundleArtifactRef {
   if (artifact_store === 'file') {
-    if (
-      !/^[A-Za-z0-9_-]+$/.test(runId) ||
-      !/^sha256:[0-9a-f]{64}$/.test(reference.digest)
-    )
+    if (!/^[A-Za-z0-9_-]+$/.test(runId) || !/^sha256:[0-9a-f]{64}$/.test(reference.digest))
       throw new Error('Invalid input bundle publication identity.')
     return {
       ...reference,
       uri: pathToFileURL(
-        path.join(
-          input_bundle_staging_root,
-          inputObjectKey(runId, reference.digest)
-        )
+        path.join(input_bundle_staging_root, inputObjectKey(runId, reference.digest))
       ).href
     }
   }
@@ -120,9 +110,7 @@ export async function publishInputBundle(
     const source = fileURLToPath(reference.uri)
     const destination = fileURLToPath(published.uri)
     await fs.mkdir(path.dirname(destination), { recursive: true })
-    const temporary = await fs.mkdtemp(
-      path.join(path.dirname(destination), '.publish-')
-    )
+    const temporary = await fs.mkdtemp(path.join(path.dirname(destination), '.publish-'))
     try {
       const staged = path.join(temporary, 'bundle')
       await fs.copyFile(source, staged)
@@ -156,9 +144,7 @@ export async function publishInputBundle(
     }
   }
   if (!artifact_s3_bucket) {
-    throw new Error(
-      'SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.'
-    )
+    throw new Error('SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.')
   }
 
   const source = new URL(reference.uri)
@@ -167,19 +153,12 @@ export async function publishInputBundle(
   }
   const key = inputObjectKey(runId, reference.digest)
   const client = configuredClient()
-  const existing = await existingObjectMatches(
-    client,
-    artifact_s3_bucket,
-    key,
-    reference
-  )
+  const existing = await existingObjectMatches(client, artifact_s3_bucket, key, reference)
   if (existing === true) {
     return publishedInputBundleReference(reference, runId)
   }
   if (existing === false) {
-    throw new Error(
-      `Immutable input bundle object conflicts with existing content: ${key}`
-    )
+    throw new Error(`Immutable input bundle object conflicts with existing content: ${key}`)
   }
 
   try {
@@ -200,17 +179,11 @@ export async function publishInputBundle(
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-            ?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
         : undefined
     if (
       status !== 412 ||
-      (await existingObjectMatches(
-        client,
-        artifact_s3_bucket,
-        key,
-        reference
-      )) !== true
+      (await existingObjectMatches(client, artifact_s3_bucket, key, reference)) !== true
     ) {
       throw error
     }
@@ -219,9 +192,7 @@ export async function publishInputBundle(
 }
 
 /** A failed read is uncertainty, not absence. Only a definitive missing object returns false. */
-export async function inputBundleExists(
-  reference: InputBundleArtifactRef
-): Promise<boolean> {
+export async function inputBundleExists(reference: InputBundleArtifactRef): Promise<boolean> {
   const uri = new URL(reference.uri)
   if (uri.protocol === 'file:') {
     try {
@@ -229,19 +200,11 @@ export async function inputBundleExists(
       const { size } = await fs.stat(source)
       const digest = createHash('sha256')
       await pipeline(createReadStream(source), digest)
-      if (
-        size !== reference.size_bytes ||
-        `sha256:${digest.digest('hex')}` !== reference.digest
-      )
+      if (size !== reference.size_bytes || `sha256:${digest.digest('hex')}` !== reference.digest)
         throw new Error('Local input bundle differs from its immutable intent.')
       return true
     } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      )
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
         return false
       throw error
     }
@@ -254,7 +217,6 @@ export async function inputBundleExists(
     uri.pathname.slice(1),
     reference
   )
-  if (matches === false)
-    throw new Error('Input bundle object differs from its immutable intent.')
+  if (matches === false) throw new Error('Input bundle object differs from its immutable intent.')
   return matches === true
 }

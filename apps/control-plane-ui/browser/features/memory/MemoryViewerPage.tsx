@@ -1,12 +1,5 @@
 import React from 'react'
-import {
-  ActionIcon,
-  Alert,
-  Container,
-  Group,
-  Title,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Alert, Container, Group, Title, Tooltip } from '@mantine/core'
 import { IconDownload } from '@tabler/icons-react'
 import { useParams } from 'react-router-dom'
 
@@ -72,8 +65,7 @@ export function MemoryVersionDiffPage(): React.JSX.Element {
         if (!controller.signal.aborted) setRecord(nextRecord)
       },
       (error: unknown) => {
-        if (!controller.signal.aborted && !isAbortError(error))
-          setFailure(error)
+        if (!controller.signal.aborted && !isAbortError(error)) setFailure(error)
       }
     )
     return (): void => controller.abort()
@@ -123,11 +115,7 @@ export function ExtractionTrajectoryPage(): React.JSX.Element {
   return <TrajectoryPage target={target} />
 }
 
-function TrajectoryPage({
-  target
-}: {
-  target: TrajectoryTarget
-}): React.JSX.Element {
+function TrajectoryPage({ target }: { target: TrajectoryTarget }): React.JSX.Element {
   const t = useMessages()
   return (
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>

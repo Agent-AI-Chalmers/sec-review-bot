@@ -3,10 +3,7 @@ import type { TrustedDefaultBranch } from '../../github/default-branch-service.j
 import type { Octokit } from 'octokit'
 import { prepareIssueReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type {
-  IssueReviewInput,
-  TestChangesPolicy
-} from '../../execution/input.js'
+import type { IssueReviewInput, TestChangesPolicy } from '../../execution/input.js'
 
 interface PrepareIssueReviewArgs {
   run_id: string
@@ -46,9 +43,7 @@ function assertIssueReviewInput(
 
 export async function prepareIssueReview(
   args: PrepareIssueReviewArgs,
-  {
-    prepare_input = prepareIssueReviewInput
-  }: Partial<PrepareIssueReviewDeps> = {}
+  { prepare_input = prepareIssueReviewInput }: Partial<PrepareIssueReviewDeps> = {}
 ): Promise<{
   review: PreparedIssueReviewRun
   input: IssueReviewInput & Record<string, unknown>

@@ -1,14 +1,8 @@
 /* Parked-run summary, queue rows, and the parked-run decision banner. */
 
 .parked-runs-summary {
-  border-color: light-dark(
-    var(--mantine-color-orange-2),
-    var(--mantine-color-orange-9)
-  );
-  background: light-dark(
-    var(--mantine-color-orange-0),
-    var(--mantine-color-dark-6)
-  );
+  border-color: light-dark(var(--mantine-color-orange-2), var(--mantine-color-orange-9));
+  background: light-dark(var(--mantine-color-orange-0), var(--mantine-color-dark-6));
 }
 
 .parked-runs-summary svg {
@@ -27,10 +21,7 @@
 }
 
 .parked-runs-summary-trigger:hover {
-  background: light-dark(
-    var(--mantine-color-orange-1),
-    var(--mantine-color-dark-5)
-  );
+  background: light-dark(var(--mantine-color-orange-1), var(--mantine-color-dark-5));
 }
 
 .parked-runs-summary-trigger:focus-visible {

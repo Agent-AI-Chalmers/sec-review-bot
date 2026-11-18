@@ -18,10 +18,7 @@ import {
 } from '../../src/triggers/repository-review.js'
 import type { Octokit } from 'octokit'
 import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
-import type {
-  ReviewRunAdmission,
-  ReviewRunRecord
-} from '../../src/review-runs/client.js'
+import type { ReviewRunAdmission, ReviewRunRecord } from '../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import type { RepositoryReviewInput } from '../../src/execution/input.js'
 import type { PreparedRepositoryReviewRun } from '../../src/reviews/repositories/prepare-review.js'
@@ -36,16 +33,13 @@ import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
  * lets the `ReviewRunRecord` type police it.
  */
 
-const bundleRoot = await fs.mkdtemp(
-  path.join(os.tmpdir(), 'repository-trigger-input-')
-)
+const bundleRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'repository-trigger-input-'))
 const bundlePath = path.join(bundleRoot, 'bundle.tar.zst')
 await fs.writeFile(bundlePath, 'x')
 afterAll(() => fs.rm(bundleRoot, { recursive: true, force: true }))
 
 /** A complete `RepositoryReviewInput`, returned by preparation. */
-function repositoryReviewInput(): RepositoryReviewInput &
-  Record<string, unknown> {
+function repositoryReviewInput(): RepositoryReviewInput & Record<string, unknown> {
   return {
     api_version: EXECUTION_API_VERSION,
     input_bundle: {
@@ -68,9 +62,7 @@ function repositoryReviewInput(): RepositoryReviewInput &
   } satisfies RepositoryReviewInput
 }
 
-function admittedRecord(
-  overrides: Partial<ReviewRunRecord> & { run_id: string }
-): ReviewRunRecord {
+function admittedRecord(overrides: Partial<ReviewRunRecord> & { run_id: string }): ReviewRunRecord {
   return {
     workflow: 'issue-review',
     source_platform: 'github',
@@ -117,9 +109,7 @@ function fakeApp(): App {
   // installation *lookup*; the client it would otherwise hand back is never reached.
   return fakeGitHubApp({
     respond: ({ url }) => {
-      const match = /^\/repos\/([^/]+)\/([^/]+)\/installation$/.exec(
-        new URL(url).pathname
-      )
+      const match = /^\/repos\/([^/]+)\/([^/]+)\/installation$/.exec(new URL(url).pathname)
       if (!match) return githubJson({ message: 'Not Found' }, 404)
       return githubJson({ id: 123 })
     }
@@ -276,8 +266,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         },
         submitPreparedRun: (run_id, _token, context, input) =>
           saved_runs.push({ run_id, context, input }),
-        failPreparation: () =>
-          expect.unreachable('successful review must not be marked failed')
+        failPreparation: () => expect.unreachable('successful review must not be marked failed')
       }
     }
   })
@@ -311,10 +300,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
     run_id: 'run-1',
     input: {
       ...repositoryReviewInput(),
-      input_bundle: publishedInputBundleReference(
-        repositoryReviewInput().input_bundle,
-        'run-1'
-      )
+      input_bundle: publishedInputBundleReference(repositoryReviewInput().input_bundle, 'run-1')
     },
     context: {
       repo: {
@@ -379,12 +365,9 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
             }
           })
         }),
-        submitPreparedRun: () =>
-          expect.unreachable('replayed dispatch must not queue again'),
+        submitPreparedRun: () => expect.unreachable('replayed dispatch must not queue again'),
         failPreparation: () =>
-          expect.unreachable(
-            'replayed dispatch must not change the original run'
-          )
+          expect.unreachable('replayed dispatch must not change the original run')
       }
     }
   })
@@ -392,9 +375,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
   expect(submitted.run_id).toBe('run-original')
   expect(submitted.replayed).toBe(true)
   expect(submissions).toBe(0)
-  expect(admissions).toStrictEqual([
-    { run_id: 'run-original', status: 'running', replayed: true }
-  ])
+  expect(admissions).toStrictEqual([{ run_id: 'run-original', status: 'running', replayed: true }])
 })
 
 test('dispatchRepositoryReview maps resolver errors to validation errors', async () => {
@@ -426,10 +407,8 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
               preparation_token: 'claim'
             } satisfies ReviewRunAdmission
           },
-          submitPreparedRun: () =>
-            expect.unreachable('invalid dispatch must not queue a run'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('invalid dispatch must not queue a run'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -462,18 +441,13 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
       deps: {
         getInstallationOctokit: async () =>
           expect.unreachable('invalid contract must not call GitHub'),
-        resolve_dispatch: async () =>
-          expect.unreachable('invalid contract must not resolve refs'),
-        prepare_review: async () =>
-          expect.unreachable('invalid contract must not submit'),
+        resolve_dispatch: async () => expect.unreachable('invalid contract must not resolve refs'),
+        prepare_review: async () => expect.unreachable('invalid contract must not submit'),
         store: {
           ...preparationClaim,
-          admitReviewRun: () =>
-            expect.unreachable('invalid contract must not create a run'),
-          submitPreparedRun: () =>
-            expect.unreachable('invalid contract must not queue'),
-          failPreparation: () =>
-            expect.unreachable('invalid contract has no run to fail')
+          admitReviewRun: () => expect.unreachable('invalid contract must not create a run'),
+          submitPreparedRun: () => expect.unreachable('invalid contract must not queue'),
+          failPreparation: () => expect.unreachable('invalid contract has no run to fail')
         }
       }
     })
@@ -522,10 +496,8 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
               preparation_token: 'claim'
             } satisfies ReviewRunAdmission
           },
-          submitPreparedRun: () =>
-            expect.unreachable('failed review must not be queued'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('failed review must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -615,8 +587,7 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
             transitions.push(['prepared', run_id, context, input])
             throw error
           },
-          failPreparation: (run_id, _token, failure) =>
-            transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
     })
@@ -663,8 +634,7 @@ test('recovery transport failure retries preparation without rebuilding GitHub i
           async listInputBundleCandidates() {
             throw error
           },
-          submitPreparedRun: () =>
-            expect.unreachable('unconfirmed input must not submit'),
+          submitPreparedRun: () => expect.unreachable('unconfirmed input must not submit'),
           failPreparation: (_run, _token, _failure, options) => {
             failures.push(options)
           }
@@ -673,8 +643,7 @@ test('recovery transport failure retries preparation without rebuilding GitHub i
     })
   ).rejects.toSatisfy(
     (caught) =>
-      caught instanceof RepositoryReviewDispatchValidationError &&
-      caught.message === error.message
+      caught instanceof RepositoryReviewDispatchValidationError && caught.message === error.message
   )
   expect((failures[0] as { retry: boolean }).retry).toBe(true)
 })

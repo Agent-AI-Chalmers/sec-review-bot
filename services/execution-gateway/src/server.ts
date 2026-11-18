@@ -6,20 +6,13 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyRequest
-} from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 
 import { supportedWorkflows } from './execution-api-validation.js'
 import { ExecutionRunConflictError, type ExecutionRecord } from './execution.js'
 import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
-import {
-  executionError,
-  TemporalExecutionClient
-} from './temporal-execution-client.js'
+import { executionError, TemporalExecutionClient } from './temporal-execution-client.js'
 
 function specPath(): string {
   const moduleDirectory = import.meta.dirname
@@ -36,9 +29,7 @@ function tokenMatches(header: string | undefined, expected: string): boolean {
 }
 
 function response(record: ExecutionRecord): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(record).filter(([, value]) => value !== undefined)
-  )
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined))
 }
 
 function semanticError(
@@ -58,10 +49,7 @@ export async function registerExecutionGatewayRoutes(
   }
 ): Promise<void> {
   const { client, token } = options
-  const workflowTimeoutSeconds = integerEnv(
-    'TEMPORAL_WORKFLOW_TIMEOUT_SECONDS',
-    10_800
-  )
+  const workflowTimeoutSeconds = integerEnv('TEMPORAL_WORKFLOW_TIMEOUT_SECONDS', 10_800)
   await app.register(openapiGlue, {
     specification: specPath(),
     serviceHandlers: {
@@ -100,20 +88,15 @@ export async function registerExecutionGatewayRoutes(
           })
         }
         try {
-          return await reply
-            .status(202)
-            .send(response(await client.start(submission)))
+          return await reply.status(202).send(response(await client.start(submission)))
         } catch (error) {
           if (error instanceof ExecutionRunConflictError) {
             return await reply.status(409).send({
               run_id: error.runId,
               workflow: error.requestedWorkflow,
-              error: semanticError(
-                'EXECUTION_RUN_CONFLICT',
-                'input',
-                error.message,
-                { existing_workflow: error.existingWorkflow ?? null }
-              )
+              error: semanticError('EXECUTION_RUN_CONFLICT', 'input', error.message, {
+                existing_workflow: error.existingWorkflow ?? null
+              })
             })
           }
           throw error
@@ -125,45 +108,31 @@ export async function registerExecutionGatewayRoutes(
         if (record) return response(record)
         return await reply.status(404).send({
           run_id: runId,
-          error: semanticError(
-            'EXECUTION_RUN_NOT_FOUND',
-            'runtime',
-            'Execution run not found.'
-          )
+          error: semanticError('EXECUTION_RUN_NOT_FOUND', 'runtime', 'Execution run not found.')
         })
       },
       getRunStatuses: async (request: FastifyRequest) => {
         const body = request.body as RequestBody<'getRunStatuses'>
         const records = await Promise.all(
-          [...new Set(body.run_ids)].map(
-            async (runId) => [runId, await client.get(runId)] as const
-          )
+          [...new Set(body.run_ids)].map(async (runId) => [runId, await client.get(runId)] as const)
         )
         return {
           runs: records
-            .filter(
-              (entry): entry is readonly [string, ExecutionRecord] =>
-                entry[1] !== undefined
-            )
+            .filter((entry): entry is readonly [string, ExecutionRecord] => entry[1] !== undefined)
             .map(([runId, record]) => ({
               run_id: runId,
               status: record.status
             })),
-          missing: records
-            .filter(([, record]) => !record)
-            .map(([runId]) => runId)
+          missing: records.filter(([, record]) => !record).map(([runId]) => runId)
         }
       }
     },
     securityHandlers: {
       HTTPBearer: (request: FastifyRequest) => {
         if (token && !tokenMatches(request.headers.authorization, token)) {
-          throw Object.assign(
-            new Error('Missing or invalid execution gateway token.'),
-            {
-              statusCode: 401
-            }
-          )
+          throw Object.assign(new Error('Missing or invalid execution gateway token.'), {
+            statusCode: 401
+          })
         }
       }
     }
@@ -203,15 +172,8 @@ export async function startExecutionGateway(): Promise<{
   const port = integerEnv('EXECUTION_GATEWAY_PORT', 8000, 1, 65_535)
   const token = process.env.EXECUTION_GATEWAY_TOKEN?.trim()
   const host = process.env.EXECUTION_GATEWAY_HOST?.trim() || '127.0.0.1'
-  if (
-    !token &&
-    host !== '127.0.0.1' &&
-    host !== 'localhost' &&
-    host !== '::1'
-  ) {
-    throw new Error(
-      'EXECUTION_GATEWAY_TOKEN is required for a non-loopback host.'
-    )
+  if (!token && host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
+    throw new Error('EXECUTION_GATEWAY_TOKEN is required for a non-loopback host.')
   }
   await using resources = new AsyncDisposableStack()
   const client = await TemporalExecutionClient.connect()

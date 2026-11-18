@@ -7,12 +7,7 @@ import {
   RepositoryTriggerConfigError
 } from '../../src/github/repo-config-service.js'
 import type { Octokit } from 'octokit'
-import {
-  fakeGitHub,
-  githubFile,
-  githubJson,
-  type RecordedRequest
-} from '../github-client.js'
+import { fakeGitHub, githubFile, githubJson, type RecordedRequest } from '../github-client.js'
 
 type Content_by_path = Record<string, string | Error>
 
@@ -21,14 +16,11 @@ function createOctokitWithContent(contentByPath: Content_by_path = {}): {
   requests: RecordedRequest[]
 } {
   return fakeGitHub(({ url }) => {
-    const path = decodeURIComponent(
-      new URL(url).pathname.split('/contents/')[1] ?? ''
-    )
+    const path = decodeURIComponent(new URL(url).pathname.split('/contents/')[1] ?? '')
     const source = contentByPath[path]
     // A missing entry is a real 404, which is what GitHub answers for an absent file.
     if (source === undefined) return githubJson({ message: 'Not Found' }, 404)
-    if (source instanceof Error)
-      return githubJson({ message: source.message }, 500)
+    if (source instanceof Error) return githubJson({ message: source.message }, 500)
     return githubFile(source, path)
   })
 }
@@ -172,11 +164,9 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
   const { octokit } = createOctokitWithContent({
-    [CONFIG_PATH]: [
-      'sec_review_bot:',
-      '  trigger_mode: automatic',
-      '  paths_ignore: invalid'
-    ].join('\n')
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic', '  paths_ignore: invalid'].join(
+      '\n'
+    )
   })
 
   await expect(
@@ -212,9 +202,7 @@ test('reads the .sec-review/config.yml path', async () => {
   // was read without replacing the client's method.
   expect(requests).toHaveLength(1)
   expect.assert(
-    decodeURIComponent(new URL(requests[0]!.url).pathname).endsWith(
-      `/contents/${CONFIG_PATH}`
-    ),
+    decodeURIComponent(new URL(requests[0]!.url).pathname).endsWith(`/contents/${CONFIG_PATH}`),
     requests[0]!.url
   )
 })
@@ -231,8 +219,7 @@ test('invalid YAML in the config path is rejected', async () => {
       ref: 'main'
     })
   ).rejects.toSatisfy(
-    (error: unknown) =>
-      isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
   )
 })
 
@@ -257,8 +244,6 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
       ref: 'main'
     })
   ).rejects.toSatisfy(
-    (error: unknown) =>
-      isRepositoryTriggerConfigError(error) &&
-      error.reason === 'invalid-content'
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
   )
 })

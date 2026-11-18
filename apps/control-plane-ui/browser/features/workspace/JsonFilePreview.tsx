@@ -16,18 +16,12 @@ const treeTheme = {
   base06: 'var(--mantine-color-text)',
   base07: 'var(--mantine-color-text)',
   base08: 'light-dark(var(--mantine-color-red-8), var(--mantine-color-red-4))',
-  base09:
-    'light-dark(var(--mantine-color-orange-8), var(--mantine-color-orange-4))',
-  base0A:
-    'light-dark(var(--mantine-color-yellow-8), var(--mantine-color-yellow-4))',
-  base0B:
-    'light-dark(var(--mantine-color-green-8), var(--mantine-color-green-4))',
-  base0C:
-    'light-dark(var(--mantine-color-cyan-8), var(--mantine-color-cyan-4))',
-  base0D:
-    'light-dark(var(--mantine-color-blue-8), var(--mantine-color-blue-4))',
-  base0E:
-    'light-dark(var(--mantine-color-grape-8), var(--mantine-color-grape-4))',
+  base09: 'light-dark(var(--mantine-color-orange-8), var(--mantine-color-orange-4))',
+  base0A: 'light-dark(var(--mantine-color-yellow-8), var(--mantine-color-yellow-4))',
+  base0B: 'light-dark(var(--mantine-color-green-8), var(--mantine-color-green-4))',
+  base0C: 'light-dark(var(--mantine-color-cyan-8), var(--mantine-color-cyan-4))',
+  base0D: 'light-dark(var(--mantine-color-blue-8), var(--mantine-color-blue-4))',
+  base0E: 'light-dark(var(--mantine-color-grape-8), var(--mantine-color-grape-4))',
   base0F: 'light-dark(var(--mantine-color-pink-8), var(--mantine-color-pink-4))'
 }
 
@@ -73,12 +67,7 @@ function JsonLine({
           </Text>
         )}
       </summary>
-      {opened &&
-        (value === undefined ? (
-          <Code block>{raw}</Code>
-        ) : (
-          <JsonTree value={value} />
-        ))}
+      {opened && (value === undefined ? <Code block>{raw}</Code> : <JsonTree value={value} />)}
     </details>
   )
 }

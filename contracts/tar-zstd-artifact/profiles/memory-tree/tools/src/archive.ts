@@ -12,12 +12,7 @@ const BLOCK_SIZE = 512
 const CANONICAL_MANIFEST = Buffer.from('{"version":1}\n')
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
 
-export type EntryKind =
-  | 'file'
-  | 'directory'
-  | 'symlink'
-  | 'character-device'
-  | 'pax-header'
+export type EntryKind = 'file' | 'directory' | 'symlink' | 'character-device' | 'pax-header'
 
 export interface ArchiveEntry {
   path: string
@@ -51,30 +46,19 @@ export function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-function writeString(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: string
-): void {
+function writeString(target: Buffer, offset: number, length: number, value: string): void {
   const bytes = Buffer.from(value)
   if (bytes.length > length) throw new Error(`tar field is too long: ${value}`)
   bytes.copy(target, offset)
 }
 
-function writeOctal(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: number
-): void {
+function writeOctal(target: Buffer, offset: number, length: number, value: number): void {
   const encoded = value.toString(8).padStart(length - 1, '0') + '\0'
   writeString(target, offset, length, encoded)
 }
 
 function splitUstarPath(entryPath: string): { name: string; prefix: string } {
-  if (Buffer.byteLength(entryPath) <= 100)
-    return { name: entryPath, prefix: '' }
+  if (Buffer.byteLength(entryPath) <= 100) return { name: entryPath, prefix: '' }
   for (
     let index = entryPath.lastIndexOf('/');
     index > 0;
@@ -118,8 +102,7 @@ function tarHeader(entry: ArchiveEntry): Buffer {
   writeOctal(header, 136, 12, 0)
   header.fill(0x20, 148, 156)
   writeString(header, 156, 1, typeFlag)
-  if (entry.linkPath !== undefined)
-    writeString(header, 157, 100, entry.linkPath)
+  if (entry.linkPath !== undefined) writeString(header, 157, 100, entry.linkPath)
   writeString(header, 257, 6, 'ustar\0')
   writeString(header, 263, 2, '00')
   writeString(header, 345, 155, prefix)
@@ -152,8 +135,7 @@ function readString(block: Buffer, offset: number, length: number): string {
 
 function readOctal(block: Buffer, offset: number, length: number): number {
   const value = readString(block, offset, length).trim()
-  if (!/^[0-7]+$/.test(value))
-    throw new ArchiveError('INVALID_TAR', 'invalid octal field')
+  if (!/^[0-7]+$/.test(value)) throw new ArchiveError('INVALID_TAR', 'invalid octal field')
   return Number.parseInt(value, 8)
 }
 
@@ -162,27 +144,20 @@ function parsePaxPath(body: Buffer): string {
   let path: string | undefined
   while (position < body.length) {
     const space = body.indexOf(0x20, position)
-    if (space < 0)
-      throw new ArchiveError('INVALID_PAX', 'missing record length')
+    if (space < 0) throw new ArchiveError('INVALID_PAX', 'missing record length')
     const lengthText = body.subarray(position, space).toString('ascii')
-    if (!/^\d+$/.test(lengthText))
-      throw new ArchiveError('INVALID_PAX', 'invalid record length')
+    if (!/^\d+$/.test(lengthText)) throw new ArchiveError('INVALID_PAX', 'invalid record length')
     const end = position + Number.parseInt(lengthText, 10)
     if (end > body.length || body[end - 1] !== 0x0a)
       throw new ArchiveError('INVALID_PAX', 'invalid record boundary')
     const record = body.subarray(space + 1, end - 1)
     const equals = record.indexOf(0x3d)
-    if (
-      equals < 0 ||
-      record.subarray(0, equals).toString('ascii') !== 'path' ||
-      path !== undefined
-    )
+    if (equals < 0 || record.subarray(0, equals).toString('ascii') !== 'path' || path !== undefined)
       throw new ArchiveError('UNSUPPORTED_PAX', 'unsupported PAX metadata')
     path = UTF8_DECODER.decode(record.subarray(equals + 1))
     position = end
   }
-  if (path === undefined)
-    throw new ArchiveError('INVALID_PAX', 'PAX header has no path')
+  if (path === undefined) throw new ArchiveError('INVALID_PAX', 'PAX header has no path')
   return path
 }
 
@@ -208,10 +183,7 @@ function parseTar(tar: Buffer): ParsedEntry[] {
         offset + BLOCK_SIZE > tar.length ||
         !tar.subarray(offset, offset + BLOCK_SIZE).every((byte) => byte === 0)
       ) {
-        throw new ArchiveError(
-          'INVALID_TAR',
-          'tar requires two zero terminator blocks'
-        )
+        throw new ArchiveError('INVALID_TAR', 'tar requires two zero terminator blocks')
       }
       offset += BLOCK_SIZE
       foundTerminator = true
@@ -222,9 +194,7 @@ function parseTar(tar: Buffer): ParsedEntry[] {
     const storedChecksum = readOctal(header, 148, 8)
     const checksumHeader = Buffer.from(header)
     checksumHeader.fill(0x20, 148, 156)
-    if (
-      checksumHeader.reduce((total, byte) => total + byte, 0) !== storedChecksum
-    ) {
+    if (checksumHeader.reduce((total, byte) => total + byte, 0) !== storedChecksum) {
       throw new ArchiveError('INVALID_TAR', 'header checksum mismatch')
     }
     const name = readString(header, 0, 100)
@@ -259,43 +229,29 @@ function parseTar(tar: Buffer): ParsedEntry[] {
     })
     pendingPath = undefined
   }
-  if (pendingPath !== undefined)
-    throw new ArchiveError('INVALID_PAX', 'orphan PAX header')
+  if (pendingPath !== undefined) throw new ArchiveError('INVALID_PAX', 'orphan PAX header')
   if (!foundTerminator || tar.subarray(offset).some((byte) => byte !== 0)) {
-    throw new ArchiveError(
-      'INVALID_TAR',
-      'missing terminator or non-zero trailing bytes'
-    )
+    throw new ArchiveError('INVALID_TAR', 'missing terminator or non-zero trailing bytes')
   }
   return entries
 }
 
 function canonicalPath(entry: ParsedEntry): boolean {
   const isDirectory = entry.typeFlag === '5'
-  if (
-    entry.path.includes('\\') ||
-    entry.path.includes('\0') ||
-    entry.path.startsWith('/')
-  )
+  if (entry.path.includes('\\') || entry.path.includes('\0') || entry.path.startsWith('/'))
     return false
-  if (isDirectory ? !entry.path.endsWith('/') : entry.path.endsWith('/'))
-    return false
-  const withoutTrailingSlash = isDirectory
-    ? entry.path.slice(0, -1)
-    : entry.path
+  if (isDirectory ? !entry.path.endsWith('/') : entry.path.endsWith('/')) return false
+  const withoutTrailingSlash = isDirectory ? entry.path.slice(0, -1) : entry.path
   const segments = withoutTrailingSlash.split('/')
   return (
     segments.length > 0 &&
-    segments.every(
-      (segment) => segment !== '' && segment !== '.' && segment !== '..'
-    )
+    segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..')
   )
 }
 
 function allowedPath(entry: ParsedEntry): boolean {
   if (entry.path === 'manifest.json') return entry.typeFlag === '0'
-  if (entry.path === 'memory/' || entry.path === 'memory/topics/')
-    return entry.typeFlag === '5'
+  if (entry.path === 'memory/' || entry.path === 'memory/topics/') return entry.typeFlag === '5'
   if (entry.path === 'memory/MEMORY.md') return entry.typeFlag === '0'
   if (!entry.path.startsWith('memory/topics/')) return false
   if (entry.typeFlag === '5') return true
@@ -317,10 +273,7 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
     if (!canonicalPath(entry))
       throw new ArchiveError('INVALID_PATH', `non-canonical path ${entry.path}`)
     if (entry.typeFlag !== '0' && entry.typeFlag !== '5') {
-      throw new ArchiveError(
-        'UNSUPPORTED_TYPE',
-        `unsupported type for ${entry.path}`
-      )
+      throw new ArchiveError('UNSUPPORTED_TYPE', `unsupported type for ${entry.path}`)
     }
     if (!allowedPath(entry))
       throw new ArchiveError('UNEXPECTED_PATH', `unexpected path ${entry.path}`)
@@ -337,10 +290,7 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
         `non-canonical owner or time for ${entry.path}`
       )
     }
-    if (
-      entry.mode !== (directory ? 0o755 : 0o644) ||
-      (directory && entry.size !== 0)
-    ) {
+    if (entry.mode !== (directory ? 0o755 : 0o644) || (directory && entry.size !== 0)) {
       throw new ArchiveError(
         'NON_CANONICAL_METADATA',
         `non-canonical mode or size for ${entry.path}`
@@ -351,10 +301,7 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
         throw new ArchiveError('FILE_TOO_LARGE', `${entry.path} exceeds limit`)
       extractedBytes += entry.size
       if (extractedBytes > MAX_EXTRACTED_BYTES) {
-        throw new ArchiveError(
-          'EXTRACTED_TOO_LARGE',
-          'extracted bytes exceed limit'
-        )
+        throw new ArchiveError('EXTRACTED_TOO_LARGE', 'extracted bytes exceed limit')
       }
       try {
         UTF8_DECODER.decode(entry.body)
@@ -363,28 +310,17 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
       }
     }
   }
-  for (const required of [
-    'manifest.json',
-    'memory/',
-    'memory/MEMORY.md',
-    'memory/topics/'
-  ]) {
-    if (!paths.has(required))
-      throw new ArchiveError('MISSING_REQUIRED_PATH', `missing ${required}`)
+  for (const required of ['manifest.json', 'memory/', 'memory/MEMORY.md', 'memory/topics/']) {
+    if (!paths.has(required)) throw new ArchiveError('MISSING_REQUIRED_PATH', `missing ${required}`)
   }
   if (!entries[0]?.body.equals(CANONICAL_MANIFEST)) {
-    throw new ArchiveError(
-      'INVALID_MANIFEST',
-      'manifest bytes are not canonical v1 JSON'
-    )
+    throw new ArchiveError('INVALID_MANIFEST', 'manifest bytes are not canonical v1 JSON')
   }
   const remainingPaths = entries.slice(1).map((entry) => entry.path)
   const sortedPaths = [...remainingPaths].sort((left, right) =>
     Buffer.from(left).compare(Buffer.from(right))
   )
-  if (
-    remainingPaths.some((entryPath, index) => entryPath !== sortedPaths[index])
-  ) {
+  if (remainingPaths.some((entryPath, index) => entryPath !== sortedPaths[index])) {
     throw new ArchiveError('INVALID_ORDER', 'entries are not in lexical order')
   }
   return {

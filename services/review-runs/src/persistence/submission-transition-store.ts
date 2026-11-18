@@ -25,10 +25,7 @@ export class SubmissionTransitionStore {
     private readonly claimTimeoutMs: number
   ) {}
 
-  private async findWorkflow(
-    client: PoolClient,
-    runId: string
-  ): Promise<ReviewRunWorkflow | null> {
+  private async findWorkflow(client: PoolClient, runId: string): Promise<ReviewRunWorkflow | null> {
     const result = await client.query<{ workflow: ReviewRunWorkflow }>(
       `SELECT workflow FROM review_runs
        WHERE run_id=$1 AND connector_id=$2`,
@@ -44,13 +41,7 @@ export class SubmissionTransitionStore {
     input: JsonObject
   ): Promise<void> {
     await transaction(this.pool, async (client) => {
-      await requirePreparationClaim(
-        client,
-        runId,
-        this.connectorId,
-        token,
-        this.claimTimeoutMs
-      )
+      await requirePreparationClaim(client, runId, this.connectorId, token, this.claimTimeoutMs)
       // Match the complete persisted intent, not just its digest. A response-loss replay
       // may repeat a selection, but cannot rewrite the input under an already chosen object.
       const candidate = await client.query(
@@ -93,11 +84,7 @@ export class SubmissionTransitionStore {
     })
   }
 
-  async markQueued(
-    runId: string,
-    token: string,
-    context: JsonObject
-  ): Promise<void> {
+  async markQueued(runId: string, token: string, context: JsonObject): Promise<void> {
     await transaction(this.pool, async (client) => {
       const workflow = await this.findWorkflow(client, runId)
       if (workflow === null)
@@ -106,10 +93,7 @@ export class SubmissionTransitionStore {
         })
       // Execution may have accepted the saved request just as the lease elapsed. Finish
       // recording that acknowledgement only if no expiry/takeover has replaced this owner.
-      await client.query(
-        `SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE`,
-        [runId]
-      )
+      await client.query(`SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE`, [runId])
       const publication = await client.query(
         `UPDATE publications
          SET input=$2::jsonb, updated_at=clock_timestamp()
@@ -136,9 +120,7 @@ export class SubmissionTransitionStore {
         [runId, token, this.connectorId]
       )
       if (publication.rowCount !== 1 || execution.rowCount !== 1)
-        throw new Error(
-          `Review run ${runId} cannot transition from pending to queued.`
-        )
+        throw new Error(`Review run ${runId} cannot transition from pending to queued.`)
       const preparation = await client.query(
         `UPDATE preparations
          SET status='submitted', claim_token=NULL, claimed_at=NULL,
@@ -168,10 +150,7 @@ export class SubmissionTransitionStore {
     })
   }
 
-  async completeSubmissionRecovery(
-    runId: string,
-    token: string
-  ): Promise<boolean> {
+  async completeSubmissionRecovery(runId: string, token: string): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE executions
@@ -217,11 +196,7 @@ export class SubmissionTransitionStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (result.rowCount !== 1) return false
-      const publicationFrom = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
+      const publicationFrom = await abandonInFlightPublication(client, this.connectorId, runId)
       const executionEventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

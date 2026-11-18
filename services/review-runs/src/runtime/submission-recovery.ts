@@ -4,10 +4,7 @@ type SubmissionError = { code?: string | null; message: string }
 
 interface SubmissionRecoveryStore {
   executions: {
-    claimSubmissionRecovery(
-      runId: string,
-      maxUnresolvedRecoveries: number
-    ): Promise<string | null>
+    claimSubmissionRecovery(runId: string, maxUnresolvedRecoveries: number): Promise<string | null>
     disconnectExhaustedSubmissionRecovery(
       runId: string,
       maxUnresolvedRecoveries: number
@@ -16,11 +13,7 @@ interface SubmissionRecoveryStore {
   }
   submissionTransitions: {
     completeSubmissionRecovery(runId: string, token: string): Promise<boolean>
-    failSubmissionRecovery(
-      runId: string,
-      token: string,
-      error: SubmissionError
-    ): Promise<boolean>
+    failSubmissionRecovery(runId: string, token: string, error: SubmissionError): Promise<boolean>
   }
 }
 
@@ -75,8 +68,7 @@ export async function recoverReviewRunSubmission(
       claimToken,
       {
         code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
-        message:
-          'The persisted Execution input is missing; this submission cannot be recovered.'
+        message: 'The persisted Execution input is missing; this submission cannot be recovered.'
       }
     )
     return { outcome: recorded ? 'input_missing' : 'claim_lost' }
@@ -92,13 +84,8 @@ export async function recoverReviewRunSubmission(
     const classified = dependencies.classifyError(error)
     if (classified.uncertain) {
       // Only an unknown replay result spends this budget. Keep the lease to pace the next replay.
-      const recorded = await store.executions.recordUnknownRecoveryOutcome(
-        run.run_id,
-        claimToken
-      )
-      return recorded
-        ? { outcome: 'deferred', error }
-        : { outcome: 'claim_lost' }
+      const recorded = await store.executions.recordUnknownRecoveryOutcome(run.run_id, claimToken)
+      return recorded ? { outcome: 'deferred', error } : { outcome: 'claim_lost' }
     }
     const recorded = await store.submissionTransitions.failSubmissionRecovery(
       run.run_id,
@@ -108,10 +95,7 @@ export async function recoverReviewRunSubmission(
     return recorded ? { outcome: 'failed', error } : { outcome: 'claim_lost' }
   }
   // A local commit failure cannot establish that the accepted remote submission failed.
-  return (await store.submissionTransitions.completeSubmissionRecovery(
-    run.run_id,
-    claimToken
-  ))
+  return (await store.submissionTransitions.completeSubmissionRecovery(run.run_id, claimToken))
     ? { outcome: 'recovered' }
     : { outcome: 'claim_lost' }
 }

@@ -56,10 +56,7 @@ export async function readExecutionArchive(
     throw new Error('execution_archive_too_large')
   let tarBytes: Buffer
   try {
-    tarBytes = decompressRestrictedPaxArchive(
-      bytes,
-      MAX_EXTRACTED_BYTES + MAX_ENTRIES * 2048
-    )
+    tarBytes = decompressRestrictedPaxArchive(bytes, MAX_EXTRACTED_BYTES + MAX_ENTRIES * 2048)
   } catch (error) {
     if (error instanceof Error && error.message === 'invalid_tar_zstd_envelope')
       throw new Error('invalid_execution_archive', { cause: error })
@@ -90,14 +87,10 @@ export async function readExecutionArchive(
           })
         } else {
           extractedBytes += header.size
-          if (extractedBytes > MAX_EXTRACTED_BYTES)
-            throw new Error('execution_archive_too_large')
+          if (extractedBytes > MAX_EXTRACTED_BYTES) throw new Error('execution_archive_too_large')
           entries.set(
             name,
-            await collectEntry(
-              stream as unknown as AsyncIterable<Uint8Array>,
-              header.size
-            )
+            await collectEntry(stream as unknown as AsyncIterable<Uint8Array>, header.size)
           )
         }
         next()
@@ -132,11 +125,7 @@ export async function readExecutionArchive(
   } catch {
     throw new Error('invalid_execution_archive')
   }
-  if (
-    typeof manifest !== 'object' ||
-    manifest === null ||
-    Array.isArray(manifest)
-  )
+  if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest))
     throw new Error('invalid_execution_archive')
   const record = manifest as Record<string, unknown>
   if (
@@ -182,10 +171,7 @@ export async function readExecutionArchive(
     }
     try {
       const text = utf8.decode(value)
-      if (
-        text.includes('\0') ||
-        previewBytes + value.length > MAX_PREVIEW_TEXT_BYTES
-      ) {
+      if (text.includes('\0') || previewBytes + value.length > MAX_PREVIEW_TEXT_BYTES) {
         unpreviewableFiles[name] = { sizeBytes: value.length }
       } else {
         files[name] = text

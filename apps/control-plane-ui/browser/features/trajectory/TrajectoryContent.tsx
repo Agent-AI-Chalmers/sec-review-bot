@@ -1,11 +1,7 @@
 import React from 'react'
 
 import type { TrajectoryContentResponse } from '../../../shared/artifact-content.js'
-import {
-  api,
-  isAbortError,
-  throwIfUnauthorized
-} from '../../shared/api-client.js'
+import { api, isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 import { LatestRequestGuard } from '../../shared/latest-request.js'
@@ -53,7 +49,5 @@ export function TrajectoryContent({
       </div>
     )
   if (loading) return <LoadingState message={t('loading')} />
-  return (
-    <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
-  )
+  return <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
 }

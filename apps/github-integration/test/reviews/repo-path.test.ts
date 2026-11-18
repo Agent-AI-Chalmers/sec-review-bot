@@ -44,14 +44,7 @@ test('rejects paths that are empty, whitespace-padded, or absolute', () => {
 })
 
 test('rejects traversal segments, empty segments, and dot segments', () => {
-  for (const path of [
-    'workspace/../x',
-    '../outside',
-    'a/./b',
-    'a//b',
-    'a/..',
-    './a'
-  ]) {
+  for (const path of ['workspace/../x', '../outside', 'a/./b', 'a//b', 'a/..', './a']) {
     expect(
       () => validateRepoRelativePathShape(path),
       `${JSON.stringify(path)} must be rejected`
@@ -60,9 +53,7 @@ test('rejects traversal segments, empty segments, and dot segments', () => {
 })
 
 test('rejects backslashes, which some platforms would treat as separators', () => {
-  expect(() => validateRepoRelativePathShape('a\\b.txt')).toThrow(
-    /Unsafe repository file path/
-  )
+  expect(() => validateRepoRelativePathShape('a\\b.txt')).toThrow(/Unsafe repository file path/)
 })
 
 test('rejects any path that touches .git', () => {
@@ -104,7 +95,5 @@ test('the structural check alone permits a sensitive path', () => {
   // `validateRepoRelativePathShape` is contract-shape only; policy lives in the two validators.
   // Pinning that keeps a future refactor from silently moving policy into the shape check (or
   // removing it from the validators).
-  expect(validateRepoRelativePathShape('.github/workflows/ci.yml')).toBe(
-    '.github/workflows/ci.yml'
-  )
+  expect(validateRepoRelativePathShape('.github/workflows/ci.yml')).toBe('.github/workflows/ci.yml')
 })

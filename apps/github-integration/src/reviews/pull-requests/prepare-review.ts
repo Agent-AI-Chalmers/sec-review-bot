@@ -8,10 +8,7 @@ import type { Octokit } from 'octokit'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type {
-  PullRequestReviewInput,
-  TestChangesPolicy
-} from '../../execution/input.js'
+import type { PullRequestReviewInput, TestChangesPolicy } from '../../execution/input.js'
 
 export interface PreparedPullRequestReviewRun {
   pr: PullRequestContext
@@ -130,10 +127,7 @@ export async function preparePullRequestReview({
   logInfo('pull_request_review_files_fetch_completed', {
     event_type,
     file_count: files.length,
-    mode:
-      event_type === 'synchronize'
-        ? 'synchronize_scope_completed'
-        : 'pull_request_scope',
+    mode: event_type === 'synchronize' ? 'synchronize_scope_completed' : 'pull_request_scope',
     note: describeFetchedFiles(event_type, files),
     pr: pr.pr_number
   })

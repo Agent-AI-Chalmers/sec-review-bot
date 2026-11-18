@@ -74,10 +74,7 @@
 }
 
 .file-workspace-node:hover {
-  background: light-dark(
-    var(--mantine-color-gray-1),
-    var(--mantine-color-dark-6)
-  );
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6));
 }
 
 .file-workspace-node[data-active] {
@@ -273,8 +270,5 @@
 
 .code-editor .cm-activeLine,
 .code-editor .cm-activeLineGutter {
-  background: light-dark(
-    var(--mantine-color-gray-0),
-    var(--mantine-color-dark-6)
-  );
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
 }

@@ -4,12 +4,10 @@ import { expect, test } from 'vitest'
 
 test('shared corpus manifest covers every encoded archive', () => {
   const corpus = path.resolve(import.meta.dirname, '../../v1/corpus')
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')
-  ) as { corpus: { file: string }[] }
-  expect(
-    manifest.corpus.map((item: { file: string }) => item.file).sort()
-  ).toStrictEqual(
+  const manifest = JSON.parse(fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8')) as {
+    corpus: { file: string }[]
+  }
+  expect(manifest.corpus.map((item: { file: string }) => item.file).sort()).toStrictEqual(
     fs
       .readdirSync(corpus)
       .filter((name) => name.endsWith('.tar.zst'))

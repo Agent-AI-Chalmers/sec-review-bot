@@ -1,13 +1,8 @@
 import type { FixtureRun, FixtureStep } from './generate.js'
 
-export function validateRun(
-  run: FixtureRun,
-  steps: readonly FixtureStep[]
-): void {
+export function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   const fail = (reason: string): never => {
-    throw new Error(
-      `dev fixture ${run.run_id} describes an unreachable run: ${reason}`
-    )
+    throw new Error(`dev fixture ${run.run_id} describes an unreachable run: ${reason}`)
   }
   const execution = run.execution.status
   const preparation = run.preparation
@@ -29,16 +24,13 @@ export function validateRun(
   if ((preparation.started_at !== null) !== preparationStarted) {
     fail('preparation.started_at is set exactly when the phase has begun')
   }
-  const preparationFinished =
-    preparation.status === 'submitted' || preparation.status === 'failed'
+  const preparationFinished = preparation.status === 'submitted' || preparation.status === 'failed'
   if ((preparation.finished_at !== null) !== preparationFinished) {
     fail('preparation.finished_at is set exactly when the phase is terminal')
   }
   if (
     (run.execution.finished_at !== null) !==
-    (execution === 'succeeded' ||
-      execution === 'failed' ||
-      execution === 'skipped')
+    (execution === 'succeeded' || execution === 'failed' || execution === 'skipped')
   ) {
     fail('execution_finished_at is set exactly when the execution is terminal')
   }
@@ -94,19 +86,13 @@ export function validateRun(
   if (execution === 'succeeded' && publication === 'skipped') {
     fail('a succeeded execution always has a publication to perform')
   }
-  if (
-    (execution === 'failed' || execution === 'skipped') &&
-    publication !== 'skipped'
-  ) {
+  if ((execution === 'failed' || execution === 'skipped') && publication !== 'skipped') {
     fail('a terminal execution leaves nothing to publish')
   }
   if (execution === 'skipped' && preparation.status !== 'failed') {
     fail('execution is skipped only when preparation failed before it ran')
   }
-  if (
-    (execution === 'uncertain' || execution === 'disconnected') &&
-    publication !== 'pending'
-  ) {
+  if ((execution === 'uncertain' || execution === 'disconnected') && publication !== 'pending') {
     // An unconfirmed submission may still be accepted, so it is not yet a conclusion that
     // nothing is publishable. Publication must stay `pending`; only a conclusive failure may
     // skip it, and the state machine has no `skipped -> pending` edge to undo an early skip.
@@ -134,15 +120,9 @@ export function validateRun(
   // over, not with preparation having failed. A run whose execution failed carries an execution
   // notice even though its preparation completed normally.
   const failedAxis =
-    preparation.status === 'failed'
-      ? 'preparation'
-      : execution === 'failed'
-        ? 'execution'
-        : null
+    preparation.status === 'failed' ? 'preparation' : execution === 'failed' ? 'execution' : null
   if (failedAxis !== null && run.notices.length === 0) {
-    fail(
-      'a run that failed on an axis names the stage its failure notice reached'
-    )
+    fail('a run that failed on an axis names the stage its failure notice reached')
   }
   // A parked run is not a failed run, but the requester is still told that automation stopped,
   // so an attention notice exists for exactly those two parked states and nothing else.
@@ -154,11 +134,7 @@ export function validateRun(
   ) {
     fail('only a failed or disconnected run has a notice')
   }
-  if (
-    run.notices.length > 0 &&
-    failedAxis !== null &&
-    run.notices[0]?.axis !== failedAxis
-  ) {
+  if (run.notices.length > 0 && failedAxis !== null && run.notices[0]?.axis !== failedAxis) {
     fail('a failure notice names the axis that actually failed')
   }
   if (execution === 'disconnected') {
@@ -174,39 +150,21 @@ export function validateRun(
   }
   if (publication === 'disconnected') {
     const notice = run.notices[0]
-    if (
-      run.notices.length !== 1 ||
-      notice?.kind !== 'attention' ||
-      notice.axis !== 'publication'
-    ) {
+    if (run.notices.length !== 1 || notice?.kind !== 'attention' || notice.axis !== 'publication') {
       fail('a disconnected publication queues one publication attention notice')
     }
   }
   if (
     preparation.status === 'submitted' &&
-    ![
-      'uncertain',
-      'disconnected',
-      'queued',
-      'running',
-      'succeeded',
-      'failed'
-    ].includes(execution)
+    !['uncertain', 'disconnected', 'queued', 'running', 'succeeded', 'failed'].includes(execution)
   ) {
-    fail(
-      'a submitted preparation means the run has moved on to the Execution Gateway lifecycle'
-    )
+    fail('a submitted preparation means the run has moved on to the Execution Gateway lifecycle')
   }
-  if (
-    run.artifact_storage !== null &&
-    !['succeeded', 'failed'].includes(execution)
-  ) {
+  if (run.artifact_storage !== null && !['succeeded', 'failed'].includes(execution)) {
     fail('the execution archive is only reported at execution terminal')
   }
   const failedOnAnAxis =
-    execution === 'failed' ||
-    execution === 'skipped' ||
-    publication === 'failed'
+    execution === 'failed' || execution === 'skipped' || publication === 'failed'
   if (failedOnAnAxis && run.failure_code === null) {
     fail('a terminal failure carries its failure code')
   }
@@ -216,9 +174,7 @@ export function validateRun(
     execution !== 'uncertain' &&
     execution !== 'disconnected' // an unconfirmed submission keeps its code
   ) {
-    fail(
-      'only a terminal failure or unconfirmed submission carries a failure code'
-    )
+    fail('only a terminal failure or unconfirmed submission carries a failure code')
   }
   if (run.created_at > run.execution.updated_at) {
     fail('execution.updated_at must not precede created_at')
@@ -234,16 +190,10 @@ export function validateRun(
       'an unaccepted, pending, or skipped execution has no execution.started_at, and every other state has one'
     )
   }
-  if (
-    run.execution.started_at !== null &&
-    run.execution.started_at < run.created_at
-  ) {
+  if (run.execution.started_at !== null && run.execution.started_at < run.created_at) {
     fail('execution.started_at must not precede created_at')
   }
-  if (
-    run.execution.started_at !== null &&
-    run.execution.started_at > run.execution.updated_at
-  ) {
+  if (run.execution.started_at !== null && run.execution.started_at > run.execution.updated_at) {
     fail('execution.started_at must not follow execution.updated_at')
   }
   if (run.publication.finished_at !== null) {
@@ -269,31 +219,18 @@ export function validateRun(
     if (run.publication.updated_at < run.publication.started_at) {
       fail('publication.updated_at must not precede publication.started_at')
     }
-    if (
-      publication === 'publishing' &&
-      run.publication.updated_at === run.publication.started_at
-    ) {
-      fail(
-        'a running publication keeps being written, so updated_at moves past its start'
-      )
+    if (publication === 'publishing' && run.publication.updated_at === run.publication.started_at) {
+      fail('a running publication keeps being written, so updated_at moves past its start')
     }
   }
   // A finished publication exists exactly for the terminal outcomes; a skipped one never
   // started, so it has an end but no start.
   const publicationFinished =
-    publication === 'published' ||
-    publication === 'failed' ||
-    publication === 'skipped'
+    publication === 'published' || publication === 'failed' || publication === 'skipped'
   if ((run.publication.finished_at !== null) !== publicationFinished) {
-    fail(
-      'publication_finished_at is set exactly when the publication is terminal'
-    )
+    fail('publication_finished_at is set exactly when the publication is terminal')
   }
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-      run.run_id
-    )
-  ) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(run.run_id)) {
     fail('run ids are UUID v4, as Review Runs assigns them')
   }
 
@@ -303,16 +240,10 @@ export function validateRun(
   if (startedPublication && steps.length === 0) {
     fail('a started publication always has steps')
   }
-  if (
-    publication === 'published' &&
-    steps.some((step) => step.status !== 'succeeded')
-  ) {
+  if (publication === 'published' && steps.some((step) => step.status !== 'succeeded')) {
     fail('a published run has only succeeded steps')
   }
-  if (
-    publication === 'publishing' &&
-    steps.every((step) => step.status === 'succeeded')
-  ) {
+  if (publication === 'publishing' && steps.every((step) => step.status === 'succeeded')) {
     fail('a publishing run still has work outstanding')
   }
   if (

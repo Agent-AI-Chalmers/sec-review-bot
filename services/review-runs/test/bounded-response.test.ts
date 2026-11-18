@@ -1,10 +1,7 @@
 import { ReadableStream } from 'node:stream/web'
 import { expect, test } from 'vitest'
 
-import {
-  ResponseTooLargeError,
-  readBoundedResponseBody
-} from '../src/bounded-response.js'
+import { ResponseTooLargeError, readBoundedResponseBody } from '../src/bounded-response.js'
 
 /**
  * The budget is the only protection against an upstream answering with a page far larger than
@@ -33,9 +30,7 @@ test('a declared length over the budget is refused without reading the body', as
   const response = new Response(stream, {
     headers: { 'content-length': '8' }
   })
-  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(
-    ResponseTooLargeError
-  )
+  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(ResponseTooLargeError)
   expect(cancelled).toBe(true)
 })
 
@@ -50,14 +45,10 @@ test('a body that grows past the budget mid-stream is refused', async () => {
   })
   // No content-length: the declared-length check cannot help here.
   const response = new Response(stream)
-  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(
-    ResponseTooLargeError
-  )
+  await expect(readBoundedResponseBody(response, 4)).rejects.toThrow(ResponseTooLargeError)
 })
 
 test('an empty body reads as no bytes', async () => {
   const response = new Response(null)
-  expect(await readBoundedResponseBody(response, 4)).toStrictEqual(
-    new Uint8Array(0)
-  )
+  expect(await readBoundedResponseBody(response, 4)).toStrictEqual(new Uint8Array(0))
 })

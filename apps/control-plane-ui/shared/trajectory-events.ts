@@ -16,11 +16,7 @@ export interface TrajectoryMessageEvent extends ExecutionContext {
 export type TrajectoryEvent =
   | TrajectoryMessageEvent
   | (ExecutionContext & {
-      event:
-        | 'model_calls_start'
-        | 'model_calls_end'
-        | 'model_call_start'
-        | 'model_call_end'
+      event: 'model_calls_start' | 'model_calls_end' | 'model_call_start' | 'model_call_end'
       message_id?: string
       status?: string
     })
@@ -39,15 +35,9 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
     throw new Error('invalid_trajectory_artifact')
   }
   if (!object(value)) return invalid()
-  if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 1)
-    return invalid()
+  if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 1) return invalid()
   for (const key of ['agent', 'source', 'run_id', 'call_id']) {
-    if (
-      value[key] !== undefined &&
-      value[key] !== null &&
-      !nonempty(value[key])
-    )
-      return invalid()
+    if (value[key] !== undefined && value[key] !== null && !nonempty(value[key])) return invalid()
   }
   if (
     value.parent_ids !== undefined &&
@@ -77,10 +67,7 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
         'cache_creation_input_tokens',
         'reasoning_tokens'
       ] as const
-      if (
-        Object.keys(usage).length !== fields.length ||
-        !fields.every((key) => key in usage)
-      )
+      if (Object.keys(usage).length !== fields.length || !fields.every((key) => key in usage))
         return invalid()
       for (const key of fields) {
         if (
@@ -91,10 +78,7 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
       }
       const input = usage.input_tokens as number | null
       const output = usage.output_tokens as number | null
-      if (
-        usage.total_tokens !==
-        (input === null || output === null ? null : input + output)
-      )
+      if (usage.total_tokens !== (input === null || output === null ? null : input + output))
         return invalid()
       if (
         input !== null &&
@@ -118,10 +102,7 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
       !['completed', 'failed', 'interrupted'].includes(value.status)
     )
       return invalid()
-  } else if (
-    value.event === 'model_call_start' ||
-    value.event === 'model_call_end'
-  ) {
+  } else if (value.event === 'model_call_start' || value.event === 'model_call_end') {
     if (
       !nonempty(value.call_id) ||
       (value.event === 'model_call_end' && !nonempty(value.message_id))
@@ -142,8 +123,7 @@ export function readTrajectoryJsonl(content: string): TrajectoryEvent[] {
   for (const line of content.split('\n')) {
     if (!line.trim()) continue
     const event = validateTrajectoryEvent(JSON.parse(line))
-    if (closed || event.seq <= previous)
-      throw new Error('invalid_trajectory_artifact')
+    if (closed || event.seq <= previous) throw new Error('invalid_trajectory_artifact')
     previous = event.seq
     if (event.event === 'message') {
       const id = event.message.id as string
@@ -165,12 +145,7 @@ export function readTrajectoryJsonl(content: string): TrajectoryEvent[] {
         starts.add(callId)
       } else {
         const response = messages.get(event.message_id!)
-        if (
-          !starts.has(callId) ||
-          ends.has(callId) ||
-          !response ||
-          response.call_id !== callId
-        )
+        if (!starts.has(callId) || ends.has(callId) || !response || response.call_id !== callId)
           throw new Error('invalid_trajectory_artifact')
         ends.add(callId)
       }

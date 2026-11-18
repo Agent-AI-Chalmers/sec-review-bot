@@ -40,9 +40,9 @@ test('transitions exclude synthetic initialization events', () => {
     to_status: 'pending'
   })
   const actual = event({ event_id: 3 })
-  expect(
-    actualTransitions([initial, actual]).map((candidate) => candidate.event_id)
-  ).toStrictEqual([3])
+  expect(actualTransitions([initial, actual]).map((candidate) => candidate.event_id)).toStrictEqual(
+    [3]
+  )
 })
 
 test('the default axis follows the latest actual transition', () => {
@@ -87,20 +87,10 @@ test('a transition lasts until the next event on the same axis', () => {
     occurred_at: '2026-10-28T10:00:05.000Z'
   })
   expect(
-    transitionDuration(
-      first,
-      [first, second],
-      run(),
-      Date.parse('2026-10-28T10:00:10.000Z')
-    )
+    transitionDuration(first, [first, second], run(), Date.parse('2026-10-28T10:00:10.000Z'))
   ).toStrictEqual({ kind: 'duration', ms: 5000 })
   expect(
-    transitionDuration(
-      second,
-      [first, second],
-      run(),
-      Date.parse('2026-10-28T10:00:10.000Z')
-    )
+    transitionDuration(second, [first, second], run(), Date.parse('2026-10-28T10:00:10.000Z'))
   ).toStrictEqual({ kind: 'duration', ms: 5000 })
 })
 
@@ -173,8 +163,7 @@ test('transitions use a twelve-row page', () => {
 })
 
 test('operator conclusions retain their reason while absent and unknown reasons stay generic', async () => {
-  const { stateMachine } =
-    await import('../browser/features/runs/state-machines.generated.js')
+  const { stateMachine } = await import('../browser/features/runs/state-machines.generated.js')
   for (const language of ['en', 'zh'] as const) {
     const base = event({
       axis: 'preparation',
@@ -186,18 +175,12 @@ test('operator conclusions retain their reason while absent and unknown reasons 
       'PREPARATION_GIVEN_UP_BY_OPERATOR',
       'PREPARATION_ABANDONED_BY_OPERATOR'
     ]) {
-      const explanation = transitionExplanation(
-        { ...base, reason_code: reason },
-        language
-      )
+      const explanation = transitionExplanation({ ...base, reason_code: reason }, language)
       expect.assert(explanation)
       explanations.add(explanation)
       const machine = stateMachine('preparation', language)
       const edge = machine.transitions.find(
-        (item) =>
-          item.from === 'disconnected' &&
-          item.to === 'failed' &&
-          item.reason === reason
+        (item) => item.from === 'disconnected' && item.to === 'failed' && item.reason === reason
       )
       expect.assert(edge)
       expect(edgeLabel(machine, edge)).toBe(explanation)
@@ -206,16 +189,12 @@ test('operator conclusions retain their reason while absent and unknown reasons 
     // Every transition on this pair names a reason, so an absent or unknown reason identifies
     // none of the operator decisions: the explanation describes the reached state instead of
     // guessing a decision.
-    const reached = stateMachine('preparation', language).details.failed
-      ?.summary
+    const reached = stateMachine('preparation', language).details.failed?.summary
     expect.assert(reached)
     expect.assert(!explanations.has(reached))
     expect(transitionExplanation(base, language)).toBe(reached)
-    expect(
-      transitionExplanation(
-        { ...base, reason_code: 'UNKNOWN_REASON' },
-        language
-      )
-    ).toBe(reached)
+    expect(transitionExplanation({ ...base, reason_code: 'UNKNOWN_REASON' }, language)).toBe(
+      reached
+    )
   }
 })

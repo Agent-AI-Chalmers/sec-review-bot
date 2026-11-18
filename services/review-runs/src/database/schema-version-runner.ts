@@ -11,9 +11,7 @@ const SCHEMA_VERSIONS = [
   }
 ] as const
 
-export const KNOWN_SCHEMA_VERSIONS = SCHEMA_VERSIONS.map(
-  ({ version }) => version
-)
+export const KNOWN_SCHEMA_VERSIONS = SCHEMA_VERSIONS.map(({ version }) => version)
 
 interface AppliedSchemaVersion {
   version: number
@@ -39,9 +37,7 @@ async function transaction<T>(
   }
 }
 
-async function loadSchemaVersion(
-  file: string
-): Promise<{ sql: string; checksum: string }> {
+async function loadSchemaVersion(file: string): Promise<{ sql: string; checksum: string }> {
   const sql = await readFile(new URL(file, import.meta.url), 'utf8')
   return {
     sql,
@@ -64,15 +60,9 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
     const applied = await client.query<AppliedSchemaVersion>(
       'SELECT version,name,checksum FROM schema_versions ORDER BY version'
     )
-    const appliedByVersion = new Map(
-      applied.rows.map((item) => [item.version, item])
-    )
-    const knownVersions = new Set<number>(
-      SCHEMA_VERSIONS.map((item) => item.version)
-    )
-    const unknown = applied.rows.find(
-      (item) => !knownVersions.has(item.version)
-    )
+    const appliedByVersion = new Map(applied.rows.map((item) => [item.version, item]))
+    const knownVersions = new Set<number>(SCHEMA_VERSIONS.map((item) => item.version))
+    const unknown = applied.rows.find((item) => !knownVersions.has(item.version))
     if (unknown !== undefined) {
       // This normally means an older application image is pointed at a newer
       // database. Starting it could make assumptions the newer schema broke.
@@ -85,10 +75,7 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
       const source = await loadSchemaVersion(schemaVersion.file)
       const existing = appliedByVersion.get(schemaVersion.version)
       if (existing !== undefined) {
-        if (
-          existing.name !== schemaVersion.name ||
-          existing.checksum !== source.checksum
-        ) {
+        if (existing.name !== schemaVersion.name || existing.checksum !== source.checksum) {
           throw new Error(
             `Applied schema version ${schemaVersion.version} no longer matches its checked-in SQL file.`
           )
@@ -97,10 +84,11 @@ export async function applySchemaVersions(pool: Pool): Promise<void> {
       }
 
       await client.query(source.sql)
-      await client.query(
-        'INSERT INTO schema_versions (version,name,checksum) VALUES ($1,$2,$3)',
-        [schemaVersion.version, schemaVersion.name, source.checksum]
-      )
+      await client.query('INSERT INTO schema_versions (version,name,checksum) VALUES ($1,$2,$3)', [
+        schemaVersion.version,
+        schemaVersion.name,
+        source.checksum
+      ])
     }
   })
 }

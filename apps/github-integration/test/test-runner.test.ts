@@ -25,15 +25,9 @@ test('test runner isolates inherited Git settings while preserving repository at
       'junction'
     )
     await fs.writeFile(path.join(root, 'package.json'), '{"type":"module"}')
-    await fs.writeFile(
-      path.join(root, 'xdg', 'git', 'attributes'),
-      '* text eol=crlf\n'
-    )
+    await fs.writeFile(path.join(root, 'xdg', 'git', 'attributes'), '* text eol=crlf\n')
     const config = path.join(root, 'user.gitconfig')
-    await fs.writeFile(
-      config,
-      '[core]\n\tautocrlf = true\n[commit]\n\tgpgsign = true\n'
-    )
+    await fs.writeFile(config, '[core]\n\tautocrlf = true\n[commit]\n\tgpgsign = true\n')
     await fs.copyFile(
       path.join(packageRoot, 'test', 'fixtures', 'git-environment-probe.ts'),
       path.join(root, 'test', 'probe.test.ts')

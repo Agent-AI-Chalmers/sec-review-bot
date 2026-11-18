@@ -3,9 +3,7 @@ import type { InputBundlePublicationStore } from '../src/artifacts/input-bundle-
 /** Lightweight ledger boundary for trigger tests; protocol behavior has its own crash probes. */
 export function inputBundlePublicationStore(): Pick<
   InputBundlePublicationStore,
-  | 'reserveInputBundleCandidate'
-  | 'listInputBundleCandidates'
-  | 'settleInputBundleCandidate'
+  'reserveInputBundleCandidate' | 'listInputBundleCandidates' | 'settleInputBundleCandidate'
 > {
   return {
     async listInputBundleCandidates() {

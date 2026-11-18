@@ -8,11 +8,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import {
-  Ajv2020,
-  type AnySchemaObject,
-  type ValidateFunction
-} from 'ajv/dist/2020.js'
+import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import * as ajvFormats from 'ajv-formats'
 
 import { REPO_ROOT } from './generated-paths.js'
@@ -25,9 +21,7 @@ const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')
 const root = REPO_ROOT
 // One contract version can hold several schemas, so each fixture is validated against the schema the
 // manifest names for it rather than against whichever schema was loaded first.
-const manifest = JSON.parse(
-  readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')
-) as {
+const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {
   schema_fixtures: Record<string, string>
   invalid_schema_fixtures: Record<string, string>
 }
@@ -53,9 +47,7 @@ function validate(schemaName: string, value: unknown): boolean {
   // import, a namespace import's `.default`, and `import ... = require(...)`, with and
   // without `esModuleInterop`. The plugin really is on `default` at runtime, which the
   // assertions below prove the moment they run — a wrong cast makes them fail, not pass.
-  const addFormats = ajvFormats.default as unknown as (
-    instance: Ajv2020
-  ) => Ajv2020
+  const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
   addFormats(ajv)
   const validator = ajv.compile(schema) as ValidateFunction
   validators.set(schemaName, validator)
@@ -66,18 +58,10 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Review Runs never sends, so both directions are asserted.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    expect(
-      validate(schemaName, fixture(name)),
-      `${name} must be accepted`
-    ).toBe(true)
+    expect(validate(schemaName, fixture(name)), `${name} must be accepted`).toBe(true)
   }
-  for (const [name, schemaName] of Object.entries(
-    manifest.invalid_schema_fixtures
-  )) {
-    expect(
-      validate(schemaName, fixture(name)),
-      `${name} must be rejected`
-    ).toBe(false)
+  for (const [name, schemaName] of Object.entries(manifest.invalid_schema_fixtures)) {
+    expect(validate(schemaName, fixture(name)), `${name} must be rejected`).toBe(false)
   }
 })
 
@@ -116,8 +100,8 @@ function paths(value: unknown, prefix = ''): string[] {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return [prefix]
   }
-  return Object.entries(value as Record<string, unknown>).flatMap(
-    ([key, child]) => paths(child, prefix === '' ? key : `${prefix}.${key}`)
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+    paths(child, prefix === '' ? key : `${prefix}.${key}`)
   )
 }
 
@@ -166,10 +150,9 @@ test('token usage keeps the documented subset invariants', () => {
       }
       const total = usage.total_tokens
       if (total != null && input != null && output != null) {
-        expect(
-          total,
-          `${name}: total_tokens must equal input_tokens + output_tokens`
-        ).toBe(input + output)
+        expect(total, `${name}: total_tokens must equal input_tokens + output_tokens`).toBe(
+          input + output
+        )
       }
     }
   }
@@ -207,9 +190,7 @@ test('each invalid fixture differs from its valid counterpart only where it inte
   }
 })
 
-function recordWith(
-  artifactStorage: ReviewRunRecord['artifact_storage']
-): ReviewRunRecord {
+function recordWith(artifactStorage: ReviewRunRecord['artifact_storage']): ReviewRunRecord {
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
@@ -277,11 +258,7 @@ test('the redacted read never carries a field the observed schema does not decla
     'workflow'
   ])
   // The connector-owned record fields are the ones that must not survive redaction.
-  for (const dropped of [
-    'publish_context',
-    'execution_input',
-    'failure_message'
-  ]) {
+  for (const dropped of ['publish_context', 'execution_input', 'failure_message']) {
     expect.assert(
       !(dropped in observed),
       `${dropped} is record-only and must not reach the redacted read`

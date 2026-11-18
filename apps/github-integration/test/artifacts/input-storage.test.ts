@@ -44,8 +44,7 @@ test('uploads an immutable input bundle to its deterministic run key', async () 
     })
   )
   s3.on(PutObjectCommand).resolves({})
-  const { publishInputBundle } =
-    await import('../../src/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/artifacts/input-storage.js')
 
   const published = await publishInputBundle(await reference(), 'run-123')
 
@@ -53,9 +52,7 @@ test('uploads an immutable input bundle to its deterministic run key', async () 
     `s3://sec-review/runs/run-123/input/${'a'.repeat(64)}/input-bundle.v1.tar.zst`
   )
   expect(s3.commandCalls(PutObjectCommand)).toHaveLength(1)
-  expect(s3.commandCalls(PutObjectCommand)[0]?.args[0].input.IfNoneMatch).toBe(
-    '*'
-  )
+  expect(s3.commandCalls(PutObjectCommand)[0]?.args[0].input.IfNoneMatch).toBe('*')
 })
 
 test('reuses an existing object only when immutable metadata matches', async () => {
@@ -67,8 +64,7 @@ test('reuses an existing object only when immutable metadata matches', async () 
       'media-type': input.media_type
     }
   })
-  const { publishInputBundle } =
-    await import('../../src/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/artifacts/input-storage.js')
 
   const published = await publishInputBundle(input, 'run-123')
 
@@ -78,12 +74,11 @@ test('reuses an existing object only when immutable metadata matches', async () 
 
 test('rejects conflicting content at the immutable run key', async () => {
   s3.on(HeadObjectCommand).resolves({ ContentLength: 99, Metadata: {} })
-  const { publishInputBundle } =
-    await import('../../src/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/artifacts/input-storage.js')
 
-  await expect(
-    publishInputBundle(await reference(), 'run-123')
-  ).rejects.toThrow(/conflicts with existing content/)
+  await expect(publishInputBundle(await reference(), 'run-123')).rejects.toThrow(
+    /conflicts with existing content/
+  )
 })
 
 test('a concurrent identical conditional write is recovered after a 412', async () => {
@@ -107,8 +102,7 @@ test('a concurrent identical conditional write is recovered after a 412', async 
       $metadata: { httpStatusCode: 412 }
     })
   )
-  const { publishInputBundle } =
-    await import('../../src/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/artifacts/input-storage.js')
   const result = await publishInputBundle(input, 'run')
   expect(result.uri).toMatch(/^s3:/)
   expect(heads).toBe(2)
@@ -130,9 +124,7 @@ for (const status of [403, 404]) {
       Contents: [{ Key: key + '.other' }]
     })
     expect(await inputBundleExists(published)).toBe(false)
-    expect(
-      s3.commandCalls(ListObjectsV2Command)[0]?.args[0].input
-    ).toStrictEqual({
+    expect(s3.commandCalls(ListObjectsV2Command)[0]?.args[0].input).toStrictEqual({
       Bucket: 'sec-review',
       Prefix: key,
       MaxKeys: 1

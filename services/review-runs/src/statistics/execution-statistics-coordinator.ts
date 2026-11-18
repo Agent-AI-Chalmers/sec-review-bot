@@ -23,12 +23,7 @@ interface ReconciliationOptions {
   retryDelayMs: number
   onResult: (
     work: ExecutionStatisticsWork,
-    result:
-      | 'pending'
-      | 'settled'
-      | 'partial_window'
-      | 'no_observations'
-      | 'unavailable'
+    result: 'pending' | 'settled' | 'partial_window' | 'no_observations' | 'unavailable'
   ) => void
   onError: (work: ExecutionStatisticsWork, error: unknown) => void
 }
@@ -59,19 +54,12 @@ async function reconcileClaimedWork(
     snapshot = aggregateExecutionStatistics(read)
   } catch (error) {
     if (error instanceof LangfuseRateLimitError) {
-      const result = await store.recordRateLimit(
-        work,
-        error.retryAfterMs ?? retryDelayMs
-      )
+      const result = await store.recordRateLimit(work, error.retryAfterMs ?? retryDelayMs)
       onResult(work, result)
       return
     }
     onError(work, error)
-    const result = await store.recordFailure(
-      work,
-      maxConsecutiveFailures,
-      retryDelayMs
-    )
+    const result = await store.recordFailure(work, maxConsecutiveFailures, retryDelayMs)
     if (result === 'unavailable') onResult(work, result)
     return
   }

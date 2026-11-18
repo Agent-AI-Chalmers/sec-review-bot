@@ -14,12 +14,11 @@ import type { RepositoryContext } from './prepare-review.js'
  * `RepositoryScanScope`, so `status` cannot drift to a value the scan scope does not accept. The
  * line counts are artifact-only: the execution scan scope does not carry them.
  */
-export type ChangedFileRecord =
-  RepositoryScanScope['incremental_changed_files'][number] & {
-    additions: number
-    deletions: number
-    changes: number
-  }
+export type ChangedFileRecord = RepositoryScanScope['incremental_changed_files'][number] & {
+  additions: number
+  deletions: number
+  changes: number
+}
 
 export async function materializeIncrementalArtifacts({
   workspace_path,
@@ -53,11 +52,7 @@ export async function materializeIncrementalArtifacts({
     base_sha,
     head_sha
   })
-  await fs.writeFile(
-    path.join(incremental_window_path, 'incremental.patch'),
-    patchText,
-    'utf8'
-  )
+  await fs.writeFile(path.join(incremental_window_path, 'incremental.patch'), patchText, 'utf8')
 
   // The workspace export already reports the contract's status vocabulary and keeps the
   // previous path for a rename or copy, so this is a projection into the artifact's shape and not

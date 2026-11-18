@@ -27,10 +27,7 @@
   display: flex;
   max-height: min(68vh, 720px);
   overflow: auto;
-  background: light-dark(
-    var(--mantine-color-gray-0),
-    var(--mantine-color-dark-8)
-  );
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8));
   cursor: grab;
   user-select: none;
 }
@@ -59,10 +56,7 @@
 }
 
 .version-graph-edges path[data-active-line] {
-  stroke: light-dark(
-    var(--mantine-color-green-7),
-    var(--mantine-color-green-5)
-  );
+  stroke: light-dark(var(--mantine-color-green-7), var(--mantine-color-green-5));
   stroke-width: 3;
 }
 
@@ -93,10 +87,7 @@
 }
 
 .version-graph-node[data-current] {
-  border-color: light-dark(
-    var(--mantine-color-green-7),
-    var(--mantine-color-green-5)
-  );
+  border-color: light-dark(var(--mantine-color-green-7), var(--mantine-color-green-5));
   background: var(--status-complete-soft);
 }
 
@@ -128,10 +119,7 @@
 }
 
 .memory-current-row > td {
-  background-color: light-dark(
-    var(--mantine-color-green-0),
-    rgba(47, 158, 68, 0.12)
-  );
+  background-color: light-dark(var(--mantine-color-green-0), rgba(47, 158, 68, 0.12));
 }
 
 .memory-current-row .memory-version-cell {
@@ -170,13 +158,9 @@
 @keyframes memory-version-highlight {
   0%,
   24% {
-    background-color: light-dark(
-      var(--mantine-color-yellow-2),
-      rgba(250, 176, 5, 0.24)
-    );
+    background-color: light-dark(var(--mantine-color-yellow-2), rgba(250, 176, 5, 0.24));
     outline-color: var(--mantine-color-yellow-6);
-    box-shadow: 0 0 0 3px
-      light-dark(rgba(250, 176, 5, 0.2), rgba(250, 176, 5, 0.16));
+    box-shadow: 0 0 0 3px light-dark(rgba(250, 176, 5, 0.2), rgba(250, 176, 5, 0.16));
   }
 
   100% {
@@ -315,10 +299,7 @@
 .memory-markdown :not(pre) > code {
   padding: 0.12em 0.36em;
   border-radius: 4px;
-  background: light-dark(
-    var(--mantine-color-gray-1),
-    var(--mantine-color-dark-6)
-  );
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6));
   color: var(--mantine-color-text);
   font-size: 0.9em;
 }

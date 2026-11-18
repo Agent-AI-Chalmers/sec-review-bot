@@ -39,22 +39,16 @@ export function useMemoryResources(): MemoryResources {
   const automation = useResource((signal) =>
     api<MemoryTreeAutomation>('/memory/tree/automation', { signal })
   )
-  const tree = useResource((signal) =>
-    api<MemoryTree>('/memory/tree', { signal })
-  )
+  const tree = useResource((signal) => api<MemoryTree>('/memory/tree', { signal }))
   const graphTargetRef = React.useRef<number | undefined>(undefined)
   const [graphTarget, setGraphTarget] = React.useState<number>()
   const graphVersions = useResource(async (signal) => {
     const target = graphTargetRef.current
     if (target === undefined)
-      return api<MemoryTreeVersionList>(
-        `/memory/versions?limit=${GRAPH_VERSION_WINDOW}`,
-        { signal }
-      )
-    const latest = await api<MemoryTreeVersionList>(
-      '/memory/versions?limit=1',
-      { signal }
-    )
+      return api<MemoryTreeVersionList>(`/memory/versions?limit=${GRAPH_VERSION_WINDOW}`, {
+        signal
+      })
+    const latest = await api<MemoryTreeVersionList>('/memory/versions?limit=1', { signal })
     const newest = latest.versions[0]?.version ?? 0
     // Catalog assigns contiguous versions with max(version) + 1 and retains history.
     // Prefer 25 newer and 24 older neighbors; transfer unused space at either end.
@@ -80,11 +74,7 @@ export function useMemoryResources(): MemoryResources {
       })
     }
   )
-  const observationPages = usePagedResource<
-    number | undefined,
-    string,
-    ObservationList
-  >(
+  const observationPages = usePagedResource<number | undefined, string, ObservationList>(
     { filter: undefined, limit: DEFAULT_PAGE_SIZE },
     ({ filter, limit, trail }, signal) => {
       const query = new URLSearchParams({ limit: String(limit) })

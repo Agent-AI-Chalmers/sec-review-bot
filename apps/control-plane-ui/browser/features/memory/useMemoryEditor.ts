@@ -30,18 +30,12 @@ export function useMemoryEditor(): MemoryEditor {
     const files =
       baseVersion === 0
         ? { 'MEMORY.md': '# Security Review Experience Memory\n' }
-        : (
-            await api<MemoryTreeContentResponse>(
-              `/memory/versions/${baseVersion}/content`
-            )
-          ).files
+        : (await api<MemoryTreeContentResponse>(`/memory/versions/${baseVersion}/content`)).files
     setSession({ baseVersion, files, initialFiles: files })
   }
 
   const changeFiles = (files: Record<string, string>): void => {
-    setSession((previous) =>
-      previous === undefined ? undefined : { ...previous, files }
-    )
+    setSession((previous) => (previous === undefined ? undefined : { ...previous, files }))
   }
 
   const close = (): void => setSession(undefined)

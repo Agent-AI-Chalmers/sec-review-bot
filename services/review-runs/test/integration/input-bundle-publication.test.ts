@@ -65,12 +65,7 @@ test('selection requires published identical input and commits candidate, input 
         intent.input
       )
     ).rejects.toThrow(/no matching published candidate/)
-    await store.inputBundleCandidates.settle(
-      runId,
-      token,
-      intent.reference.digest,
-      'present'
-    )
+    await store.inputBundleCandidates.settle(runId, token, intent.reference.digest, 'present')
     // The execution update is made ineligible after presence confirmation. Candidate selection
     // must roll back too, rather than leaving a selected object with no accepted input.
     await f.pool.query(
@@ -85,13 +80,10 @@ test('selection requires published identical input and commits candidate, input 
         intent.input
       )
     ).rejects.toThrow(/outside pending/)
-    expect(
-      (await store.inputBundleCandidates.list(runId, token))[0]?.status
-    ).toBe('present')
-    await f.pool.query(
-      `UPDATE executions SET status='pending', finished_at=NULL WHERE run_id=$1`,
-      [runId]
-    )
+    expect((await store.inputBundleCandidates.list(runId, token))[0]?.status).toBe('present')
+    await f.pool.query(`UPDATE executions SET status='pending', finished_at=NULL WHERE run_id=$1`, [
+      runId
+    ])
     await store.submissionTransitions.savePreparedSubmission(
       runId,
       token,
@@ -106,20 +98,13 @@ test('selection requires published identical input and commits candidate, input 
       intent.input
     )
     await expect(
-      store.submissionTransitions.savePreparedSubmission(
-        runId,
-        token,
-        intent.publish_context,
-        { ...intent.input, snapshot: 'changed' }
-      )
+      store.submissionTransitions.savePreparedSubmission(runId, token, intent.publish_context, {
+        ...intent.input,
+        snapshot: 'changed'
+      })
     ).rejects.toThrow(/no matching published candidate/)
     await expect(
-      store.inputBundleCandidates.settle(
-        runId,
-        token,
-        intent.reference.digest,
-        'abandoned'
-      )
+      store.inputBundleCandidates.settle(runId, token, intent.reference.digest, 'abandoned')
     ).rejects.toSatisfy(() => true)
     const rows = await f.pool.query(
       `SELECT c.status,e.input,p.input AS context FROM input_bundle_candidates c JOIN executions e USING(run_id) JOIN publications p USING(run_id) WHERE c.run_id=$1`,
@@ -146,16 +131,11 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
       [f.runId]
     )
     expect(await f.store.preparations.renewClaim(f.runId, f.token)).toBe(false)
+    await expect(f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)).rejects.toThrow(
+      /claim was lost/
+    )
     await expect(
-      f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
-    ).rejects.toThrow(/claim was lost/)
-    await expect(
-      f.store.inputBundleCandidates.settle(
-        f.runId,
-        f.token,
-        f.intent.reference.digest,
-        'present'
-      )
+      f.store.inputBundleCandidates.settle(f.runId, f.token, f.intent.reference.digest, 'present')
     ).rejects.toThrow(/claim was lost/)
     await expect(
       f.store.submissionTransitions.savePreparedSubmission(
@@ -168,10 +148,7 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
     await f.store.preparations.expireStale()
     const next = await f.store.preparations.claimNext()
     expect.assert(next)
-    const candidates = await f.store.inputBundleCandidates.list(
-      f.runId,
-      next.claim_token
-    )
+    const candidates = await f.store.inputBundleCandidates.list(f.runId, next.claim_token)
     expect(candidates[0]?.input).toStrictEqual(f.intent.input)
     await f.store.inputBundleCandidates.settle(
       f.runId,
@@ -186,12 +163,7 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
       f.intent.input
     )
     await expect(
-      f.store.inputBundleCandidates.settle(
-        f.runId,
-        f.token,
-        f.intent.reference.digest,
-        'present'
-      )
+      f.store.inputBundleCandidates.settle(f.runId, f.token, f.intent.reference.digest, 'present')
     ).rejects.toThrow(/claim was lost/)
   } finally {
     await f.close()
@@ -201,14 +173,10 @@ test('expiry fences reserve, confirmation and selection before the sweep; takeov
 test('reservation replay is immutable and connector/run ownership cannot be crossed', async () => {
   const f = await fixture()
   try {
-    const first = await f.store.inputBundleCandidates.reserve(
-      f.runId,
-      f.token,
-      f.intent
+    const first = await f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
+    expect(await f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)).toStrictEqual(
+      first
     )
-    expect(
-      await f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
-    ).toStrictEqual(first)
     await expect(
       f.store.inputBundleCandidates.reserve(f.runId, f.token, {
         ...f.intent,
@@ -221,9 +189,9 @@ test('reservation replay is immutable and connector/run ownership cannot be cros
     })
     await intruder.initialize()
     try {
-      await expect(
-        intruder.inputBundleCandidates.list(f.runId, f.token)
-      ).rejects.toThrow(/claim was lost/)
+      await expect(intruder.inputBundleCandidates.list(f.runId, f.token)).rejects.toThrow(
+        /claim was lost/
+      )
     } finally {
       await intruder.close()
     }
@@ -248,23 +216,19 @@ test('takeover wins against a reservation waiting for its preparation lock', asy
   const blocker = await f.pool.connect()
   try {
     await blocker.query('BEGIN')
-    await blocker.query(
-      'SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE',
-      [f.runId]
-    )
+    await blocker.query('SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE', [f.runId])
     const rejected = expect(
       f.store.inputBundleCandidates.reserve(f.runId, f.token, f.intent)
     ).rejects.toThrow(/claim was lost/)
-    await blocker.query(
-      `UPDATE preparations SET claim_token=$2 WHERE run_id=$1`,
-      [f.runId, randomUUID()]
-    )
+    await blocker.query(`UPDATE preparations SET claim_token=$2 WHERE run_id=$1`, [
+      f.runId,
+      randomUUID()
+    ])
     await blocker.query('COMMIT')
     await rejected
-    const rows = await f.pool.query(
-      'SELECT * FROM input_bundle_candidates WHERE run_id=$1',
-      [f.runId]
-    )
+    const rows = await f.pool.query('SELECT * FROM input_bundle_candidates WHERE run_id=$1', [
+      f.runId
+    ])
     expect(rows.rowCount).toBe(0)
   } finally {
     blocker.release()
@@ -275,10 +239,9 @@ test('takeover wins against a reservation waiting for its preparation lock', asy
 test('publication operations cross the authenticated HTTP contract with real PostgreSQL', async () => {
   const f = await fixture()
   const { default: Fastify } = await import('fastify')
-  const { registerReviewRunsRoutes, REVIEW_RUNS_FASTIFY_OPTIONS } =
-    (await import(
-      new URL('../../dist/http/server-surface.js', import.meta.url).href
-    )) as typeof import('../../src/http/server-surface.js')
+  const { registerReviewRunsRoutes, REVIEW_RUNS_FASTIFY_OPTIONS } = (await import(
+    new URL('../../dist/http/server-surface.js', import.meta.url).href
+  )) as typeof import('../../src/http/server-surface.js')
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
   try {
     await registerReviewRunsRoutes(app, {
@@ -308,9 +271,7 @@ test('publication operations cross the authenticated HTTP contract with real Pos
       payload: { token: f.token }
     })
     expect(listed.statusCode).toBe(200)
-    expect(listed.json<[{ input: unknown }]>()[0].input).toStrictEqual(
-      f.intent.input
-    )
+    expect(listed.json<[{ input: unknown }]>()[0].input).toStrictEqual(f.intent.input)
     expect(
       (
         await app.inject({

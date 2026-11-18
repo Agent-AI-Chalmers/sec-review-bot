@@ -5,10 +5,7 @@ import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import type { TrajectoryMessageView } from './trajectory-model.js'
 import { rolePresentation } from './trajectory-roles.js'
-import {
-  messageKey,
-  scrollToTrajectoryElement
-} from './trajectory-navigation.js'
+import { messageKey, scrollToTrajectoryElement } from './trajectory-navigation.js'
 import { HighlightText } from './TrajectoryText.js'
 import { TokenUsagePopover } from './TokenUsagePopover.js'
 import { TrajectorySection } from './TrajectorySection.js'
@@ -25,15 +22,9 @@ export function TrajectoryMessage({
 }): React.JSX.Element {
   const t = useMessages()
   const presentation = rolePresentation(message.role)
-  const modelLabel = [message.modelProvider, message.modelName]
-    .filter(Boolean)
-    .join(' · ')
+  const modelLabel = [message.modelProvider, message.modelName].filter(Boolean).join(' · ')
   const primaryLabel =
-    [
-      message.agent,
-      message.source,
-      message.role === 'assistant' ? modelLabel : message.name
-    ]
+    [message.agent, message.source, message.role === 'assistant' ? modelLabel : message.name]
       .filter(Boolean)
       .join(' · ') || undefined
   const jumpToCall = (): void => {
@@ -52,19 +43,11 @@ export function TrajectoryMessage({
     >
       <Group justify="space-between" wrap="wrap" p="sm" gap="xs">
         <Group gap="xs" wrap="wrap">
-          <Badge
-            variant="light"
-            color={presentation.color}
-            leftSection={presentation.icon}
-          >
+          <Badge variant="light" color={presentation.color} leftSection={presentation.icon}>
             {t(presentation.key)}
           </Badge>
           {primaryLabel && (
-            <Text
-              size="sm"
-              c="dimmed"
-              fw={message.role === 'assistant' ? 600 : undefined}
-            >
+            <Text size="sm" c="dimmed" fw={message.role === 'assistant' ? 600 : undefined}>
               <HighlightText value={primaryLabel} query={query} />
             </Text>
           )}
@@ -114,11 +97,7 @@ export function TrajectoryMessage({
           <Button
             variant="subtle"
             size="compact-xs"
-            onClick={() =>
-              scrollToTrajectoryElement(
-                `trajectory-${message.repeatedSystemId}`
-              )
-            }
+            onClick={() => scrollToTrajectoryElement(`trajectory-${message.repeatedSystemId}`)}
           >
             {t('trajectoryRepeatedSystem')}
           </Button>
@@ -126,15 +105,9 @@ export function TrajectoryMessage({
         {message.content && !message.repeatedSystemId && (
           <TrajectorySection
             kind={message.role === 'tool' ? 'result' : 'message'}
-            title={
-              message.role === 'tool'
-                ? t('trajectoryResult')
-                : t('trajectoryContent')
-            }
+            title={message.role === 'tool' ? t('trajectoryResult') : t('trajectoryContent')}
             value={message.content}
-            openedInitially={
-              message.content.length <= 600 && message.role !== 'system'
-            }
+            openedInitially={message.content.length <= 600 && message.role !== 'system'}
             force={force}
             color={message.role === 'tool' ? 'green' : 'blue'}
             query={query}
@@ -147,11 +120,7 @@ export function TrajectoryMessage({
           </TrajectorySection>
         )}
         {message.toolCalls.length > 0 && (
-          <TrajectoryToolCalls
-            calls={message.toolCalls}
-            force={force}
-            query={query}
-          />
+          <TrajectoryToolCalls calls={message.toolCalls} force={force} query={query} />
         )}
         {message.artifact !== undefined && message.artifact !== null && (
           <TrajectorySection
@@ -162,10 +131,7 @@ export function TrajectoryMessage({
             color="gray"
           >
             <Code block>
-              <HighlightText
-                value={JSON.stringify(message.artifact, null, 2)}
-                query={query}
-              />
+              <HighlightText value={JSON.stringify(message.artifact, null, 2)} query={query} />
             </Code>
           </TrajectorySection>
         )}

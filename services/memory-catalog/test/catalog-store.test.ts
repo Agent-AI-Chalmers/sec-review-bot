@@ -51,8 +51,7 @@ test('extraction registration atomically stores its optional observation', async
         sql.includes('and tree_digest=$3')
       )
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('insert into extractions'))
-        return Promise.resolve({ rows: [], rowCount: 1 })
+      if (sql.includes('insert into extractions')) return Promise.resolve({ rows: [], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -71,9 +70,7 @@ test('extraction registration atomically stores its optional observation', async
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
-      observations: [
-        { observation_id: 'extraction-1', body_markdown: 'Remember this.' }
-      ]
+      observations: [{ observation_id: 'extraction-1', body_markdown: 'Remember this.' }]
     })
   ).toBe(true)
 
@@ -109,8 +106,7 @@ test('extraction replay compares the optional observation as part of identity', 
         sql.includes('and tree_digest=$3')
       )
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('insert into extractions'))
-        return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes('insert into extractions')) return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes('as identical'))
         return Promise.resolve({ rows: [{ identical: false }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
@@ -146,9 +142,7 @@ test('learning commit records immutable history before moving the active pointer
         sql.includes('and tree_digest=$3')
       )
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (
-        sql.includes('select active_version as version from memory_tree_state')
-      )
+      if (sql.includes('select active_version as version from memory_tree_state'))
         return Promise.resolve({ rows: [{ version: '3' }], rowCount: 1 })
       if (sql.includes('select state from memory_tree_automation'))
         return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
@@ -206,12 +200,10 @@ test('learning commit records immutable history before moving the active pointer
   expect(operations[6] ?? '').toMatch(/set consumed_version=/)
   expect(operations[7] ?? '').toMatch(/update memory_tree_state/)
   expect(
-    statements.find(({ sql }) => sql.includes('set consumed_version='))
-      ?.parameters
+    statements.find(({ sql }) => sql.includes('set consumed_version='))?.parameters
   ).toStrictEqual([4, ['extraction-1']])
   expect(
-    statements.find(({ sql }) => sql.includes('update memory_tree_state'))
-      ?.parameters
+    statements.find(({ sql }) => sql.includes('update memory_tree_state'))?.parameters
   ).toStrictEqual([4])
 })
 
@@ -264,9 +256,7 @@ test('reorganization commit records history without consuming observations', asy
         sql.includes('update observations set consumed_version')
     )
   ).toBe(false)
-  const insert = statements.find(({ sql }) =>
-    sql.includes('insert into memory_tree_versions')
-  )
+  const insert = statements.find(({ sql }) => sql.includes('insert into memory_tree_versions'))
   expect(insert?.parameters).toStrictEqual([
     4,
     3,
@@ -357,9 +347,7 @@ test('paused control rejects a new automatic version commit before active CAS', 
       }
     })
   ).rejects.toThrow(AutomationPausedError)
-  expect(statements.some((sql) => sql.includes('select active_version'))).toBe(
-    false
-  )
+  expect(statements.some((sql) => sql.includes('select active_version'))).toBe(false)
 })
 
 test('manual edit commits without consuming observations', async () => {
@@ -411,9 +399,7 @@ test('manual edit commits without consuming observations', async () => {
         sql.includes('update observations set consumed_version')
     )
   ).toBe(false)
-  const insert = statements.find(({ sql }) =>
-    sql.includes('insert into memory_tree_versions')
-  )
+  const insert = statements.find(({ sql }) => sql.includes('insert into memory_tree_versions'))
   expect(insert?.parameters?.slice(0, 2)).toStrictEqual([3, 1])
 })
 
@@ -456,9 +442,7 @@ test('manual operation id replays identical content and rejects drift', async ()
     source: { kind: 'manual', operation_id: 'operation-1' }
   })
   identical = false
-  await expect(store.createMemoryTreeVersion(input)).rejects.toThrow(
-    MemoryTreeVersionConflictError
-  )
+  await expect(store.createMemoryTreeVersion(input)).rejects.toThrow(MemoryTreeVersionConflictError)
 })
 
 test('restore moves the active pointer without creating a version', async () => {
@@ -502,9 +486,7 @@ test('restore moves the active pointer without creating a version', async () => 
     active_version: 2,
     operation_id: 'restore-1'
   })
-  expect(
-    statements.some((sql) => sql.includes('insert into memory_tree_versions'))
-  ).toBe(false)
+  expect(statements.some((sql) => sql.includes('insert into memory_tree_versions'))).toBe(false)
 })
 
 /** Assert that each pattern matches a recorded statement, in this order. Statements are found by
@@ -513,9 +495,7 @@ test('restore moves the active pointer without creating a version', async () => 
 function assertStatementOrder(statements: string[], patterns: RegExp[]): void {
   let previous = -1
   for (const pattern of patterns) {
-    const index = statements.findIndex(
-      (sql, position) => position > previous && pattern.test(sql)
-    )
+    const index = statements.findIndex((sql, position) => position > previous && pattern.test(sql))
     expect.assert(
       index > previous,
       `expected a statement matching ${pattern} after position ${previous}`

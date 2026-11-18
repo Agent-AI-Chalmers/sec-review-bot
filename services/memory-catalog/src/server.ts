@@ -3,11 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyRequest
-} from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 
 import {
   ExtractionConflictError,
@@ -21,11 +17,7 @@ import {
   type AuthenticatedMemoryTreeVersionCreation,
   type MemoryCatalogStore
 } from './catalog-store.js'
-import type {
-  PathParameters,
-  QueryParameters,
-  RequestBody
-} from './route-types.js'
+import type { PathParameters, QueryParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
 import { registerResponseValidation } from './response-validation.js'
 
@@ -35,10 +27,7 @@ function requiredEnv(name: string): string {
   return value
 }
 
-function bearerTokenMatches(
-  header: string | undefined,
-  expected: string
-): boolean {
+function bearerTokenMatches(header: string | undefined, expected: string): boolean {
   const prefix = 'Bearer '
   if (!header?.startsWith(prefix)) return false
   const actual = Buffer.from(header.slice(prefix.length))
@@ -74,9 +63,7 @@ function validateExtraction(input: RequestBody<'registerExtraction'>): void {
 }
 
 // OpenAPI cannot relate decision ids to the consumed observation ids.
-function validateMaintenanceReport(
-  source: RequestBody<'createMemoryTreeVersion'>['source']
-): void {
+function validateMaintenanceReport(source: RequestBody<'createMemoryTreeVersion'>['source']): void {
   if (source.kind === 'manual') return
   const decided = source.maintenance_report.observation_decisions.map(
     (decision) => decision.observation_id
@@ -101,10 +88,7 @@ function specPath(): string {
   const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
   if (existsSync(built)) return built
-  return path.resolve(
-    moduleDirectory,
-    '../../../contracts/memory-catalog-api/v1/openapi.yaml'
-  )
+  return path.resolve(moduleDirectory, '../../../contracts/memory-catalog-api/v1/openapi.yaml')
 }
 
 function errorStatusCode(error: unknown): number {
@@ -139,10 +123,7 @@ export async function registerMemoryCatalogRoutes(
   // OpenAPI Glue runs security handlers before service handlers. Keep the authenticated role
   // out of request bodies and attach it to the request object without mutating Fastify types.
   const authenticatedRoles = new WeakMap<FastifyRequest, CatalogRole>()
-  const authenticate = (
-    request: FastifyRequest,
-    allowedRoles: readonly CatalogRole[]
-  ): void => {
+  const authenticate = (request: FastifyRequest, allowedRoles: readonly CatalogRole[]): void => {
     const role = bearerTokenMatches(request.headers.authorization, workerToken)
       ? 'worker'
       : bearerTokenMatches(request.headers.authorization, operatorToken)
@@ -159,8 +140,7 @@ export async function registerMemoryCatalogRoutes(
       input.source.kind === 'learning' || input.source.kind === 'reorganization'
     if (
       (requiresWorker && authenticatedRoles.get(request) !== 'worker') ||
-      (input.source.kind === 'manual' &&
-        authenticatedRoles.get(request) !== 'operator')
+      (input.source.kind === 'manual' && authenticatedRoles.get(request) !== 'operator')
     )
       throw unauthorized()
     validateMaintenanceReport(input.source)
@@ -172,21 +152,18 @@ export async function registerMemoryCatalogRoutes(
     specification: specPath(),
     serviceHandlers: {
       reserveExtractionPublication: async (request: FastifyRequest) => {
-        const input =
-          request.body as RequestBody<'reserveExtractionPublication'>
+        const input = request.body as RequestBody<'reserveExtractionPublication'>
         validateExtraction(input.registration)
         return await store.reserveExtractionPublication(input)
       },
       confirmExtractionPublication: async (request: FastifyRequest) => {
-        const input =
-          request.body as RequestBody<'confirmExtractionPublication'>
+        const input = request.body as RequestBody<'confirmExtractionPublication'>
         validateExtraction(input.registration)
         return await store.confirmExtractionPublication(input)
       },
       listExtractionPublications: async (request: FastifyRequest) => ({
         publications: await store.listExtractionPublications(
-          (request.params as PathParameters<'listExtractionPublications'>)
-            .extraction_id
+          (request.params as PathParameters<'listExtractionPublications'>).extraction_id
         )
       }),
       abandonVersionPublications: async (request: FastifyRequest) => ({
@@ -195,16 +172,11 @@ export async function registerMemoryCatalogRoutes(
         )
       }),
       reserveVersionPublication: async (request: FastifyRequest) =>
-        await store.reserveVersionPublication(
-          authenticatedVersionInput(request)
-        ),
+        await store.reserveVersionPublication(authenticatedVersionInput(request)),
       confirmVersionPublication: async (request: FastifyRequest) =>
-        await store.confirmVersionPublication(
-          authenticatedVersionInput(request)
-        ),
+        await store.confirmVersionPublication(authenticatedVersionInput(request)),
       listVersionPublications: async (request: FastifyRequest) => {
-        const { kind, owner_id } =
-          request.params as PathParameters<'listVersionPublications'>
+        const { kind, owner_id } = request.params as PathParameters<'listVersionPublications'>
         if (
           ((kind === 'learning' || kind === 'reorganization') &&
             authenticatedRoles.get(request) !== 'worker') ||
@@ -222,8 +194,7 @@ export async function registerMemoryCatalogRoutes(
         return { ok: true, created: await store.registerExtraction(input) }
       },
       getExtraction: async (request: FastifyRequest, reply: FastifyReply) => {
-        const extractionId = (request.params as PathParameters<'getExtraction'>)
-          .extraction_id
+        const extractionId = (request.params as PathParameters<'getExtraction'>).extraction_id
         const record = await store.queries.getExtraction(extractionId)
         if (record) return record
         return await reply.status(404).send({
@@ -235,13 +206,9 @@ export async function registerMemoryCatalogRoutes(
         const query = request.query as QueryParameters<'listExtractions'>
         const limit = query.limit ? Number(query.limit) : 50
         return await store.queries.listExtractions(query.cursor, limit, {
-          ...(query.source_workflow
-            ? { sourceWorkflow: query.source_workflow }
-            : {}),
+          ...(query.source_workflow ? { sourceWorkflow: query.source_workflow } : {}),
           ...(query.source_run_id ? { sourceRunId: query.source_run_id } : {}),
-          ...(query.has_observation
-            ? { hasObservation: query.has_observation === 'true' }
-            : {})
+          ...(query.has_observation ? { hasObservation: query.has_observation === 'true' } : {})
         })
       },
       listObservations: async (request: FastifyRequest) => {
@@ -249,23 +216,16 @@ export async function registerMemoryCatalogRoutes(
         const limit = query.limit ? Number(query.limit) : 50
         return await store.queries.listObservations(query.cursor, limit, {
           ...(query.status ? { status: query.status } : {}),
-          ...(query.consumed_version
-            ? { consumedVersion: Number(query.consumed_version) }
-            : {})
+          ...(query.consumed_version ? { consumedVersion: Number(query.consumed_version) } : {})
         })
       },
-      getObservationBacklog: async () =>
-        await store.queries.getObservationBacklog(),
+      getObservationBacklog: async () => await store.queries.getObservationBacklog(),
       getCatalogOverview: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'getCatalogOverview'>
         return await store.queries.getCatalogOverview(query.range ?? '30d')
       },
-      getMemoryTreeAutomation: async () =>
-        await store.queries.getMemoryTreeAutomation(),
-      pauseMemoryTreeAutomation: async (
-        request: FastifyRequest,
-        reply: FastifyReply
-      ) => {
+      getMemoryTreeAutomation: async () => await store.queries.getMemoryTreeAutomation(),
+      pauseMemoryTreeAutomation: async (request: FastifyRequest, reply: FastifyReply) => {
         const result = await store.changeMemoryTreeAutomation('paused', {
           ...(request.body as RequestBody<'pauseMemoryTreeAutomation'>),
           actor: operatorActor
@@ -273,10 +233,7 @@ export async function registerMemoryCatalogRoutes(
         if (result.created) void reply.status(201)
         return result
       },
-      resumeMemoryTreeAutomation: async (
-        request: FastifyRequest,
-        reply: FastifyReply
-      ) => {
+      resumeMemoryTreeAutomation: async (request: FastifyRequest, reply: FastifyReply) => {
         const result = await store.changeMemoryTreeAutomation('enabled', {
           ...(request.body as RequestBody<'resumeMemoryTreeAutomation'>),
           actor: operatorActor
@@ -285,31 +242,18 @@ export async function registerMemoryCatalogRoutes(
         return result
       },
       getLearningInput: async (request: FastifyRequest) => {
-        const limit = Number(
-          (request.query as QueryParameters<'getLearningInput'>).limit
-        )
+        const limit = Number((request.query as QueryParameters<'getLearningInput'>).limit)
         return { input: await store.getLearningInput(limit) }
       },
-      createMemoryTreeVersion: async (
-        request: FastifyRequest,
-        reply: FastifyReply
-      ) => {
-        const result = await store.createMemoryTreeVersion(
-          authenticatedVersionInput(request)
-        )
+      createMemoryTreeVersion: async (request: FastifyRequest, reply: FastifyReply) => {
+        const result = await store.createMemoryTreeVersion(authenticatedVersionInput(request))
         if (result.created) {
-          void reply.header(
-            'Location',
-            `/v1/memory-tree/versions/${result.version}`
-          )
+          void reply.header('Location', `/v1/memory-tree/versions/${result.version}`)
           void reply.status(201)
         }
         return result
       },
-      restoreMemoryTree: async (
-        request: FastifyRequest,
-        reply: FastifyReply
-      ) => {
+      restoreMemoryTree: async (request: FastifyRequest, reply: FastifyReply) => {
         const result = await store.restoreMemoryTree({
           ...(request.body as RequestBody<'restoreMemoryTree'>),
           actor: operatorActor
@@ -318,13 +262,8 @@ export async function registerMemoryCatalogRoutes(
         return result
       },
       getMemoryTree: async () => await store.queries.getMemoryTree(),
-      getMemoryTreeVersion: async (
-        request: FastifyRequest,
-        reply: FastifyReply
-      ) => {
-        const version = Number(
-          (request.params as PathParameters<'getMemoryTreeVersion'>).version
-        )
+      getMemoryTreeVersion: async (request: FastifyRequest, reply: FastifyReply) => {
+        const version = Number((request.params as PathParameters<'getMemoryTreeVersion'>).version)
         const record = await store.queries.getMemoryTreeVersion(version)
         if (record) return record
         return await reply.status(404).send({
@@ -334,9 +273,7 @@ export async function registerMemoryCatalogRoutes(
       },
       listMemoryTreeVersions: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'listMemoryTreeVersions'>
-        const beforeVersion = query.before_version
-          ? Number(query.before_version)
-          : undefined
+        const beforeVersion = query.before_version ? Number(query.before_version) : undefined
         const limit = query.limit ? Number(query.limit) : 50
         return await store.queries.listMemoryTreeVersions(beforeVersion, limit)
       }

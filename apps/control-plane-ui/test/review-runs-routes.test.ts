@@ -50,16 +50,11 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       `${base}/api/runs?workflow=issue-review&source_platform=github&range=7d&cursor=abc`,
       { headers: { cookie } }
     )
-    expect(upstreamPath).toBe(
-      '/v1/runs?cursor=abc&source_platform=github&workflow=issue-review'
+    expect(upstreamPath).toBe('/v1/runs?cursor=abc&source_platform=github&workflow=issue-review')
+    expect((await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } })).status).toBe(
+      404
     )
-    expect(
-      (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } }))
-        .status
-    ).toBe(404)
-    expect(
-      (await fetch(`${base}/api/store`, { headers: { cookie } })).status
-    ).toBe(404)
+    expect((await fetch(`${base}/api/store`, { headers: { cookie } })).status).toBe(404)
     // The run-id segment must be the contract's UUID shape. A catch-all would still be safe
     // today (Review Runs answers 400), but it would forward any future path shape upstream,
     // so the allow-list rejects a non-UUID id here instead of relaying it.
@@ -88,10 +83,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
         `${rejected} must not be proxied upstream`
       ).toBe(404)
     }
-    expect(
-      upstreamPath,
-      'a rejected path must never reach the upstream Review Runs'
-    ).toBe('')
+    expect(upstreamPath, 'a rejected path must never reach the upstream Review Runs').toBe('')
     // The blocked-preparation queue is a fixed sub-resource of the run collection, not a run id,
     // so it must pass the allow-list before the UUID check rejects it.
     await fetch(`${base}/api/runs/parked`, {
@@ -290,10 +282,9 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
     expect.assert(cookie !== null)
     const proxied = await fetch(`${base}/api/runs`, { headers: { cookie } })
     expect(proxied.status).toBe(200)
-    expect(
-      proxied.headers.get('content-type'),
-      'the upstream text/html must not be echoed'
-    ).toBe('application/json; charset=utf-8')
+    expect(proxied.headers.get('content-type'), 'the upstream text/html must not be echoed').toBe(
+      'application/json; charset=utf-8'
+    )
     expect(
       proxied.headers.get('x-content-type-options'),
       'nosniff is still set so the body cannot be reinterpreted'

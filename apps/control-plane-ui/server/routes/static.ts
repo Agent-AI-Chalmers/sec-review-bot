@@ -8,19 +8,9 @@ export interface StaticRoutes {
 }
 
 /** Serve the built browser assets and the SPA fallback. */
-export function createStaticRoutes({
-  assets
-}: {
-  assets: string
-}): StaticRoutes {
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
-    const requested =
-      request.url === '/'
-        ? 'index.html'
-        : (request.url?.slice(1) ?? 'index.html')
+export function createStaticRoutes({ assets }: { assets: string }): StaticRoutes {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requested = request.url === '/' ? 'index.html' : (request.url?.slice(1) ?? 'index.html')
     let file = path.resolve(assets, requested)
     if (!file.startsWith(`${assets}${path.sep}`)) {
       response.writeHead(404)

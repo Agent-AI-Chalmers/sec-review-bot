@@ -1,9 +1,4 @@
-import {
-  openAuthenticatedRuns,
-  openRunFilters,
-  test,
-  expect
-} from './fixtures.js'
+import { openAuthenticatedRuns, openRunFilters, test, expect } from './fixtures.js'
 
 test('execution filter keeps long selected labels and selected options visible', async ({
   page
@@ -75,9 +70,7 @@ test('execution filter keeps long selected labels and selected options visible',
         range.selectNodeContents(text)
         const bounds = range.getBoundingClientRect()
         const available = text.getBoundingClientRect()
-        return (
-          bounds.left >= available.left && bounds.right <= available.right + 0.5
-        )
+        return bounds.left >= available.left && bounds.right <= available.right + 0.5
       })
     ).toBe(true)
     await page.keyboard.press('Escape')
@@ -89,10 +82,7 @@ test('selection fill remains distinct from keyboard navigation and hover', async
 }, testInfo) => {
   // Both themes need coverage; avoid multiplying the same interaction by every device/theme pair.
   const theme = testInfo.project.name === 'mobile' ? 'dark' : 'light'
-  await page.addInitScript(
-    (value) => localStorage.setItem('ui-theme', value),
-    theme
-  )
+  await page.addInitScript((value) => localStorage.setItem('ui-theme', value), theme)
   await openAuthenticatedRuns(page)
   await openRunFilters(page)
   const filter = page.getByRole('combobox', {
@@ -102,9 +92,7 @@ test('selection fill remains distinct from keyboard navigation and hover', async
   await filter.click()
   await page.getByRole('option', { name: 'Succeeded', exact: true }).click()
   // Reopen only after the URL-backed value has committed; the next click checks selection styling.
-  await expect(page).toHaveURL(
-    (url) => url.searchParams.get('execution_status') === 'succeeded'
-  )
+  await expect(page).toHaveURL((url) => url.searchParams.get('execution_status') === 'succeeded')
   await expect(filter).toHaveValue('Succeeded')
   await filter.click()
   const selected = page.getByRole('option', {
@@ -126,33 +114,17 @@ test('selection fill remains distinct from keyboard navigation and hover', async
   const active = page.locator('[role="option"][data-combobox-selected]')
   await expect(active).not.toHaveAttribute('aria-selected', 'true')
   await expect(selected).toHaveAttribute('aria-selected', 'true')
-  expect(
-    await selected.evaluate(
-      (element) => getComputedStyle(element).backgroundColor
-    )
-  ).toBe(fill)
-  expect(
-    await active.evaluate(
-      (element) => getComputedStyle(element).backgroundColor
-    )
-  ).not.toBe(fill)
-  expect(
-    await active.evaluate((element) => getComputedStyle(element).outlineStyle)
-  ).toBe('solid')
+  expect(await selected.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(fill)
+  expect(await active.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
+    fill
+  )
+  expect(await active.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('solid')
   await selected.hover()
-  expect(
-    await selected.evaluate(
-      (element) => getComputedStyle(element).backgroundColor
-    )
-  ).toBe(fill)
-  expect(
-    await selected.evaluate((element) => getComputedStyle(element).outlineStyle)
-  ).toBe('solid')
+  expect(await selected.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(fill)
+  expect(await selected.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('solid')
 })
 
-test('all coordination recovery states are selectable in each axis filter', async ({
-  page
-}) => {
+test('all coordination recovery states are selectable in each axis filter', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await openRunFilters(page)
   for (const [axis, labels] of [

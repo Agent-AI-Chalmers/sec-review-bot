@@ -37,15 +37,10 @@ export function publishedArtifact(
   const digest = record.digest
   const uri = record.uri
   const sizeBytes = record.size_bytes
-  if (typeof digest !== 'string' || !DIGEST.test(digest))
-    return { kind: 'invalid' }
+  if (typeof digest !== 'string' || !DIGEST.test(digest)) return { kind: 'invalid' }
   if (typeof uri !== 'string') return { kind: 'invalid' }
   if (record.media_type !== expected.mediaType) return { kind: 'invalid' }
-  if (
-    typeof sizeBytes !== 'number' ||
-    !Number.isSafeInteger(sizeBytes) ||
-    sizeBytes < 0
-  )
+  if (typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes < 0)
     return { kind: 'invalid' }
   const prefix = `s3://${expected.bucket}/`
   if (!uri.startsWith(prefix)) return { kind: 'invalid' }

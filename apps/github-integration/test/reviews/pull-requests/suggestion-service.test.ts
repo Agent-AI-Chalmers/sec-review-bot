@@ -155,9 +155,7 @@ test('suggestion candidates split a hunk into minimal contiguous +/- change bloc
 
   const manifest = await generateSuggestionCandidatesFromReviewRecord({
     files,
-    review_record: reviewRecordWithPatchDiff(
-      workspacePatchWithInsertionSample()
-    )
+    review_record: reviewRecordWithPatchDiff(workspacePatchWithInsertionSample())
   })
 
   expect(
@@ -202,21 +200,12 @@ for (const filename of [
   test(`suggestions preserve actual Git filename ${JSON.stringify(filename)}`, async () => {
     const root = mkdtempSync(join(tmpdir(), 'suggestion-path-'))
     try {
-      const git = (...args: string[]) =>
-        execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+      const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
       git('init', '-q')
       mkdirSync(dirname(join(root, filename)), { recursive: true })
       writeFileSync(join(root, filename), 'old\n')
       git('add', '.')
-      git(
-        '-c',
-        'user.name=Test',
-        '-c',
-        'user.email=test@example.com',
-        'commit',
-        '-qm',
-        'base'
-      )
+      git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'base')
       writeFileSync(join(root, filename), 'fixed\n')
       const patch = git(
         '-c',
@@ -235,9 +224,7 @@ for (const filename of [
         files,
         review_record: reviewRecordWithPatchDiff(patch)
       })
-      expect(manifest.candidates.map((item) => item.path)).toStrictEqual([
-        filename
-      ])
+      expect(manifest.candidates.map((item) => item.path)).toStrictEqual([filename])
       expect(manifest.candidates[0]?.replacement).toBe('fixed')
       expect(manifest.unmapped_changes).toStrictEqual([])
     } finally {

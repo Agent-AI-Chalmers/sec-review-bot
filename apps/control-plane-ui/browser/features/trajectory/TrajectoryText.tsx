@@ -18,29 +18,20 @@ export function HighlightText({
   return (
     <>
       {parts.map((part, index) =>
-        part.toLowerCase() === needle.toLowerCase() ? (
-          <mark key={index}>{part}</mark>
-        ) : (
-          part
-        )
+        part.toLowerCase() === needle.toLowerCase() ? <mark key={index}>{part}</mark> : part
       )}
     </>
   )
 }
 
 function highlightNode(node: React.ReactNode, query: string): React.ReactNode {
-  if (typeof node === 'string')
-    return <HighlightText value={node} query={query} />
+  if (typeof node === 'string') return <HighlightText value={node} query={query} />
   if (Array.isArray(node))
     return node.map((item: React.ReactNode, index) => (
       <React.Fragment key={index}>{highlightNode(item, query)}</React.Fragment>
     ))
   if (React.isValidElement<{ children?: React.ReactNode }>(node))
-    return React.cloneElement(
-      node,
-      undefined,
-      highlightNode(node.props.children, query)
-    )
+    return React.cloneElement(node, undefined, highlightNode(node.props.children, query))
   return node
 }
 
@@ -51,20 +42,15 @@ export function HighlightedMarkdown({
   children: string
   query: string
 }): React.JSX.Element {
-  const highlight = ({
-    children: node
-  }: {
-    children?: React.ReactNode
-  }): React.ReactNode => highlightNode(node, query)
+  const highlight = ({ children: node }: { children?: React.ReactNode }): React.ReactNode =>
+    highlightNode(node, query)
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
         p: ({ children: node }) => <p>{highlight({ children: node })}</p>,
         li: ({ children: node }) => <li>{highlight({ children: node })}</li>,
-        code: ({ children: node }) => (
-          <code>{highlight({ children: node })}</code>
-        ),
+        code: ({ children: node }) => <code>{highlight({ children: node })}</code>,
         td: ({ children: node }) => <td>{highlight({ children: node })}</td>,
         th: ({ children: node }) => <th>{highlight({ children: node })}</th>
       }}
@@ -83,10 +69,7 @@ export function TrajectoryText({
   query: string
   mode: string
 }): React.JSX.Element {
-  const rendered = React.useMemo(
-    () => markdownWithoutXmlTags(children),
-    [children]
-  )
+  const rendered = React.useMemo(() => markdownWithoutXmlTags(children), [children])
   return (
     <div>
       {mode === 'source' ? (

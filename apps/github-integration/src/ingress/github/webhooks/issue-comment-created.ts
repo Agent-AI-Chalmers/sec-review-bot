@@ -22,10 +22,7 @@ import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { createLogThrottle } from '../../../utils/log-throttle.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
-import {
-  type TrustedRefHandlerDeps,
-  type WebhookHandlerArgs
-} from './handler-deps.js'
+import { type TrustedRefHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type IssueCommentCreatedWebhookEvent = Pick<
   EmitterWebhookEvent<'issue_comment.created'>,
@@ -105,10 +102,7 @@ export async function handleIssueCommentCreatedWithDeps(
     const mentions = unmatchedMentions(commentBody)
     // Only the first sighting per repository per window is logged; the parse itself still runs
     // so behaviour does not depend on whether the line was emitted.
-    if (
-      mentions.length > 0 &&
-      unmatchedMentionThrottleFn(mentionThrottleKey(payload))
-    ) {
+    if (mentions.length > 0 && unmatchedMentionThrottleFn(mentionThrottleKey(payload))) {
       logInfo('workflow_skipped', {
         event: 'issue_comment.created',
         reason: 'comment_mention_not_recognized',
@@ -129,9 +123,7 @@ export async function handleIssueCommentCreatedWithDeps(
       owner_login: issue.owner_login,
       repo_name: issue.repo_name,
       sender_login:
-        typeof payload === 'object' &&
-        payload !== null &&
-        !Array.isArray(payload)
+        typeof payload === 'object' && payload !== null && !Array.isArray(payload)
           ? (payload as { sender?: { login?: string } }).sender?.login
           : undefined
     })
@@ -152,10 +144,10 @@ export async function handleIssueCommentCreatedWithDeps(
 
     // Resolve the trusted default branch once for this run; both the issue and
     // PR paths below reuse it instead of re-resolving.
-    const trusted_default_branch = await resolveTrustedDefaultBranchFn(
-      octokit,
-      { owner_login: issue.owner_login, repo_name: issue.repo_name }
-    )
+    const trusted_default_branch = await resolveTrustedDefaultBranchFn(octokit, {
+      owner_login: issue.owner_login,
+      repo_name: issue.repo_name
+    })
 
     if (issue.is_pull_request) {
       await backgroundPreparations.startAndWaitForAdmission(

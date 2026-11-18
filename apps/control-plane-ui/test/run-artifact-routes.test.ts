@@ -62,12 +62,8 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     })
     expect(download.status).toBe(200)
     expect(await download.text()).toBe('artifact')
-    expect(requestedKey).toBe(
-      `runs/${runId}/artifacts/execution-archive.v1.tar.zst`
-    )
-    expect(download.headers.get('content-type')).toBe(
-      'application/octet-stream'
-    )
+    expect(requestedKey).toBe(`runs/${runId}/artifacts/execution-archive.v1.tar.zst`)
+    expect(download.headers.get('content-type')).toBe('application/octet-stream')
     expect(download.headers.get('content-disposition')).toBe(
       'attachment; filename="execution-archive.v1.tar.zst"'
     )
@@ -375,9 +371,7 @@ test('BFF times out a stalled artifact download', async () => {
     artifactStore: {
       async getObject(_key, signal): Promise<{ body: Readable }> {
         return await new Promise((_, reject) => {
-          signal.addEventListener('abort', () =>
-            reject(new DOMException('Aborted', 'AbortError'))
-          )
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
         })
       }
     }

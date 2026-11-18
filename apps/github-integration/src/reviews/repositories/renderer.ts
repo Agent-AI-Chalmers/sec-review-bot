@@ -59,9 +59,7 @@ interface RepositoryScanTargetLike {
   head_sha?: unknown
 }
 
-function caseResultsById(
-  case_results: RepositoryCaseResult[]
-): Map<string, RepositoryCaseResult> {
+function caseResultsById(case_results: RepositoryCaseResult[]): Map<string, RepositoryCaseResult> {
   const indexed = new Map<string, RepositoryCaseResult>()
   for (const item of case_results) {
     if (!indexed.has(item.case_id)) {
@@ -75,14 +73,7 @@ function renderFoldedBlock(summary: string, bodyLines: string[]): string[] {
   if (!bodyLines.some((line) => nonEmptyText(line).length > 0)) {
     return []
   }
-  return [
-    '<details>',
-    `<summary>${summary}</summary>`,
-    '',
-    ...bodyLines,
-    '',
-    '</details>'
-  ]
+  return ['<details>', `<summary>${summary}</summary>`, '', ...bodyLines, '', '</details>']
 }
 
 function parseCvssBaseVector(vector: unknown): Record<string, string> {
@@ -110,9 +101,7 @@ function formatCvssKeyMetrics(vector: unknown): string {
   return metrics.map((key) => `${key}=${parsed[key] ?? '?'}`).join(', ')
 }
 
-function buildCvssSummaryFromCases(
-  case_results: RepositoryCaseResult[]
-): CvssSummary {
+function buildCvssSummaryFromCases(case_results: RepositoryCaseResult[]): CvssSummary {
   const severity_counts: Record<string, number> = {
     critical: 0,
     high: 0,
@@ -172,19 +161,14 @@ function renderCvssScoringSection(cvss: ReviewRecord['cvss']): string[] {
     return ['#### CVSS', '', 'No CVSS score was recorded.', '']
   }
   const outcome = cvss.outcome
-  const overview = String(
-    cvss.overview ?? 'No CVSS scoring overview was recorded.'
-  )
+  const overview = String(cvss.overview ?? 'No CVSS scoring overview was recorded.')
   if (outcome === 'not-scored') {
     return [
       '#### CVSS',
       '',
       '- Outcome: `not-scored`',
       '',
-      String(
-        cvss.not_scored_reason ??
-          'Current case is not independently CVSS-scoreable.'
-      ),
+      String(cvss.not_scored_reason ?? 'Current case is not independently CVSS-scoreable.'),
       ''
     ]
   }
@@ -279,9 +263,7 @@ function deliveryIdForDelivery(delivery: PublishedDeliveryEntryLike) {
   return delivery.delivery_id
 }
 
-function coordinationNotesForDeliveries(
-  deliveries: PublishedDeliveryEntryLike[]
-): string[] {
+function coordinationNotesForDeliveries(deliveries: PublishedDeliveryEntryLike[]): string[] {
   const byFile = new Map<string, PublishedDeliveryEntryLike[]>()
   for (const delivery of deliveries) {
     for (const filePath of fileChangePaths(delivery.file_changes)) {
@@ -292,8 +274,8 @@ function coordinationNotesForDeliveries(
   }
 
   const notes: string[] = []
-  for (const [filePath, items] of [...byFile.entries()].sort(
-    ([left], [right]) => left.localeCompare(right)
+  for (const [filePath, items] of [...byFile.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
   )) {
     if (items.length < 2) {
       continue
@@ -321,9 +303,7 @@ function renderMitigationSummaryLines(
 ): string[] {
   return [
     nonEmptyText(mitigation.overview) || fallback,
-    ...(options.includeReferencePatch
-      ? renderReferencePatch(mitigation.patch_diff)
-      : [])
+    ...(options.includeReferencePatch ? renderReferencePatch(mitigation.patch_diff) : [])
   ]
 }
 
@@ -373,27 +353,21 @@ function isBlockedConfirmedCase(caseResult: RepositoryCaseResult): boolean {
   if (caseResult.deliverable) {
     return false
   }
-  return [
-    'confirmed-defect',
-    'confirmed-vulnerability',
-    'plausible-risk'
-  ].includes(caseResult.review_record.analysis.verdict ?? '')
+  return ['confirmed-defect', 'confirmed-vulnerability', 'plausible-risk'].includes(
+    caseResult.review_record.analysis.verdict ?? ''
+  )
 }
 
-function renderBlockedConfirmedCases(
-  case_results: RepositoryCaseResult[]
-): string[] {
+function renderBlockedConfirmedCases(case_results: RepositoryCaseResult[]): string[] {
   const blocks: string[] = []
   for (const caseResult of case_results) {
     if (!isBlockedConfirmedCase(caseResult)) {
       continue
     }
 
-    const { analysis, mitigation, verification, cvss } =
-      caseResult.review_record
+    const { analysis, mitigation, verification, cvss } = caseResult.review_record
     const case_id = caseResult.case_id
-    const deliveryReason =
-      nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
+    const deliveryReason = nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
 
     const body = [
       // The status lines belong in the card body so the title only carries case
@@ -421,25 +395,14 @@ function renderBlockedConfirmedCases(
       )
     ]
 
-    blocks.push(
-      ...renderFoldedBlock(
-        blockedConfirmedCaseTitle(case_id, analysis, cvss),
-        body
-      )
-    )
+    blocks.push(...renderFoldedBlock(blockedConfirmedCaseTitle(case_id, analysis, cvss), body))
   }
   return blocks
 }
 
-export function buildRepoReviewSummaryBody({
-  repo
-}: {
-  repo: RepoLike
-}): string {
+export function buildRepoReviewSummaryBody({ repo }: { repo: RepoLike }): string {
   const repo_full_name =
-    typeof repo.repo_full_name === 'string'
-      ? repo.repo_full_name
-      : 'unknown/unknown'
+    typeof repo.repo_full_name === 'string' ? repo.repo_full_name : 'unknown/unknown'
   return [
     '# Repository Security Review Summary',
     '',
@@ -471,12 +434,8 @@ export function renderRepositorySecuritySummaryComment({
   const cvss_summary = workflow_result.cvss_summary
   const cvss_severity_counts = cvss_summary.severity_counts
   const blockedConfirmedCaseBlocks = renderBlockedConfirmedCases(case_results)
-  const blockedConfirmedCaseCount = case_results.filter(
-    isBlockedConfirmedCase
-  ).length
-  const ready_case_count = case_results.filter(
-    (item) => item.deliverable
-  ).length
+  const blockedConfirmedCaseCount = case_results.filter(isBlockedConfirmedCase).length
+  const ready_case_count = case_results.filter((item) => item.deliverable).length
   const scan_summary = workflow_result.scan_summary
   const scan_mode = displayText(scan_target?.scan_mode, 'full').trim() || 'full'
   const base_sha = displayText(scan_target?.base_sha, '').trim()
@@ -540,21 +499,11 @@ export function renderRepositorySecuritySummaryComment({
 
   if (normalizedDeliveryEntries.length > 0) {
     lines.push('', '### Published Delivery PRs', '')
-    lines.push(
-      "_Grouped by each delivery PR's highest case CVSS severity._",
-      ''
-    )
-    const sortedDeliveryEntries = sortDeliveriesByRisk(
-      normalizedDeliveryEntries
-    )
-    const deliveryEntriesBySeverity = Map.groupBy(
-      sortedDeliveryEntries,
-      deliverySeverityKey
-    )
+    lines.push("_Grouped by each delivery PR's highest case CVSS severity._", '')
+    const sortedDeliveryEntries = sortDeliveriesByRisk(normalizedDeliveryEntries)
+    const deliveryEntriesBySeverity = Map.groupBy(sortedDeliveryEntries, deliverySeverityKey)
 
-    for (const severityKey of sortSeverityKeys([
-      ...deliveryEntriesBySeverity.keys()
-    ])) {
+    for (const severityKey of sortSeverityKeys([...deliveryEntriesBySeverity.keys()])) {
       const group = deliveryEntriesBySeverity.get(severityKey) ?? []
       lines.push(`#### ${severityKey} (${group.length})`, '')
       for (const [index, item] of group.entries()) {
@@ -565,26 +514,14 @@ export function renderRepositorySecuritySummaryComment({
       }
       lines.push('')
     }
-    const coordinationNotes = coordinationNotesForDeliveries(
-      normalizedDeliveryEntries
-    )
+    const coordinationNotes = coordinationNotesForDeliveries(normalizedDeliveryEntries)
     if (coordinationNotes.length > 0) {
-      lines.push(
-        '### Coordination Notes',
-        '',
-        ...coordinationNotes.map((item) => `- ${item}`),
-        ''
-      )
+      lines.push('### Coordination Notes', '', ...coordinationNotes.map((item) => `- ${item}`), '')
     }
   }
 
   if (blockedConfirmedCaseBlocks.length > 0) {
-    lines.push(
-      '',
-      '### Blocked Confirmed Cases',
-      '',
-      ...blockedConfirmedCaseBlocks
-    )
+    lines.push('', '### Blocked Confirmed Cases', '', ...blockedConfirmedCaseBlocks)
   }
 
   return lines.join('\n')
@@ -600,9 +537,7 @@ export function buildDeliveryDraftPrBody({
   case_results?: RepositoryCaseResult[]
 }): string {
   const repo_full_name =
-    typeof repo.repo_full_name === 'string'
-      ? repo.repo_full_name
-      : 'unknown/unknown'
+    typeof repo.repo_full_name === 'string' ? repo.repo_full_name : 'unknown/unknown'
   const changed_files = fileChangePaths(delivery.file_changes)
   const case_ids = delivery.case_ids
   const case_count = delivery.case_count
@@ -631,15 +566,11 @@ export function buildDeliveryDraftPrBody({
     if (!caseResult) {
       return []
     }
-    const { analysis, mitigation, verification, cvss } =
-      caseResult.review_record
+    const { analysis, mitigation, verification, cvss } = caseResult.review_record
     const body = [
       `### Case ${inlineCode(case_id)}`,
       '',
-      ...renderReviewStatusLines(
-        { analysis, mitigation, verification },
-        { includeNextStep: true }
-      ),
+      ...renderReviewStatusLines({ analysis, mitigation, verification }, { includeNextStep: true }),
       '',
       ...renderFoldedBlock('Analysis', [
         nonEmptyText(analysis.overview) || 'No analyzer overview was recorded.',
@@ -649,10 +580,7 @@ export function buildDeliveryDraftPrBody({
       ...renderFoldedBlock('CVSS', renderCvssScoringBody(cvss)),
       ...renderFoldedBlock(
         'Mitigation',
-        renderMitigationSummaryLines(
-          mitigation,
-          'No mitigation overview was recorded.'
-        )
+        renderMitigationSummaryLines(mitigation, 'No mitigation overview was recorded.')
       ),
       ...renderFoldedBlock(
         'Verification',

@@ -80,16 +80,12 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
 
     const events = await store.queries.listEvents(runId)
     expect.assert(events.length > 0)
-    for (const event of events)
-      assertIsoTimestamp(event.occurred_at, 'event.occurred_at')
+    for (const event of events) assertIsoTimestamp(event.occurred_at, 'event.occurred_at')
 
     const [stepRecord] = await store.publications.listPublicationSteps(runId)
     assertIsoTimestamp(stepRecord?.last_attempt_at, 'step.last_attempt_at')
 
-    await pool.query(
-      `UPDATE publications SET status='disconnected' WHERE run_id=$1`,
-      [runId]
-    )
+    await pool.query(`UPDATE publications SET status='disconnected' WHERE run_id=$1`, [runId])
     const parked = await store.queries.listParkedRuns()
     const parkedRun = parked.find((item) => item.run_id === runId)
     expect.assert(parkedRun)

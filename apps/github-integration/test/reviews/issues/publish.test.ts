@@ -52,11 +52,7 @@ function buildHarness() {
   const steps = new Map<string, PublicationStepRecord>()
 
   const store = {
-    initializePublicationSteps: async (
-      _runId: string,
-      _token: string,
-      keys: string[]
-    ) => {
+    initializePublicationSteps: async (_runId: string, _token: string, keys: string[]) => {
       initializedSteps.push(keys)
       for (const key of keys)
         steps.set(key, {
@@ -93,18 +89,15 @@ function buildHarness() {
         number: 1
       })
     }
-    if (pathname.includes('/comments') && method === 'GET')
-      return githubJson([])
+    if (pathname.includes('/comments') && method === 'GET') return githubJson([])
     if (pathname.includes('/comments') && method === 'POST') {
       createdComments.push(body)
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
     if (pathname.includes('/git/blobs')) return githubJson({ sha: 'blob-sha' })
-    if (pathname.includes('/git/commits/'))
-      return githubJson({ tree: { sha: 'base-tree-sha' } })
+    if (pathname.includes('/git/commits/')) return githubJson({ tree: { sha: 'base-tree-sha' } })
     if (pathname.includes('/git/trees')) return githubJson({ sha: 'tree-sha' })
-    if (pathname.includes('/git/commits'))
-      return githubJson({ sha: 'commit-sha' })
+    if (pathname.includes('/git/commits')) return githubJson({ sha: 'commit-sha' })
     if (pathname.includes('/git/refs')) return githubJson({})
     return githubJson({ default_branch: 'main' })
   })
@@ -118,10 +111,7 @@ function buildHarness() {
   }
 }
 
-async function runPublish(
-  open_pr: boolean,
-  review_record = issueReviewRecordWithPatch()
-) {
+async function runPublish(open_pr: boolean, review_record = issueReviewRecordWithPatch()) {
   const harness = buildHarness()
   await handleIssueReviewRun({
     run: {
@@ -156,10 +146,7 @@ test('issue publish opens a draft PR when the run opted in', async () => {
   const harness = await runPublish(true)
   expect(harness.createdPullRequests).toHaveLength(1)
   expect(harness.createdComments).toHaveLength(1)
-  expect(harness.initializedSteps[0]).toStrictEqual([
-    'issue:draft-pr',
-    'issue:summary-comment'
-  ])
+  expect(harness.initializedSteps[0]).toStrictEqual(['issue:draft-pr', 'issue:summary-comment'])
 })
 
 test('issue publish keeps the patch in the summary comment when not opted in', async () => {

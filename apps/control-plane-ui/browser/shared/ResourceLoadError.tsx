@@ -19,11 +19,7 @@ export function ResourceLoadError({
   const t = useMessages()
   return (
     <Stack
-      className={
-        fill
-          ? 'resource-load-error resource-load-error-fill'
-          : 'resource-load-error'
-      }
+      className={fill ? 'resource-load-error resource-load-error-fill' : 'resource-load-error'}
       align="center"
       gap="sm"
       role="alert"

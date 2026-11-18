@@ -153,9 +153,7 @@ async function listCommitChainRefsForPullRequest({
     }
   }
 
-  const uniqueRefs = refs.filter(
-    (item, index, array) => array.indexOf(item) === index
-  )
+  const uniqueRefs = refs.filter((item, index, array) => array.indexOf(item) === index)
   if (uniqueRefs.length === 0) {
     return [pr.head_sha]
   }
@@ -203,12 +201,11 @@ async function materializeIncrementalWindowArtifacts({
   // describe different change sets. The API cannot serve this role: its compare response caps at
   // 300 files and the pull request files endpoint at 3000, while the diff has no cap, so a large
   // run would list fewer files than its patch contains.
-  const { patch: incremental_patch, files: changed_files } =
-    await exportWorkspaceWindow({
-      workspace_path,
-      base_sha: window.base_sha,
-      head_sha: window.head_sha
-    })
+  const { patch: incremental_patch, files: changed_files } = await exportWorkspaceWindow({
+    workspace_path,
+    base_sha: window.base_sha,
+    head_sha: window.head_sha
+  })
 
   await Promise.all([
     fs.writeFile(
@@ -322,10 +319,7 @@ export async function preparePullRequestReviewInput({
     run_id
   )
   const workspace_path = path.join(input_bundle_root, 'workspace')
-  const incremental_window_path = path.join(
-    input_bundle_root,
-    'incremental-window'
-  )
+  const incremental_window_path = path.join(input_bundle_root, 'incremental-window')
   const history_path = path.join(input_bundle_root, 'history')
 
   await ensureCleanDirectory(input_bundle_root)
@@ -388,29 +382,23 @@ export async function preparePullRequestReviewInput({
   })
   const pullRequestMetadata = historyArtifacts.pr_metadata
   // The claim-owning command registers and publishes this input bundle after preparation.
-  const { input } =
-    await archiveInputBundleAndBuildInput<PullRequestReviewInput>({
-      input_bundle_root,
-      include_incremental_window: true,
-      workflow: 'pull request review',
-      build_input: (
-        reference: InputBundleArtifactRef
-      ): PullRequestReviewInput => ({
-        api_version: EXECUTION_API_VERSION,
-        review_intent: {
-          objective: 'audit',
-          ...(test_changes ? { test_changes } : {})
-        },
-        pr: pullRequestMetadata,
-        input_bundle: reference,
-        ...(setup_declaration ? { setup_declaration } : {})
-      })
-    })
-
-  const input_path = path.join(
+  const { input } = await archiveInputBundleAndBuildInput<PullRequestReviewInput>({
     input_bundle_root,
-    'pull-request-review-input.json'
-  )
+    include_incremental_window: true,
+    workflow: 'pull request review',
+    build_input: (reference: InputBundleArtifactRef): PullRequestReviewInput => ({
+      api_version: EXECUTION_API_VERSION,
+      review_intent: {
+        objective: 'audit',
+        ...(test_changes ? { test_changes } : {})
+      },
+      pr: pullRequestMetadata,
+      input_bundle: reference,
+      ...(setup_declaration ? { setup_declaration } : {})
+    })
+  })
+
+  const input_path = path.join(input_bundle_root, 'pull-request-review-input.json')
   await fs.writeFile(input_path, JSON.stringify(input, null, 2), 'utf8')
 
   // The suggestion anchoring set comes from the same workspace diff as the patch, so a file the

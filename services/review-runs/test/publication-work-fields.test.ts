@@ -31,8 +31,7 @@ const CLAIM_ONLY_FIELDS = new Set(['workflow_result', 'claim_token'])
 
 function schemaOf(name: string): Schema {
   const schema = spec.components?.schemas?.[name]
-  if (schema?.properties === undefined)
-    throw new Error(`${name} has no properties`)
+  if (schema?.properties === undefined) throw new Error(`${name} has no properties`)
   return schema
 }
 
@@ -49,26 +48,15 @@ test('PublicationWork carries every ReviewRunRecord field plus the claim', () =>
   const work = schemaOf('PublicationWork')
 
   const expectedFields = new Set([...fieldsOf(record), ...CLAIM_ONLY_FIELDS])
-  const unexpectedFields = [...fieldsOf(work)].filter(
-    (field) => !expectedFields.has(field)
-  )
-  const missingFields = [...expectedFields].filter(
-    (field) => !fieldsOf(work).has(field)
-  )
+  const unexpectedFields = [...fieldsOf(work)].filter((field) => !expectedFields.has(field))
+  const missingFields = [...expectedFields].filter((field) => !fieldsOf(work).has(field))
 
   // Requiredness must match too: a field present in both but required only on the record would
   // generate `notices?` here while the store always sends it, and the difference would only show
   // up in the generated type, not in the serialized payload.
-  const expectedRequired = new Set([
-    ...requiredOf(record),
-    ...CLAIM_ONLY_FIELDS
-  ])
-  const unexpectedRequired = [...requiredOf(work)].filter(
-    (field) => !expectedRequired.has(field)
-  )
-  const missingRequired = [...expectedRequired].filter(
-    (field) => !requiredOf(work).has(field)
-  )
+  const expectedRequired = new Set([...requiredOf(record), ...CLAIM_ONLY_FIELDS])
+  const unexpectedRequired = [...requiredOf(work)].filter((field) => !expectedRequired.has(field))
+  const missingRequired = [...expectedRequired].filter((field) => !requiredOf(work).has(field))
 
   expect(
     {

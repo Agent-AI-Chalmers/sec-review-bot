@@ -8,10 +8,7 @@ import {
   validateThemeTransitionCoverage
 } from './color-contract.js'
 
-const stylesheetPath = path.resolve(
-  import.meta.dirname,
-  '../browser/styles/base.css'
-)
+const stylesheetPath = path.resolve(import.meta.dirname, '../browser/styles/base.css')
 const stylesheet = await readFile(stylesheetPath, 'utf8')
 const issues = [
   ...validateColorContract(parseThemeColors(stylesheet), BRAND_COLORS),

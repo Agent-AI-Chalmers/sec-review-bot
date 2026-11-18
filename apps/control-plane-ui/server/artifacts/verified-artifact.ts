@@ -73,16 +73,12 @@ async function streamVerifiedArtifact(
   try {
     resetIdleTimeout()
     if (options.signal?.aborted) controller.abort()
-    const object = await artifactStore.getObject(
-      artifact.key,
-      controller.signal
-    )
+    const object = await artifactStore.getObject(artifact.key, controller.signal)
     body = object.body
     resetIdleTimeout()
     if (
       object.contentLength !== undefined &&
-      (object.contentLength !== artifact.sizeBytes ||
-        object.contentLength > artifact.maximumSize)
+      (object.contentLength !== artifact.sizeBytes || object.contentLength > artifact.maximumSize)
     )
       throw new Error('artifact_identity_mismatch')
 
@@ -103,10 +99,7 @@ async function streamVerifiedArtifact(
     })
     await pipeline(body, verify, sink, { signal: controller.signal })
     clearTimeout(idleTimeout)
-    if (
-      size !== artifact.sizeBytes ||
-      `sha256:${digest.digest('hex')}` !== artifact.digest
-    )
+    if (size !== artifact.sizeBytes || `sha256:${digest.digest('hex')}` !== artifact.digest)
       throw new Error('artifact_identity_mismatch')
   } catch (error) {
     if (timedOut) throw new ArtifactDownloadTimeoutError()
@@ -152,12 +145,7 @@ export async function withVerifiedArtifactFile<T>(
   const directory = await mkdtemp(path.join(tmpdir(), 'sec-review-artifact-'))
   try {
     const file = path.join(directory, options.filename)
-    await streamVerifiedArtifact(
-      artifactStore,
-      artifact,
-      options,
-      createWriteStream(file)
-    )
+    await streamVerifiedArtifact(artifactStore, artifact, options, createWriteStream(file))
     return await use({ path: file, sizeBytes: artifact.sizeBytes })
   } finally {
     await rm(directory, { recursive: true, force: true })

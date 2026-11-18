@@ -38,28 +38,22 @@ function buildHarness({
   const postedIssues: unknown[] = []
   const postedComments: unknown[] = []
 
-  const steps = ['repository:summary-issue', 'repository:summary-comment'].map(
-    (step_key) => ({
-      step_key,
-      status: 'pending' as const,
-      attempt_count: 0,
-      last_attempt_at: null,
-      unresolved_recovery_count: 0,
-      remote_object_id: null,
-      remote_object_url: null,
-      failure_code: null,
-      failure_message: null
-    })
-  )
+  const steps = ['repository:summary-issue', 'repository:summary-comment'].map((step_key) => ({
+    step_key,
+    status: 'pending' as const,
+    attempt_count: 0,
+    last_attempt_at: null,
+    unresolved_recovery_count: 0,
+    remote_object_id: null,
+    remote_object_url: null,
+    failure_code: null,
+    failure_message: null
+  }))
 
   const store = {
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (
-      _runId: string,
-      _token: string,
-      stepKey: string
-    ) => {
+    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       // Only the step under test is out of attempts; everything before it is ready.
       if (stepKey === exhaustedStep) throw exhaustedError()
     },
@@ -119,9 +113,7 @@ function buildHarness({
   return { store, octokit, settles, postedIssues, postedComments }
 }
 
-async function runPublish(
-  harness: ReturnType<typeof buildHarness>
-): Promise<void> {
+async function runPublish(harness: ReturnType<typeof buildHarness>): Promise<void> {
   await handleRepositoryReviewRun({
     run: {
       run_id: RUN_ID,

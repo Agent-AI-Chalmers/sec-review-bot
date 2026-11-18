@@ -9,8 +9,7 @@ import { PreparationStore } from '../src/persistence/preparation-store.js'
 import { ReviewRunQueries } from '../src/persistence/review-run-queries.js'
 import { ReviewRunStore } from '../src/persistence/review-run-store.js'
 process.env.NODE_ENV = 'test'
-const { startReviewRunsServer } =
-  await import('../src/runtime/server-runtime.js')
+const { startReviewRunsServer } = await import('../src/runtime/server-runtime.js')
 
 async function setup(t: TestContext) {
   const occupied = createServer()
@@ -32,11 +31,7 @@ async function setup(t: TestContext) {
     REVIEW_RUNS_READ_TOKEN: 'read',
     REVIEW_RUNS_PORT: String(address.port)
   }
-  for (const name of [
-    'LANGFUSE_BASE_URL',
-    'LANGFUSE_PUBLIC_KEY',
-    'LANGFUSE_SECRET_KEY'
-  ])
+  for (const name of ['LANGFUSE_BASE_URL', 'LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY'])
     environment[name] = undefined
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
@@ -50,34 +45,26 @@ async function setup(t: TestContext) {
   let opens = 0
   let closes = 0
   let closeFailure: Error | undefined
-  vi.spyOn(ReviewRunStore.prototype, 'initialize').mockImplementation(
-    async () => {
-      opens += 1
-    }
-  )
+  vi.spyOn(ReviewRunStore.prototype, 'initialize').mockImplementation(async () => {
+    opens += 1
+  })
   vi.spyOn(ReviewRunStore.prototype, 'close').mockImplementation(() => {
     closes += 1
     return closeFailure ? Promise.reject(closeFailure) : Promise.resolve()
   })
-  vi.spyOn(ReviewRunStore.prototype, 'checkReadiness').mockImplementation(
-    async () => {}
-  )
-  vi.spyOn(PreparationStore.prototype, 'expireStale').mockImplementation(
-    async () => ({
-      blocked: [],
-      concluded: 0
-    })
-  )
-  vi.spyOn(
-    ReviewRunQueries.prototype,
-    'listSubmissionRecoveries'
-  ).mockImplementation(async () => ({ runs: [], dropped: [] }))
-  vi.spyOn(ReviewRunQueries.prototype, 'listActiveRuns').mockImplementation(
-    async () => ({
-      runs: [],
-      dropped: []
-    })
-  )
+  vi.spyOn(ReviewRunStore.prototype, 'checkReadiness').mockImplementation(async () => {})
+  vi.spyOn(PreparationStore.prototype, 'expireStale').mockImplementation(async () => ({
+    blocked: [],
+    concluded: 0
+  }))
+  vi.spyOn(ReviewRunQueries.prototype, 'listSubmissionRecoveries').mockImplementation(async () => ({
+    runs: [],
+    dropped: []
+  }))
+  vi.spyOn(ReviewRunQueries.prototype, 'listActiveRuns').mockImplementation(async () => ({
+    runs: [],
+    dropped: []
+  }))
   return {
     occupied,
     opens: () => opens,
@@ -137,9 +124,7 @@ test('shutdown does not close the backend twice after a backend close error', as
 test('invalid configuration fails before opening backend resources', async (t) => {
   const fixture = await setup(t)
   process.env.LANGFUSE_BASE_URL = 'http://127.0.0.1:1'
-  await expect(startReviewRunsServer()).rejects.toThrow(
-    /must be configured together/
-  )
+  await expect(startReviewRunsServer()).rejects.toThrow(/must be configured together/)
   expect(fixture.opens()).toBe(0)
 })
 
@@ -161,11 +146,9 @@ test('startup retains the original failure when backend cleanup also fails', asy
 test('initialization failure releases the partially initialized backend', async (t) => {
   const fixture = await setup(t)
   const failure = new Error('schema initialization failed')
-  vi.spyOn(ReviewRunStore.prototype, 'initialize').mockImplementation(
-    async () => {
-      throw failure
-    }
-  )
+  vi.spyOn(ReviewRunStore.prototype, 'initialize').mockImplementation(async () => {
+    throw failure
+  })
   await expect(startReviewRunsServer()).rejects.toMatchObject({
     ...failure,
     name: failure.name,
@@ -186,18 +169,14 @@ test('statistics cleanup failure still stops both background loops and closes th
   })
   let coordinationPasses = 0
   let statisticsPasses = 0
-  vi.spyOn(PreparationStore.prototype, 'expireStale').mockImplementation(
-    async () => {
-      coordinationPasses += 1
-      return { blocked: [], concluded: 0 }
-    }
-  )
-  vi.spyOn(ExecutionStatisticsStore.prototype, 'claimNext').mockImplementation(
-    async () => {
-      statisticsPasses += 1
-      return null
-    }
-  )
+  vi.spyOn(PreparationStore.prototype, 'expireStale').mockImplementation(async () => {
+    coordinationPasses += 1
+    return { blocked: [], concluded: 0 }
+  })
+  vi.spyOn(ExecutionStatisticsStore.prototype, 'claimNext').mockImplementation(async () => {
+    statisticsPasses += 1
+    return null
+  })
   const failure = new Error('statistics connection close failed')
   vi.spyOn(ExecutionStatisticsStore.prototype, 'close').mockImplementation(() =>
     Promise.reject(failure)

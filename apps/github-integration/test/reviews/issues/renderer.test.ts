@@ -45,9 +45,7 @@ test('promoted issue comment uses the shared status vocabulary and keeps the ove
   expect(body).toMatch(/^## Issue Security Review$/m)
   expect(body).toMatch(/- Analysis: `confirmed security defect`/)
   expect(body).toMatch(/- Mitigation: `patch proposed, 1 file changed`/)
-  expect(body).toMatch(
-    /- Verification: `full coverage; logic simulation; checks not run`/
-  )
+  expect(body).toMatch(/- Verification: `full coverage; logic simulation; checks not run`/)
   expect(body).toMatch(/Analyzer overview text\./)
   expect(body).toMatch(/PR: #97 \(https:\/\/example\.test\/pull\/97\)/)
   expect(body).not.toMatch(/\*\*Verification:\*\*/)
@@ -64,9 +62,7 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
   expect(body).toMatch(/^## Security Review$/m)
   expect(body).toMatch(/- Analysis: `confirmed security defect`/)
   expect(body).toMatch(/- Mitigation: `patch proposed, 1 file changed`/)
-  expect(body).toMatch(
-    /- Verification: `full coverage; logic simulation; checks not run`/
-  )
+  expect(body).toMatch(/- Verification: `full coverage; logic simulation; checks not run`/)
   expect(body).toMatch(/- Patch ready: `yes`/)
   expect(body).toMatch(/- `src\/app\.ts`/)
   expect(body).toMatch(/Next step: `none`/)

@@ -1,9 +1,4 @@
-import {
-  createServer,
-  type Server,
-  type IncomingMessage,
-  type ServerResponse
-} from 'node:http'
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
 import path from 'node:path'
 
 import type { ArtifactStore } from './artifacts/store.js'
@@ -92,10 +87,7 @@ export function createControlPlaneUiBffServer({
   ]
   const staticRoutes = createStaticRoutes({ assets })
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<void> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     applySecurityHeaders(response)
     if (request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -109,8 +101,7 @@ export function createControlPlaneUiBffServer({
         response.end('{"error":"unauthorized"}')
         return
       }
-      for (const routes of apiRoutes)
-        if (await routes.handle(request, response)) return
+      for (const routes of apiRoutes) if (await routes.handle(request, response)) return
       response.writeHead(404)
       response.end()
       return

@@ -9,9 +9,7 @@ export function sanitizeBranchSegment(value: unknown): string {
   // no draft PR). Replacing dots with `-` makes every dot form ref-safe.
   return (
     (
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean'
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
         ? String(value)
         : ''
     )

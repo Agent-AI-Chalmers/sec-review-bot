@@ -108,9 +108,7 @@ test('invalid configuration fails before opening backend resources', async (t) =
   const fixture = await setup(t)
   process.env.EXECUTION_GATEWAY_HOST = '0.0.0.0'
   delete process.env.EXECUTION_GATEWAY_TOKEN
-  await expect(startExecutionGateway()).rejects.toThrow(
-    /EXECUTION_GATEWAY_TOKEN/
-  )
+  await expect(startExecutionGateway()).rejects.toThrow(/EXECUTION_GATEWAY_TOKEN/)
   expect(fixture.opens()).toBe(0)
 })
 

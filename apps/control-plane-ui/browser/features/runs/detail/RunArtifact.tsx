@@ -7,11 +7,7 @@ import { ICON_SIZE } from '../../../shared/design.js'
 import { CopyAction } from '../../../shared/CopyAction.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
 import { artifactStatusColor, artifactStatusLabel } from '../status.js'
-import {
-  abbreviateDigest,
-  formatBytes,
-  isDownloadableArtifact
-} from '../format.js'
+import { abbreviateDigest, formatBytes, isDownloadableArtifact } from '../format.js'
 
 export function RunArtifact({
   storage,
@@ -33,11 +29,7 @@ export function RunArtifact({
       <div className="artifact-state">
         {storage.message && <Text size="sm">{storage.message}</Text>}
         {storage.error_code && (
-          <Text
-            c={storage.status === 'failed' ? 'red' : 'dimmed'}
-            size="xs"
-            ff="monospace"
-          >
+          <Text c={storage.status === 'failed' ? 'red' : 'dimmed'} size="xs" ff="monospace">
             {storage.error_code}
           </Text>
         )}
@@ -98,10 +90,7 @@ export function RunArtifact({
           )}
         </div>
       </div>
-      <RunFilesViewer
-        runId={filesOpen ? runId : undefined}
-        onClose={() => setFilesOpen(false)}
-      />
+      <RunFilesViewer runId={filesOpen ? runId : undefined} onClose={() => setFilesOpen(false)} />
     </>
   )
 }

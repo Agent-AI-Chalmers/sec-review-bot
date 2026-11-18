@@ -18,9 +18,7 @@ function loadInput() {
   const bundle = process.env.SMOKE_INPUT_BUNDLE
   assert.ok(bundle, 'SMOKE_INPUT_BUNDLE is required')
   return {
-    ...(JSON.parse(
-      readFileSync('/smoke/issue-review-input.json', 'utf8')
-    ) as Input),
+    ...(JSON.parse(readFileSync('/smoke/issue-review-input.json', 'utf8')) as Input),
     input_bundle: JSON.parse(bundle) as Record<string, unknown>
   }
 }
@@ -159,9 +157,7 @@ export async function verifyReplay(runId: string): Promise<void> {
     })
   ).json()) as Execution
   assert.equal(execution.status, 'running')
-  console.error(
-    'ok: Gateway accepted identical replay and rejected changed input'
-  )
+  console.error('ok: Gateway accepted identical replay and rejected changed input')
 }
 
 export function verifyExecutionIdentity(
@@ -169,16 +165,12 @@ export function verifyExecutionIdentity(
   beforeJson: string,
   afterJson: string
 ): void {
-  const before = (JSON.parse(beforeJson) as Description).workflowExecutionInfo
-    .execution
-  const after = (JSON.parse(afterJson) as Description).workflowExecutionInfo
-    .execution
+  const before = (JSON.parse(beforeJson) as Description).workflowExecutionInfo.execution
+  const after = (JSON.parse(afterJson) as Description).workflowExecutionInfo.execution
   assert.equal(before.workflowId, runId)
   assert.equal(after.workflowId, runId)
   assert.equal(typeof before.runId, 'string')
   assert.ok(before.runId.length > 0)
   assert.equal(after.runId, before.runId)
-  console.error(
-    'ok: Replay and conflict preserved the original Temporal execution'
-  )
+  console.error('ok: Replay and conflict preserved the original Temporal execution')
 }

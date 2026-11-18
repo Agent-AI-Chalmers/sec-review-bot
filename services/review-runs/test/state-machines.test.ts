@@ -9,10 +9,7 @@ import { expect, test } from 'vitest'
 
 import { parse as parseYaml } from 'yaml'
 
-import {
-  STATE_MACHINES,
-  type MachineBody
-} from '../src/state-machines.generated.js'
+import { STATE_MACHINES, type MachineBody } from '../src/state-machines.generated.js'
 import { REVIEW_RUNS_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
 
 type Spec = {
@@ -27,8 +24,7 @@ function enumFor(spec: Spec, field: string): string[] {
   const direct = spec.components?.schemas?.[schemaName] as
     | { properties?: Record<string, { enum?: unknown }> }
     | undefined
-  if (direct !== undefined)
-    return asEnum(direct.properties?.[member]?.enum, field)
+  if (direct !== undefined) return asEnum(direct.properties?.[member]?.enum, field)
   const observed = spec.components?.schemas?.ObservedRun as
     | { properties?: Record<string, unknown> }
     | undefined
@@ -56,13 +52,14 @@ function enumFor(spec: Spec, field: string): string[] {
 }
 
 /** Every machine with a name for messages: each axis, and each axis' step machine. */
-const ALL_MACHINES: ReadonlyArray<[string, MachineBody]> =
-  STATE_MACHINES.flatMap((machine): Array<[string, MachineBody]> => [
+const ALL_MACHINES: ReadonlyArray<[string, MachineBody]> = STATE_MACHINES.flatMap(
+  (machine): Array<[string, MachineBody]> => [
     [machine.axis, machine],
     ...(machine.step === undefined
       ? []
       : [[`${machine.axis}.step`, machine.step] as [string, MachineBody]])
-  ])
+  ]
+)
 
 function asEnum(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) throw new Error(`${field} has no enum`)
@@ -106,10 +103,7 @@ test('every transition names states the machine declares, and every state is rea
     const states = new Set(machine.states)
     expect.assert(states.has(machine.initial), `${name} initial is a state`)
     for (const terminal of machine.terminal)
-      expect.assert(
-        states.has(terminal),
-        `${name} terminal ${terminal} is a state`
-      )
+      expect.assert(states.has(terminal), `${name} terminal ${terminal} is a state`)
     const reached = new Set<string>([machine.initial])
     // Breadth-first over the declared edges: a state with no path from the initial one is a
     // diagram lie (it would be drawn but never entered).

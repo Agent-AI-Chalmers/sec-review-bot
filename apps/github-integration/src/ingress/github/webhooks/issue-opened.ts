@@ -1,10 +1,7 @@
 import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
-import {
-  extractIssueContext,
-  type IssueContext
-} from '../../../github/issue-service.js'
+import { extractIssueContext, type IssueContext } from '../../../github/issue-service.js'
 import {
   fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
@@ -20,15 +17,9 @@ import { logIssuePayload } from '../../../utils/log-issue.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
-import {
-  type TriggerConfigHandlerDeps,
-  type WebhookHandlerArgs
-} from './handler-deps.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
-type IssueOpenedWebhookEvent = Pick<
-  EmitterWebhookEvent<'issues.opened'>,
-  'id' | 'payload'
-> & {
+type IssueOpenedWebhookEvent = Pick<EmitterWebhookEvent<'issues.opened'>, 'id' | 'payload'> & {
   octokit: Octokit
 }
 
@@ -39,11 +30,7 @@ interface HandlerDeps extends TriggerConfigHandlerDeps {
     trusted_default_branch: { default_branch: string; head_sha: string }
     event_type: 'opened'
     delivery_id: string
-    on_admitted?: (admission: {
-      run_id: string
-      status: string
-      replayed: boolean
-    }) => void
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   }) => Promise<unknown>
 }
 

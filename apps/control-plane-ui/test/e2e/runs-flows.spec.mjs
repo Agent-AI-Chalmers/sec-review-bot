@@ -5,10 +5,7 @@ import {
   runRunsClockCheck,
   runRunsInputAndThemeChecks
 } from '../browser-flows/runs-environments.mjs'
-import {
-  runFixtureAdminFlow,
-  runRunsErrorFlow
-} from '../browser-flows/runs-errors.mjs'
+import { runFixtureAdminFlow, runRunsErrorFlow } from '../browser-flows/runs-errors.mjs'
 import { runFixtureRunDeliveryFlow } from '../browser-flows/runs-fixture-delivery.mjs'
 import {
   runFixtureRunListFlow,
@@ -30,11 +27,7 @@ const EXPECTED_HEADERS = [
   'Failure code'
 ]
 
-async function waitUntil(
-  predicate,
-  message,
-  { timeoutMs = 5_000, intervalMs = 50 } = {}
-) {
+async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
     if (await predicate()) return
@@ -62,9 +55,7 @@ async function runFilesError(page, baseURL) {
   await page.goto(`${baseURL}/runs/fixture-artifact-load-error/files`, {
     waitUntil: 'domcontentloaded'
   })
-  await page
-    .getByText('The run files could not be opened.', { exact: true })
-    .waitFor()
+  await page.getByText('The run files could not be opened.', { exact: true }).waitFor()
   await page.getByRole('link', { name: 'Download execution archive' }).waitFor()
 }
 
@@ -89,10 +80,7 @@ test('runs browser behavior', async ({ page, fixtureRuntime }, testInfo) => {
     expectedHeaders: EXPECTED_HEADERS,
     screenshotPath: testInfo.outputPath('runs.png')
   })
-  test.skip(
-    !hasRuns,
-    'The external deployment currently has no runs to inspect.'
-  )
+  test.skip(!hasRuns, 'The external deployment currently has no runs to inspect.')
 })
 
 test('fixture run list covers pagination, filters and identity navigation', async ({
@@ -112,17 +100,12 @@ test('fixture run list covers pagination, filters and identity navigation', asyn
   })
 })
 
-test('fixture time ranges wait for filtered responses', async ({
-  page,
-  fixtureRuntime
-}) => {
+test('fixture time ranges wait for filtered responses', async ({ page, fixtureRuntime }) => {
   test.skip(
     fixtureRuntime.server === undefined,
     'Time range expectations require stable local fixtures.'
   )
-  await page.addInitScript(() =>
-    localStorage.setItem('ui-auto-refresh', 'false')
-  )
+  await page.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
   await openAuthenticatedRuns(page)
   let delayed = false
   await page.route('**/api/runs?*', async (route) => {

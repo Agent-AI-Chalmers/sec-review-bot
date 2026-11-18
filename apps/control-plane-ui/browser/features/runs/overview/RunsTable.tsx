@@ -4,17 +4,8 @@ import { Group, Paper, Table, Text, Tooltip } from '@mantine/core'
 import type { Run } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
 import { CopyAction } from '../../../shared/CopyAction.js'
-import {
-  ExecutionStatus,
-  PreparationStatus,
-  PublicationStatus
-} from '../status.js'
-import {
-  abbreviate,
-  formatDuration,
-  lastActivity,
-  workflowLabel
-} from '../format.js'
+import { ExecutionStatus, PreparationStatus, PublicationStatus } from '../status.js'
+import { abbreviate, formatDuration, lastActivity, workflowLabel } from '../format.js'
 import { PlatformMark } from '../PlatformMark.js'
 
 export function RunsTable({
@@ -69,9 +60,7 @@ export function RunsTable({
                   </span>
                 </Group>
               </Table.Td>
-              <Table.Td data-label={t('workflow')}>
-                {workflowLabel(run.workflow, t)}
-              </Table.Td>
+              <Table.Td data-label={t('workflow')}>{workflowLabel(run.workflow, t)}</Table.Td>
               <Table.Td data-label={t('platform')}>
                 <PlatformMark
                   platform={run.source_platform}
@@ -93,11 +82,7 @@ export function RunsTable({
               <Table.Td data-label={t('lastActivity')}>
                 <Tooltip label={formatDate(lastActivity(run), language)}>
                   <span>
-                    {formatDuration(
-                      Date.now() - Date.parse(lastActivity(run)),
-                      t
-                    )}{' '}
-                    {t('ago')}
+                    {formatDuration(Date.now() - Date.parse(lastActivity(run)), t)} {t('ago')}
                   </span>
                 </Tooltip>
               </Table.Td>

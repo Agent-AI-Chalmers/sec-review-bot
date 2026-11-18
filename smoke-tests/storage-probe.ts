@@ -28,9 +28,9 @@ function client(role: 'INTEGRATION' | 'EXECUTION') {
 }
 
 const corpus = '/smoke/input-bundle-corpus'
-const { corpus: cases } = JSON.parse(
-  readFileSync(`${corpus}/manifest.json`, 'utf8')
-) as { corpus: { file: string; sha256: string; size: number }[] }
+const { corpus: cases } = JSON.parse(readFileSync(`${corpus}/manifest.json`, 'utf8')) as {
+  corpus: { file: string; sha256: string; size: number }[]
+}
 const fixture = cases.find((entry) => entry.file === 'valid-minimal.tar.zst')
 assert.ok(fixture, 'Minimal input-bundle fixture is required')
 const payload = readFileSync(`${corpus}/${fixture.file}`)
@@ -47,12 +47,9 @@ const writer = client('INTEGRATION')
 const reader = client('EXECUTION')
 
 try {
-  await writer.send(
-    new PutObjectCommand({ Bucket, Key, Body: payload, ContentType }),
-    {
-      abortSignal: AbortSignal.timeout(15000)
-    }
-  )
+  await writer.send(new PutObjectCommand({ Bucket, Key, Body: payload, ContentType }), {
+    abortSignal: AbortSignal.timeout(15000)
+  })
   console.error('ok: Integration identity uploaded the input bundle')
   const response = await reader.send(new GetObjectCommand({ Bucket, Key }), {
     abortSignal: AbortSignal.timeout(15000)
@@ -63,9 +60,7 @@ try {
   assert.equal(response.ContentLength, payload.length)
   assert.deepEqual(downloaded, payload)
   assert.equal(createHash('sha256').update(downloaded).digest('hex'), digest)
-  console.error(
-    'ok: Execution identity downloaded matching bytes, size, and digest'
-  )
+  console.error('ok: Execution identity downloaded matching bytes, size, and digest')
 
   await assert.rejects(
     reader.send(new PutObjectCommand({ Bucket, Key, Body: payload }), {

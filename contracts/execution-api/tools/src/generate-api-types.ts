@@ -72,16 +72,12 @@ const WORKFLOW_INPUTS = [
 ] as const
 
 function readSchema(file: string): JsonSchema {
-  return JSON.parse(
-    readFileSync(path.join(SCHEMA_DIR, file), 'utf8')
-  ) as JsonSchema
+  return JSON.parse(readFileSync(path.join(SCHEMA_DIR, file), 'utf8')) as JsonSchema
 }
 
 function defsOf(document: JsonSchema): Record<string, JsonSchema> {
   const defs = document.$defs
-  return typeof defs === 'object' && defs !== null
-    ? (defs as Record<string, JsonSchema>)
-    : {}
+  return typeof defs === 'object' && defs !== null ? (defs as Record<string, JsonSchema>) : {}
 }
 
 /**
@@ -110,8 +106,7 @@ function commonDefName(ref: unknown, where: string): string {
  * compile-time projection intentionally keeps one stable transport shape for producers.
  */
 function projectSchema(value: unknown, common: JsonSchema): unknown {
-  if (Array.isArray(value))
-    return value.map((item) => projectSchema(item, common))
+  if (Array.isArray(value)) return value.map((item) => projectSchema(item, common))
   if (typeof value !== 'object' || value === null) return value
 
   const node = value as JsonSchema
@@ -249,9 +244,7 @@ const STRUCTURAL_KEYS = new Set([
 ])
 
 function limitName(path: string[]): string | null {
-  if (
-    path.some((part) => part === 'allOf' || part === 'if' || part === 'then')
-  ) {
+  if (path.some((part) => part === 'allOf' || part === 'if' || part === 'then')) {
     return null
   }
   const parts = path.filter((part) => !STRUCTURAL_KEYS.has(part))
@@ -272,9 +265,7 @@ function renderWorkflowName(): string {
   const suffix = '-input.schema.json'
   const workflows = WORKFLOW_INPUTS.map(({ schema }) => {
     if (!schema.endsWith(suffix)) {
-      throw new Error(
-        `workflow input schema must end with ${suffix}: ${schema}`
-      )
+      throw new Error(`workflow input schema must end with ${suffix}: ${schema}`)
     }
     return schema.slice(0, -suffix.length)
   })
@@ -328,13 +319,7 @@ async function renderFile(): Promise<string> {
 }
 
 function gatewayVersionOutput(): string {
-  return path.join(
-    REPO_ROOT,
-    'services',
-    'execution-gateway',
-    'src',
-    'execution-api-version.ts'
-  )
+  return path.join(REPO_ROOT, 'services', 'execution-gateway', 'src', 'execution-api-version.ts')
 }
 
 function connectorVersionOutput(): string {
@@ -410,16 +395,14 @@ async function formatOutput(file: string, source: string): Promise<string> {
     semi: false,
     singleQuote: true,
     trailingComma: 'none',
-    printWidth: 80,
+    printWidth: 100,
     sortImports: false,
     sortPackageJson: false,
     embeddedLanguageFormatting: 'off',
     proseWrap: 'preserve'
   })
   if (result.errors.length > 0) {
-    throw new Error(
-      `Failed to format ${file}: ${JSON.stringify(result.errors)}`
-    )
+    throw new Error(`Failed to format ${file}: ${JSON.stringify(result.errors)}`)
   }
   return result.code
 }

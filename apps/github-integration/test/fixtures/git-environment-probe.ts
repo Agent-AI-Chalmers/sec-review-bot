@@ -9,13 +9,9 @@ test('isolated Git behavior', () => {
   git('init', '-q')
   git('config', 'user.name', 'Test')
   git('config', 'user.email', 'test@example.com')
-  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe(
-    'sample.txt: eol: unspecified'
-  )
+  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe('sample.txt: eol: unspecified')
   fs.writeFileSync('repo/.gitattributes', '*.txt text eol=lf\n')
-  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe(
-    'sample.txt: eol: lf'
-  )
+  expect(git('check-attr', 'eol', '--', 'sample.txt')).toBe('sample.txt: eol: lf')
   fs.writeFileSync('repo/sample.txt', 'hello\n')
   git('add', '.')
   git('commit', '-qm', 'fixture')

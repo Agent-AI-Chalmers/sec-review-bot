@@ -27,9 +27,7 @@ const TOKEN_COLUMNS = [
   'reasoning_tokens'
 ] as const
 
-function tokenValues(
-  snapshot: ExecutionStatisticsSnapshot
-): Array<number | null> {
+function tokenValues(snapshot: ExecutionStatisticsSnapshot): Array<number | null> {
   return [
     snapshot.tokenUsage.input_tokens,
     snapshot.tokenUsage.output_tokens,
@@ -63,10 +61,7 @@ export class ExecutionStatisticsStore {
     this.initialDelayMs = initialDelayMs
     this.settlementWindowMs = settlementWindowMs
     this.pool.on('error', (error: Error) => {
-      console.error(
-        'execution_statistics_pool_idle_client_error',
-        error.message
-      )
+      console.error('execution_statistics_pool_idle_client_error', error.message)
     })
   }
 
@@ -129,9 +124,7 @@ export class ExecutionStatisticsStore {
       )
       const row = claimed.rows[0]
       if (row === undefined)
-        throw new Error(
-          `Execution statistics work changed while claiming ${runId}.`
-        )
+        throw new Error(`Execution statistics work changed while claiming ${runId}.`)
       return {
         runId: row.run_id,
         claimToken: row.claim_token,
@@ -161,9 +154,7 @@ export class ExecutionStatisticsStore {
       )
       const row = current.rows[0]
       if (row === undefined)
-        throw new Error(
-          `Execution statistics claim was lost for ${work.runId}.`
-        )
+        throw new Error(`Execution statistics claim was lost for ${work.runId}.`)
       // An empty Langfuse result cannot prove zero model calls: the agents may not be
       // exporting. Keep polling for the whole window and report that absence explicitly.
       const hasReviewRoots = snapshot.rootTraceCount > 0
@@ -214,10 +205,7 @@ export class ExecutionStatisticsStore {
           confirmationDelayMs
         ]
       )
-      await client.query(
-        'DELETE FROM execution_statistics_groups WHERE run_id=$1',
-        [work.runId]
-      )
+      await client.query('DELETE FROM execution_statistics_groups WHERE run_id=$1', [work.runId])
       for (const group of snapshot.groups) {
         await client.query(
           `INSERT INTO execution_statistics_groups

@@ -46,8 +46,7 @@ export async function readBoundedResponseBody(
         value?: unknown
       }
       if (done) break
-      if (!(value instanceof Uint8Array))
-        throw new TypeError('Expected response body bytes')
+      if (!(value instanceof Uint8Array)) throw new TypeError('Expected response body bytes')
       size += value.byteLength
       if (size > maximumBytes) {
         await reader.cancel()

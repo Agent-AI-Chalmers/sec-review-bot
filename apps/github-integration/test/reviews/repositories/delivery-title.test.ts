@@ -35,7 +35,5 @@ test('repository draft PR title uses primary case id and related count for combi
     case_count: 2
   })
 
-  expect(title).toBe(
-    '[sec] Fix security issue in src/server.js (case-1 +1 related case)'
-  )
+  expect(title).toBe('[sec] Fix security issue in src/server.js (case-1 +1 related case)')
 })

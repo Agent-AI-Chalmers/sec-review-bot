@@ -20,12 +20,7 @@ export const SPEC_PATH = path.resolve(
   'v1',
   'openapi.yaml'
 )
-export const SCHEMA_DIR = path.resolve(
-  REPO_ROOT,
-  'contracts',
-  'review-runs-api',
-  'v1'
-)
+export const SCHEMA_DIR = path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1')
 
 const META_SCHEMA = 'https://json-schema.org/draft/2020-12/schema'
 
@@ -34,8 +29,7 @@ function componentSchema(name: string): unknown {
     components?: { schemas?: Record<string, unknown> }
   }
   const schema = spec.components?.schemas?.[name]
-  if (schema === undefined)
-    throw new Error(`openapi.yaml has no component schema ${name}`)
+  if (schema === undefined) throw new Error(`openapi.yaml has no component schema ${name}`)
   return schema
 }
 
@@ -49,18 +43,11 @@ function componentSchema(name: string): unknown {
  * committed schema without a word — the schema would then accept or describe something other
  * than what openapi.yaml says. Nothing in the current contract does this, so failing loudly
  * costs nothing today and prevents a silent mistranslation later. */
-function inlineLocalRefs(
-  node: unknown,
-  schemas: Record<string, unknown>
-): unknown {
-  if (Array.isArray(node))
-    return node.map((item) => inlineLocalRefs(item, schemas))
+function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unknown {
+  if (Array.isArray(node)) return node.map((item) => inlineLocalRefs(item, schemas))
   if (typeof node !== 'object' || node === null) return node
   const record = node as Record<string, unknown>
-  if (
-    typeof record.$ref === 'string' &&
-    record.$ref.startsWith('#/components/schemas/')
-  ) {
+  if (typeof record.$ref === 'string' && record.$ref.startsWith('#/components/schemas/')) {
     const siblings = Object.keys(record).filter((key) => key !== '$ref')
     if (siblings.length > 0) {
       throw new Error(
@@ -94,7 +81,7 @@ async function renderSchema(id: string, schema: unknown): Promise<string> {
       semi: false,
       singleQuote: true,
       trailingComma: 'none',
-      printWidth: 80,
+      printWidth: 100,
       sortImports: false,
       sortPackageJson: false,
       embeddedLanguageFormatting: 'off',
@@ -113,10 +100,7 @@ export async function renderObservedRunSchema(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as {
     components?: { schemas?: Record<string, unknown> }
   }
-  const inlined = inlineLocalRefs(
-    componentSchema('ObservedRun'),
-    spec.components?.schemas ?? {}
-  )
+  const inlined = inlineLocalRefs(componentSchema('ObservedRun'), spec.components?.schemas ?? {})
   return await renderSchema(
     'https://sec-review-bot.local/contracts/review-runs-api/v1/observed-run.schema.json',
     inlined
@@ -143,9 +127,7 @@ export async function renderReviewRunRecordSchema(): Promise<string> {
 const GENERATED_SCHEMAS = [
   ['observed-run.schema.json', renderObservedRunSchema],
   ['review-run-record.schema.json', renderReviewRunRecordSchema]
-] as const satisfies ReadonlyArray<
-  readonly [string, () => string | Promise<string>]
->
+] as const satisfies ReadonlyArray<readonly [string, () => string | Promise<string>]>
 
 /** The schema file names under {@link SCHEMA_DIR}, for the manifest check. */
 export const SCHEMA_FILENAMES = GENERATED_SCHEMAS.map(([filename]) => filename)

@@ -49,10 +49,9 @@ export async function runViewerFlow({ page }) {
         role: 'tool',
         name: 'replace_text',
         tool_call_id: 'replace-1',
-        content: Array.from(
-          { length: 80 },
-          (_, index) => `replacement complete ${index + 1}`
-        ).join('\n'),
+        content: Array.from({ length: 80 }, (_, index) => `replacement complete ${index + 1}`).join(
+          '\n'
+        ),
         artifact: { source: 'workspace', changed_files: 1 }
       }
     })
@@ -79,8 +78,7 @@ export async function runViewerFlow({ page }) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const height = await page.evaluate(() =>
       Math.round(
-        document.querySelector('.trajectory-timeline')?.getBoundingClientRect()
-          .height ?? 0
+        document.querySelector('.trajectory-timeline')?.getBoundingClientRect().height ?? 0
       )
     )
     if (height > 0 && height === previousHeight) {
@@ -95,8 +93,7 @@ export async function runViewerFlow({ page }) {
     previousHeight = height
     await page.waitForTimeout(100)
   }
-  if (!settled)
-    throw new Error('trajectory layout did not settle before minimap checks')
+  if (!settled) throw new Error('trajectory layout did not settle before minimap checks')
 
   if ((page.viewportSize()?.width ?? 0) > 700) {
     const minimap = page.getByRole('navigation', {
@@ -109,9 +106,7 @@ export async function runViewerFlow({ page }) {
       3,
       'the minimap must create one primary segment per visible top-level message'
     )
-    const current = minimap.locator(
-      '.trajectory-minimap-segment[data-current="true"]'
-    )
+    const current = minimap.locator('.trajectory-minimap-segment[data-current="true"]')
     assert.strictEqual(
       await current.count(),
       1,
@@ -122,16 +117,10 @@ export async function runViewerFlow({ page }) {
     })
     await slider.waitFor()
     const controls = await slider.getAttribute('aria-controls')
-    assert.ok(
-      controls,
-      'the minimap slider must control the trajectory timeline'
-    )
+    assert.ok(controls, 'the minimap slider must control the trajectory timeline')
     assert.strictEqual(
       await page.evaluate(
-        (id) =>
-          document
-            .getElementById(id)
-            ?.classList.contains('trajectory-timeline') === true,
+        (id) => document.getElementById(id)?.classList.contains('trajectory-timeline') === true,
         controls
       ),
       true,
@@ -161,10 +150,7 @@ export async function runViewerFlow({ page }) {
     await slider.focus()
     await page.keyboard.press('Home')
     await page.waitForFunction(
-      () =>
-        document
-          .querySelector('[role="slider"]')
-          ?.getAttribute('aria-valuenow') === '1',
+      () => document.querySelector('[role="slider"]')?.getAttribute('aria-valuenow') === '1',
       null,
       { timeout: 5_000 }
     )
@@ -172,19 +158,13 @@ export async function runViewerFlow({ page }) {
     // sleeping: a fixed delay can race the scroll listener on a busy runner.
     await page.keyboard.press('ArrowDown')
     await page.waitForFunction(
-      () =>
-        document
-          .querySelector('[role="slider"]')
-          ?.getAttribute('aria-valuenow') === '2',
+      () => document.querySelector('[role="slider"]')?.getAttribute('aria-valuenow') === '2',
       null,
       { timeout: 5_000 }
     )
     await page.keyboard.press('ArrowDown')
     await page.waitForFunction(
-      () =>
-        document
-          .querySelector('[role="slider"]')
-          ?.getAttribute('aria-valuenow') === '3',
+      () => document.querySelector('[role="slider"]')?.getAttribute('aria-valuenow') === '3',
       null,
       { timeout: 5_000 }
     )
@@ -211,9 +191,7 @@ export async function runViewerFlow({ page }) {
     )
     await page.waitForFunction(
       () => {
-        const messages = document.querySelectorAll(
-          '.trajectory-timeline .trajectory-message'
-        )
+        const messages = document.querySelectorAll('.trajectory-timeline .trajectory-message')
         const element = messages[1]
         if (element === undefined) return false
         const rect = element.getBoundingClientRect()
@@ -243,24 +221,15 @@ export async function runViewerFlow({ page }) {
       null,
       { timeout: 5_000 }
     )
-    const denseMarkCount = await page
-      .locator('.trajectory-minimap-segment')
-      .count()
-    assert.ok(
-      denseMarkCount <= 26,
-      `dense minimap must cap its marks: ${denseMarkCount}`
-    )
+    const denseMarkCount = await page.locator('.trajectory-minimap-segment').count()
+    assert.ok(denseMarkCount <= 26, `dense minimap must cap its marks: ${denseMarkCount}`)
     assert.strictEqual(
-      await page
-        .locator('.trajectory-minimap-segment[data-current="true"]')
-        .count(),
+      await page.locator('.trajectory-minimap-segment[data-current="true"]').count(),
       1,
       'exactly one current mark must be drawn after bucketing'
     )
     assert.strictEqual(
-      await page
-        .getByRole('slider', { name: 'Trajectory position' })
-        .getAttribute('aria-valuemax'),
+      await page.getByRole('slider', { name: 'Trajectory position' }).getAttribute('aria-valuemax'),
       '130',
       'the slider must keep addressing every dense message'
     )

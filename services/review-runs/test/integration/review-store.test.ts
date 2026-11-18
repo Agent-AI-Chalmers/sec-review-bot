@@ -36,18 +36,10 @@ test('an axis row cannot be written under a connector the trunk does not own', a
     })
     // Delete the axis rows first so the insert below cannot fail on the primary key; the only
     // thing left to reject it is the connector the trunk owns.
-    for (const table of [
-      'executions',
-      'preparations',
-      'publications'
-    ] as const) {
+    for (const table of ['executions', 'preparations', 'publications'] as const) {
       await pool.query(`DELETE FROM ${table} WHERE run_id=$1`, [runId])
     }
-    for (const table of [
-      'executions',
-      'preparations',
-      'publications'
-    ] as const) {
+    for (const table of ['executions', 'preparations', 'publications'] as const) {
       await expect(
         pool.query(
           `INSERT INTO ${table} (run_id, connector_id, status${
@@ -148,13 +140,8 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
         [runId, sourceEventId]
       )
       .catch(() => undefined)
-    const stored = await pool.query(
-      'SELECT connector_id FROM run_notices WHERE run_id=$1',
-      [runId]
-    )
-    expect(stored.rowCount, 'the wrong-connector notice was never stored').toBe(
-      0
-    )
+    const stored = await pool.query('SELECT connector_id FROM run_notices WHERE run_id=$1', [runId])
+    expect(stored.rowCount, 'the wrong-connector notice was never stored').toBe(0)
     expect(
       (await store.queries.getRun(runId))?.notices,
       'and so the run reports no notice rather than a phantom one'
@@ -186,10 +173,9 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       started_at: Date | null
       claim_token: string | null
       claimed_at: Date | null
-    }>(
-      'SELECT status, started_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
-      [runId]
-    )
+    }>('SELECT status, started_at, claim_token, claimed_at FROM executions WHERE run_id=$1', [
+      runId
+    ])
     expect(executions.rowCount).toBe(1)
     expect.assert(executions.rows[0])
     expect(executions.rows[0].status).toBe('pending')
@@ -211,9 +197,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema='public' AND table_name='review_runs'`
     )
-    const trunkColumns = trunk.rows.map(
-      (row: { column_name: string }) => row.column_name
-    )
+    const trunkColumns = trunk.rows.map((row: { column_name: string }) => row.column_name)
     for (const moved of [
       'runner_status',
       'execution_input',
@@ -224,10 +208,9 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'started_at',
       'publish_context'
     ]) {
-      expect(
-        trunkColumns,
-        `review_runs must not keep execution column ${moved}`
-      ).not.toContain(moved)
+      expect(trunkColumns, `review_runs must not keep execution column ${moved}`).not.toContain(
+        moved
+      )
     }
   } finally {
     await pool.end()
@@ -285,9 +268,7 @@ for (const axis of ['executions', 'preparations'] as const) {
       // The single-run read answers `null`, the same as an unknown id, so it reports the fault
       // through the callback rather than leaving corruption to look like a missing run.
       // An unknown id must NOT report corruption; only a stored row that fails to project does.
-      expect(await store.queries.getRun(`run-unknown-${randomUUID()}`)).toBe(
-        null
-      )
+      expect(await store.queries.getRun(`run-unknown-${randomUUID()}`)).toBe(null)
       expect.assert(
         !dropped.some((entry) => entry.run_id.startsWith('run-unknown-')),
         'an unknown run id is not reported as corruption'
@@ -437,24 +418,19 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   })
   await restarted.initialize()
   try {
-    const { runs: firstPage, next_cursor: cursor } =
-      await restarted.queries.listRunsPage({ limit: 1 })
+    const { runs: firstPage, next_cursor: cursor } = await restarted.queries.listRunsPage({
+      limit: 1
+    })
     expect(firstPage).toHaveLength(1)
-    expect.assert(
-      cursor,
-      'a second run remains, so the first page must carry a cursor'
-    )
-    const { runs: secondPage, next_cursor: finalCursor } =
-      await restarted.queries.listRunsPage({
-        limit: 1,
-        cursor
-      })
+    expect.assert(cursor, 'a second run remains, so the first page must carry a cursor')
+    const { runs: secondPage, next_cursor: finalCursor } = await restarted.queries.listRunsPage({
+      limit: 1,
+      cursor
+    })
     expect(secondPage).toHaveLength(1)
     expect(secondPage[0]?.run_id).not.toBe(firstPage[0]?.run_id)
     expect(finalCursor).toBe(null)
-    expect(
-      (await restarted.queries.getRun(runIds[0] ?? ''))?.execution_input?.secret
-    ).toBe(true)
+    expect((await restarted.queries.getRun(runIds[0] ?? ''))?.execution_input?.secret).toBe(true)
   } finally {
     await restarted.close()
   }
@@ -502,20 +478,14 @@ test('run queries apply status filters before pagination limits', async () => {
       preparation_status: 'failed',
       limit: 10
     })
-    expect(failedPreparations.map((run) => run.run_id)).toStrictEqual([
-      failedRunId
-    ])
+    expect(failedPreparations.map((run) => run.run_id)).toStrictEqual([failedRunId])
     expect(failedPreparations[0]?.preparation?.status).toBe('failed')
     const { runs: preparingPreparations } = await store.queries.listRunsPage({
       preparation_status: 'preparing',
       limit: 10
     })
     expect(preparingPreparations).toHaveLength(2)
-    expect.assert(
-      preparingPreparations.every(
-        (run) => run.preparation?.status === 'preparing'
-      )
-    )
+    expect.assert(preparingPreparations.every((run) => run.preparation?.status === 'preparing'))
     const { runs: githubRuns } = await store.queries.listRunsPage({
       source_platform: 'github',
       limit: 10
@@ -556,10 +526,9 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       [runIds[0], connectorId]
     )
 
-    const { runs: firstPage, next_cursor: cursor } =
-      await store.queries.listRunsPage({
-        limit: 1
-      })
+    const { runs: firstPage, next_cursor: cursor } = await store.queries.listRunsPage({
+      limit: 1
+    })
     expect(firstPage).toHaveLength(1)
     expect.assert(cursor)
     const { runs: secondPage } = await store.queries.listRunsPage({
@@ -567,9 +536,7 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       cursor
     })
     expect(secondPage).toHaveLength(1)
-    expect([firstPage[0]?.run_id, secondPage[0]?.run_id].sort()).toStrictEqual(
-      [...runIds].sort()
-    )
+    expect([firstPage[0]?.run_id, secondPage[0]?.run_id].sort()).toStrictEqual([...runIds].sort())
   } finally {
     await observer.end()
     await store.close()
@@ -598,18 +565,14 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
         publish_context: {}
       })
       expect.assert(admission.preparation_token)
-      await store.submissionTransitions.markQueued(
-        runId,
-        admission.preparation_token,
-        {}
-      )
+      await store.submissionTransitions.markQueued(runId, admission.preparation_token, {})
     }
 
     const pool = new Pool({ connectionString: databaseUrl() })
-    await pool.query(
-      'UPDATE executions SET artifact_storage=$2::jsonb WHERE run_id=$1',
-      [poisonedId, JSON.stringify({ status: 'available' })]
-    )
+    await pool.query('UPDATE executions SET artifact_storage=$2::jsonb WHERE run_id=$1', [
+      poisonedId,
+      JSON.stringify({ status: 'available' })
+    ])
     try {
       const page = await store.queries.listRunsPage({ limit: 10 })
       expect(
@@ -649,11 +612,7 @@ test('a submission for an unknown run is a 404, not a server fault', async () =>
   await store.initialize()
   try {
     await expect(
-      store.submissionTransitions.markQueued(
-        `missing-${randomUUID()}`,
-        randomUUID(),
-        {}
-      )
+      store.submissionTransitions.markQueued(`missing-${randomUUID()}`, randomUUID(), {})
     ).rejects.toSatisfy(
       (error: unknown) =>
         typeof error === 'object' &&
@@ -694,10 +653,7 @@ test('an execution may hold a recovery claim only while uncertain', async () => 
       'a pending execution must not carry a recovery claim'
     ).rejects.toThrow(/violates check constraint/)
     // A token on `uncertain` is accepted: that is the state a recovery claims.
-    await pool.query(
-      `UPDATE executions SET status='uncertain' WHERE run_id=$1`,
-      [runId]
-    )
+    await pool.query(`UPDATE executions SET status='uncertain' WHERE run_id=$1`, [runId])
     await pool.query(
       `UPDATE executions SET claim_token=$2, claimed_at=clock_timestamp()
        WHERE run_id=$1`,

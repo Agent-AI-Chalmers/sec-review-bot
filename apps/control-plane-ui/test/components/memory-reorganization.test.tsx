@@ -146,25 +146,19 @@ test.each(['list', 'graph'])(
   async (view) => {
     renderHistory([learningVersion], view)
     fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
-    expect(
-      await screen.findByText('Added one lesson and skipped a duplicate.')
-    ).toBeInTheDocument()
+    expect(await screen.findByText('Added one lesson and skipped a duplicate.')).toBeInTheDocument()
     expect(screen.queryByText('extraction-1')).not.toBeInTheDocument()
     expect(screen.getByText('Added')).toBeInTheDocument()
     expect(screen.getByText('/memory/topics/path.md')).toBeInTheDocument()
     expect(screen.getByText('Skipped')).toBeInTheDocument()
-    expect(
-      screen.getByText('Already covered by the path topic.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Already covered by the path topic.')).toBeInTheDocument()
   }
 )
 
 test('a reorganization report states that no observations were consumed', async () => {
   renderHistory([version])
   fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
-  expect(
-    await screen.findByText('Merged duplicate path topics.')
-  ).toBeInTheDocument()
+  expect(await screen.findByText('Merged duplicate path topics.')).toBeInTheDocument()
   expect(screen.getByText('No observations were consumed.')).toBeInTheDocument()
 })
 

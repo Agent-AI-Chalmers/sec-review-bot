@@ -22,64 +22,35 @@ test('runtime recordings show natural flat order with subagent and summary label
     await page.getByLabel('Paste trajectory JSONL').fill(raw)
     await page.getByRole('button', { name: 'Render', exact: true }).click()
     const messages = page.locator('[data-trajectory-message-key]')
-    await expect(messages.first()).toHaveAttribute(
-      'data-trajectory-role',
-      'system'
-    )
-    await expect(messages.nth(1)).toHaveAttribute(
-      'data-trajectory-role',
-      'human'
-    )
+    await expect(messages.first()).toHaveAttribute('data-trajectory-role', 'system')
+    await expect(messages.nth(1)).toHaveAttribute('data-trajectory-role', 'human')
     if (name === 'subagents') {
       for (const agent of ['source-reviewer', 'test-reviewer']) {
         const branch = page.locator(
           `[data-trajectory-message-key][data-trajectory-agent="${agent}"]`
         )
-        await expect(branch.first()).toHaveAttribute(
-          'data-trajectory-role',
-          'system'
-        )
-        await expect(branch.nth(1)).toHaveAttribute(
-          'data-trajectory-role',
-          'human'
-        )
+        await expect(branch.first()).toHaveAttribute('data-trajectory-role', 'system')
+        await expect(branch.nth(1)).toHaveAttribute('data-trajectory-role', 'human')
       }
     } else {
       const summary = page.locator(
         '[data-trajectory-message-key][data-trajectory-source="summarization"]'
       )
-      await expect(summary.first()).toHaveAttribute(
-        'data-trajectory-role',
-        'human'
-      )
-      await expect(summary.nth(1)).toHaveAttribute(
-        'data-trajectory-role',
-        'assistant'
-      )
-      await expect(summary.nth(2)).toHaveAttribute(
-        'data-trajectory-role',
-        'human'
-      )
+      await expect(summary.first()).toHaveAttribute('data-trajectory-role', 'human')
+      await expect(summary.nth(1)).toHaveAttribute('data-trajectory-role', 'assistant')
+      await expect(summary.nth(2)).toHaveAttribute('data-trajectory-role', 'human')
       await summary
         .first()
         .getByRole('button', { name: /Message/ })
         .click()
-      await expect(summary.first()).toContainText(
-        'Context Extraction Assistant'
-      )
+      await expect(summary.first()).toContainText('Context Extraction Assistant')
       await expect(summary.first()).not.toContainText('<primary_objective>')
       await summary.first().getByText('Source', { exact: true }).click()
       await expect(summary.first().locator('pre')).toContainText('<role>')
-      await expect(summary.first().locator('pre')).toContainText(
-        '<primary_objective>'
-      )
+      await expect(summary.first().locator('pre')).toContainText('<primary_objective>')
       await summary.first().getByText('Preview', { exact: true }).click()
       await expect(summary.first()).not.toContainText('<primary_objective>')
-      await summary
-        .first()
-        .locator('.trajectory-section-header')
-        .first()
-        .scrollIntoViewIfNeeded()
+      await summary.first().locator('.trajectory-section-header').first().scrollIntoViewIfNeeded()
       await page.screenshot({
         path: test.info().outputPath('summary-preview.png')
       })
@@ -107,24 +78,14 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
   })
   await expect(references).toHaveCount(4)
   await references.last().click()
-  await expect(
-    page.locator('[data-trajectory-role="system"]').first()
-  ).toBeInViewport()
+  await expect(page.locator('[data-trajectory-role="system"]').first()).toBeInViewport()
   await page.getByRole('button', { name: 'Expand all' }).click()
+  await expect(page.getByText('Recorded arguments: {}', { exact: true })).toHaveCount(5)
+  await expect(page.getByText('/workspace/project/src', { exact: true })).toBeVisible()
   await expect(
-    page.getByText('Recorded arguments: {}', { exact: true })
-  ).toHaveCount(5)
-  await expect(
-    page.getByText('/workspace/project/src', { exact: true })
-  ).toBeVisible()
-  await expect(
-    page
-      .locator('.trajectory-message-body')
-      .filter({ hasText: '"type": "function_call"' })
+    page.locator('.trajectory-message-body').filter({ hasText: '"type": "function_call"' })
   ).toHaveCount(0)
-  const errors = page.locator(
-    '.trajectory-tool-call[data-result-status="error"]'
-  )
+  const errors = page.locator('.trajectory-tool-call[data-result-status="error"]')
   await expect(errors).toHaveCount(5)
   for (const theme of ['light', 'dark']) {
     await page.evaluate((value) => {
@@ -173,8 +134,7 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
         redName: isRed(getComputedStyle(name).color),
         redIcon: isRed(getComputedStyle(icon).stroke),
         badgeBesideName:
-          badgeBox.left >= nameBox.right &&
-          Math.abs(badgeBox.top - nameBox.top) < 10,
+          badgeBox.left >= nameBox.right && Math.abs(badgeBox.top - nameBox.top) < 10,
         fitsViewport: element.getBoundingClientRect().right <= viewportWidth
       }
     }, page.viewportSize().width)
@@ -191,9 +151,7 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
   }
 })
 
-test('truncated trajectory shows a parse alert outside message cards', async ({
-  page
-}) => {
+test('truncated trajectory shows a parse alert outside message cards', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
   const raw = trajectoryCorpus('truncated.jsonl')

@@ -7,10 +7,7 @@
 // gets one that is safe to use or a refusal.
 import { Pool } from 'pg'
 
-import {
-  applySchemaVersions,
-  KNOWN_SCHEMA_VERSIONS
-} from './schema-version-runner.js'
+import { applySchemaVersions, KNOWN_SCHEMA_VERSIONS } from './schema-version-runner.js'
 
 export class Database {
   readonly #pool: Pool
@@ -55,9 +52,7 @@ export class Database {
    */
   pool(): Pool {
     if (!this.#initialized)
-      throw new Error(
-        'Review Runs database is not initialized; await initialize() before use.'
-      )
+      throw new Error('Review Runs database is not initialized; await initialize() before use.')
     return this.#pool
   }
 
@@ -69,9 +64,7 @@ export class Database {
     const appliedVersions = result.rows.map(({ version }) => version)
     if (
       appliedVersions.length !== KNOWN_SCHEMA_VERSIONS.length ||
-      appliedVersions.some(
-        (version, index) => version !== KNOWN_SCHEMA_VERSIONS[index]
-      )
+      appliedVersions.some((version, index) => version !== KNOWN_SCHEMA_VERSIONS[index])
     ) {
       throw new Error('Review Runs schema ledger is not current.')
     }

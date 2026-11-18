@@ -34,10 +34,7 @@ function isSameOrigin(request: IncomingMessage): boolean {
  * whichever route it reached, and a new route cannot invent a second error code for the
  * same policy. Callers return early when this sends the refusal.
  */
-export function requireSameOrigin(
-  request: IncomingMessage,
-  response: ServerResponse
-): boolean {
+export function requireSameOrigin(request: IncomingMessage, response: ServerResponse): boolean {
   if (isSameOrigin(request)) return true
   sendJson(response, 403, { error: 'cross_site_request' })
   return false

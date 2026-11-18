@@ -10,22 +10,14 @@ import type { ExecutionRunStatusBatch } from '../execution-client.js'
 
 export type CoordinationStore = {
   preparations: Pick<ReviewRunStore['preparations'], 'expireStale'>
-  queries: Pick<
-    ReviewRunStore['queries'],
-    'listSubmissionRecoveries' | 'listActiveRuns'
-  >
+  queries: Pick<ReviewRunStore['queries'], 'listSubmissionRecoveries' | 'listActiveRuns'>
 }
 
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
   /** Read the whole pass's execution statuses in one request. */
-  readExecutionStatuses: (
-    runs: readonly ReviewRunRecord[]
-  ) => Promise<ExecutionRunStatusBatch>
-  observeActiveRun: (
-    run: ReviewRunRecord,
-    statuses: ExecutionRunStatusBatch
-  ) => Promise<void>
+  readExecutionStatuses: (runs: readonly ReviewRunRecord[]) => Promise<ExecutionRunStatusBatch>
+  observeActiveRun: (run: ReviewRunRecord, statuses: ExecutionRunStatusBatch) => Promise<void>
   /** Report a stored row the contract cannot represent. The pass continues without it, so a
    * single corrupt row degrades one run's coordination instead of stopping the whole pass. */
   onDroppedRunRow: (dropped: DroppedRunRow) => void

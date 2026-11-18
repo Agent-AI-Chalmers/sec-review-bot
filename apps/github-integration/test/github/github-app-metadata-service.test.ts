@@ -36,13 +36,9 @@ test('wasAuthoredByCurrentAppBot recognizes only this app bot', () => {
     })
   ).toBe(true)
   // A different bot is not us, even with a similar login.
-  expect(
-    wasAuthoredByCurrentAppBot({ login: 'other-bot[bot]', type: 'Bot' })
-  ).toBe(false)
+  expect(wasAuthoredByCurrentAppBot({ login: 'other-bot[bot]', type: 'Bot' })).toBe(false)
   // A human account with the same login string is not a bot.
-  expect(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })
-  ).toBe(false)
+  expect(wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })).toBe(false)
   expect(wasAuthoredByCurrentAppBot(null)).toBe(false)
 })
 
@@ -55,20 +51,14 @@ test('isCurrentAppBotLogin compares only a stored login, and says so', () => {
   expect(isCurrentAppBotLogin(null)).toBe(false)
   // It fails closed exactly like the full check: no metadata means no safe answer.
   setGitHubAppMetadata({})
-  expect(() => isCurrentAppBotLogin('sec-review-bot[bot]')).toThrow(
-    /metadata is not loaded/
-  )
+  expect(() => isCurrentAppBotLogin('sec-review-bot[bot]')).toThrow(/metadata is not loaded/)
 })
 
 test('wasAuthoredByCurrentAppBot still rejects a human account with a bot login', () => {
   // The full check keeps both halves: the login must match AND the entity must be a Bot. This
   // is why callers without a `type` use the narrower function instead of passing a fake one.
-  expect(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })
-  ).toBe(false)
-  expect(
-    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' })
-  ).toBe(true)
+  expect(wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' })).toBe(false)
+  expect(wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' })).toBe(true)
 })
 
 test('wasAuthoredByCurrentAppBot refuses to attribute when metadata is unloaded', () => {
@@ -96,9 +86,7 @@ test('unattributable metadata is a deterministic publish failure, not a retryabl
   }
   expect.assert(thrown instanceof Error, 'unattributable metadata must throw')
   expect(
-    (({ retry, code, reason }) => ({ retry, code, reason }))(
-      classifyPublicationFailure(thrown)
-    )
+    (({ retry, code, reason }) => ({ retry, code, reason }))(classifyPublicationFailure(thrown))
   ).toStrictEqual({
     retry: false,
     code: 'APP_METADATA_UNAVAILABLE',
@@ -114,13 +102,10 @@ test('isSelfOriginatedWebhookEvent ignores this app bot and other bots when attr
     isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot')),
     'our own bot event must be skipped to avoid a publish/trigger loop'
   ).toBe(true)
-  expect(
-    isSelfOriginatedWebhookEvent(event('human', 'User')),
-    'a human event is external'
-  ).toBe(false)
+  expect(isSelfOriginatedWebhookEvent(event('human', 'User')), 'a human event is external').toBe(
+    false
+  )
   // An unattributable bot is treated as self-originated (fail closed) rather than processed.
   setGitHubAppMetadata({})
-  expect(
-    isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot'))
-  ).toBe(true)
+  expect(isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot'))).toBe(true)
 })

@@ -1,13 +1,5 @@
 import React from 'react'
-import {
-  Button,
-  Group,
-  Modal,
-  Stack,
-  Text,
-  Textarea,
-  TextInput
-} from '@mantine/core'
+import { Button, Group, Modal, Stack, Text, Textarea, TextInput } from '@mantine/core'
 
 import { useMessages, type Message } from '../../../shared/i18n.js'
 import { adminRunAction, type AdminRunAction } from '../api.js'
@@ -81,8 +73,7 @@ export function AdminRunActionDialog({
     }
   }
 
-  const incomplete =
-    adminToken.trim() === '' || (config.requiresReason && reason.trim() === '')
+  const incomplete = adminToken.trim() === '' || (config.requiresReason && reason.trim() === '')
 
   return (
     <Modal opened={opened} onClose={onClose} title={t(config.title)} centered>
@@ -123,17 +114,13 @@ export function AdminRunActionDialog({
             {t('cancel')}
           </Button>
           <Button
-            {...(config.confirmColor === undefined
-              ? {}
-              : { color: config.confirmColor })}
+            {...(config.confirmColor === undefined ? {} : { color: config.confirmColor })}
             loading={submitting}
             disabled={incomplete}
             onClick={() => {
               void submit()
             }}
-            {...(config.testId === undefined
-              ? {}
-              : { 'data-testid': config.testId })}
+            {...(config.testId === undefined ? {} : { 'data-testid': config.testId })}
           >
             {t(config.confirmLabel)}
           </Button>

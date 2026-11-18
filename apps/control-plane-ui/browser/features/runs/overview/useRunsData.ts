@@ -47,9 +47,7 @@ export function useRunsData(query: string): RunsData {
         // The queue is an operator aid, not a precondition for reading runs.
       })
     try {
-      const nextData = await api<ListRunsResponseBody>(
-        `/runs?${requestedQuery}`
-      )
+      const nextData = await api<ListRunsResponseBody>(`/runs?${requestedQuery}`)
       if (latestQuery.current === requestedQuery) {
         setResult({ query: requestedQuery, data: nextData })
       }

@@ -19,17 +19,10 @@ interface ObservationStore {
   ): Promise<boolean>
 }
 
-export type ExecutionObservationResult =
-  | 'active'
-  | 'succeeded'
-  | 'failed'
-  | 'poll_retry'
+export type ExecutionObservationResult = 'active' | 'succeeded' | 'failed' | 'poll_retry'
 
 export interface ExecutionObservationEvent {
-  kind:
-    | 'execution_poll_retry'
-    | 'execution_state_changed'
-    | 'execution_terminal_recorded'
+  kind: 'execution_poll_retry' | 'execution_state_changed' | 'execution_terminal_recorded'
   run_id: string
   workflow: ReviewRunRecord['workflow']
   from: ReviewRunRecord['execution']['status']
@@ -39,10 +32,7 @@ export interface ExecutionObservationEvent {
 
 function errorInfo(error: unknown): { code: string; message: string } {
   const code =
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string'
+    typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
       ? error.code
       : 'EXECUTION_FAILED'
   return {
@@ -55,10 +45,7 @@ function errorInfo(error: unknown): { code: string; message: string } {
 export async function observeExecutionRun(
   store: ObservationStore,
   run: ReviewRunRecord,
-  getStatus: (
-    runId: string,
-    workflow: ReviewRunRecord['workflow']
-  ) => Promise<ExecutionRunStatus>,
+  getStatus: (runId: string, workflow: ReviewRunRecord['workflow']) => Promise<ExecutionRunStatus>,
   isTerminalPollingError: (error: unknown) => boolean,
   onEvent: (event: ExecutionObservationEvent) => void = () => {}
 ): Promise<ExecutionObservationResult> {

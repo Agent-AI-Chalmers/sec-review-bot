@@ -1,11 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { LIST_RUN_QUERY_PARAMS } from '../../shared/list-run-query-params.js'
-import {
-  RequestBodyTooLargeError,
-  readBoundedRequestBody,
-  sendJson
-} from '../http.js'
+import { RequestBodyTooLargeError, readBoundedRequestBody, sendJson } from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
@@ -57,8 +53,7 @@ function isAllowedReadPath(bffUrl: string): boolean {
   if (url.pathname === '/api/runs/parked') return true
   const segments = url.pathname.split('/')
   // ['', 'api', 'runs', '<runId>', ...optional suffix]
-  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')
-    return false
+  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs') return false
   let runId: string
   try {
     runId = decodeURIComponent(segments[3] ?? '')
@@ -111,11 +106,7 @@ export function createReviewRunsRoutes({
       // The action is taken from the matched route, never from the raw URL, so the
       // upstream path can only be one of the decisions this BFF states it proxies.
       const action =
-        decision[2] === 'resume'
-          ? 'resume'
-          : decision[2] === 'give-up'
-            ? 'give-up'
-            : 'abandon'
+        decision[2] === 'resume' ? 'resume' : decision[2] === 'give-up' ? 'give-up' : 'abandon'
       const upstream = await reviewRuns.decide(
         decodeURIComponent(decision[1] ?? ''),
         action,
@@ -128,10 +119,7 @@ export function createReviewRunsRoutes({
     }
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.method === 'POST') {
       const decision = ADMIN_DECISION.exec(request.url ?? '')
       if (decision !== null) {
@@ -139,8 +127,7 @@ export function createReviewRunsRoutes({
         return true
       }
     }
-    if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? ''))
-      return false
+    if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? '')) return false
     try {
       const upstream = await reviewRuns.read(forwardedPath(request.url ?? '/'))
       writeUpstreamResult(response, upstream)

@@ -7,18 +7,8 @@ import { zstdCompressSync } from 'node:zlib'
 const profileRoot = path.resolve(import.meta.dirname, '../..')
 const corpusRoot = path.join(profileRoot, 'v1', 'corpus')
 
-function writeOctal(
-  header: Buffer,
-  offset: number,
-  length: number,
-  value: number
-) {
-  header.write(
-    `${value.toString(8).padStart(length - 1, '0')}\0`,
-    offset,
-    length,
-    'ascii'
-  )
+function writeOctal(header: Buffer, offset: number, length: number, value: number) {
+  header.write(`${value.toString(8).padStart(length - 1, '0')}\0`, offset, length, 'ascii')
 }
 
 type EntrySpec = {
@@ -50,11 +40,7 @@ function rawEntry({
   const checksum = header.reduce((sum, byte) => sum + byte, 0)
   header.write(`${checksum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii')
   const content = type === '0' ? body : Buffer.alloc(0)
-  return Buffer.concat([
-    header,
-    content,
-    Buffer.alloc((512 - (content.length % 512)) % 512)
-  ])
+  return Buffer.concat([header, content, Buffer.alloc((512 - (content.length % 512)) % 512)])
 }
 
 function json(value: unknown): Buffer {
@@ -81,9 +67,7 @@ const minimal = (): EntrySpec[] => [
 ]
 
 function archive(entries: EntrySpec[]): Buffer {
-  return zstdCompressSync(
-    Buffer.concat([...entries.map(rawEntry), Buffer.alloc(1024)])
-  )
+  return zstdCompressSync(Buffer.concat([...entries.map(rawEntry), Buffer.alloc(1024)]))
 }
 
 const definitions = [
@@ -123,9 +107,7 @@ const definitions = [
   {
     file: 'invalid-missing-history.tar.zst',
     expected: 'invalid',
-    bytes: archive(
-      minimal().filter((entry) => !entry.name.startsWith('history/'))
-    )
+    bytes: archive(minimal().filter((entry) => !entry.name.startsWith('history/')))
   },
   {
     file: 'invalid-unexpected-path.tar.zst',
@@ -139,11 +121,7 @@ const definitions = [
   {
     file: 'invalid-symlink.tar.zst',
     expected: 'invalid',
-    bytes: archive([
-      ...minimal().slice(0, -1),
-      { name: 'history/link', type: '2' },
-      snapshot()
-    ])
+    bytes: archive([...minimal().slice(0, -1), { name: 'history/link', type: '2' }, snapshot()])
   }
 ]
 
@@ -155,9 +133,7 @@ const manifestValue = {
     size: bytes.length
   }))
 }
-const outputs = new Map(
-  definitions.map(({ file, bytes }) => [path.join(corpusRoot, file), bytes])
-)
+const outputs = new Map(definitions.map(({ file, bytes }) => [path.join(corpusRoot, file), bytes]))
 outputs.set(
   path.join(corpusRoot, 'manifest.json'),
   Buffer.from(`${JSON.stringify(manifestValue, null, 2)}\n`)

@@ -28,8 +28,7 @@ const PATCH_KEYS = ['patchText', 'patch'] as const
 
 function patchKeyFor(args: Record<string, unknown>): string | undefined {
   return PATCH_KEYS.find(
-    (key) =>
-      typeof args[key] === 'string' && args[key].includes('*** Begin Patch')
+    (key) => typeof args[key] === 'string' && args[key].includes('*** Begin Patch')
   )
 }
 
@@ -61,16 +60,10 @@ export function ToolArguments({
   const patchKey = patchKeyFor(args)
   // Shell commands are data, not prose: markdown rendering collapses them into
   // an unreadable paragraph. Show them in a terminal-style block instead.
-  const commandKey = ['command', 'cmd', 'script'].find(
-    (key) => typeof args[key] === 'string'
-  )
+  const commandKey = ['command', 'cmd', 'script'].find((key) => typeof args[key] === 'string')
   const ordinary = Object.entries(args).filter(
     ([key]) =>
-      key !== oldKey &&
-      key !== newKey &&
-      key !== 'todos' &&
-      key !== patchKey &&
-      key !== commandKey
+      key !== oldKey && key !== newKey && key !== 'todos' && key !== patchKey && key !== commandKey
   )
   return (
     <Stack gap="sm">
@@ -78,9 +71,7 @@ export function ToolArguments({
         <Stack gap={4} className="trajectory-todos">
           {args.todos.map((item, index) => {
             const todo =
-              typeof item === 'object' && item !== null
-                ? (item as Record<string, unknown>)
-                : {}
+              typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : {}
             const color =
               todo.status === 'completed'
                 ? 'green'
@@ -91,9 +82,7 @@ export function ToolArguments({
               <Group key={index} gap="xs" wrap="nowrap">
                 <Badge size="xs" variant="light" color={color}>
                   <HighlightText
-                    value={
-                      typeof todo.status === 'string' ? todo.status : 'pending'
-                    }
+                    value={typeof todo.status === 'string' ? todo.status : 'pending'}
                     query={query}
                   />
                 </Badge>
@@ -128,9 +117,7 @@ export function ToolArguments({
               </Text>
               {PROSE_ARGUMENT_KEYS.has(key) && typeof value === 'string' ? (
                 <div className="memory-markdown json-markdown">
-                  <HighlightedMarkdown query={query}>
-                    {value}
-                  </HighlightedMarkdown>
+                  <HighlightedMarkdown query={query}>{value}</HighlightedMarkdown>
                 </div>
               ) : (
                 <JsonValueView value={value} query={query} />
@@ -140,11 +127,7 @@ export function ToolArguments({
         </div>
       )}
       {oldKey && newKey && (
-        <SimpleGrid
-          cols={{ base: 1, md: 2 }}
-          spacing="sm"
-          className="trajectory-diff"
-        >
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm" className="trajectory-diff">
           <div className="trajectory-diff-old">
             <Text size="xs" fw={700} mb={6} className="trajectory-arg-key">
               {oldKey}

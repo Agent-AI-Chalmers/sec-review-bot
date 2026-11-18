@@ -3,11 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream/promises'
 
 import type { RunArtifactContentResponse } from '../../shared/artifact-content.js'
-import {
-  ARTIFACT_BUCKET,
-  type ArtifactStore,
-  artifactStorageStatus
-} from '../artifacts/store.js'
+import { ARTIFACT_BUCKET, type ArtifactStore, artifactStorageStatus } from '../artifacts/store.js'
 import {
   ArtifactDownloadTimeoutError,
   readVerifiedArtifactBuffer,
@@ -16,10 +12,7 @@ import {
 import { PROXIED_CONTENT_TYPE, sendJson } from '../http.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
-import {
-  publishedExecutionArchive,
-  type PublishedRunArtifact
-} from '../run/artifact-reference.js'
+import { publishedExecutionArchive, type PublishedRunArtifact } from '../run/artifact-reference.js'
 import { readExecutionArchive } from '../run/execution-archive.js'
 
 function decodeRunId(raw: string | undefined): string | null {
@@ -46,10 +39,7 @@ export function createRunArtifactRoutes({
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs: number
 }): RunArtifactRoutes {
-  const preview = async (
-    response: ServerResponse,
-    runId: string
-  ): Promise<void> => {
+  const preview = async (response: ServerResponse, runId: string): Promise<void> => {
     if (artifactStore === undefined) {
       sendJson(response, 503, { error: 'artifact_view_unavailable' })
       return
@@ -67,11 +57,7 @@ export function createRunArtifactRoutes({
       const body = JSON.parse(upstream.body.toString('utf8')) as {
         run?: PublishedRunArtifact
       }
-      const published = publishedExecutionArchive(
-        body.run,
-        runId,
-        ARTIFACT_BUCKET
-      )
+      const published = publishedExecutionArchive(body.run, runId, ARTIFACT_BUCKET)
       if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
         return
@@ -80,11 +66,9 @@ export function createRunArtifactRoutes({
         sendJson(response, 413, { error: 'artifact_too_large' })
         return
       }
-      const complete = await readVerifiedArtifactBuffer(
-        artifactStore,
-        published.artifact,
-        { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
-      )
+      const complete = await readVerifiedArtifactBuffer(artifactStore, published.artifact, {
+        idleTimeoutMs: artifactDownloadIdleTimeoutMs
+      })
       const view = await readExecutionArchive(complete, runId)
       response.writeHead(200, {
         'content-type': PROXIED_CONTENT_TYPE,
@@ -143,11 +127,7 @@ export function createRunArtifactRoutes({
       const body = JSON.parse(upstream.body.toString('utf8')) as {
         run?: PublishedRunArtifact
       }
-      const published = publishedExecutionArchive(
-        body.run,
-        runId,
-        ARTIFACT_BUCKET
-      )
+      const published = publishedExecutionArchive(body.run, runId, ARTIFACT_BUCKET)
       if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
         return
@@ -167,8 +147,7 @@ export function createRunArtifactRoutes({
         async (file) => {
           response.writeHead(200, {
             'content-type': 'application/octet-stream',
-            'content-disposition':
-              'attachment; filename="execution-archive.v1.tar.zst"',
+            'content-disposition': 'attachment; filename="execution-archive.v1.tar.zst"',
             'cache-control': 'private, no-store',
             'content-length': String(file.sizeBytes)
           })
@@ -182,36 +161,26 @@ export function createRunArtifactRoutes({
       const status = artifactStorageStatus(error)
       const identityMismatch =
         error instanceof Error && error.message === 'artifact_identity_mismatch'
-      const metadataTimedOut =
-        error instanceof UpstreamRequestError && error.kind === 'timeout'
+      const metadataTimedOut = error instanceof UpstreamRequestError && error.kind === 'timeout'
       const downloadTimedOut = error instanceof ArtifactDownloadTimeoutError
-      sendJson(
-        response,
-        status === 404 ? 404 : metadataTimedOut || downloadTimedOut ? 504 : 502,
-        {
-          error:
-            status === 404
-              ? 'artifact_not_found'
-              : metadataTimedOut
-                ? 'review_runs_timeout'
-                : downloadTimedOut
-                  ? 'artifact_download_timeout'
-                  : identityMismatch
-                    ? 'artifact_identity_mismatch'
-                    : 'artifact_download_failed'
-        }
-      )
+      sendJson(response, status === 404 ? 404 : metadataTimedOut || downloadTimedOut ? 504 : 502, {
+        error:
+          status === 404
+            ? 'artifact_not_found'
+            : metadataTimedOut
+              ? 'review_runs_timeout'
+              : downloadTimedOut
+                ? 'artifact_download_timeout'
+                : identityMismatch
+                  ? 'artifact_identity_mismatch'
+                  : 'artifact_download_failed'
+      })
     }
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.method !== 'GET') return false
-    const contentMatch = /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(
-      request.url ?? ''
-    )
+    const contentMatch = /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(request.url ?? '')
     if (contentMatch !== null) {
       const runId = decodeRunId(contentMatch[1])
       if (runId === null) {
@@ -221,9 +190,7 @@ export function createRunArtifactRoutes({
       await preview(response, runId)
       return true
     }
-    const artifactMatch = /^\/api\/runs\/([^/?]+)\/artifact$/.exec(
-      request.url ?? ''
-    )
+    const artifactMatch = /^\/api\/runs\/([^/?]+)\/artifact$/.exec(request.url ?? '')
     if (artifactMatch !== null) {
       const runId = decodeRunId(artifactMatch[1])
       if (runId === null) {

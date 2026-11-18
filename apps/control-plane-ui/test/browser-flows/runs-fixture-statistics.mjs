@@ -2,12 +2,7 @@ import assert from 'node:assert/strict'
 
 import { openPublishedRepositoryRun } from './runs-fixture-support.mjs'
 
-async function clickAndWaitForExpansion({
-  control,
-  expanded,
-  waitUntil,
-  message
-}) {
+async function clickAndWaitForExpansion({ control, expanded, waitUntil, message }) {
   let previousBox = null
   let stableSamples = 0
   await control.scrollIntoViewIfNeeded()
@@ -26,19 +21,12 @@ async function clickAndWaitForExpansion({
   }, `${message}: control did not settle before click`)
   await control.click()
   await waitUntil(
-    async () =>
-      (await control.getAttribute('aria-expanded')) === String(expanded),
+    async () => (await control.getAttribute('aria-expanded')) === String(expanded),
     message
   )
 }
 
-export async function runFixtureRunStatisticsFlow({
-  name,
-  viewport,
-  page,
-  base,
-  waitUntil
-}) {
+export async function runFixtureRunStatisticsFlow({ name, viewport, page, base, waitUntil }) {
   await openPublishedRepositoryRun({ name, page, base, waitUntil })
   const statistics = page.getByTestId('execution-statistics')
   await statistics.waitFor()
@@ -69,9 +57,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} workflow stages must start collapsed`
   )
   await clickAndWaitForExpansion({
-    control: workflowStages
-      .nth(0)
-      .locator('.statistics-workflow-stage-control'),
+    control: workflowStages.nth(0).locator('.statistics-workflow-stage-control'),
     expanded: true,
     waitUntil,
     message: `${name} scan stage did not expand`
@@ -107,9 +93,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} triage details must explain its batches without adding hierarchy`
   )
   await clickAndWaitForExpansion({
-    control: workflowStages
-      .nth(1)
-      .locator('.statistics-workflow-stage-control'),
+    control: workflowStages.nth(1).locator('.statistics-workflow-stage-control'),
     expanded: true,
     waitUntil,
     message: `${name} review stage did not expand`
@@ -167,9 +151,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} a case without feedback must not label its only pass as initial`
   )
   await clickAndWaitForExpansion({
-    control: workflowStages
-      .nth(2)
-      .locator('.statistics-workflow-stage-control'),
+    control: workflowStages.nth(2).locator('.statistics-workflow-stage-control'),
     expanded: true,
     waitUntil,
     message: `${name} delivery stage did not expand`
@@ -218,9 +200,7 @@ export async function runFixtureRunStatisticsFlow({
   const expandedBefore = await statisticsDetails
     .locator('.statistics-group-row[aria-expanded="true"]')
     .count()
-  const analyzerRow = usageRows
-    .filter({ hasText: 'repository-analyzer' })
-    .first()
+  const analyzerRow = usageRows.filter({ hasText: 'repository-analyzer' }).first()
   await clickAndWaitForExpansion({
     control: analyzerRow,
     expanded: true,
@@ -232,9 +212,7 @@ export async function runFixtureRunStatisticsFlow({
     /Input\s*5,200.*Cache read\s*1,600.*Cache write\s*104.*Output\s*1,000.*Reasoning\s*150/,
     `${name} an agent without subgroups must expose its token breakdown`
   )
-  const scorerRow = usageRows
-    .filter({ hasText: 'repository-cvss-v4-scorer' })
-    .first()
+  const scorerRow = usageRows.filter({ hasText: 'repository-cvss-v4-scorer' }).first()
   await clickAndWaitForExpansion({
     control: scorerRow,
     expanded: true,
@@ -242,9 +220,7 @@ export async function runFixtureRunStatisticsFlow({
     message: `${name} scorer details did not expand`
   })
   assert.strictEqual(
-    await statisticsDetails
-      .locator('.statistics-group-row[aria-expanded="true"]')
-      .count(),
+    await statisticsDetails.locator('.statistics-group-row[aria-expanded="true"]').count(),
     expandedBefore + 2,
     `${name} expanding one usage group must not close another`
   )
@@ -267,9 +243,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} expand all must open every workflow stage`
   )
   assert.strictEqual(
-    await statisticsDetails
-      .locator('.statistics-unit-control[aria-expanded="true"]')
-      .count(),
+    await statisticsDetails.locator('.statistics-unit-control[aria-expanded="true"]').count(),
     2,
     `${name} expand all must open every review case`
   )
@@ -279,9 +253,8 @@ export async function runFixtureRunStatisticsFlow({
       (await statisticsDetails
         .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
         .count()) === 0 &&
-      (await statisticsDetails
-        .locator('.statistics-group-row[aria-expanded="true"]')
-        .count()) === 0,
+      (await statisticsDetails.locator('.statistics-group-row[aria-expanded="true"]').count()) ===
+        0,
     `${name} collapse all did not close every statistics section`
   )
   assert.strictEqual(
@@ -292,9 +265,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} collapse all must close every workflow stage`
   )
   assert.strictEqual(
-    await statisticsDetails
-      .locator('.statistics-group-row[aria-expanded="true"]')
-      .count(),
+    await statisticsDetails.locator('.statistics-group-row[aria-expanded="true"]').count(),
     0,
     `${name} collapse all must close every usage group`
   )
@@ -314,10 +285,7 @@ export async function runFixtureRunStatisticsFlow({
     `${name} transitions must show one selected state machine at a time`
   )
   const transitionRows = transitions.locator('.run-transition')
-  assert.ok(
-    (await transitionRows.count()) > 0,
-    `${name} the run must list its actual transitions`
-  )
+  assert.ok((await transitionRows.count()) > 0, `${name} the run must list its actual transitions`)
   assert.doesNotMatch(
     (await transitionRows.first().textContent()) ?? '',
     /—\s*→/,

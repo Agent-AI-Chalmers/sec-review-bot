@@ -18,10 +18,7 @@ export class UpstreamResponseTooLargeError extends Error {
  * streaming rather than after the fact: a declared length that already exceeds it is
  * refused before any body is read.
  */
-async function readBoundedUpstreamBody(
-  response: Response,
-  maximumBytes: number
-): Promise<Buffer> {
+async function readBoundedUpstreamBody(response: Response, maximumBytes: number): Promise<Buffer> {
   const contentLength = response.headers.get('content-length')
   if (
     contentLength !== null &&
@@ -43,8 +40,7 @@ async function readBoundedUpstreamBody(
         value?: unknown
       }
       if (done) break
-      if (!(value instanceof Uint8Array))
-        throw new TypeError('Expected response body bytes')
+      if (!(value instanceof Uint8Array)) throw new TypeError('Expected response body bytes')
       size += value.byteLength
       if (size > maximumBytes) {
         await reader.cancel()
@@ -112,15 +108,13 @@ export async function requestUpstream(
       if (error instanceof UpstreamResponseTooLargeError)
         throw new UpstreamRequestError('too_large', { cause: error })
       const kind = failureKind()
-      if (kind !== undefined)
-        throw new UpstreamRequestError(kind, { cause: error })
+      if (kind !== undefined) throw new UpstreamRequestError(kind, { cause: error })
       throw error
     }
   } catch (error) {
     if (error instanceof UpstreamRequestError) throw error
     const kind = failureKind()
-    if (kind !== undefined)
-      throw new UpstreamRequestError(kind, { cause: error })
+    if (kind !== undefined) throw new UpstreamRequestError(kind, { cause: error })
     throw error
   } finally {
     clearTimeout(timeout)

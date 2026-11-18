@@ -21,14 +21,8 @@ import type { PullRequestContext } from '../../src/github/pull-request-service.j
 import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
-import type {
-  IssueReviewInput,
-  PullRequestReviewInput
-} from '../../src/execution/input.js'
-import type {
-  ReviewRunAdmission,
-  ReviewRunRecord
-} from '../../src/review-runs/client.js'
+import type { IssueReviewInput, PullRequestReviewInput } from '../../src/execution/input.js'
+import type { ReviewRunAdmission, ReviewRunRecord } from '../../src/review-runs/client.js'
 import { unusedGitHub } from '../github-client.js'
 
 const bundleRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'trigger-input-'))
@@ -50,9 +44,7 @@ const localBundle = {
  * something the real service never would. Building the record here keeps one definition and
  * lets the `ReviewRunRecord` type police it.
  */
-function admittedRecord(
-  overrides: Partial<ReviewRunRecord> & { run_id: string }
-): ReviewRunRecord {
+function admittedRecord(overrides: Partial<ReviewRunRecord> & { run_id: string }): ReviewRunRecord {
   return {
     workflow: 'issue-review',
     source_platform: 'github',
@@ -177,8 +169,7 @@ function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
 }
 
 /** A complete `PullRequestReviewInput`, returned by PR preparation. */
-function pullRequestReviewInput(): PullRequestReviewInput &
-  Record<string, unknown> {
+function pullRequestReviewInput(): PullRequestReviewInput & Record<string, unknown> {
   return {
     api_version: EXECUTION_API_VERSION,
     input_bundle: localBundle,
@@ -247,15 +238,11 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         },
         reserveInputBundleCandidate: async (...args) => {
           phases.push('reserve')
-          return await inputBundlePublicationStore().reserveInputBundleCandidate(
-            ...args
-          )
+          return await inputBundlePublicationStore().reserveInputBundleCandidate(...args)
         },
         settleInputBundleCandidate: async (...args) => {
           phases.push('present')
-          return await inputBundlePublicationStore().settleInputBundleCandidate(
-            ...args
-          )
+          return await inputBundlePublicationStore().settleInputBundleCandidate(...args)
         },
         admitReviewRun: (run) => {
           transitions.push(['pending', withoutPreparationInput(run)])
@@ -269,21 +256,13 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           phases.push('submit')
           transitions.push(['queued', run_id, publish_context])
         },
-        failPreparation: () =>
-          expect.unreachable('successful review must not be marked failed')
+        failPreparation: () => expect.unreachable('successful review must not be marked failed')
       }
     }
   })
 
   expect(submitted.run_id).toBe('run-issue-1')
-  expect(phases).toStrictEqual([
-    'renew',
-    'prepared',
-    'renew',
-    'reserve',
-    'present',
-    'submit'
-  ])
+  expect(phases).toStrictEqual(['renew', 'prepared', 'renew', 'reserve', 'present', 'submit'])
   expect(transitions).toStrictEqual([
     [
       'pending',
@@ -326,12 +305,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     delivery_id: 'delivery-pr-1',
     test_changes: 'deny',
     deps: {
-      prepare_review: async ({
-        pr: submittedPr,
-        run_id,
-        event_type,
-        test_changes
-      }) => {
+      prepare_review: async ({ pr: submittedPr, run_id, event_type, test_changes }) => {
         expect(run_id).toBe('run-pr-1')
         expect(event_type).toBe('manual_review')
         expect(test_changes).toBe('deny')
@@ -356,8 +330,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
-        failPreparation: () =>
-          expect.unreachable('successful review must not be marked failed')
+        failPreparation: () => expect.unreachable('successful review must not be marked failed')
       }
     }
   })
@@ -419,10 +392,8 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
               preparation_token: 'claim'
             }
           },
-          submitPreparedRun: () =>
-            expect.unreachable('failed review must not be queued'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('failed review must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -438,11 +409,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
         ingress_key: 'delivery-pr-failed'
       }
     ],
-    [
-      'failed',
-      'run-pr-failed',
-      { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }
-    ]
+    ['failed', 'run-pr-failed', { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }]
   ])
 })
 
@@ -486,8 +453,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
             transitions.push(['prepared', run_id, context, input])
             throw error
           },
-          failPreparation: (run_id, _token, failure) =>
-            transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
     })
@@ -540,8 +506,7 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
             transitions.push(['prepared', run_id, context, input])
             throw error
           },
-          failPreparation: (run_id, _token, failure) =>
-            transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
     })
@@ -574,8 +539,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
           transitions.push(['context'])
           throw new Error('GitHub PR lookup failed')
         },
-        prepare_review: async () =>
-          expect.unreachable('review must not start without PR context'),
+        prepare_review: async () => expect.unreachable('review must not start without PR context'),
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
@@ -586,10 +550,8 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
               preparation_token: 'claim'
             } satisfies ReviewRunAdmission
           },
-          submitPreparedRun: () =>
-            expect.unreachable('failed context lookup must not queue'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('failed context lookup must not queue'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -615,9 +577,7 @@ for (const recovering of [false, true]) {
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-checkpoint',
-      ...(recovering
-        ? { claimed_preparation: { run_id: 'run-checkpoint', token: 'claim' } }
-        : {}),
+      ...(recovering ? { claimed_preparation: { run_id: 'run-checkpoint', token: 'claim' } } : {}),
       pr_reference: {
         owner_login: 'octo',
         repo_name: 'example-repo',
@@ -648,15 +608,12 @@ for (const recovering of [false, true]) {
             } satisfies ReviewRunAdmission
           },
           checkpointPreparationInput: async (...args) => {
-            const recovered = parsePullRequestPreparationInput(
-              JSON.parse(JSON.stringify(args[2]))
-            )
+            const recovered = parsePullRequestPreparationInput(JSON.parse(JSON.stringify(args[2])))
             expect(recovered.pr).toStrictEqual(pr)
             checkpoints.push(args)
           },
           submitPreparedRun: () => {},
-          failPreparation: () =>
-            expect.unreachable('checkpointed review must not fail')
+          failPreparation: () => expect.unreachable('checkpointed review must not fail')
         }
       }
     })
@@ -704,12 +661,9 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
             }
           })
         }),
-        submitPreparedRun: () =>
-          expect.unreachable('replayed delivery must not queue again'),
+        submitPreparedRun: () => expect.unreachable('replayed delivery must not queue again'),
         failPreparation: () =>
-          expect.unreachable(
-            'replayed delivery must not change the original run'
-          )
+          expect.unreachable('replayed delivery must not change the original run')
       }
     }
   })
@@ -746,12 +700,9 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
             }
           })
         }),
-        submitPreparedRun: () =>
-          expect.unreachable('replayed delivery must not queue again'),
+        submitPreparedRun: () => expect.unreachable('replayed delivery must not queue again'),
         failPreparation: () =>
-          expect.unreachable(
-            'replayed delivery must not change the original run'
-          )
+          expect.unreachable('replayed delivery must not change the original run')
       }
     }
   })
@@ -772,12 +723,9 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
       delivery_id: 'delivery-pr-setup-invalid',
       deps: {
         prepare_review: async () => {
-          throw new SetupDeclarationError(
-            'setup[0] has unsupported key(s): shell',
-            {
-              reason: 'unsupported-step-key'
-            }
-          )
+          throw new SetupDeclarationError('setup[0] has unsupported key(s): shell', {
+            reason: 'unsupported-step-key'
+          })
         },
         store: {
           ...preparationClaim,
@@ -790,10 +738,8 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
               created: true,
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
-          submitPreparedRun: () =>
-            expect.unreachable('invalid setup must not be queued'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -823,12 +769,9 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
       delivery_id: 'delivery-issue-setup-invalid',
       deps: {
         prepare_review: async () => {
-          throw new SetupDeclarationError(
-            'setup declaration is not valid YAML',
-            {
-              reason: 'invalid-yaml'
-            }
-          )
+          throw new SetupDeclarationError('setup declaration is not valid YAML', {
+            reason: 'invalid-yaml'
+          })
         },
         store: {
           ...preparationClaim,
@@ -841,10 +784,8 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
               created: true,
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
-          submitPreparedRun: () =>
-            expect.unreachable('invalid setup must not be queued'),
-          failPreparation: (run_id, _token, error) =>
-            transitions.push(['failed', run_id, error])
+          submitPreparedRun: () => expect.unreachable('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     })
@@ -939,13 +880,11 @@ test('a failed PR checkpoint prevents preparation and submission', async () => {
           expect.unreachable('an uncheckpointed snapshot must not prepare'),
         store: {
           ...preparationClaim,
-          admitReviewRun: () =>
-            expect.unreachable('a retry must not admit again'),
+          admitReviewRun: () => expect.unreachable('a retry must not admit again'),
           checkpointPreparationInput: async () => {
             throw error
           },
-          submitPreparedRun: () =>
-            expect.unreachable('an uncheckpointed snapshot must not submit'),
+          submitPreparedRun: () => expect.unreachable('an uncheckpointed snapshot must not submit'),
           failPreparation: (...args) => {
             failures.push(args)
           }

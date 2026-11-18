@@ -1,14 +1,6 @@
-import type {
-  TrajectoryEvent,
-  TrajectoryMessageEvent
-} from '../../../shared/trajectory-events.js'
+import type { TrajectoryEvent, TrajectoryMessageEvent } from '../../../shared/trajectory-events.js'
 
-export type TrajectoryRole =
-  | 'system'
-  | 'human'
-  | 'assistant'
-  | 'tool'
-  | 'unknown'
+export type TrajectoryRole = 'system' | 'human' | 'assistant' | 'tool' | 'unknown'
 
 export type { TrajectoryEvent } from '../../../shared/trajectory-events.js'
 
@@ -63,8 +55,7 @@ export interface TrajectoryDocument {
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return undefined
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   return value as Record<string, unknown>
 }
 
@@ -88,10 +79,7 @@ function contentParts(
   if (typeof value === 'string') return { content: value, reasoning: '' }
   if (!Array.isArray(value)) {
     return {
-      content:
-        value === null || value === undefined
-          ? ''
-          : JSON.stringify(value, null, 2),
+      content: value === null || value === undefined ? '' : JSON.stringify(value, null, 2),
       reasoning: ''
     }
   }
@@ -107,8 +95,7 @@ function contentParts(
       content.push(JSON.stringify(block, null, 2))
       continue
     }
-    if (item.type === 'text' && typeof item.text === 'string')
-      content.push(item.text)
+    if (item.type === 'text' && typeof item.text === 'string') content.push(item.text)
     else if (item.type === 'thinking' && typeof item.thinking === 'string')
       reasoning.push(item.thinking)
     else if (
@@ -116,8 +103,7 @@ function contentParts(
       calls.some((call) => call.id === item.call_id && call.name === item.name)
     )
       continue // The canonical tool call is rendered separately; retain unmatched blocks.
-    else if (item.type !== 'tool_use')
-      content.push(JSON.stringify(item, null, 2))
+    else if (item.type !== 'tool_use') content.push(JSON.stringify(item, null, 2))
   }
   return { content: content.join('\n\n'), reasoning: reasoning.join('\n\n') }
 }
@@ -136,15 +122,10 @@ function usage(message: Record<string, unknown>): UsageView | undefined {
     total: number(source.total_tokens),
     reasoning: number(source.reasoning_tokens)
   }
-  return Object.values(result).some((item) => item !== undefined)
-    ? result
-    : undefined
+  return Object.values(result).some((item) => item !== undefined) ? result : undefined
 }
 
-function toolCalls(
-  message: Record<string, unknown>,
-  seq: number
-): ToolCallView[] {
+function toolCalls(message: Record<string, unknown>, seq: number): ToolCallView[] {
   if (!Array.isArray(message.tool_calls)) return []
   return message.tool_calls.flatMap((value, index) => {
     const call = record(value)
@@ -153,10 +134,7 @@ function toolCalls(
     return [
       {
         anchorId: `trajectory-call-${seq}-${index}`,
-        id:
-          typeof call.id === 'string' && call.id
-            ? call.id
-            : `tool-call-${index + 1}`,
+        id: typeof call.id === 'string' && call.id ? call.id : `tool-call-${index + 1}`,
         name:
           typeof call.name === 'string'
             ? call.name
@@ -176,13 +154,10 @@ function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
   const blocks = contentParts(raw.content, calls)
   const kwargs = record(raw.additional_kwargs)
   const additionalReasoning =
-    typeof kwargs?.reasoning_content === 'string'
-      ? kwargs.reasoning_content
-      : ''
+    typeof kwargs?.reasoning_content === 'string' ? kwargs.reasoning_content : ''
   const messageRole = role(raw.role)
   const responseMetadata = record(raw.response_metadata)
-  const id =
-    typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
+  const id = typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
   const view: TrajectoryMessageView = {
     id,
     seq: event.seq,
@@ -192,26 +167,20 @@ function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
     parentIds: event.parent_ids,
     name: typeof raw.name === 'string' && raw.name ? raw.name : undefined,
     modelProvider:
-      typeof responseMetadata?.model_provider === 'string' &&
-      responseMetadata.model_provider
+      typeof responseMetadata?.model_provider === 'string' && responseMetadata.model_provider
         ? responseMetadata.model_provider
         : undefined,
     modelName:
-      typeof responseMetadata?.model_name === 'string' &&
-      responseMetadata.model_name
+      typeof responseMetadata?.model_name === 'string' && responseMetadata.model_name
         ? responseMetadata.model_name
         : undefined,
     content: blocks.content,
-    reasoning: [additionalReasoning, blocks.reasoning]
-      .filter(Boolean)
-      .join('\n\n'),
+    reasoning: [additionalReasoning, blocks.reasoning].filter(Boolean).join('\n\n'),
     toolCalls: calls,
-    toolCallId:
-      typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
+    toolCallId: typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
     status: typeof raw.status === 'string' ? raw.status : undefined,
     artifact: raw.artifact,
-    diff:
-      typeof kwargs?.diff === 'string' && kwargs.diff ? kwargs.diff : undefined,
+    diff: typeof kwargs?.diff === 'string' && kwargs.diff ? kwargs.diff : undefined,
     diffTruncated: kwargs?.diff_truncated === true ? true : undefined,
     usage: usage(raw),
     searchable: ''
@@ -244,18 +213,15 @@ function linkToolResults(messages: TrajectoryMessageView[]): void {
     for (const call of message.toolCalls) {
       // Tool IDs may repeat in parallel subagents; select the closest execution branch.
       const candidates = results.filter((result) => {
-        if (result.toolCallId !== call.id || result.seq <= message.seq)
-          return false
-        if (message.agent && result.agent && message.agent !== result.agent)
-          return false
+        if (result.toolCallId !== call.id || result.seq <= message.seq) return false
+        if (message.agent && result.agent && message.agent !== result.agent) return false
         // The last parent is the model/tools node, which differs within one
         // conversation. Earlier parents identify the owning execution branch.
         const left = message.parentIds?.slice(0, -1)
         const right = result.parentIds?.slice(0, -1)
         if (left?.length && right?.length)
           return (
-            left.length === right.length &&
-            left.every((parent, index) => parent === right[index])
+            left.length === right.length && left.every((parent, index) => parent === right[index])
           )
         return true
       })
@@ -264,14 +230,12 @@ function linkToolResults(messages: TrajectoryMessageView[]): void {
           const left = message.parentIds ?? []
           const right = result.parentIds ?? []
           let common = 0
-          while (common < left.length && left[common] === right[common])
-            common += 1
+          while (common < left.length && left[common] === right[common]) common += 1
           return { result, common }
         })
         .sort((a, b) => b.common - a.common)
       const result =
-        scored.length === 1 ||
-        (scored.length > 1 && scored[0].common > scored[1].common)
+        scored.length === 1 || (scored.length > 1 && scored[0].common > scored[1].common)
           ? scored[0]?.result
           : undefined
       if (result) {
@@ -284,10 +248,7 @@ function linkToolResults(messages: TrajectoryMessageView[]): void {
     for (const call of message.toolCalls) {
       const candidate = proposed.get(call)
       // A unique result candidate can still be ambiguous on the request side.
-      const result =
-        candidate && resultRequests.get(candidate.id) === 1
-          ? candidate
-          : undefined
+      const result = candidate && resultRequests.get(candidate.id) === 1 ? candidate : undefined
       call.resultMessageId = result?.id
       call.resultStatus = result?.status
       if (result) result.requestAnchorId = call.anchorId
@@ -314,17 +275,14 @@ function totalRecordedUsage(
     reasoning: undefined,
     total: undefined
   }
-  const hasCallRecords = events.some(
-    (event) => event.event === 'model_calls_start'
-  )
+  const hasCallRecords = events.some((event) => event.event === 'model_calls_start')
   const responses = new Map<string, string[]>()
   const selected = new Map<string, string>()
   for (const event of events) {
     if (event.event === 'model_call_start') responses.set(event.call_id!, [])
     else if (event.event === 'message' && event.call_id)
       responses.get(event.call_id)?.push(event.message.id as string)
-    else if (event.event === 'model_call_end')
-      selected.set(event.call_id!, event.message_id!)
+    else if (event.event === 'model_call_end') selected.set(event.call_id!, event.message_id!)
   }
   // Keep known usage for interrupted calls only when their response is unambiguous.
   for (const [callId, ids] of responses) {
@@ -345,18 +303,13 @@ function totalRecordedUsage(
     'total'
   ] as const) {
     const values = covered.map((message) => message?.usage?.[key])
-    if (
-      values.length &&
-      values.every((value): value is number => value !== undefined)
-    )
+    if (values.length && values.every((value): value is number => value !== undefined))
       totalUsage[key] = values.reduce((sum, value) => sum + value, 0)
   }
   return totalUsage
 }
 
-export function buildTrajectoryDocument(
-  events: TrajectoryEvent[]
-): TrajectoryDocument {
+export function buildTrajectoryDocument(events: TrajectoryEvent[]): TrajectoryDocument {
   const messageEvents = events.filter(
     (event): event is TrajectoryMessageEvent => event.event === 'message'
   )
@@ -367,13 +320,8 @@ export function buildTrajectoryDocument(
   // raw content so distinct non-text blocks are never merged by text projection.
   const systems = new Map<string, { content: string; id: string }>()
   for (const [index, message] of messages.entries()) {
-    if (message.role !== 'system' || (message.parentIds?.length ?? 0) < 2)
-      continue
-    const branch = JSON.stringify([
-      message.agent,
-      message.source,
-      message.parentIds!.slice(0, -1)
-    ])
+    if (message.role !== 'system' || (message.parentIds?.length ?? 0) < 2) continue
+    const branch = JSON.stringify([message.agent, message.source, message.parentIds!.slice(0, -1)])
     const content = JSON.stringify(messageEvents[index].message.content)
     const previous = systems.get(branch)
     if (previous?.content === content) message.repeatedSystemId = previous.id

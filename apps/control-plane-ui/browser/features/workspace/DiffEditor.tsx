@@ -6,8 +6,7 @@ import { MergeView, unifiedMergeView } from '@codemirror/merge'
 import { basicSetup, EditorView } from 'codemirror'
 
 function editorExtensions(language: 'markdown' | 'json' | 'text'): Extension[] {
-  const languageExtension =
-    language === 'markdown' ? markdown() : language === 'json' ? json() : []
+  const languageExtension = language === 'markdown' ? markdown() : language === 'json' ? json() : []
   return [
     basicSetup,
     languageExtension,

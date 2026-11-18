@@ -43,9 +43,7 @@ for (const crash of [
   'after-commit'
 ] as const) {
   test(`recovers the original input after ${crash} failure`, async () => {
-    const directory = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'publication-crash-')
-    )
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'publication-crash-'))
     const source = path.join(directory, 'bundle')
     const bytes = Buffer.from('immutable bundle')
     await fs.writeFile(source, bytes)
@@ -97,9 +95,7 @@ for (const crash of [
         return candidate
       },
       async listInputBundleCandidates() {
-        return candidate && candidate.status !== 'abandoned'
-          ? [structuredClone(candidate)]
-          : []
+        return candidate && candidate.status !== 'abandoned' ? [structuredClone(candidate)] : []
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
         expect.assert(candidate)
@@ -123,20 +119,13 @@ for (const crash of [
           subject: 'original snapshot'
         })
       ).rejects.toThrow(/process died/)
-      expect.assert(
-        candidate,
-        'intent must be durable before the first external write'
-      )
+      expect.assert(candidate, 'intent must be durable before the first external write')
       if (crash === 'before-upload') {
-        expect(
-          await recoverInputBundlePublication(store, 'run', 'takeover')
-        ).toBe(false)
+        expect(await recoverInputBundlePublication(store, 'run', 'takeover')).toBe(false)
         expect(candidate.status).toBe('abandoned')
         expect(authoritative).toBe(undefined)
       } else {
-        expect(
-          await recoverInputBundlePublication(store, 'run', 'takeover')
-        ).toBe(true)
+        expect(await recoverInputBundlePublication(store, 'run', 'takeover')).toBe(true)
         expect(authoritative).toStrictEqual({
           context,
           input: {
@@ -187,7 +176,7 @@ test('an unavailable store is not evidence that the intent should be abandoned',
       expect.unreachable('must not submit unverified bytes')
     }
   }
-  await expect(
-    recoverInputBundlePublication(store, 'run', 'current')
-  ).rejects.toThrow(/storage unavailable/)
+  await expect(recoverInputBundlePublication(store, 'run', 'current')).rejects.toThrow(
+    /storage unavailable/
+  )
 })

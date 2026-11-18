@@ -5,20 +5,11 @@ import { IconFileCode } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import { HighlightText } from './TrajectoryText.js'
-import {
-  parsePatch,
-  type DiffFile,
-  type DiffRow,
-  type DiffRowKind
-} from './diff-parse.js'
+import { parsePatch, type DiffFile, type DiffRow, type DiffRowKind } from './diff-parse.js'
 
 function patchLineKind(line: string): string {
   if (line.startsWith('*** ')) return 'file'
-  if (
-    line.startsWith('Index: ') ||
-    line.startsWith('--- ') ||
-    line.startsWith('+++ ')
-  )
+  if (line.startsWith('Index: ') || line.startsWith('--- ') || line.startsWith('+++ '))
     return 'file'
   if (line.startsWith('@@')) return 'hunk'
   if (line.startsWith('+')) return 'add'
@@ -27,23 +18,13 @@ function patchLineKind(line: string): string {
 }
 
 /** Raw fallback when a patch cannot be parsed into hunks. */
-export function PatchView({
-  text,
-  query
-}: {
-  text: string
-  query: string
-}): React.JSX.Element {
+export function PatchView({ text, query }: { text: string; query: string }): React.JSX.Element {
   return (
     <div className="trajectory-patch" data-trajectory-patch="">
       {text.split('\n').map((line, index) => {
         const kind = patchLineKind(line)
         return (
-          <div
-            key={index}
-            className={'trajectory-patch-line ' + kind}
-            data-patch-line={kind}
-          >
+          <div key={index} className={'trajectory-patch-line ' + kind} data-patch-line={kind}>
             <HighlightText value={line === '' ? ' ' : line} query={query} />
           </div>
         )
@@ -69,13 +50,7 @@ function UnifiedHunks({ file, query }: { file: DiffFile; query: string }) {
               data-patch-line={row.kind}
             >
               <HighlightText
-                value={
-                  (row.kind === 'add'
-                    ? '+'
-                    : row.kind === 'remove'
-                      ? '-'
-                      : ' ') + row.text
-                }
+                value={(row.kind === 'add' ? '+' : row.kind === 'remove' ? '-' : ' ') + row.text}
                 query={query}
               />
             </div>
@@ -173,25 +148,11 @@ function SplitHunks({ file, query }: { file: DiffFile; query: string }) {
               className={'trajectory-diff-split-row ' + row.kind}
               data-diff-kind={row.kind}
             >
-              <div
-                className={
-                  'trajectory-diff-cell old' +
-                  (row.oldChanged ? ' changed' : '')
-                }
-              >
-                {row.oldText !== null && (
-                  <HighlightText value={row.oldText} query={query} />
-                )}
+              <div className={'trajectory-diff-cell old' + (row.oldChanged ? ' changed' : '')}>
+                {row.oldText !== null && <HighlightText value={row.oldText} query={query} />}
               </div>
-              <div
-                className={
-                  'trajectory-diff-cell new' +
-                  (row.newChanged ? ' changed' : '')
-                }
-              >
-                {row.newText !== null && (
-                  <HighlightText value={row.newText} query={query} />
-                )}
+              <div className={'trajectory-diff-cell new' + (row.newChanged ? ' changed' : '')}>
+                {row.newText !== null && <HighlightText value={row.newText} query={query} />}
               </div>
             </div>
           ))}
@@ -273,19 +234,12 @@ export function DiffView({
         const pathLabel = file.movedFrom
           ? displayPath(file.movedFrom) + ' → ' + displayPath(file.path)
           : displayPath(file.path)
-        const title = file.movedFrom
-          ? file.movedFrom + ' → ' + file.path
-          : file.path
+        const title = file.movedFrom ? file.movedFrom + ' → ' + file.path : file.path
         return (
           <div className="trajectory-diff-file" key={file.path}>
             <div className="trajectory-diff-file-header" title={title}>
               <IconFileCode size={ICON_SIZE.sm} />
-              <Text
-                size="sm"
-                fw={600}
-                truncate
-                className="trajectory-diff-file-path"
-              >
+              <Text size="sm" fw={600} truncate className="trajectory-diff-file-path">
                 <HighlightText value={pathLabel} query={query} />
               </Text>
               {file.movedFrom ? (
@@ -302,11 +256,7 @@ export function DiffView({
                 </Badge>
               ) : null}
               {(stats.adds > 0 || stats.removes > 0) && (
-                <Text
-                  size="xs"
-                  c="dimmed"
-                  className="trajectory-diff-file-stats"
-                >
+                <Text size="xs" c="dimmed" className="trajectory-diff-file-stats">
                   {'+' + stats.adds} {'−' + stats.removes}
                 </Text>
               )}

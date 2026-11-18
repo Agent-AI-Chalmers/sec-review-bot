@@ -1,13 +1,5 @@
 import React from 'react'
-import {
-  Accordion,
-  Badge,
-  Button,
-  Drawer,
-  Group,
-  Table,
-  Text
-} from '@mantine/core'
+import { Accordion, Badge, Button, Drawer, Group, Table, Text } from '@mantine/core'
 
 import type { Run } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
@@ -29,9 +21,7 @@ interface AgentSummary {
 }
 
 function formatCount(value: number | null, language: 'en' | 'zh') {
-  return value === null
-    ? '—'
-    : value.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+  return value === null ? '—' : value.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
 }
 
 function statusPresentation(statistics: Statistics): {
@@ -57,10 +47,7 @@ function UsageDetails({ usage }: { usage: Usage }): React.JSX.Element {
         value={usage.input_tokens}
         subsets={[
           [t('statisticsCacheReadTokens'), usage.cache_read_input_tokens],
-          [
-            t('statisticsCacheCreationTokens'),
-            usage.cache_creation_input_tokens
-          ]
+          [t('statisticsCacheCreationTokens'), usage.cache_creation_input_tokens]
         ]}
         language={language}
       />
@@ -104,15 +91,10 @@ function UsageMetric({
   )
 }
 
-function phaseLabel(
-  group: StatisticsGroup,
-  t: ReturnType<typeof useMessages>
-): string {
+function phaseLabel(group: StatisticsGroup, t: ReturnType<typeof useMessages>): string {
   if (group.agent_phase === 'feedback') {
     const label = t('statisticsFeedbackRetry')
-    return group.feedback_retry_index === null
-      ? label
-      : `${label} ${group.feedback_retry_index}`
+    return group.feedback_retry_index === null ? label : `${label} ${group.feedback_retry_index}`
   }
   if (group.agent_phase === 'initial') return t('statisticsInitialReview')
   if (group.agent_phase === 'draft')
@@ -172,9 +154,7 @@ function summedUsage(groups: StatisticsGroup[]): Usage {
     output_tokens: sum((usage) => usage.output_tokens),
     total_tokens: sum((usage) => usage.total_tokens),
     cache_read_input_tokens: sum((usage) => usage.cache_read_input_tokens),
-    cache_creation_input_tokens: sum(
-      (usage) => usage.cache_creation_input_tokens
-    ),
+    cache_creation_input_tokens: sum((usage) => usage.cache_creation_input_tokens),
     reasoning_tokens: sum((usage) => usage.reasoning_tokens)
   }
 }
@@ -189,8 +169,7 @@ function summarizeAgents(
     const key = agentGroupKey(group)
     const label = breakdownLabelFor(group)
     if (label !== null) {
-      const agentBreakdowns =
-        breakdownGroups.get(key) ?? new Map<string, StatisticsGroup[]>()
+      const agentBreakdowns = breakdownGroups.get(key) ?? new Map<string, StatisticsGroup[]>()
       agentBreakdowns.set(label, [...(agentBreakdowns.get(label) ?? []), group])
       breakdownGroups.set(key, agentBreakdowns)
     }
@@ -252,17 +231,12 @@ function SummaryMetrics({
     <Text size="xs" c="dimmed" className="statistics-unit-metrics">
       {prefix !== undefined && <>{prefix} · </>}
       {formatCount(groupCallCount(groups), language)} {t('statisticsCalls')} ·{' '}
-      {formatCount(groupTokenCount(groups), language)}{' '}
-      {t('statisticsTokenUnit')}
+      {formatCount(groupTokenCount(groups), language)} {t('statisticsTokenUnit')}
     </Text>
   )
 }
 
-function AgentBreakdown({
-  sections
-}: {
-  sections: UsageSection[]
-}): React.JSX.Element {
+function AgentBreakdown({ sections }: { sections: UsageSection[] }): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
   const totalUsage = summedUsage(sections.flatMap((section) => section.groups))
@@ -272,8 +246,7 @@ function AgentBreakdown({
         {formatCount(usage.input_tokens, language)}
       </Text>
       <Text size="xs" c="dimmed" className="statistics-usage-cell-subset">
-        {t('statisticsCacheReadTokens')}{' '}
-        {formatCount(usage.cache_read_input_tokens, language)} ·{' '}
+        {t('statisticsCacheReadTokens')} {formatCount(usage.cache_read_input_tokens, language)} ·{' '}
         {t('statisticsCacheCreationTokens')}{' '}
         {formatCount(usage.cache_creation_input_tokens, language)}
       </Text>
@@ -283,8 +256,7 @@ function AgentBreakdown({
         {formatCount(usage.output_tokens, language)}
       </Text>
       <Text size="xs" c="dimmed" className="statistics-usage-cell-subset">
-        {t('statisticsReasoningTokens')}{' '}
-        {formatCount(usage.reasoning_tokens, language)}
+        {t('statisticsReasoningTokens')} {formatCount(usage.reasoning_tokens, language)}
       </Text>
     </Table.Td>
   ]
@@ -336,8 +308,7 @@ function StatisticsTable({
             {section.label}
           </Text>
           <Text size="xs" c="dimmed">
-            {formatCount(groupCallCount(section.groups), language)}{' '}
-            {t('statisticsCalls')}
+            {formatCount(groupCallCount(section.groups), language)} {t('statisticsCalls')}
           </Text>
         </Group>
       )}
@@ -346,9 +317,7 @@ function StatisticsTable({
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t('statisticsAgent')}</Table.Th>
-              <Table.Th className="statistics-model-column">
-                {t('statisticsModel')}
-              </Table.Th>
+              <Table.Th className="statistics-model-column">{t('statisticsModel')}</Table.Th>
               <Table.Th className="statistics-numeric-column" ta="right">
                 {t('statisticsCalls')}
               </Table.Th>
@@ -395,12 +364,8 @@ function StatisticsTable({
                           </Text>
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {formatCount(group.model_call_count, language)}{' '}
-                          {t('statisticsCalls')} ·{' '}
-                          {formatCount(
-                            group.token_usage.total_tokens,
-                            language
-                          )}{' '}
+                          {formatCount(group.model_call_count, language)} {t('statisticsCalls')} ·{' '}
+                          {formatCount(group.token_usage.total_tokens, language)}{' '}
                           {t('statisticsTokenUnit')}
                         </Text>
                       </div>
@@ -425,12 +390,8 @@ function StatisticsTable({
                   {expanded && (
                     <Table.Tr className="statistics-group-detail">
                       <Table.Td colSpan={4}>
-                        {groupBreakdown.length > 0 && (
-                          <AgentBreakdown sections={groupBreakdown} />
-                        )}
-                        {groupBreakdown.length === 0 && (
-                          <UsageDetails usage={group.token_usage} />
-                        )}
+                        {groupBreakdown.length > 0 && <AgentBreakdown sections={groupBreakdown} />}
+                        {groupBreakdown.length === 0 && <UsageDetails usage={group.token_usage} />}
                       </Table.Td>
                     </Table.Tr>
                   )}
@@ -479,21 +440,15 @@ function RepositoryBreakdown({
       caseGroups.set(group.case_id, existing)
     } else if (group.agent_name === 'repository-delivery-planner') {
       deliveryStageGroups.push(group)
-    } else if (
-      group.delivery_id !== null ||
-      group.agent_name === 'patch-synthesizer'
-    ) {
+    } else if (group.delivery_id !== null || group.agent_name === 'patch-synthesizer') {
       deliveryStageGroups.push(group)
     }
   }
   const scanSummary = summarizeAgents(scanGroups, (group) =>
-    group.agent_name === 'repository-triager'
-      ? phaseLabel(group, t)
-      : group.chunk_id
+    group.agent_name === 'repository-triager' ? phaseLabel(group, t) : group.chunk_id
   )
   const deliverySummary = summarizeAgents(deliveryStageGroups, (group) => {
-    if (group.agent_name === 'repository-delivery-planner')
-      return phaseLabel(group, t)
+    if (group.agent_name === 'repository-delivery-planner') return phaseLabel(group, t)
     return group.delivery_id
   })
 
@@ -550,11 +505,7 @@ function RepositoryBreakdown({
                 const sections = phaseSections(caseUsageGroups, t)
                 const onlyInitialReview = isOnlyInitialReview(sections)
                 return (
-                  <Accordion.Item
-                    key={caseId}
-                    value={caseId}
-                    className="statistics-unit"
-                  >
+                  <Accordion.Item key={caseId} value={caseId} className="statistics-unit">
                     <Accordion.Control className="statistics-unit-control">
                       <Group justify="space-between" wrap="nowrap" gap="md">
                         <span>
@@ -658,11 +609,7 @@ function PhaseBreakdown({
       className="statistics-workflow-stages"
     >
       {sections.map((section) => (
-        <Accordion.Item
-          key={section.key}
-          value={section.key}
-          className="statistics-workflow-stage"
-        >
+        <Accordion.Item key={section.key} value={section.key} className="statistics-workflow-stage">
           <Accordion.Control className="statistics-workflow-stage-control">
             <Group justify="space-between" wrap="nowrap" gap="md">
               <span>{section.label}</span>
@@ -693,9 +640,7 @@ export function ExecutionStatistics({
 }): React.JSX.Element | null {
   const { language } = useLanguage()
   const t = useMessages()
-  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(
-    () => new Set()
-  )
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => new Set())
   const [detailsOpened, setDetailsOpened] = React.useState(false)
   const [openStages, setOpenStages] = React.useState<string[]>([])
   const [openCases, setOpenCases] = React.useState<string[]>([])
@@ -704,8 +649,7 @@ export function ExecutionStatistics({
   const status = statusPresentation(statistics)
   const noObservations = statistics.ingestion_status === 'no_observations'
   const partial =
-    statistics.ingestion_status === 'partial_window' ||
-    statistics.usage_coverage === 'partial'
+    statistics.ingestion_status === 'partial_window' || statistics.usage_coverage === 'partial'
   // A successful empty read is meaningful: show "0 calls" instead of making it look like no
   // statistics exist. A never-read pending row and an unavailable dependency still stay empty.
   const hasObservedUsage =
@@ -739,9 +683,7 @@ export function ExecutionStatistics({
     setOpenCases(caseIds)
     const root = detailsRef.current
     if (root === null) return
-    const keys = [
-      ...root.querySelectorAll<HTMLElement>('.statistics-group-row')
-    ]
+    const keys = [...root.querySelectorAll<HTMLElement>('.statistics-group-row')]
       .map((row) => row.dataset.groupKey)
       .filter((key): key is string => key !== undefined)
     setExpandedGroups(new Set(keys))
@@ -765,10 +707,8 @@ export function ExecutionStatistics({
         )}
         {hasObservedUsage && (
           <Text size="sm" c="dimmed">
-            {formatCount(statistics.observed_call_count, language)}{' '}
-            {t('statisticsCalls')} ·{' '}
-            {formatCount(statistics.token_usage.total_tokens, language)}{' '}
-            {t('statisticsTokenUnit')}
+            {formatCount(statistics.observed_call_count, language)} {t('statisticsCalls')} ·{' '}
+            {formatCount(statistics.token_usage.total_tokens, language)} {t('statisticsTokenUnit')}
           </Text>
         )}
         {hasDetails && (
@@ -788,12 +728,7 @@ export function ExecutionStatistics({
         </Text>
       )}
       {noObservations && (
-        <Text
-          size="xs"
-          c="dimmed"
-          mt={4}
-          data-testid="statistics-no-observations"
-        >
+        <Text size="xs" c="dimmed" mt={4} data-testid="statistics-no-observations">
           {t('statisticsNoObservations')}
         </Text>
       )}
@@ -809,8 +744,7 @@ export function ExecutionStatistics({
                 {t('statisticsDetailsTitle')}
               </Text>
               <Text size="xs" c="dimmed">
-                {t('statisticsUpdated')}{' '}
-                {formatDate(statistics.updated_at, language)}
+                {t('statisticsUpdated')} {formatDate(statistics.updated_at, language)}
               </Text>
             </div>
           }
@@ -828,9 +762,7 @@ export function ExecutionStatistics({
                 {t('statisticsCollapseAll')}
               </Button>
             </Group>
-            {hasObservedUsage && (
-              <UsageDetails usage={statistics.token_usage} />
-            )}
+            {hasObservedUsage && <UsageDetails usage={statistics.token_usage} />}
             <div className="statistics-groups">
               {workflow === 'repository-review' ? (
                 <RepositoryBreakdown

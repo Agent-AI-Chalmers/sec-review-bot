@@ -18,18 +18,8 @@ import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
 export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'services', 'review-runs')
-export const SPEC_PATH = path.resolve(
-  REPO_ROOT,
-  'contracts',
-  'execution-api',
-  'v1',
-  'openapi.yaml'
-)
-export const REVIEW_RUNS_OUTPUT_PATH = path.join(
-  REVIEW_RUNS_ROOT,
-  'src',
-  'execution-api-schema.ts'
-)
+export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'execution-api', 'v1', 'openapi.yaml')
+export const REVIEW_RUNS_OUTPUT_PATH = path.join(REVIEW_RUNS_ROOT, 'src', 'execution-api-schema.ts')
 export const GATEWAY_OUTPUT_PATH = path.join(
   REPO_ROOT,
   'services',
@@ -45,16 +35,14 @@ const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path r
 `
 
 function renderOperationOptionsById(spec: unknown): string {
-  const paths = (spec as { paths?: Record<string, Record<string, unknown>> })
-    .paths
+  const paths = (spec as { paths?: Record<string, Record<string, unknown>> }).paths
   if (paths === undefined) throw new Error('Execution API has no paths')
   const entries: string[] = []
   for (const pathItem of Object.values(paths)) {
     for (const operation of Object.values(pathItem)) {
       const operationId = (operation as { operationId?: unknown }).operationId
       if (typeof operationId !== 'string') continue
-      const typeName =
-        operationId.charAt(0).toUpperCase() + operationId.slice(1)
+      const typeName = operationId.charAt(0).toUpperCase() + operationId.slice(1)
       entries.push(`  ${operationId}: ${typeName}Options`)
     }
   }
@@ -62,9 +50,7 @@ function renderOperationOptionsById(spec: unknown): string {
 }
 
 /** The committed content of `src/execution-api-schema.ts`. */
-export async function renderExecutionApiTypes(
-  outputPath: string
-): Promise<string> {
+export async function renderExecutionApiTypes(outputPath: string): Promise<string> {
   const spec = parse(await readFile(SPEC_PATH, 'utf8')) as unknown
   const composedTypes = `
 ${await renderWorkflowInputDeclarations()}
@@ -84,22 +70,19 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
     input: WorkflowInputByName[Workflow]
   }
 `
-  const rendered =
-    HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
+  const rendered = HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
   const result = await format(outputPath, rendered, {
     semi: false,
     singleQuote: true,
     trailingComma: 'none',
-    printWidth: 80,
+    printWidth: 100,
     sortImports: false,
     sortPackageJson: false,
     embeddedLanguageFormatting: 'off',
     proseWrap: 'preserve'
   })
   if (result.errors.length > 0) {
-    throw new Error(
-      `Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`
-    )
+    throw new Error(`Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`)
   }
   return result.code
 }

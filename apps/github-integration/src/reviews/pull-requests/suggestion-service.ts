@@ -188,11 +188,7 @@ function decodeGitPatchPath(value: string): string {
         index += 3
       } else {
         const escaped = value[++index]
-        if (
-          index >= value.length - 1 ||
-          escaped === undefined ||
-          !(escaped in escapes)
-        ) {
+        if (index >= value.length - 1 || escaped === undefined || !(escaped in escapes)) {
           throw new Error('Invalid escape in quoted Git path.')
         }
         bytes.push(escapes[escaped]!)
@@ -223,10 +219,7 @@ function buildSuggestionBody(replacement: string) {
   return ['```suggestion', replacement, '```'].join('\n')
 }
 
-function toLineRange(
-  start: number,
-  count: number
-): { start: number; end: number } | null {
+function toLineRange(start: number, count: number): { start: number; end: number } | null {
   if (start <= 0 || count <= 0) {
     return null
   }
@@ -247,10 +240,7 @@ function findAnchoringHunkForBlock(
   block: WorkspaceSuggestionBlock,
   prHunks: HunkHeader[]
 ): HunkHeader | null {
-  const blockRange = toLineRange(
-    block.start_line,
-    block.line - block.start_line + 1
-  )
+  const blockRange = toLineRange(block.start_line, block.line - block.start_line + 1)
   if (!blockRange) {
     return null
   }
@@ -411,8 +401,7 @@ function buildSuggestionManifest({
   const skipReasons = new Set<string>()
 
   if (!mitigation || workspacePatchFiles.length === 0) {
-    manifest.skipped_reason =
-      'Workspace patch contains no suggestible file entries.'
+    manifest.skipped_reason = 'Workspace patch contains no suggestible file entries.'
     return manifest
   }
 
@@ -423,18 +412,10 @@ function buildSuggestionManifest({
       manifest.unmapped_changes.push({ path: workspacePatchFile.path, reason })
       continue
     }
-    const prFile = files.find(
-      (file) => file.filename === workspacePatchFile.path
-    )
-    if (
-      !prFile ||
-      typeof prFile.patch !== 'string' ||
-      prFile.patch.trim() === ''
-    ) {
+    const prFile = files.find((file) => file.filename === workspacePatchFile.path)
+    if (!prFile || typeof prFile.patch !== 'string' || prFile.patch.trim() === '') {
       const reason = 'File is not visible as a patchable PR diff file.'
-      skipReasons.add(
-        `File ${workspacePatchFile.path} is not visible as a patchable PR diff file.`
-      )
+      skipReasons.add(`File ${workspacePatchFile.path} is not visible as a patchable PR diff file.`)
       manifest.unmapped_changes.push({
         path: workspacePatchFile.path,
         reason
@@ -445,9 +426,7 @@ function buildSuggestionManifest({
     const prHunks = parsePatchHunks(prFile.patch)
     if (prHunks.length === 0) {
       const reason = 'File has no anchorable PR patch hunks.'
-      skipReasons.add(
-        `File ${workspacePatchFile.path} has no anchorable PR patch hunks.`
-      )
+      skipReasons.add(`File ${workspacePatchFile.path} has no anchorable PR patch hunks.`)
       manifest.unmapped_changes.push({
         path: workspacePatchFile.path,
         reason
@@ -456,14 +435,10 @@ function buildSuggestionManifest({
     }
 
     for (const workspaceHunk of workspacePatchFile.hunks) {
-      const suggestionBlocks =
-        splitWorkspaceHunkIntoSuggestionBlocks(workspaceHunk)
+      const suggestionBlocks = splitWorkspaceHunkIntoSuggestionBlocks(workspaceHunk)
       if (suggestionBlocks.length === 0) {
-        const reason =
-          'Workspace hunk produced an empty suggestion replacement.'
-        skipReasons.add(
-          `File ${workspacePatchFile.path} produced an empty suggestion replacement.`
-        )
+        const reason = 'Workspace hunk produced an empty suggestion replacement.'
+        skipReasons.add(`File ${workspacePatchFile.path} produced an empty suggestion replacement.`)
         manifest.unmapped_changes.push({
           path: workspacePatchFile.path,
           reason,
@@ -493,10 +468,7 @@ function buildSuggestionManifest({
           continue
         }
 
-        const anchoringRange = toLineRange(
-          anchoringHunk.new_start,
-          anchoringHunk.new_count
-        )
+        const anchoringRange = toLineRange(anchoringHunk.new_start, anchoringHunk.new_count)
         if (!anchoringRange) {
           const reason =
             'Workspace hunk has no right-side line range for inline suggestion anchoring.'

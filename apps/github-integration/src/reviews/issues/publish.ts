@@ -8,10 +8,7 @@ import {
 } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../review-runs/publish-context.js'
 import type { Octokit } from 'octokit'
-import {
-  buildDraftBranchName,
-  createDraftPullRequestFromIssueReviewRecord
-} from './draft-pr.js'
+import { buildDraftBranchName, createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 import { parseIssueReviewPublishContext } from '../../review-runs/publish-context.js'
@@ -50,9 +47,7 @@ type CompletedExecutionRun = {
   publish_context: Record<string, unknown>
 }
 
-function issueReviewResultFromWorkflowResult(
-  result: unknown
-): IssueReviewWorkflowResult | null {
+function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
     assertWorkflowResult('issue-review', result)
     const rawResult = result as {
@@ -94,9 +89,7 @@ export async function handleIssueReviewRun({
   if (workflow_result === null) {
     throw new Error(`Issue review run ${run.run_id} is not ready to publish.`)
   }
-  const octokit = await installation_octokit_for_repo(
-    context.issue.repo_full_name
-  )
+  const octokit = await installation_octokit_for_repo(context.issue.repo_full_name)
   await publishIssueReviewResult({
     octokit,
     issue: context.issue,
@@ -176,9 +169,7 @@ async function publishIssueReviewResult({
           repo_name: issue.repo_name,
           branch_name: branch
         })
-        return existing === null
-          ? null
-          : { id: existing.number, url: existing.html_url }
+        return existing === null ? null : { id: existing.number, url: existing.html_url }
       },
       effect: async () => {
         // The creation path is idempotent on its own: the branch is run-specific and an
@@ -191,9 +182,7 @@ async function publishIssueReviewResult({
           review_record,
           assert_publication_claim
         })
-        return created === null
-          ? null
-          : { id: created.number, url: created.html_url }
+        return created === null ? null : { id: created.number, url: created.html_url }
       }
     })
     // A step that was already claimed once may have created the pull request before its

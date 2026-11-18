@@ -43,19 +43,10 @@ export function useRunsLocation(): RunsLocation {
   // Persisted in sessionStorage because navigating to a run detail unmounts this
   // component; without it, returning would reset the trail and strand the reader
   // with no Previous control (the Detail "Back to runs" link restores only the URL).
-  const [cursorParents, setCursorParents] = React.useState<
-    Record<string, string>
-  >(() => {
+  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>(() => {
     try {
-      const stored: unknown = JSON.parse(
-        window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}'
-      )
-      if (
-        typeof stored !== 'object' ||
-        stored === null ||
-        Array.isArray(stored)
-      )
-        return {}
+      const stored: unknown = JSON.parse(window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}')
+      if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {}
       return Object.fromEntries(
         Object.entries(stored).filter(
           (entry): entry is [string, string] => typeof entry[1] === 'string'
@@ -66,18 +57,13 @@ export function useRunsLocation(): RunsLocation {
     }
   })
   React.useEffect(() => {
-    window.sessionStorage.setItem(
-      CURSOR_PARENTS_KEY,
-      JSON.stringify(cursorParents)
-    )
+    window.sessionStorage.setItem(CURSOR_PARENTS_KEY, JSON.stringify(cursorParents))
   }, [cursorParents])
   const cursor = search.get('cursor') ?? ''
   const previousCursor = cursorParents[cursor]
   const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)
   const pageSize =
-    Number.isSafeInteger(requestedPageSize) &&
-    requestedPageSize >= 1 &&
-    requestedPageSize <= 100
+    Number.isSafeInteger(requestedPageSize) && requestedPageSize >= 1 && requestedPageSize <= 100
       ? requestedPageSize
       : DEFAULT_PAGE_SIZE
   // State the page size on every request, so the console never depends on the

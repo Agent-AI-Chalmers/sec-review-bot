@@ -20,10 +20,7 @@ export function isUnauthorizedApiError(error: unknown): error is ApiError {
  * so cancellation during route and component lifecycle changes never becomes resource error UI. */
 export function isAbortError(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    error.name === 'AbortError'
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
   )
 }
 
@@ -34,9 +31,7 @@ export function throwIfUnauthorized(error: unknown): void {
   if (isUnauthorizedApiError(error)) throw error
 }
 
-export async function errorCode(
-  response: Response
-): Promise<string | undefined> {
+export async function errorCode(response: Response): Promise<string | undefined> {
   try {
     const body: unknown = await response.json()
     if (
@@ -68,10 +63,7 @@ export interface ApiRequest {
  * second path to `fetch`: the error mapping and the console's error code live on this one seam,
  * so a new endpoint cannot answer a failure differently by accident.
  */
-export async function request(
-  path: string,
-  options: ApiRequest = {}
-): Promise<Response> {
+export async function request(path: string, options: ApiRequest = {}): Promise<Response> {
   const hasBody = options.body !== undefined
   const headers =
     options.headers === undefined
@@ -87,15 +79,11 @@ export async function request(
     ...(headers === undefined ? {} : { headers }),
     ...(hasBody ? { body: JSON.stringify(options.body) } : {})
   })
-  if (!response.ok)
-    throw new ApiError(response.status, await errorCode(response))
+  if (!response.ok) throw new ApiError(response.status, await errorCode(response))
   return response
 }
 
-export async function api<T>(
-  path: string,
-  options: ApiRequest = {}
-): Promise<T> {
+export async function api<T>(path: string, options: ApiRequest = {}): Promise<T> {
   const response = await request(path, options)
   return (await response.json()) as T
 }

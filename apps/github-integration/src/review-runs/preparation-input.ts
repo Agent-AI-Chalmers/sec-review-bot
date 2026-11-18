@@ -44,18 +44,13 @@ export function parseRepositoryPreparationInput(value: unknown): {
   const input = requireRecord(value, 'object')
   return {
     payload: requireRecord(input.payload, 'payload'),
-    verified_repository: requireText(
-      input.verified_repository,
-      'verified_repository'
-    )
+    verified_repository: requireText(input.verified_repository, 'verified_repository')
   }
 }
 
 function requireString(value: unknown, label: string): string {
   if (typeof value !== 'string')
-    throw new InvalidPreparationInputError(
-      `Preparation input has an invalid ${label}.`
-    )
+    throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.`)
   return value
 }
 
@@ -69,57 +64,34 @@ function requireChoice<const T extends string>(
   label: string
 ): T {
   for (const choice of choices) if (value === choice) return choice
-  throw new InvalidPreparationInputError(
-    `Preparation input has an invalid ${label}.`
-  )
+  throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.`)
 }
 
 function requireTestChanges(value: unknown): TestChangesPolicy | null {
-  return value === null
-    ? null
-    : requireChoice(value, ['allow', 'deny'], 'test_changes')
+  return value === null ? null : requireChoice(value, ['allow', 'deny'], 'test_changes')
 }
 
-export function parseIssuePreparationInput(
-  value: unknown
-): IssuePreparationInput {
+export function parseIssuePreparationInput(value: unknown): IssuePreparationInput {
   const input = requireRecord(value, 'object')
   return {
     kind: requireChoice(input.kind, ['github_issue_review'], 'kind'),
     issue: requireIssueContext(input.issue),
-    trusted_default_branch: requireTrustedDefaultBranch(
-      input.trusted_default_branch
-    ),
-    event_type: requireChoice(
-      input.event_type,
-      ['opened', 'manual_review'],
-      'event_type'
-    ),
+    trusted_default_branch: requireTrustedDefaultBranch(input.trusted_default_branch),
+    event_type: requireChoice(input.event_type, ['opened', 'manual_review'], 'event_type'),
     review_objective:
       input.review_objective === null
         ? null
-        : requireChoice(
-            input.review_objective,
-            ['audit', 'repair'],
-            'review_objective'
-          ),
+        : requireChoice(input.review_objective, ['audit', 'repair'], 'review_objective'),
     test_changes: requireTestChanges(input.test_changes),
-    open_pr:
-      input.open_pr === null
-        ? null
-        : requireBooleanField(input, 'open_pr', 'input')
+    open_pr: input.open_pr === null ? null : requireBooleanField(input, 'open_pr', 'input')
   }
 }
 
-export function parsePullRequestPreparationInput(
-  value: unknown
-): PullRequestPreparationInput {
+export function parsePullRequestPreparationInput(value: unknown): PullRequestPreparationInput {
   const input = requireRecord(value, 'object')
   const common = {
     kind: requireChoice(input.kind, ['github_pull_request_review'], 'kind'),
-    trusted_default_branch: requireTrustedDefaultBranch(
-      input.trusted_default_branch
-    ),
+    trusted_default_branch: requireTrustedDefaultBranch(input.trusted_default_branch),
     event_type: requireChoice(
       input.event_type,
       ['opened', 'ready_for_review', 'synchronize', 'manual_review'],
@@ -128,8 +100,7 @@ export function parsePullRequestPreparationInput(
     test_changes: requireTestChanges(input.test_changes)
   }
   // Existing checkpoints carry both fields. Their captured snapshot is authoritative.
-  if (input.pr !== undefined)
-    return { ...common, pr: requirePersistedPullRequest(input.pr) }
+  if (input.pr !== undefined) return { ...common, pr: requirePersistedPullRequest(input.pr) }
   const reference = requireRecord(input.pr_reference, 'pr_reference')
   const pr_number = requireNumberField(reference, 'pr_number', 'pr_reference')
   if (!Number.isInteger(pr_number) || pr_number <= 0)
@@ -148,38 +119,24 @@ export function parsePullRequestPreparationInput(
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isRecord(value))
-    throw new InvalidPreparationInputError(
-      `Preparation input is missing ${label}.`
-    )
+    throw new InvalidPreparationInputError(`Preparation input is missing ${label}.`)
   return value
 }
 
 function requireText(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.trim() === '')
-    throw new InvalidPreparationInputError(
-      `Preparation input is missing ${label}.`
-    )
+    throw new InvalidPreparationInputError(`Preparation input is missing ${label}.`)
   return value
 }
 
-function requireStringField(
-  record: Record<string, unknown>,
-  field: string,
-  label: string
-) {
+function requireStringField(record: Record<string, unknown>, field: string, label: string) {
   return requireText(record[field], `${label}.${field}`)
 }
 
-function requireNumberField(
-  record: Record<string, unknown>,
-  field: string,
-  label: string
-): number {
+function requireNumberField(record: Record<string, unknown>, field: string, label: string): number {
   const value = record[field]
   if (typeof value !== 'number' || !Number.isFinite(value))
-    throw new InvalidPreparationInputError(
-      `Preparation input is missing ${label}.${field}`
-    )
+    throw new InvalidPreparationInputError(`Preparation input is missing ${label}.${field}`)
   return value
 }
 
@@ -190,9 +147,7 @@ function requireBooleanField(
 ): boolean {
   const value = record[field]
   if (typeof value !== 'boolean')
-    throw new InvalidPreparationInputError(
-      `Preparation input is missing ${label}.${field}`
-    )
+    throw new InvalidPreparationInputError(`Preparation input is missing ${label}.${field}`)
   return value
 }
 
@@ -200,27 +155,14 @@ function requireBooleanField(
 function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
   const record = requireRecord(value, label)
   // JSON omits undefined logins produced by extractIssueContext.
-  const sender_login = optionalLogin(
-    record.sender_login,
-    `${label}.sender_login`
-  )
-  const issue_author = optionalLogin(
-    record.issue_author,
-    `${label}.issue_author`
-  )
+  const sender_login = optionalLogin(record.sender_login, `${label}.sender_login`)
+  const issue_author = optionalLogin(record.issue_author, `${label}.issue_author`)
   const issue_body = record.issue_body
   if (issue_body !== null && typeof issue_body !== 'string')
-    throw new InvalidPreparationInputError(
-      `Preparation input has an invalid ${label}.issue_body`
-    )
+    throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.issue_body`)
   const labels = record.labels
-  if (
-    !Array.isArray(labels) ||
-    !labels.every((item): item is string => typeof item === 'string')
-  )
-    throw new InvalidPreparationInputError(
-      `Preparation input is missing ${label}.labels`
-    )
+  if (!Array.isArray(labels) || !labels.every((item): item is string => typeof item === 'string'))
+    throw new InvalidPreparationInputError(`Preparation input is missing ${label}.labels`)
   return {
     action: requireString(record['action'], `${label}.action`),
     repo_name: requireStringField(record, 'repo_name', label),
@@ -236,10 +178,7 @@ function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
     labels,
     html_url: requireString(record['html_url'], `${label}.html_url`),
     api_url: requireString(record['api_url'], `${label}.api_url`),
-    comments_url: requireString(
-      record['comments_url'],
-      `${label}.comments_url`
-    ),
+    comments_url: requireString(record['comments_url'], `${label}.comments_url`),
     is_pull_request: requireBooleanField(record, 'is_pull_request', label)
   }
 }
@@ -252,10 +191,7 @@ function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
  * window and the commit list), while this input exists before preparation
  * starts. They are separate lifecycles and must not share a validator.
  */
-function requirePersistedPullRequest(
-  value: unknown,
-  label = 'pr'
-): PullRequestContext {
+function requirePersistedPullRequest(value: unknown, label = 'pr'): PullRequestContext {
   const record = requireRecord(value, label)
   return {
     action: requireString(record['action'], `${label}.action`),
@@ -280,25 +216,11 @@ function requirePersistedPullRequest(
     html_url: requireString(record['html_url'], `${label}.html_url`),
     api_url: requireString(record['api_url'], `${label}.api_url`),
     commits_url: requireString(record['commits_url'], `${label}.commits_url`),
-    review_comments_url: requireString(
-      record.review_comments_url,
-      `${label}.review_comments_url`
-    ),
-    comments_url: requireString(
-      record['comments_url'],
-      `${label}.comments_url`
-    ),
+    review_comments_url: requireString(record.review_comments_url, `${label}.review_comments_url`),
+    comments_url: requireString(record['comments_url'], `${label}.comments_url`),
     issue_url: requireString(record['issue_url'], `${label}.issue_url`),
-    head_repo_full_name: optionalStringOrNull(
-      record,
-      'head_repo_full_name',
-      label
-    ),
-    base_repo_full_name: optionalStringOrNull(
-      record,
-      'base_repo_full_name',
-      label
-    ),
+    head_repo_full_name: optionalStringOrNull(record, 'head_repo_full_name', label),
+    base_repo_full_name: optionalStringOrNull(record, 'base_repo_full_name', label),
     from_fork: requireBooleanField(record, 'from_fork', label)
   }
 }
@@ -310,9 +232,7 @@ function optionalStringOrNull(
 ): string | null {
   const value = record[field]
   if (value !== null && typeof value !== 'string')
-    throw new InvalidPreparationInputError(
-      `Preparation input has an invalid ${label}.${field}`
-    )
+    throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.${field}`)
   return value
 }
 

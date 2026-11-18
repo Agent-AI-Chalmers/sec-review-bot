@@ -49,19 +49,11 @@ function parsePaxPath(body: Buffer): string {
     if (!/^\d+$/.test(lengthText)) throw new Error('invalid_tar_zstd_envelope')
     const length = Number.parseInt(lengthText, 10)
     const end = position + length
-    if (
-      length <= space - position + 2 ||
-      end > body.length ||
-      body[end - 1] !== 0x0a
-    )
+    if (length <= space - position + 2 || end > body.length || body[end - 1] !== 0x0a)
       throw new Error('invalid_tar_zstd_envelope')
     const record = body.subarray(space + 1, end - 1)
     const equals = record.indexOf(0x3d)
-    if (
-      equals < 0 ||
-      record.subarray(0, equals).toString('ascii') !== 'path' ||
-      path !== undefined
-    )
+    if (equals < 0 || record.subarray(0, equals).toString('ascii') !== 'path' || path !== undefined)
       throw new Error('invalid_tar_zstd_envelope')
     path = utf8.decode(record.subarray(equals + 1))
     position = end
@@ -81,9 +73,7 @@ export function validateRestrictedPaxTar(tarBytes: Buffer): TarEnvelopeEntry[] {
     if (header.every((byte) => byte === 0)) {
       if (
         offset + BLOCK_SIZE > tarBytes.length ||
-        !tarBytes
-          .subarray(offset, offset + BLOCK_SIZE)
-          .every((byte) => byte === 0)
+        !tarBytes.subarray(offset, offset + BLOCK_SIZE).every((byte) => byte === 0)
       )
         throw new Error('invalid_tar_zstd_envelope')
       offset += BLOCK_SIZE
@@ -95,30 +85,23 @@ export function validateRestrictedPaxTar(tarBytes: Buffer): TarEnvelopeEntry[] {
     const expectedChecksum = octal(header, 148, 8)
     const checksumHeader = Buffer.from(header)
     checksumHeader.fill(0x20, 148, 156)
-    if (
-      checksumHeader.reduce((sum, byte) => sum + byte, 0) !== expectedChecksum
-    )
+    if (checksumHeader.reduce((sum, byte) => sum + byte, 0) !== expectedChecksum)
       throw new Error('invalid_tar_zstd_envelope')
     const size = octal(header, 124, 12)
     const paddedSize = Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE
-    if (offset + paddedSize > tarBytes.length)
-      throw new Error('invalid_tar_zstd_envelope')
+    if (offset + paddedSize > tarBytes.length) throw new Error('invalid_tar_zstd_envelope')
     const body = tarBytes.subarray(offset, offset + size)
     offset += paddedSize
     const typeFlag = field(header, 156, 1).toString('ascii') || '0'
-    if (rejectedExtensionTypes.has(typeFlag))
-      throw new Error('invalid_tar_zstd_envelope')
+    if (rejectedExtensionTypes.has(typeFlag)) throw new Error('invalid_tar_zstd_envelope')
     if (typeFlag === 'x') {
-      if (pendingPath !== undefined)
-        throw new Error('invalid_tar_zstd_envelope')
-      if (size > MAX_PAX_HEADER_BYTES)
-        throw new Error('invalid_tar_zstd_envelope')
+      if (pendingPath !== undefined) throw new Error('invalid_tar_zstd_envelope')
+      if (size > MAX_PAX_HEADER_BYTES) throw new Error('invalid_tar_zstd_envelope')
       pendingPath = parsePaxPath(body)
       continue
     }
     const path = pendingPath ?? headerPath(header)
-    if (typeFlag !== '0' && typeFlag !== '5')
-      throw new Error('invalid_tar_zstd_envelope')
+    if (typeFlag !== '0' && typeFlag !== '5') throw new Error('invalid_tar_zstd_envelope')
     const entry: TarEnvelopeEntry = {
       path,
       typeFlag,
@@ -153,10 +136,7 @@ export function validateRestrictedPaxTar(tarBytes: Buffer): TarEnvelopeEntry[] {
   return entries
 }
 
-export function decompressRestrictedPaxArchive(
-  bytes: Buffer,
-  maxOutputLength: number
-): Buffer {
+export function decompressRestrictedPaxArchive(bytes: Buffer, maxOutputLength: number): Buffer {
   const tarBytes = zstdDecompressSync(bytes, { maxOutputLength })
   validateRestrictedPaxTar(tarBytes)
   return tarBytes

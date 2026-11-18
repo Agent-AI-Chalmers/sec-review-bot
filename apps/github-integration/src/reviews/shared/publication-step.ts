@@ -80,9 +80,7 @@ export async function runPublicationStep({
   find: () => Promise<ReconciledRemote | null>
   effect: () => Promise<ReconciledRemote | null>
 }): Promise<PublicationStepRun> {
-  const step = (await store.listPublicationSteps(runId)).find(
-    (item) => item.step_key === stepKey
-  )
+  const step = (await store.listPublicationSteps(runId)).find((item) => item.step_key === stepKey)
   const previousAttempts = step?.attempt_count ?? 0
   if (step?.status === 'succeeded')
     return {
@@ -106,12 +104,10 @@ export async function runPublicationStep({
       find
     })
     if (settled.outcome === 'lookup_failed') {
-      if (settled.recording === 'not_owned')
-        throw new PublicationClaimLostError(runId)
+      if (settled.recording === 'not_owned') throw new PublicationClaimLostError(runId)
       throw settled.error
     }
-    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
-      throw error
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded') throw error
     return {
       remote: settled.remote,
       alreadySucceeded: true,

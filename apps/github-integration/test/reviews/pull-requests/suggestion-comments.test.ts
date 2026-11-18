@@ -22,13 +22,10 @@ const pr = {
 }
 
 /** The JSON body of the review the client posted. */
-function postedReview(
-  requests: Array<{ method: string; url: string; body: unknown }>
-) {
+function postedReview(requests: Array<{ method: string; url: string; body: unknown }>) {
   const posted = requests.find(
     (request) =>
-      request.method === 'POST' &&
-      new URL(request.url).pathname.endsWith('/pulls/7/reviews')
+      request.method === 'POST' && new URL(request.url).pathname.endsWith('/pulls/7/reviews')
   )
   expect.assert(posted, 'a review must be posted')
   return posted.body as { comments: Array<Record<string, unknown>> }

@@ -21,28 +21,20 @@ test('viewer investigation survives navigation but clear and reload remove it', 
     buffer: Buffer.from(input)
   })
   // Use the current translated placeholder rather than a CSS input position.
-  const trajectorySearch = page.getByPlaceholder(
-    'Search messages, tools, and arguments'
-  )
+  const trajectorySearch = page.getByPlaceholder('Search messages, tools, and arguments')
   await expect(page.locator('.trajectory-timeline')).toBeVisible()
   await trajectorySearch.fill('Investigation')
   await page.getByRole('checkbox', { name: 'System', exact: true }).uncheck()
   await page.evaluate(() => window.scrollTo(0, 650))
   const position = await page.evaluate(() => window.scrollY)
   await page.getByRole('link', { name: 'Memory', exact: true }).click()
-  await expect(
-    page.getByRole('heading', { name: 'Memory', exact: true })
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Memory', exact: true })).toBeVisible()
   await expect(page.locator('.trajectory-timeline')).toBeHidden()
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
   await expect(trajectorySearch).toHaveValue('Investigation')
-  await expect(
-    page.getByRole('checkbox', { name: 'System', exact: true })
-  ).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'System', exact: true })).not.toBeChecked()
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(position)
-  await expect(
-    page.getByText('investigation.jsonl', { exact: true }).first()
-  ).toBeVisible()
+  await expect(page.getByText('investigation.jsonl', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Edit input', exact: true }).click()
   await expect(page.getByLabel('Paste trajectory JSONL')).toHaveValue(input)
   await page.getByRole('button', { name: 'Clear viewer', exact: true }).click()
@@ -57,11 +49,7 @@ test('unrendered viewer drafts survive a round trip', async ({ page }) => {
   await page.goto('/viewer', { waitUntil: 'networkidle' })
   await page.getByLabel('Paste trajectory JSONL').fill('unfinished draft')
   await page.getByRole('link', { name: 'Runs', exact: true }).click()
-  await expect(
-    page.getByRole('heading', { name: 'Runs', exact: true })
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Runs', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
-  await expect(page.getByLabel('Paste trajectory JSONL')).toHaveValue(
-    'unfinished draft'
-  )
+  await expect(page.getByLabel('Paste trajectory JSONL')).toHaveValue('unfinished draft')
 })

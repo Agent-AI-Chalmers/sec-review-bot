@@ -20,10 +20,9 @@ test('the keyed error-code map covers exactly the contract enum', () => {
   const fromKeys = Object.values(PUBLICATION_STEP_ERROR_CODES).sort()
   const fromContract = [...PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT].sort()
 
-  expect(
-    fromKeys,
-    'PUBLICATION_STEP_ERROR_CODES and the contract enum have drifted'
-  ).toStrictEqual(fromContract)
+  expect(fromKeys, 'PUBLICATION_STEP_ERROR_CODES and the contract enum have drifted').toStrictEqual(
+    fromContract
+  )
 })
 
 test('the closed error-code set is exactly the contract enum', () => {
@@ -39,8 +38,7 @@ test('the closed error-code set is exactly the contract enum', () => {
       }
     }
   }
-  const enumValues =
-    spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
+  const enumValues = spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
 
   expect(
     [...ERROR_RESPONSE_CODES_FROM_CONTRACT].sort(),
