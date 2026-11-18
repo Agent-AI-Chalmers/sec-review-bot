@@ -4,7 +4,7 @@ import { createMemoryHandler } from './memory/routes.js'
 import { runs } from './runs/generate.js'
 import { createRunsHandler } from './runs/routes.js'
 
-export function createFixtureRouter(): (
+export function createMockApiRouter(): (
   request: IncomingMessage,
   response: ServerResponse,
   next: () => void
@@ -21,9 +21,7 @@ export function createFixtureRouter(): (
           candidate.artifact_storage?.status === 'available'
       )
       if (run === undefined) {
-        throw new Error(
-          `dev fixtures need one completed GitHub ${workflow} run for memory provenance`
-        )
+        throw new Error(`mock API needs one completed GitHub ${workflow} run for memory provenance`)
       }
       return [workflow, run.run_id]
     })

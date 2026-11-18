@@ -40,7 +40,7 @@ export const test = base.extend<TestFixtures>({
         return
       }
 
-      process.env.CONTROL_PLANE_UI_DEV_FIXTURES = '1'
+      process.env.CONTROL_PLANE_UI_MOCK_API = '1'
       process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME = '2026-11-12T12:00:00Z'
       let server: ViteDevServer | undefined
       try {

@@ -3,10 +3,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {
   MemoryTreeContentResponse,
   TrajectoryContentResponse
-} from '../../../shared/artifact-content.js'
+} from '../../shared/artifact-content.js'
 import historySamples from '../data/memory-history-samples.json' with { type: 'json' }
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
-import { validateTrajectoryEvent } from '../../../shared/trajectory-events.js'
+import { validateTrajectoryEvent } from '../../shared/trajectory-events.js'
 import { BASE_TIME as RUNS_BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
@@ -14,7 +14,7 @@ import type {
   ObservationRecord,
   MemoryTreeAutomation,
   MemoryTreeAutomationOperationResult
-} from '../../../browser/features/memory/api-types.generated.js'
+} from '../../browser/features/memory/api-types.generated.js'
 
 const trajectoryContent: TrajectoryContentResponse = {
   events: memoryTrajectory.events.map(validateTrajectoryEvent)

@@ -1,13 +1,13 @@
 import type { Plugin } from 'vite'
 
-import { createFixtureRouter } from './router.js'
+import { createMockApiRouter } from './router.js'
 
 /** Serve representative application states without Review Runs, Memory Catalog, or the BFF. */
-export function devFixtures(): Plugin {
+export function mockApi(): Plugin {
   return {
-    name: 'control-plane-ui-dev-fixtures',
+    name: 'control-plane-ui-mock-api',
     configureServer(server): void {
-      const handle = createFixtureRouter()
+      const handle = createMockApiRouter()
       server.middlewares.use((request, response, next) => {
         void handle(request, response, next).catch(next)
       })

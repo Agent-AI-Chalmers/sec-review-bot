@@ -36,7 +36,7 @@
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run dev:fixtures
+pnpm dev:mock
 ```
 
 打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和记忆状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态测试数据；记忆文件树与执行轨迹操作会返回小型测试数据附件，因此无需真实存储对象也能验证浏览器下载行为。
@@ -73,9 +73,12 @@ browser/
   main.tsx            browser 入口
 server/               Node BFF
 shared/               browser 与 server 都会 import 的值
-scripts/              开发期 package 工具
+mock-api/             开发预览与本地 E2E 使用的有状态模拟 API
+scripts/              命令行检查与报告工具
 test/                 browser 与 server 测试
 ```
+
+[Mock API](mock-api/README.md) 说明开发模拟服务、共享场景数据及状态生命周期的职责边界。
 
 功能域之间不得相互 import。可复用的浏览器能力放在 `browser/features/` 或 `browser/shared/`；包级 `shared/` 仅用于真正跨越 browser/server 运行时边界的代码。
 

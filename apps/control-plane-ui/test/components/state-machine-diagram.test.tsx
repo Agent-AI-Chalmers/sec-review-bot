@@ -4,7 +4,7 @@ import { expect, test } from 'vitest'
 
 import { StateMachineDiagram } from '../../browser/features/runs/detail/StateMachineDiagram.js'
 import { stateMachine } from '../../browser/features/runs/state-machines.generated.js'
-import { runs } from '../../scripts/dev-fixtures/runs/generate.js'
+import { runs } from '../../mock-api/runs/generate.js'
 import { renderComponent } from './render.js'
 
 for (const language of ['en', 'zh'] as const) {

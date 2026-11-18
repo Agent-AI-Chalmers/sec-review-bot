@@ -4,9 +4,9 @@ import type {
   ListParkedRunsResponseBody,
   ListRunPublicationStepsResponseBody,
   ListRunEventsResponseBody
-} from '../../../browser/features/runs/api-types.generated.js'
-import type { RunArtifactContentResponse } from '../../../shared/artifact-content.js'
-import type { ParkedRun } from '../../../browser/features/runs/api.js'
+} from '../../browser/features/runs/api-types.generated.js'
+import type { RunArtifactContentResponse } from '../../shared/artifact-content.js'
+import type { ParkedRun } from '../../browser/features/runs/api.js'
 import artifactContent from '../data/artifact-content.json' with { type: 'json' }
 import {
   DECLARED_QUERY_PARAMS,

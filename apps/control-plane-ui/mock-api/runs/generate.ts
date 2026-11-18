@@ -3,9 +3,9 @@ import type {
   PublicationStep,
   Run,
   RunEvent
-} from '../../../browser/features/runs/api.js'
+} from '../../browser/features/runs/api.js'
 
-import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
+import { LIST_RUN_QUERY_PARAMS } from '../../shared/list-run-query-params.js'
 import scenarioData from '../data/run-scenarios.json' with { type: 'json' }
 import { validateRun } from './validate.js'
 
@@ -1018,7 +1018,7 @@ for (const run of runs) {
   validateRun(run, stepsByRun.get(run.run_id) ?? [])
 }
 if (new Set(runs.map((run) => run.run_id)).size !== runs.length) {
-  throw new Error('dev fixtures must not reuse a run id.')
+  throw new Error('mock API runs must not reuse a run id.')
 }
 
 interface Cursor {

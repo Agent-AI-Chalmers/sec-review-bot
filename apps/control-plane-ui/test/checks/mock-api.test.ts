@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 
-import { devFixtures } from '../../scripts/dev-fixtures/index.js'
+import { mockApi } from '../../mock-api/index.js'
 import type {
   Run,
   ListRunsResponseBodyByStatus,
@@ -25,7 +25,7 @@ function captureMiddleware(): (
   response: ServerResponse,
   next: () => void
 ) => void {
-  const plugin: Plugin = devFixtures()
+  const plugin: Plugin = mockApi()
   const configureServer = plugin.configureServer
   expect.assert(typeof configureServer === 'function')
   let middleware:
@@ -40,7 +40,7 @@ function captureMiddleware(): (
       }
     }
   }
-  // `devFixtures` never reads `this`, so invoking the hook with the fake server alone is
+  // `mockApi` never reads `this`, so invoking the hook with the fake server alone is
   // faithful; the cast only satisfies Vite's `this: MinimalPluginContext` signature.
   const runConfigureServer = configureServer as (server: typeof fakeServer) => void
   runConfigureServer(fakeServer)
@@ -69,17 +69,17 @@ async function startFixtureServer(): Promise<{
   }
 }
 
-test('dev fixtures only describe reachable run states', async () => {
+test('mock API only describes reachable run states', async () => {
   // runs/generate.ts validates every generated run at import time and throws on a
   // combination Review Runs cannot produce (for example a failed execution
   // whose publication is still `pending`). Importing it is therefore the assertion:
   // this test exists so an unreachable fixture fails CI instead of silently
   // showing operators a state that cannot happen.
-  await import('../../scripts/dev-fixtures/runs/generate.js')
+  await import('../../mock-api/runs/generate.js')
 })
 
-test('dev fixtures distinguish a statistics snapshot from no snapshot', async () => {
-  const { runs, stepsByRun } = await import('../../scripts/dev-fixtures/runs/generate.js')
+test('mock API distinguishes a statistics snapshot from no snapshot', async () => {
+  const { runs, stepsByRun } = await import('../../mock-api/runs/generate.js')
   const completed = runs.filter((run) => run.execution.status === 'succeeded')
   const active = runs.find((run) => run.execution.status === 'running')
   const agentsFor = (workflow: (typeof completed)[number]['workflow']): string[] => {
@@ -173,7 +173,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
   expect(active?.execution_statistics).toBe(null)
 })
 
-test('dev fixtures track sign-out so the console reaches the sign-in form', async () => {
+test('mock API tracks sign-out so the console reaches the sign-in form', async () => {
   // The fixtures exist to show the console's real screens with no access token, so
   // they start signed in — a run list must be reachable before any session call.
   const fixture = await startFixtureServer()
@@ -211,7 +211,7 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
  * records: the disconnected axis ends as a failure whose code names the operator, so the
  * detail page after the decision is a state the store can actually produce.
  */
-test('dev fixtures answer the give-up decision the queue offers', async () => {
+test('mock API answers the give-up decision the queue offers', async () => {
   const fixture = await startFixtureServer()
   try {
     const parked = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
@@ -289,7 +289,7 @@ test('mutating one fixture server does not change another server’s run state',
   )
 })
 
-test('dev fixtures leave non-API requests to the next middleware', async () => {
+test('mock API leaves non-API requests to the next middleware', async () => {
   // The middleware must not claim routes outside `/api/`; the fixture server's `next`
   // handler answers 404, which stands in for Vite's own asset middleware.
   const fixture = await startFixtureServer()
@@ -301,7 +301,7 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
   }
 })
 
-test('dev fixtures serve memory actions as downloads', async () => {
+test('mock API serves memory actions as downloads', async () => {
   const fixture = await startFixtureServer()
   try {
     for (const [path, filename] of [
@@ -326,7 +326,7 @@ test('dev fixtures serve memory actions as downloads', async () => {
   }
 })
 
-test('dev fixtures expose stable full-page load-error scenarios', async () => {
+test('mock API exposes stable full-page load-error scenarios', async () => {
   const fixture = await startFixtureServer()
   try {
     for (const [path, status, error] of [
@@ -349,7 +349,7 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
   }
 })
 
-test('dev fixtures page the run list in the order their cursor describes', async () => {
+test('mock API pages the run list in the order their cursor describes', async () => {
   // The run list is built in scenario order, and an active run's timestamp is anchored near
   // now rather than at its newest historical slot, so array order is not creation order. The
   // fixture has to sort by the same `(created_at, run_id)` key its cursor compares against,
@@ -574,7 +574,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
 })
 
 test('fixture event responses preserve the contract reason for a failed transition', async () => {
-  const { runs } = await import('../../scripts/dev-fixtures/runs/generate.js')
+  const { runs } = await import('../../mock-api/runs/generate.js')
   const run = runs.find(
     (value) => value.preparation.status === 'failed' && value.preparation.failure_code !== null
   )!
@@ -598,7 +598,7 @@ test('fixture events show a step that failed and was retried inside a publicatio
   // Step events are what tell a publication's own history apart from its steps': without one
   // run whose step failed and recovered, every step event in the fixtures would be a clean
   // success and the console would never show the difference locally.
-  const { runs, stepsByRun } = await import('../../scripts/dev-fixtures/runs/generate.js')
+  const { runs, stepsByRun } = await import('../../mock-api/runs/generate.js')
   const run = runs.find((value) =>
     (stepsByRun.get(value.run_id) ?? []).some(
       (step) => step.status === 'succeeded' && step.attempt_count > 1

@@ -34,7 +34,7 @@ From `apps/control-plane-ui`, install dependencies and start the fixture-backed 
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run dev:fixtures
+pnpm dev:mock
 ```
 
 Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and trajectory actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
@@ -71,11 +71,14 @@ browser/
   main.tsx            browser entry point
 server/               Node BFF
 shared/               values imported by both browser and server
-scripts/              development-time package tooling
+mock-api/             stateful mock API for development preview and local E2E
+scripts/              command-line package checks and reports
 test/                 browser and server tests
 ```
 
 Feature domains must not import one another. Reusable browser capabilities live under `browser/features/` or `browser/shared/`, while package-level `shared/` is reserved for code that genuinely crosses the browser/server runtime boundary.
+
+See [Mock API](mock-api/README.md) for development-server ownership, shared scenario data, and state lifetime.
 
 The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
 
