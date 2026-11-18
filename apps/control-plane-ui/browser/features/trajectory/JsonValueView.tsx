@@ -32,13 +32,7 @@ function recordPreview(value: unknown): string {
   return typeof first === 'string' ? first.slice(0, 110) : ''
 }
 
-function JsonRaw({
-  value,
-  query
-}: {
-  value: unknown
-  query: string
-}): React.JSX.Element {
+function JsonRaw({ value, query }: { value: unknown; query: string }) {
   return (
     <details className="json-raw">
       <summary>Raw JSON</summary>

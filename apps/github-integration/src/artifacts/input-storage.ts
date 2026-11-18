@@ -21,7 +21,7 @@ import {
 } from '../config.js'
 import type { InputBundleArtifactRef } from '../execution/input.js'
 
-function inputObjectKey(runId: string, digest: string): string {
+function inputObjectKey(runId: string, digest: string) {
   return `runs/${runId}/input/${digest.replace(/^sha256:/, '')}/input-bundle.v1.tar.zst`
 }
 
@@ -42,7 +42,7 @@ function matchesReference(
     Metadata?: Record<string, string> | undefined
   },
   reference: InputBundleArtifactRef
-): boolean {
+) {
   return (
     response.ContentLength === reference.size_bytes &&
     response.Metadata?.['sha256'] ===

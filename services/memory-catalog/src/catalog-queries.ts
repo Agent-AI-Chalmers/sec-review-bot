@@ -74,7 +74,7 @@ interface VersionRow {
   created_at: Date
 }
 
-function encodeCursor(cursor: CatalogCursor): string {
+function encodeCursor(cursor: CatalogCursor) {
   return Buffer.from(JSON.stringify(cursor)).toString('base64url')
 }
 

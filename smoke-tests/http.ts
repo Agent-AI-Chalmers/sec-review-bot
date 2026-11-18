@@ -18,7 +18,7 @@ export async function request({
   token,
   headers,
   json
-}: RequestOptions) {
+}: RequestOptions): Promise<Response> {
   const response = await fetch(`${base}${path}`, {
     method,
     headers: {

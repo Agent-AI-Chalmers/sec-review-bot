@@ -130,7 +130,7 @@ function parkedAxisSelect({
   table,
   axis,
   reasonSql
-}: (typeof PARKED_AXES)[number]): string {
+}: (typeof PARKED_AXES)[number]) {
   return `SELECT run_id, '${axis}' AS axis, ${reasonSql} AS reason,
            COALESCE((
              SELECT e.occurred_at FROM review_run_events e

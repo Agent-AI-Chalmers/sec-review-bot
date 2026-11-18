@@ -23,7 +23,7 @@ const resultSchemaByWorkflow: Record<string, string> = {
   'repository-review': 'repository-review-result.schema.json'
 }
 
-function schemasRoot(): string {
+function schemasRoot() {
   return path.join(
     contractsRoot(),
     'execution-api',

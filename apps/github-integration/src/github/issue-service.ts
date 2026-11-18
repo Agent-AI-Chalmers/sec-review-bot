@@ -5,11 +5,11 @@ function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
 }
 
-function asString(value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
 
-function asNumber(value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 

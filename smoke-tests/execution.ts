@@ -25,7 +25,7 @@ function loadInput() {
   }
 }
 
-export async function submit() {
+export async function submit(): Promise<void> {
   const savedAdmission = process.env.SMOKE_ADMISSION
   assert.ok(savedAdmission, 'SMOKE_ADMISSION is required')
   const admission = JSON.parse(savedAdmission) as Admission
@@ -101,7 +101,7 @@ export async function submit() {
   console.log(runId)
 }
 
-export async function verifyReplay(runId: string) {
+export async function verifyReplay(runId: string): Promise<void> {
   // Read before replay so a restarted Gateway must recover the existing execution.
   const existing = (await (
     await request({
@@ -168,7 +168,7 @@ export function verifyExecutionIdentity(
   runId: string,
   beforeJson: string,
   afterJson: string
-) {
+): void {
   const before = (JSON.parse(beforeJson) as Description).workflowExecutionInfo
     .execution
   const after = (JSON.parse(afterJson) as Description).workflowExecutionInfo

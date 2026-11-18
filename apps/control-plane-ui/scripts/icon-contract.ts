@@ -6,7 +6,7 @@ export type IconContractIssue = Readonly<{
   message: string
 }>
 
-function lineOf(source: ts.SourceFile, node: ts.Node): number {
+function lineOf(source: ts.SourceFile, node: ts.Node) {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
 }
 

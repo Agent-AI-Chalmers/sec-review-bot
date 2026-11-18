@@ -6,7 +6,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
-function asString(value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
 

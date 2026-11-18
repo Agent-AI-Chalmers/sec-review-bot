@@ -57,7 +57,7 @@ const EMPTY_VERIFICATION: ReviewRecord['verification'] = {
   residual_risks: []
 }
 
-function asNonEmptyString(value: unknown): string {
+function asNonEmptyString(value: unknown) {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : ''
 }
 

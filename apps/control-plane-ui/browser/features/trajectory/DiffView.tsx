@@ -52,13 +52,7 @@ export function PatchView({
   )
 }
 
-function UnifiedHunks({
-  file,
-  query
-}: {
-  file: DiffFile
-  query: string
-}): React.JSX.Element {
+function UnifiedHunks({ file, query }: { file: DiffFile; query: string }) {
   return (
     <div className="trajectory-patch" data-trajectory-patch="">
       {file.hunks.map((hunk, hunkIndex) => (
@@ -163,13 +157,7 @@ function splitRows(rows: DiffRow[]): SplitRow[] {
   return split
 }
 
-function SplitHunks({
-  file,
-  query
-}: {
-  file: DiffFile
-  query: string
-}): React.JSX.Element {
+function SplitHunks({ file, query }: { file: DiffFile; query: string }) {
   return (
     <div className="trajectory-diff-split">
       {file.hunks.map((hunk, hunkIndex) => (
@@ -225,7 +213,7 @@ function fileStats(file: DiffFile): { adds: number; removes: number } {
   return { adds, removes }
 }
 
-function displayPath(path: string): string {
+function displayPath(path: string) {
   // Container workdirs are noise in a narrow card; keep the repo-relative tail.
   return path.replace(/^\/workspace\//, '')
 }

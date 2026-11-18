@@ -39,13 +39,7 @@ export function statusToneColor(tone: StatusTone): string {
   return 'gray'
 }
 
-function StatusText({
-  label,
-  tone
-}: {
-  label: string
-  tone: StatusTone
-}): React.JSX.Element {
+function StatusText({ label, tone }: { label: string; tone: StatusTone }) {
   return (
     <span className="status-text">
       <span className={`status-dot status-dot-${tone}`} aria-hidden="true" />
@@ -179,7 +173,7 @@ function axisStateLabel(
   axis: CoordinationAxis,
   status: string,
   language: Language
-): string {
+) {
   return stateMachine(axis, language).details[status]?.label ?? status
 }
 

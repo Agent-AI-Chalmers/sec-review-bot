@@ -14,7 +14,7 @@ import type {
 
 export type CatalogOverview = CatalogOverviewContract
 
-function percent(part: number, total: number): string {
+function percent(part: number, total: number) {
   return total === 0 ? '0%' : `${Math.round((part / total) * 100)}%`
 }
 

@@ -334,11 +334,11 @@ function executionError(body: unknown, status: number): ExecutionServiceError {
   )
 }
 
-function isRetryableStatus(status: number): boolean {
+function isRetryableStatus(status: number) {
   return status === 429 || status >= 500
 }
 
-function isTransientTransportError(error: unknown): boolean {
+function isTransientTransportError(error: unknown) {
   return (
     error instanceof TypeError ||
     (error instanceof Error && error.name === 'AbortError')

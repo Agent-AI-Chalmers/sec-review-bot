@@ -141,7 +141,7 @@ export const RUN_SELECT = `
 /** Normalize a timestamp the SELECT produced. `json_build_object` serializes timestamptz as an
  * ISO string, so this only ever narrows the precision (microseconds to milliseconds) - it never
  * receives a `Date`. Values come from `clock_timestamp()`, so parsing is exact. */
-function iso(value: string): string {
+function iso(value: string) {
   return new Date(value).toISOString()
 }
 

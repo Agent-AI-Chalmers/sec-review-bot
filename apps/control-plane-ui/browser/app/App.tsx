@@ -61,7 +61,7 @@ const Viewer = React.lazy(async () => ({
   default: (await import('../features/viewer/Viewer.js')).Viewer
 }))
 
-function RouteFallback(): React.JSX.Element {
+function RouteFallback() {
   return (
     <Center mih="40vh">
       <Loader size="sm" />

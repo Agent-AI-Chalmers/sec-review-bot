@@ -81,7 +81,7 @@ function workflowRefMatchesRepositoryReviewWorkflow(
   )
 }
 
-function canonicalRepository(value: unknown): string {
+function canonicalRepository(value: unknown) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 

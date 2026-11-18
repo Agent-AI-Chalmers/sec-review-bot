@@ -219,7 +219,7 @@ function parsePatchHunks(patch_content: string): HunkHeader[] {
     .filter((item): item is HunkHeader => item !== null)
 }
 
-function buildSuggestionBody(replacement: string): string {
+function buildSuggestionBody(replacement: string) {
   return ['```suggestion', replacement, '```'].join('\n')
 }
 
@@ -239,7 +239,7 @@ function toLineRange(
 function rangesOverlap(
   left: { start: number; end: number },
   right: { start: number; end: number }
-): boolean {
+) {
   return left.start <= right.end && right.start <= left.end
 }
 

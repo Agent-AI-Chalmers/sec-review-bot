@@ -21,7 +21,7 @@ function buildMentionCandidates(): string[] {
   return [slug, bot_login].filter((item): item is string => Boolean(item))
 }
 
-function stripMarkdownQuotedLines(body: string): string {
+function stripMarkdownQuotedLines(body: string) {
   // GitHub quote replies copy the original comment as Markdown blockquotes.
   // Commands inside those quoted lines are historical text, not a new request.
   return body

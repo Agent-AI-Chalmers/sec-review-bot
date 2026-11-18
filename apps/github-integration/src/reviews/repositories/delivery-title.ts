@@ -19,7 +19,7 @@ function primaryFileForDeliveryTitle(delivery: RepositoryDelivery): string {
   )
 }
 
-function titleDisambiguator(delivery: RepositoryDelivery): string {
+function titleDisambiguator(delivery: RepositoryDelivery) {
   return delivery.case_ids[0] ?? delivery.delivery_id
 }
 

@@ -28,7 +28,7 @@ interface AgentSummary {
   breakdowns: Map<string, UsageSection[]>
 }
 
-function formatCount(value: number | null, language: 'en' | 'zh'): string {
+function formatCount(value: number | null, language: 'en' | 'zh') {
   return value === null
     ? '—'
     : value.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
@@ -84,7 +84,7 @@ function UsageMetric({
   value: number | null
   subsets: ReadonlyArray<readonly [string, number | null]>
   language: 'en' | 'zh'
-}): React.JSX.Element {
+}) {
   return (
     <div className="statistics-usage-metric">
       <Text size="xs" c="dimmed">
@@ -140,7 +140,7 @@ function phaseSections(
   }))
 }
 
-function groupCallCount(groups: StatisticsGroup[]): number {
+function groupCallCount(groups: StatisticsGroup[]) {
   return groups.reduce((sum, group) => sum + group.model_call_count, 0)
 }
 
@@ -153,7 +153,7 @@ function groupTokenCount(groups: StatisticsGroup[]): number | null {
   return total
 }
 
-function agentGroupKey(group: StatisticsGroup): string {
+function agentGroupKey(group: StatisticsGroup) {
   return [group.agent_name, group.provider, group.model ?? ''].join(':')
 }
 
@@ -230,7 +230,7 @@ function summarizeAgents(
   }
 }
 
-function isOnlyInitialReview(sections: UsageSection[]): boolean {
+function isOnlyInitialReview(sections: UsageSection[]) {
   return (
     sections.length === 1 &&
     sections[0]?.groups.every(

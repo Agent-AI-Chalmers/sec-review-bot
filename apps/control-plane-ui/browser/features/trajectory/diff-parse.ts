@@ -41,7 +41,7 @@ export interface DiffFile {
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
 
-function stripPrefix(path: string): string {
+function stripPrefix(path: string) {
   return path.replace(/^[ab]\//, '')
 }
 

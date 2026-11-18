@@ -5,7 +5,7 @@ import { uiAccessToken } from './credentials.js'
 
 const ui = 'http://control-plane-ui:8091'
 
-export async function verifyBff(runId: string) {
+export async function verifyBff(runId: string): Promise<void> {
   let cookie = ''
 
   function request(

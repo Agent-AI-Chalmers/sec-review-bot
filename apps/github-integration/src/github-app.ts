@@ -24,7 +24,7 @@ function requireConfigValue(name: string, value: string | undefined): string {
   return value
 }
 
-export function createGitHubApp() {
+export function createGitHubApp(): App {
   const required_app_id = requireConfigValue('APP_ID', app_id)
   const required_private_key_path = requireConfigValue(
     'PRIVATE_KEY_PATH',

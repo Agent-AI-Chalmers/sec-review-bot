@@ -32,7 +32,7 @@ interface IssueDraftPullRequest {
   html_url: string
 }
 
-function issueReviewRunMarker(run_id: string): string {
+function issueReviewRunMarker(run_id: string) {
   // The publisher may retry after GitHub accepted a comment but its response was lost.
   // A stable run marker makes that retry observable and idempotent.
   return `<!-- sec-review-bot:issue-review-run:${run_id} -->`

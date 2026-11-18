@@ -211,7 +211,7 @@ export function isAutomaticTriggerModeEnabled(
   )
 }
 
-function isNotFoundError(error: unknown): boolean {
+function isNotFoundError(error: unknown) {
   return asErrorWithResponse(error).status === 404
 }
 

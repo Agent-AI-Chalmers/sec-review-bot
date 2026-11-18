@@ -46,7 +46,7 @@ interface GitAskPassAuth {
   env: Record<string, string | undefined>
 }
 
-function shellSingleQuote(value: string): string {
+function shellSingleQuote(value: string) {
   return `'${value.replace(/'/g, "'\\''")}'`
 }
 

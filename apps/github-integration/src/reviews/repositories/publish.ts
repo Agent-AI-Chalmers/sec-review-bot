@@ -68,7 +68,7 @@ type CompletedExecutionRun = {
   publish_context: Record<string, unknown>
 }
 
-function repositorySummaryRunMarker(run_id: string): string {
+function repositorySummaryRunMarker(run_id: string) {
   return `<!-- sec-review-bot:repository-summary-run:${run_id} -->`
 }
 

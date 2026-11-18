@@ -166,7 +166,7 @@ function requireStringField(
   record: Record<string, unknown>,
   field: string,
   label: string
-): string {
+) {
   return requireText(record[field], `${label}.${field}`)
 }
 

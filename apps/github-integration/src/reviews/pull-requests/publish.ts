@@ -133,14 +133,14 @@ export async function handlePullRequestReviewRun({
 
 function shouldPublishSuggestions(
   review_record: ReviewRecord | null | undefined
-): boolean {
+) {
   return (
     typeof review_record?.mitigation?.patch_diff === 'string' &&
     review_record.mitigation.patch_diff.trim() !== ''
   )
 }
 
-function pullRequestReviewRunMarker(run_id: string): string {
+function pullRequestReviewRunMarker(run_id: string) {
   // Publication retries use this identity to recover a review accepted by GitHub
   // when the response or the following local state update was lost.
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`

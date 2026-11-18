@@ -48,7 +48,7 @@ const MAX_PUBLICATION_STEP_ATTEMPTS = 3
 const MAX_PUBLICATION_STEP_UNRESOLVED_RECOVERIES = 3
 
 /** Whether the step has spent its write-attempt budget. */
-function isStepExhausted(step: PublicationStepRecord): boolean {
+function isStepExhausted(step: PublicationStepRecord) {
   return step.attempt_count >= MAX_PUBLICATION_STEP_ATTEMPTS
 }
 

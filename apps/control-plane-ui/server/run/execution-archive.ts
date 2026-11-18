@@ -15,7 +15,7 @@ export interface ExecutionArchiveView {
   unpreviewableFiles: Record<string, { sizeBytes: number }>
 }
 
-function safePath(name: string): boolean {
+function safePath(name: string) {
   return (
     name !== '' &&
     !name.startsWith('/') &&

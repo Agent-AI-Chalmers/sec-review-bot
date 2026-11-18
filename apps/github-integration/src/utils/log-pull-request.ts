@@ -6,7 +6,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
-function asString(value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
 
@@ -21,7 +21,7 @@ function displayNumber(value: unknown): number | string {
     : '(missing)'
 }
 
-function asBoolean(value: unknown, fallback = false): boolean {
+function asBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
 }
 

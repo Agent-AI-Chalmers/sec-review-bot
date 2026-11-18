@@ -31,7 +31,7 @@ const treeTheme = {
   base0F: 'light-dark(var(--mantine-color-pink-8), var(--mantine-color-pink-4))'
 }
 
-function JsonTree({ value }: { value: unknown }): React.JSX.Element {
+function JsonTree({ value }: { value: unknown }) {
   return (
     <JSONTree
       data={value}

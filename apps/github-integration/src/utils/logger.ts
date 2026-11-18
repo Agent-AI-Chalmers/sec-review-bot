@@ -67,7 +67,7 @@ function formatValue(value: unknown): string {
   return formatScalar(value)
 }
 
-function formatFields(fields: LogFields): string {
+function formatFields(fields: LogFields) {
   return Object.entries(fields)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${formatValue(value)}`)

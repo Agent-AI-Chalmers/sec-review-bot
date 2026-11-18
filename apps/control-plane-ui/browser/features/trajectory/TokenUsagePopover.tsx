@@ -6,7 +6,7 @@ import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import type { UsageView } from './trajectory-model.js'
 
-function formatTokens(value: number): string {
+function formatTokens(value: number) {
   return new Intl.NumberFormat(undefined, {
     notation: value >= 10_000 ? 'compact' : 'standard',
     maximumFractionDigits: 2

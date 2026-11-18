@@ -31,7 +31,7 @@ function renderFoldedSection(
   ].join('\n')
 }
 
-function joinParagraphBlocks(blocks: Array<string | null>): string {
+function joinParagraphBlocks(blocks: Array<string | null>) {
   return blocks.filter((item): item is string => Boolean(item)).join('\n\n')
 }
 

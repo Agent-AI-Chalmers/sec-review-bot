@@ -35,7 +35,7 @@ function headerPath(block: Buffer): string {
   return prefix ? `${prefix}/${name}` : name
 }
 
-function textField(block: Buffer, offset: number, length: number): string {
+function textField(block: Buffer, offset: number, length: number) {
   return utf8.decode(field(block, offset, length))
 }
 

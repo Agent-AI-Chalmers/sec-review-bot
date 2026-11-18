@@ -275,7 +275,7 @@ function sortSeverityKeys(keys: string[]): string[] {
   })
 }
 
-function deliveryIdForDelivery(delivery: PublishedDeliveryEntryLike): string {
+function deliveryIdForDelivery(delivery: PublishedDeliveryEntryLike) {
   return delivery.delivery_id
 }
 

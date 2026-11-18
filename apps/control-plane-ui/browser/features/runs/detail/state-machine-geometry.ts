@@ -81,14 +81,14 @@ function quadraticSamples(p0: Point, c: Point, p1: Point): Point[] {
   return points
 }
 
-function insideNode(point: Point, center: Point, margin: number): boolean {
+function insideNode(point: Point, center: Point, margin: number) {
   return (
     Math.abs(point.x - center.x) < NODE_W / 2 + margin &&
     Math.abs(point.y - center.y) < NODE_H / 2 + margin
   )
 }
 
-function round(value: number): number {
+function round(value: number) {
   return Math.round(value * 10) / 10
 }
 

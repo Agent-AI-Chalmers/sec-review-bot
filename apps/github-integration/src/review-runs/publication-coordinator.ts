@@ -30,7 +30,7 @@ interface Options {
   intervalMs?: number
 }
 
-function pollIntervalMs(): number {
+function pollIntervalMs() {
   return integerEnv('REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS', 15_000)
 }
 
