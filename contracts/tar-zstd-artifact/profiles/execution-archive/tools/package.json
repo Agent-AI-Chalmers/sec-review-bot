@@ -12,21 +12,17 @@
     "check": "node --import tsx src/generate.ts --check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0"
   }
 }

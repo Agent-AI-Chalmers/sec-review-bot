@@ -63,7 +63,9 @@ if (
   )
 }
 const artifact_s3_addressing_style = configured_artifact_s3_addressing_style as
-  'auto' | 'path' | 'virtual'
+  | 'auto'
+  | 'path'
+  | 'virtual'
 
 export {
   app_id,

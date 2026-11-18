@@ -24,7 +24,12 @@ import { ICON_SIZE } from '../../shared/design.js'
 export type PublicationStepStatus = PublicationStep['status']
 
 type StatusTone =
-  'waiting' | 'active' | 'complete' | 'failed' | 'neutral' | 'retry'
+  | 'waiting'
+  | 'active'
+  | 'complete'
+  | 'failed'
+  | 'neutral'
+  | 'retry'
 
 export function statusToneColor(tone: StatusTone): string {
   if (tone === 'active') return 'blue'

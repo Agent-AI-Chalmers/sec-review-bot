@@ -1,0 +1,71 @@
+{
+  "ignorePatterns": [
+    "dist/**",
+    "dist-server/**",
+    "node_modules/**",
+    "playwright-report/**",
+    "test-results/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "constructor-super": "off",
+        "getter-return": "off",
+        "no-class-assign": "off",
+        "no-const-assign": "off",
+        "no-dupe-class-members": "off",
+        "no-dupe-keys": "off",
+        "no-func-assign": "off",
+        "no-import-assign": "off",
+        "no-new-native-nonconstructor": "off",
+        "no-obj-calls": "off",
+        "no-redeclare": "off",
+        "no-setter-return": "off",
+        "no-this-before-super": "off",
+        "no-unreachable": "off",
+        "no-unsafe-negation": "off",
+        "no-var": "error",
+        "no-with": "off",
+        "prefer-const": "error",
+        "prefer-rest-params": "error",
+        "prefer-spread": "error",
+        "typescript/explicit-function-return-type": "error"
+      },
+      "globals": {
+        "console": "readonly",
+        "document": "readonly",
+        "fetch": "readonly",
+        "window": "readonly",
+        "Buffer": "readonly",
+        "process": "readonly",
+        "URL": "readonly"
+      }
+    },
+    {
+      "files": ["**/*.mjs"],
+      "globals": {
+        "process": "readonly"
+      }
+    },
+    {
+      "files": ["test/**/*.mjs"],
+      "globals": {
+        "console": "readonly",
+        "document": "readonly",
+        "fetch": "readonly",
+        "getComputedStyle": "readonly",
+        "localStorage": "readonly",
+        "navigator": "readonly",
+        "URL": "readonly"
+      }
+    },
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "import/first": "error"
+      }
+    }
+  ],
+  "extends": ["../../.oxlintrc.json"]
+}

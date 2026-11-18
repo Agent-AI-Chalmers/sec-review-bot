@@ -138,12 +138,14 @@ export async function publishInputBundle(
       try {
         await fs.link(staged, destination)
       } catch (error) {
-        if (!(
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'EEXIST'
-        ))
+        if (
+          !(
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'EEXIST'
+          )
+        )
           throw error
       }
       if (!(await inputBundleExists(published)))

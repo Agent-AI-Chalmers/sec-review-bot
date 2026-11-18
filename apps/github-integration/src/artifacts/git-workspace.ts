@@ -527,7 +527,12 @@ function requireComparableRefs(
  */
 /** The scan scope's change vocabulary, as the contract schema defines it. */
 export type ChangedFileStatus =
-  'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+  | 'added'
+  | 'modified'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'type_changed'
 
 /**
  * Project git's diff letters onto the contract's status vocabulary.

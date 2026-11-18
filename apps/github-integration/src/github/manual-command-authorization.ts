@@ -1,7 +1,13 @@
 import type { Octokit } from 'octokit'
 
 export type RepositoryPermission =
-  'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin' | 'unknown'
+  | 'none'
+  | 'read'
+  | 'triage'
+  | 'write'
+  | 'maintain'
+  | 'admin'
+  | 'unknown'
 
 const PERMISSION_RANK: Record<RepositoryPermission, number> = {
   unknown: 0,

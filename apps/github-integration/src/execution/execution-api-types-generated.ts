@@ -2,7 +2,9 @@
 // Regenerate with `pnpm --dir contracts/execution-api/tools run generate`.
 
 export type WorkflowName =
-  'issue-review' | 'pull-request-review' | 'repository-review'
+  | 'issue-review'
+  | 'pull-request-review'
+  | 'repository-review'
 
 export interface InputBundleArtifactRef {
   uri: string
@@ -31,7 +33,12 @@ export interface RepositoryScanScope {
   incremental_changed_files: {
     path: string
     status:
-      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+      | 'added'
+      | 'modified'
+      | 'deleted'
+      | 'renamed'
+      | 'copied'
+      | 'type_changed'
     previous_path: string | null
   }[]
 }
@@ -76,9 +83,19 @@ export interface ReviewRecord {
       | 'runtime-endpoint'
       | null
     coverage:
-      'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | null
+      | 'full'
+      | 'partial'
+      | 'local-only'
+      | 'unresolved'
+      | 'misaligned'
+      | null
     regression:
-      'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
+      | 'passed'
+      | 'failed'
+      | 'not-run'
+      | 'not-applicable'
+      | 'unresolved'
+      | null
     next_step: 'none' | 'retry-ai' | 'manual-review' | null
     findings: string[]
     evidence: string[]

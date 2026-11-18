@@ -13,7 +13,11 @@ const CANONICAL_MANIFEST = Buffer.from('{"version":1}\n')
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
 
 export type EntryKind =
-  'file' | 'directory' | 'symlink' | 'character-device' | 'pax-header'
+  | 'file'
+  | 'directory'
+  | 'symlink'
+  | 'character-device'
+  | 'pax-header'
 
 export interface ArchiveEntry {
   path: string

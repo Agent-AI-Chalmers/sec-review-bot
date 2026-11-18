@@ -49,6 +49,14 @@ After changing a contract, complete the checks required by the [contracts guide]
 
 List the commands you ran to check the change and report the results. Also note any relevant checks you did not run.
 
+## Formatting And Lint Responsibilities
+
+Oxfmt owns formatting, including the final formatting of contract projections. A generator must produce output that passes the formatter without another rewrite; repeating generation must leave the same bytes. Keep the existing 80-column style and fixture exclusions.
+
+Oxlint uses the shared native rule baseline in `.oxlintrc.json` and package-specific overrides. Type-aware checks remain enabled for Execution Gateway, Memory Catalog, and smoke probes. The console retains explicit function return types. Native `import/first` keeps imports before executable statements while allowing module directives. Declaration separator blank lines are left to authors rather than enforced through a style plugin.
+
+Native rules retain the remaining effective ESLint checks and severities. `no-undef` stays enabled for JavaScript; TypeScript relies on the compiler for unresolved names. Strict-mode checks `no-dupe-args` and `no-octal` are omitted because modules and the TypeScript compiler reject those forms. Type-aware rules are mapped explicitly rather than replaced by Oxlint defaults.
+
 ## Submit A Pull Request
 
 ### Title

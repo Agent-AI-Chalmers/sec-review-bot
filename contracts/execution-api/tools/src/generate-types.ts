@@ -8,7 +8,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { format } from 'oxfmt'
 import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -86,11 +86,22 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
 `
   const rendered =
     HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
-  // `format` does not read the project's Prettier config from `filepath`; it has to be
-  // resolved and passed, or the output keeps the generator's own quoting and fails
-  // `format:check`.
-  const options = await prettier.resolveConfig(outputPath)
-  return await prettier.format(rendered, { ...options, filepath: outputPath })
+  const result = await format(outputPath, rendered, {
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'none',
+    printWidth: 80,
+    sortImports: false,
+    sortPackageJson: false,
+    embeddedLanguageFormatting: 'off',
+    proseWrap: 'preserve'
+  })
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`
+    )
+  }
+  return result.code
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */

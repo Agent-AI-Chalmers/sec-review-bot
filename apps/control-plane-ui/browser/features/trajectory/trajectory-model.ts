@@ -4,7 +4,11 @@ import type {
 } from '../../../shared/trajectory-events.js'
 
 export type TrajectoryRole =
-  'system' | 'human' | 'assistant' | 'tool' | 'unknown'
+  | 'system'
+  | 'human'
+  | 'assistant'
+  | 'tool'
+  | 'unknown'
 
 export type { TrajectoryEvent } from '../../../shared/trajectory-events.js'
 

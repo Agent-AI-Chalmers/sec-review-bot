@@ -8,7 +8,10 @@ import { InvalidPreparationInputError } from './preparation-failure.js'
 
 export type IssueReviewEventType = 'opened' | 'manual_review'
 export type PullRequestReviewEventType =
-  'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
+  | 'opened'
+  | 'ready_for_review'
+  | 'synchronize'
+  | 'manual_review'
 export type PullRequestReference = Pick<
   PullRequestContext,
   'owner_login' | 'repo_name' | 'pr_number'

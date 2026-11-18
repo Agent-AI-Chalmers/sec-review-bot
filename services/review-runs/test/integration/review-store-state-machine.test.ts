@@ -512,8 +512,11 @@ test('a failure notice reports the reason captured when it was created', async (
     }
     const stillReported = await store.queries.getRun(runId)
     expect(
-      (stillReported?.preparation as { failure_code: string | null })
-        .failure_code,
+      (
+        stillReported?.preparation as
+          | { failure_code: string | null }
+          | undefined
+      )?.failure_code,
       'the preparation row really lost its code'
     ).toBe(null)
     // The notice already claimed above keeps its own copy; a fresh claim after the lease expires

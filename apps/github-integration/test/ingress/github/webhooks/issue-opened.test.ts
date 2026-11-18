@@ -27,7 +27,8 @@ function manualOnlyConfig() {
 
 function trusted(
   config:
-    ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>
+    | ReturnType<typeof automaticConfig>
+    | ReturnType<typeof manualOnlyConfig>
 ) {
   return { config, default_branch: 'main', head_sha: 'main-sha' }
 }

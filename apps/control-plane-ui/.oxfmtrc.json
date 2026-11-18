@@ -1,0 +1,17 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "printWidth": 80,
+  "sortImports": false,
+  "sortPackageJson": false,
+  "sortTailwindcss": false,
+  "ignorePatterns": [
+    "dist/",
+    "dist-server/",
+    "node_modules/",
+    "pnpm-lock.yaml",
+    "playwright-report/",
+    "test-results/"
+  ]
+}

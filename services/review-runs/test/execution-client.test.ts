@@ -58,9 +58,9 @@ test('submission sends authentication and accepts only the expected identity', a
   configureExecution()
   globalThis.fetch = async (input, init) => {
     expect(input).toBe('https://execution.test/v1/workflows/issue-review/runs')
-    expect((init?.headers as Record<string, string>).authorization).toBe(
-      'Bearer test-token'
-    )
+    expect(
+      (init?.headers as Record<string, string> | undefined)?.authorization
+    ).toBe('Bearer test-token')
     return new Response(
       JSON.stringify({
         run_id: 'run-1',

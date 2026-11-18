@@ -77,7 +77,7 @@ const test = base.extend<{
   catalog: { store: PostgresMemoryCatalogStore; pool: Pool }
 }>({
   // Vitest requires destructuring even when the fixture has no dependencies.
-  // eslint-disable-next-line no-empty-pattern
+  // oxlint-disable-next-line no-empty-pattern
   catalog: async ({}, use) => {
     const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
     await using resources = new AsyncDisposableStack()

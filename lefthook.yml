@@ -3,14 +3,14 @@
 pre-commit:
   parallel: true
   commands:
-    prettier:
+    oxfmt:
       glob: '*.{md,yml,yaml,json,jsonc,mjs,js}'
       exclude:
         - 'apps/**'
         - 'services/**'
         - 'contracts/**/tools/**'
         - 'contracts/codegen/**'
-      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+      run: pnpm exec oxfmt --check --no-error-on-unmatched-pattern {staged_files}
     markdownlint:
       glob: '*.md'
       run: pnpm exec markdownlint-cli2 {staged_files}

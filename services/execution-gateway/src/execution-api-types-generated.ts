@@ -353,7 +353,12 @@ export interface RepositoryScanScope {
   incremental_changed_files: {
     path: string
     status:
-      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+      | 'added'
+      | 'modified'
+      | 'deleted'
+      | 'renamed'
+      | 'copied'
+      | 'type_changed'
     previous_path: string | null
   }[]
 }

@@ -25,11 +25,13 @@ function enumFor(spec: Spec, field: string): string[] {
   // A machine that is not a run axis names its schema directly (`ObservedPublicationStep.status`).
   const [schemaName = '', member = ''] = field.split('.')
   const direct = spec.components?.schemas?.[schemaName] as
-    { properties?: Record<string, { enum?: unknown }> } | undefined
+    | { properties?: Record<string, { enum?: unknown }> }
+    | undefined
   if (direct !== undefined)
     return asEnum(direct.properties?.[member]?.enum, field)
   const observed = spec.components?.schemas?.ObservedRun as
-    { properties?: Record<string, unknown> } | undefined
+    | { properties?: Record<string, unknown> }
+    | undefined
   const props = observed?.properties
   if (props === undefined) throw new Error('ObservedRun has no properties')
   // An axis field is `<axis>.<member>` (preparation.status, execution.status,
@@ -39,12 +41,14 @@ function enumFor(spec: Spec, field: string): string[] {
     const [axis, key = ''] = field.split('.')
     // The member is a `$ref` to its summary schema; resolve it before reading the enum.
     const node = props[axis as string] as
-      { $ref?: string; oneOf?: Array<{ $ref?: string }> } | undefined
+      | { $ref?: string; oneOf?: Array<{ $ref?: string }> }
+      | undefined
     const target = (
       node?.$ref ?? node?.oneOf?.find((entry) => entry.$ref !== undefined)?.$ref
     )?.replace('#/components/schemas/', '')
     const summary = spec.components?.schemas?.[target ?? ''] as
-      { properties?: Record<string, { enum?: unknown }> } | undefined
+      | { properties?: Record<string, { enum?: unknown }> }
+      | undefined
     return asEnum(summary?.properties?.[key]?.enum, field)
   }
   const node = props[field] as { enum?: unknown } | undefined

@@ -13,10 +13,10 @@
     "copy:spec": "cp ../../contracts/memory-catalog-api/v1/openapi.yaml dist/openapi.yaml",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "oxlint . --deny-warnings --type-aware",
+    "lint:fix": "oxlint . --fix --deny-warnings --type-aware",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm run build && vitest run --project unit",
     "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
@@ -30,17 +30,14 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
     "vitest": "5.1.0",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007"
   }
 }

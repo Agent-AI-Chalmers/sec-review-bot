@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { format } from 'oxfmt'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -152,8 +152,7 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
       .map((code) => `  ${code.toLowerCase()}: '${code}'`)
       .join(',\n') +
     '\n} as const\n'
-  const options = await prettier.resolveConfig(OUTPUT_PATH)
-  return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
+  return formatOutput(OUTPUT_PATH, rendered)
 }
 
 // Generate the server's closed error-code vocabulary from the contract enum.
@@ -168,7 +167,8 @@ export const ERROR_CODES_PATH = path.resolve(
  */
 export function errorResponseCodes(spec: OpenApiDocument): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
-    { properties?: { code?: { enum?: (string | number)[] } } } | undefined
+    | { properties?: { code?: { enum?: (string | number)[] } } }
+    | undefined
   const values = codeSchema?.properties?.code?.enum ?? []
   const nonString = values.filter((value) => typeof value !== 'string')
   if (nonString.length > 0) {
@@ -208,8 +208,7 @@ export const PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT = [\n${array}\n] as cons
 /** Every code the contract's ErrorResponse.code enum allows. */
 export const ERROR_RESPONSE_CODES_FROM_CONTRACT = [\n${all}\n] as const
 `
-  const options = await prettier.resolveConfig(ERROR_CODES_PATH)
-  return await prettier.format(body, { ...options, filepath: ERROR_CODES_PATH })
+  return formatOutput(ERROR_CODES_PATH, body)
 }
 
 // The server's projection of the contract's domain shapes. The hand-written openapi.yaml owns
@@ -237,11 +236,7 @@ ${renderOperationTypeMaps(spec)}
 
 export type ObservedStep = ObservedPublicationStep
 `
-  const options = await prettier.resolveConfig(CONTRACT_TYPES_PATH)
-  return await prettier.format(body, {
-    ...options,
-    filepath: CONTRACT_TYPES_PATH
-  })
+  return formatOutput(CONTRACT_TYPES_PATH, body)
 }
 
 // The console's projection of the parameters `listRuns` accepts. The document models the
@@ -329,11 +324,7 @@ export const LIST_RUN_QUERY_PARAMS = [
 ${entries}
 ] as const
 `
-  const options = await prettier.resolveConfig(LIST_RUN_QUERY_PARAMS_PATH)
-  return await prettier.format(body, {
-    ...options,
-    filepath: LIST_RUN_QUERY_PARAMS_PATH
-  })
+  return formatOutput(LIST_RUN_QUERY_PARAMS_PATH, body)
 }
 
 /** The console reads Review Runs through the BFF, so it needs the same response shapes
@@ -367,8 +358,7 @@ export type Run = ObservedRun
 export type RunEvent = ReviewRunEvent
 export type PublicationStep = ObservedPublicationStep
 `
-  const options = await prettier.resolveConfig(UI_TYPES_PATH)
-  return await prettier.format(body, { ...options, filepath: UI_TYPES_PATH })
+  return formatOutput(UI_TYPES_PATH, body)
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */
@@ -380,4 +370,23 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams },
     { output: UI_TYPES_PATH, render: renderUiContractTypes }
   ]
+}
+
+async function formatOutput(file: string, source: string): Promise<string> {
+  const result = await format(file, source, {
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'none',
+    printWidth: 80,
+    sortImports: false,
+    sortPackageJson: false,
+    embeddedLanguageFormatting: 'off',
+    proseWrap: 'preserve'
+  })
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to format ${file}: ${JSON.stringify(result.errors)}`
+    )
+  }
+  return result.code
 }

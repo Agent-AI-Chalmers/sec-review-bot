@@ -575,13 +575,15 @@ export type ExecutionStatisticsGroup = {
 export type ExecutionStatisticsSummary = {
   reconciliation_status: 'pending' | 'reconciling' | 'settled' | 'unavailable'
   ingestion_status:
-    ('settled' | 'partial_window' | 'no_observations' | 'unavailable') | null
+    | ('settled' | 'partial_window' | 'no_observations' | 'unavailable')
+    | null
   /**
    * @description Coverage for calls returned by Langfuse. It is not proof that every real model call was uploaded.
    * @type string
    */
   usage_coverage:
-    ('complete_for_observed_calls' | 'partial' | 'unavailable') | null
+    | ('complete_for_observed_calls' | 'partial' | 'unavailable')
+    | null
   /**
    * @minimum 0
    * @type integer

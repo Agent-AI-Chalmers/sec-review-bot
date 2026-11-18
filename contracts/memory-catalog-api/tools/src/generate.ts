@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { format } from 'oxfmt'
 import { parse } from 'yaml'
 
 import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
@@ -53,8 +53,22 @@ export async function renderGeneratedTypes(
   const generated = await renderOpenApiTypes(contractPath)
   const spec = parse(await readFile(contractPath, 'utf8')) as unknown
   const source = `// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.\n${generated}\n\n${renderOperationOptionsById(spec)}\n`
-  const options = await prettier.resolveConfig(outputPath)
-  return prettier.format(source, { ...options, filepath: outputPath })
+  const result = await format(outputPath, source, {
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'none',
+    printWidth: 80,
+    sortImports: false,
+    sortPackageJson: false,
+    embeddedLanguageFormatting: 'off',
+    proseWrap: 'preserve'
+  })
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`
+    )
+  }
+  return result.code
 }
 
 export { outputPaths }

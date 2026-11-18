@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { compile, type JSONSchema } from 'json-schema-to-typescript'
-import prettier from 'prettier'
+import { format } from 'oxfmt'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
@@ -356,8 +356,7 @@ async function renderGatewayVersion(output: string): Promise<string> {
     `export const EXECUTION_API_VERSION = '${EXECUTION_API_VERSION}' as const`,
     ''
   ].join('\n')
-  const options = await prettier.resolveConfig(output)
-  return await prettier.format(rendered, { ...options, filepath: output })
+  return formatOutput(output, rendered)
 }
 
 async function renderConnectorVersion(output: string): Promise<string> {
@@ -370,8 +369,7 @@ async function renderConnectorVersion(output: string): Promise<string> {
     'export type ExecutionApiVersion = typeof EXECUTION_API_VERSION',
     ''
   ].join('\n')
-  const options = await prettier.resolveConfig(output)
-  return await prettier.format(rendered, { ...options, filepath: output })
+  return formatOutput(output, rendered)
 }
 
 function inputTypesOutput(): string {
@@ -393,11 +391,7 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     {
       output: apiTypesOutput,
       render: async () => {
-        const options = await prettier.resolveConfig(apiTypesOutput)
-        return await prettier.format(await renderFile(), {
-          ...options,
-          filepath: apiTypesOutput
-        })
+        return formatOutput(apiTypesOutput, await renderFile())
       }
     },
     {
@@ -409,4 +403,23 @@ export function generatedArtifacts(): GeneratedArtifact[] {
       render: async () => await renderConnectorVersion(connectorVersion)
     }
   ]
+}
+
+async function formatOutput(file: string, source: string): Promise<string> {
+  const result = await format(file, source, {
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'none',
+    printWidth: 80,
+    sortImports: false,
+    sortPackageJson: false,
+    embeddedLanguageFormatting: 'off',
+    proseWrap: 'preserve'
+  })
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to format ${file}: ${JSON.stringify(result.errors)}`
+    )
+  }
+  return result.code
 }

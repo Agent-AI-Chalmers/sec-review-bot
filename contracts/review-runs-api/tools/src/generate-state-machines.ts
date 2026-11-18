@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { format } from 'oxfmt'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -284,7 +284,8 @@ function resolveTarget(
   const [, axis, step, state, from, to, reason] = match
   const axisNode = block[axis!] as Record<string, unknown> | undefined
   const machine = (step === undefined ? axisNode : axisNode?.step) as
-    Record<string, unknown> | undefined
+    | Record<string, unknown>
+    | undefined
   if (machine === undefined) return undefined
   if (state !== undefined)
     return (machine.states as Record<string, object> | undefined)?.[state]
@@ -433,19 +434,8 @@ export interface StateMachine extends MachineBody {
 }
 
 ${machines}`
-  const options = await prettier.resolveConfig(
+  return formatOutput(
     path.resolve(
-      REPO_ROOT,
-      'apps',
-      'control-plane-ui',
-      'browser',
-      'features',
-      'runs'
-    )
-  )
-  return await prettier.format(rendered, {
-    ...options,
-    filepath: path.resolve(
       REPO_ROOT,
       'apps',
       'control-plane-ui',
@@ -453,8 +443,9 @@ ${machines}`
       'features',
       'runs',
       'state-machines.generated.ts'
-    )
-  })
+    ),
+    rendered
+  )
 }
 
 /** Escape text for a Markdown table cell. */
@@ -597,7 +588,10 @@ ${text.intro(machines.map((machine) => `\`${machine.axis}\``).join(text.listSepa
 ${text.loops}
 
 ${sections.join('\n')}`
-  return await prettier.format(rendered, { parser: 'markdown' })
+  return formatOutput(
+    `STATE_MACHINES.${language === 'zh' ? 'zh.md' : 'md'}`,
+    rendered
+  )
 }
 
 export function generatedArtifacts(): GeneratedArtifact[] {
@@ -645,4 +639,23 @@ export function generatedArtifacts(): GeneratedArtifact[] {
       render: () => renderStateMachinesModule()
     }
   ]
+}
+
+async function formatOutput(file: string, source: string): Promise<string> {
+  const result = await format(file, source, {
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'none',
+    printWidth: 80,
+    sortImports: false,
+    sortPackageJson: false,
+    embeddedLanguageFormatting: 'off',
+    proseWrap: 'preserve'
+  })
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to format ${file}: ${JSON.stringify(result.errors)}`
+    )
+  }
+  return result.code
 }

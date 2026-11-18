@@ -51,6 +51,14 @@
 
 列出你实际运行的检查命令，并说明结果。如果还有与本次修改有关的检查没有运行，也要写清楚。
 
+## 格式化与 Lint 职责
+
+Oxfmt 负责格式化，也负责契约投影的最终排版。生成器应直接产生能够通过格式检查的产物，无须再次改写；重复生成应保持相同字节。保留现有的 80 列风格及 fixtures 排除规则。
+
+Oxlint 使用根目录 `.oxlintrc.json` 中的原生规则基线和包级覆盖。Execution Gateway、Memory Catalog 和 smoke probes 保留类型感知检查，控制台保留显式函数返回类型。原生 `import/first` 要求 import 位于可执行语句之前，同时允许模块指令在前。声明之间的空行交给作者安排，不再通过风格插件强制。
+
+其余有效的 ESLint 检查及严重级别由原生规则保留。JavaScript 继续启用 `no-undef`，TypeScript 的未解析名称由编译器检查。`no-dupe-args` 和 `no-octal` 对应的语法已由模块严格模式和 TypeScript 编译器拒绝，因此不再单独配置。类型感知规则采用显式映射，不直接替换成 Oxlint 默认规则。
+
 ## 提交 Pull Request
 
 ### 标题

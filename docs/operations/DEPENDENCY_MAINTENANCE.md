@@ -69,6 +69,6 @@ Current declarations: every TypeScript package pins `engines.node` to `>=26.13.0
 
 When the next version can be adopted:
 
-- TypeScript 7: once `typescript-eslint` accepts it. Its peer range is still `>=4.8.4 <6.1.0` and the tracking issue is open.
+- TypeScript 7: after verifying compatibility with Oxfmt, Oxlint, and package typechecking and build tools.
 
 Review major upgrades separately. Update version declarations, CI version configuration, and relevant Dockerfile base images together, then run the complete checks; a lockfile-only update is insufficient.

@@ -10,10 +10,10 @@
   "scripts": {
     "generate": "node --import tsx src/generate.ts",
     "check": "node --import tsx src/check.ts",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
     "lint:contract": "spectral lint ../v1/openapi.yaml --ruleset ../../.spectral.yaml",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
@@ -22,19 +22,15 @@
     "@sec-review-bot/contract-codegen": "workspace:*",
     "@stoplight/spectral-cli": "^6.17.0",
     "json-schema-to-typescript": "16.0.0",
-    "prettier": "^3.9.10",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
     "rollup": "4.67.4",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0"
   }
 }

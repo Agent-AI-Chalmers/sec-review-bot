@@ -461,7 +461,9 @@ export type ManualVersionSource = {
 }
 
 export type MemoryTreeVersionSource =
-  LearningVersionSource | ReorganizationVersionSource | ManualVersionSource
+  | LearningVersionSource
+  | ReorganizationVersionSource
+  | ManualVersionSource
 
 export type MemoryTreeVersionCreationResult = {
   created: boolean

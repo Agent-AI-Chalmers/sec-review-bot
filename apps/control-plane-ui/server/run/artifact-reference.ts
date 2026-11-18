@@ -24,7 +24,8 @@ export function publishedExecutionArchive(
 ): PublishedArtifact {
   if (run?.run_id !== runId) return { kind: 'invalid' }
   const storage = run.artifact_storage as
-    { status?: unknown; artifact?: unknown } | undefined
+    | { status?: unknown; artifact?: unknown }
+    | undefined
   if (storage?.status !== 'available') return { kind: 'invalid' }
   return publishedArtifact(storage.artifact, {
     bucket,

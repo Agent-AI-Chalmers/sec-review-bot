@@ -71,6 +71,6 @@ action 以 major tag 固定在 `.github/workflows/`，由 Dependabot 的 `github
 
 何时可以升级到下一个版本：
 
-- TypeScript 7：在 `typescript-eslint` 接受它之后。其 peer 范围仍是 `>=4.8.4 <6.1.0`，tracking issue 仍为 open。
+- TypeScript 7：确认 Oxfmt、Oxlint 和各包的类型检查与构建工具兼容后再升级。
 
 大版本升级应单独审查。同步修改版本声明、CI 版本配置和相关 Dockerfile 基础镜像，再运行完整检查；不能只更新 lockfile。

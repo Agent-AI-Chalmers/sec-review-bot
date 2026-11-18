@@ -1,0 +1,10 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "printWidth": 80,
+  "sortImports": false,
+  "sortPackageJson": false,
+  "sortTailwindcss": false,
+  "ignorePatterns": ["node_modules/", "pnpm-lock.yaml"]
+}

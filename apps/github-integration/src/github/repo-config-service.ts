@@ -11,7 +11,8 @@ const AUTOMATIC_TRIGGER_MODE = 'automatic'
 const DEFAULT_TRIGGER_MODE = MANUAL_ONLY_TRIGGER_MODE
 
 type TriggerMode =
-  typeof MANUAL_ONLY_TRIGGER_MODE | typeof AUTOMATIC_TRIGGER_MODE
+  | typeof MANUAL_ONLY_TRIGGER_MODE
+  | typeof AUTOMATIC_TRIGGER_MODE
 
 interface RepositoryTriggerConfig {
   trigger_mode: TriggerMode

@@ -6,12 +6,7 @@
       "name": "types",
       "script": "contracts/review-runs-api/tools/src/generate-types.ts",
       "command": "pnpm --dir contracts/review-runs-api/tools run generate",
-      "inputs": [
-        "contracts/review-runs-api/v1/openapi.yaml",
-        "services/review-runs/.prettierrc.json",
-        "apps/github-integration/.prettierrc.json",
-        "apps/control-plane-ui/.prettierrc.json"
-      ],
+      "inputs": ["contracts/review-runs-api/v1/openapi.yaml"],
       "outputs": [
         "services/review-runs/src/contract-types-generated.ts",
         "services/review-runs/src/error-codes-generated.ts",

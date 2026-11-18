@@ -1,0 +1,32 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "printWidth": 80,
+  "overrides": [
+    {
+      "files": ["*.md"],
+      "options": {
+        "embeddedLanguageFormatting": "off"
+      }
+    }
+  ],
+  "sortImports": false,
+  "sortPackageJson": false,
+  "sortTailwindcss": false,
+  "ignorePatterns": [
+    "apps/*/",
+    "services/*/",
+    "smoke-tests/",
+    "contracts/codegen/",
+    "contracts/**/tools/",
+    "agents/src/sec_review_agents/resources/",
+    "agents/tests/**/fixtures/",
+    "agents/tests/**/cases/",
+    "pnpm-lock.yaml",
+    "contracts/**/*.json",
+    "contracts/**/*.yaml",
+    "contracts/**/*.yml",
+    "**/*.toml"
+  ]
+}

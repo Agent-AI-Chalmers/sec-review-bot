@@ -69,7 +69,8 @@ function coerceQueryStrings(request: FastifyRequest): void {
   )?.querystring
   const properties = (
     querystring as
-      { properties?: Record<string, { type?: QueryScalarType }> } | undefined
+      | { properties?: Record<string, { type?: QueryScalarType }> }
+      | undefined
   )?.properties
   if (properties === undefined) return
   const query = request.query as Record<string, unknown> | null
