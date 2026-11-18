@@ -36,6 +36,6 @@ Historical runs are spaced relative to a baseline before the snapshot, while act
 
 <!-- doc-default: control-plane-ui.mock-api-browser-clock; source=apps/control-plane-ui/test/e2e/fixtures.ts -->
 
-Local E2E fixes this server clock and the browser's Date to the same reference time. Browser timers continue normally. Tests against an external deployment leave its clock and browser Date unchanged. The local fixture restores the previous mock API environment settings after closing its server, including on failure.
+Local E2E fixes this server clock and the browser's Date to the same reference time. The page fixture replaces only `Date`; browser timers, RAF, and CSS animation scheduling stay native. Tests that deliberately advance timers install Playwright's full clock in a separate browser context. Tests against an external deployment leave its clock and browser Date unchanged. The local fixture restores the previous mock API environment settings after closing its server, including on failure.
 
 The environment switch controls development middleware registration. Configuration dependencies can still evaluate when Vite loads its configuration, including during builds. Browser bundle inclusion depends on the application imports and build graph.

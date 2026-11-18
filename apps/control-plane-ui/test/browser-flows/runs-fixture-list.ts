@@ -132,10 +132,9 @@ export async function runFixtureRunListFlow({
 }
 
 export async function runFixtureRunRangeFlow({ page }: { page: Page }) {
-  // Freeze only Date, not timers: presets stay on one minute boundary while
-  // network and rendering still run normally, including the delayed response.
+  // The local page fixture already fixes Date. Reuse its reference without
+  // installing a virtual timer/RAF scheduler during ordinary UI interactions.
   const now = new Date(await page.evaluate(() => Date.now()))
-  await page.clock.setFixedTime(now)
   await page.goto('/runs?limit=50', { waitUntil: 'domcontentloaded' })
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)

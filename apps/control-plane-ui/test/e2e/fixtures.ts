@@ -88,10 +88,22 @@ export const test = base.extend<TestFixtures>({
     { scope: 'test' }
   ],
   page: async ({ page, fixtureRuntime }, use): Promise<void> => {
-    // Freeze Date only. Timers and network continue normally, and remote deployments
-    // retain their real clock. Local requests and rendering share the mock API time.
+    // Playwright's clock also virtualizes RAF. Keep native frame scheduling so
+    // CSS height transitions can start and finish on real browser frames.
     if (fixtureRuntime.server !== undefined) {
-      await page.clock.setFixedTime(new Date(MOCK_API_NOW))
+      await page.context().addInitScript((time: number) => {
+        const NativeDate = Date
+        const now = () => time
+        globalThis.Date = new Proxy(NativeDate, {
+          apply: () => new NativeDate(time).toString(),
+          construct: (target, args: unknown[], newTarget): Date =>
+            Reflect.construct(target, args.length === 0 ? [time] : args, newTarget) as Date,
+          get: (target, property, receiver): unknown =>
+            property === 'now' ? now : Reflect.get(target, property, receiver)
+        })
+        // Instance constructors must use the same fixed clock as the global binding.
+        Object.defineProperty(NativeDate.prototype, 'constructor', { value: globalThis.Date })
+      }, Date.parse(MOCK_API_NOW))
     }
     await use(page)
   },
