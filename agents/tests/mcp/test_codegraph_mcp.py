@@ -166,13 +166,13 @@ def test_does_not_close_borrowed_backend_when_codegraph_prepare_raises() -> None
             "execute",
             side_effect=RuntimeError("prepare exploded"),
         ),
-        patch.object(backend, "close") as close,
+        patch.object(backend, "aclose") as close,
         pytest.raises(RuntimeError, match="prepare exploded"),
     ):
         codegraph_mcp_connections_for_backend(backend)
 
     ensure_started.assert_called_once_with()
-    close.assert_not_called()
+    close.assert_not_awaited()
 
 
 def test_skips_local_backend_without_host_workspace_path(tmp_path: Path) -> None:

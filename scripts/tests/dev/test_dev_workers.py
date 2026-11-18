@@ -1,7 +1,13 @@
+import os
+import select
+import signal
+import subprocess
+import sys
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
 from scripts.dev import dev_workers
 
 
@@ -77,7 +83,51 @@ def test_dev_worker_failure_stops_remaining_workers(monkeypatch) -> None:
         dev_workers.signal, "signal", lambda *args: dev_workers.signal.SIG_DFL
     )
 
+    stop = Mock()
+    monkeypatch.setattr(dev_workers, "_stop_worker_processes", stop)
+
     assert dev_workers._supervise_dev_workers() == 7
-    execution.terminate.assert_not_called()
-    extraction.terminate.assert_called_once_with()
-    maintenance.terminate.assert_called_once_with()
+    stop.assert_called_once_with([execution, extraction, maintenance])
+
+
+@pytest.mark.parametrize(
+    "leader_exits,ignore_term",
+    [(False, False), (True, False), (False, True), (True, True)],
+)
+def test_shutdown_stops_worker_descendants(leader_exits, ignore_term) -> None:
+    """An inherited pipe stays open until every descendant exits, even after leader exit."""
+    read_fd, write_fd = os.pipe()
+    child_code = (
+        "import os, signal, time; "
+        + ("signal.signal(signal.SIGTERM, signal.SIG_IGN); " if ignore_term else "")
+        + f"os.write({write_fd}, b'ready'); time.sleep(60)"
+    )
+    leader_code = (
+        "import subprocess, sys, time; "
+        f"subprocess.Popen([sys.executable, '-c', {child_code!r}], pass_fds=({write_fd},)); "
+        + ("sys.exit(0)" if leader_exits else "time.sleep(60)")
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", leader_code],
+        start_new_session=True,
+        pass_fds=(write_fd,),
+    )
+    os.close(write_fd)
+    try:
+        assert select.select([read_fd], [], [], 5)[0], "child did not start"
+        assert os.read(read_fd, 5) == b"ready"
+        if leader_exits:
+            process.wait(timeout=5)
+        dev_workers._stop_worker_processes([process])
+        assert select.select([read_fd], [], [], 2)[
+            0
+        ], "worker descendant survived shutdown"
+        assert os.read(read_fd, 1) == b""
+        assert process.poll() is not None
+    finally:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=5)
+        os.close(read_fd)

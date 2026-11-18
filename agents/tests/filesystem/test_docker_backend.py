@@ -115,7 +115,7 @@ async def test_async_docker_command_uses_async_subprocess() -> None:
 
 
 @pytest.mark.asyncio
-async def test_afinalize_uses_async_docker_shell() -> None:
+async def test_aclose_normalizes_ownership_with_async_docker_shell() -> None:
     """Use the non-blocking Docker API when normalizing mount ownership."""
     mount = DockerMount(
         host_path="/tmp/workspace",
@@ -133,7 +133,7 @@ async def test_afinalize_uses_async_docker_shell() -> None:
             "sec_review_agents.filesystem.docker_backend.docker_runtime.exec_shell",
         ) as sync_shell,
     ):
-        await backend.afinalize()
+        await backend.aclose()
 
     async_shell.assert_awaited_once()
     sync_shell.assert_not_called()
@@ -155,68 +155,43 @@ async def test_aclose_backend_prefers_async_cleanup() -> None:
     close.assert_not_called()
 
 
-def test_docker_backend_close_finalizes_before_stopping_container() -> None:
+@pytest.mark.asyncio
+async def test_docker_backend_aclose_normalizes_before_stopping_container() -> None:
     backend = _backend()
+    events: list[str] = []
+
+    async def normalize() -> None:
+        events.append("normalize")
+
+    def remove() -> None:
+        events.append("remove")
 
     with (
-        patch.object(backend, "finalize") as finalize,
-        patch.object(backend.container, "close") as close,
+        patch.object(backend, "_normalize_mount_ownership", side_effect=normalize),
+        patch.object(backend.container, "close", side_effect=remove),
     ):
-        backend.close()
+        await backend.aclose()
 
-    finalize.assert_called_once_with()
-    close.assert_called_once_with()
+    assert events == ["normalize", "remove"]
 
 
-def test_docker_backend_close_is_idempotent() -> None:
+@pytest.mark.asyncio
+async def test_docker_backend_aclose_is_idempotent() -> None:
     backend = _backend()
     backend.container._initialized = True
 
     with (
-        patch.object(backend, "finalize") as finalize,
+        patch.object(
+            backend, "_normalize_mount_ownership", new_callable=AsyncMock
+        ) as normalize,
         patch(
             "sec_review_agents.filesystem.docker_runtime.remove_container"
         ) as remove_container,
     ):
-        backend.close()
-        backend.close()
-
-    # The second call must skip both the finalize and the removal.
-    finalize.assert_called_once_with()
-    remove_container.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_docker_backend_aclose_finalizes_before_stopping_container() -> None:
-    backend = _backend()
-
-    with (
-        patch.object(backend, "afinalize", new_callable=AsyncMock) as afinalize,
-        patch.object(backend.container, "close") as close,
-    ):
+        await backend.aclose()
         await backend.aclose()
 
-    afinalize.assert_awaited_once_with()
-    close.assert_called_once_with()
-
-
-@pytest.mark.asyncio
-async def test_docker_backend_aclose_is_idempotent_after_sync_close() -> None:
-    backend = _backend()
-    backend.container._initialized = True
-
-    with (
-        patch.object(backend, "finalize") as finalize,
-        patch.object(backend, "afinalize", new_callable=AsyncMock) as afinalize,
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.remove_container"
-        ) as remove_container,
-    ):
-        backend.close()
-        await backend.aclose()
-
-    finalize.assert_called_once_with()
-    afinalize.assert_not_awaited()
+    normalize.assert_awaited_once_with()
     remove_container.assert_called_once()
 
 
@@ -531,14 +506,6 @@ def test_routes_define_agent_visible_prefixes() -> None:
     assert (
         backend._to_agent_path("/mnt/material/workspace/app.py") == "/workspace/app.py"
     )
-
-
-def test_finalize_normalizes_mount_ownership_once_at_backend_end() -> None:
-    backend = _backend()
-    with patch.object(backend, "_normalize_mount_ownership") as normalize:
-        backend.finalize()
-
-    normalize.assert_called_once_with()
 
 
 def test_tmp_is_container_native_even_without_material_routes() -> None:
@@ -894,112 +861,9 @@ def test_container_resource_has_empty_environment_and_unique_name() -> None:
     assert first.container_name != second.container_name
 
 
-def test_docker_backend_context_manager_closes_on_normal_exit() -> None:
-    backend = _backend()
-
-    with (
-        patch.object(backend, "finalize") as finalize,
-        patch.object(backend.container, "close") as close,
-        backend,
-    ):
-        pass
-
-    finalize.assert_called_once_with()
-    close.assert_called_once_with()
-
-
-def test_docker_backend_context_manager_surfaces_cleanup_failure_on_normal_exit() -> (
-    None
-):
-    """A failed cleanup on a clean exit must not look like success.
-
-    Nothing else in that path reports a problem, so swallowing the error would tell the caller
-    the sandbox was stopped when the container may still be running.
-    """
-    backend = _backend()
-
-    with (
-        patch.object(backend, "finalize"),
-        patch.object(
-            backend.container, "close", side_effect=RuntimeError("docker daemon gone")
-        ),
-        pytest.raises(RuntimeError, match="docker daemon gone"),
-        backend,
-    ):
-        pass
-
-
-def test_docker_backend_context_manager_keeps_the_block_error_when_cleanup_fails() -> (
-    None
-):
-    """The block's exception is what the caller needs; a cleanup failure must not replace it."""
-    backend = _backend()
-
-    with (
-        patch.object(backend, "finalize"),
-        patch.object(
-            backend.container, "close", side_effect=RuntimeError("docker daemon gone")
-        ),
-        pytest.raises(ValueError, match="block failed"),
-        backend,
-    ):
-        raise ValueError("block failed")
-
-
-def test_docker_backend_logs_cleanup_failure_while_another_exception_propagates() -> (
-    None
-):
-    """A cleanup failure during an exceptional exit is invisible unless it is logged."""
-    backend = _backend()
-
-    with (
-        patch.object(backend, "finalize"),
-        patch.object(
-            backend.container, "close", side_effect=RuntimeError("docker daemon gone")
-        ),
-        patch("sec_review_agents.filesystem.docker_backend._logger") as logger,
-        pytest.raises(ValueError, match="block failed"),
-        backend,
-    ):
-        raise ValueError("block failed")
-
-    logger.warning.assert_called_once()
-    assert logger.warning.call_args.args[0].startswith("Docker sandbox cleanup failed")
-
-
-def test_docker_backend_close_can_be_retried_after_a_cleanup_failure() -> None:
-    """A failure must leave both the backend and the container resource retryable.
-
-    Mocking `container.close()` would skip the resource's own state machine, which is where the
-    failure used to become permanent: it marked itself closed before `remove_container` ran, so
-    the retry returned early and the container was never removed.
-    """
-    backend = _backend()
-    backend.container._initialized = True
-
-    with (
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.remove_container",
-            side_effect=[RuntimeError("docker daemon gone"), None],
-        ) as remove_container,
-        patch.object(backend, "finalize"),
-    ):
-        with pytest.raises(RuntimeError, match="docker daemon gone"):
-            backend.close()
-
-        assert backend._closed is False
-        assert backend.container._closed is False
-
-        backend.close()
-
-    assert remove_container.call_count == 2
-    assert backend._closed is True
-    assert backend.container._closed is True
-
-
 @pytest.mark.asyncio
 async def test_docker_backend_aclose_can_be_retried_after_a_cleanup_failure() -> None:
-    """A failed async cleanup must leave every layer retryable, as `close` does."""
+    """A failed container removal must leave both lifecycle layers retryable."""
     backend = _backend()
     backend.container._initialized = True
 
@@ -1008,7 +872,7 @@ async def test_docker_backend_aclose_can_be_retried_after_a_cleanup_failure() ->
             "sec_review_agents.filesystem.docker_runtime.remove_container",
             side_effect=[RuntimeError("docker daemon gone"), None],
         ) as remove_container,
-        patch.object(backend, "afinalize", new_callable=AsyncMock),
+        patch.object(backend, "_normalize_mount_ownership", new_callable=AsyncMock),
     ):
         with pytest.raises(RuntimeError, match="docker daemon gone"):
             await backend.aclose()
@@ -1023,32 +887,11 @@ async def test_docker_backend_aclose_can_be_retried_after_a_cleanup_failure() ->
     assert backend.container._closed is True
 
 
-def test_docker_backend_close_records_a_completed_removal_when_finalize_fails() -> None:
-    """A failed `finalize` must not make a removed container look like it is still running.
-
-    `finalize` runs before the container is removed, so its exception reaches the caller while
-    the removal still happens. Leaving the backend open afterwards would have the caller retry
-    against a container that is already gone.
-    """
-    backend = _backend()
-    backend.container._initialized = True
-
-    with (
-        patch("sec_review_agents.filesystem.docker_runtime.remove_container"),
-        patch.object(backend, "finalize", side_effect=RuntimeError("finalize failed")),
-        pytest.raises(RuntimeError, match="finalize failed"),
-    ):
-        backend.close()
-
-    assert backend._closed is True
-    assert backend.container.closed is True
-
-
 @pytest.mark.asyncio
-async def test_docker_backend_aclose_records_a_completed_removal_when_afinalize_fails() -> (
+async def test_docker_backend_aclose_records_removal_when_ownership_cleanup_fails() -> (
     None
 ):
-    """The async path records the same state as the sync one."""
+    """Ownership cleanup failure must not leave a removed container reported as open."""
     backend = _backend()
     backend.container._initialized = True
 
@@ -1056,11 +899,11 @@ async def test_docker_backend_aclose_records_a_completed_removal_when_afinalize_
         patch("sec_review_agents.filesystem.docker_runtime.remove_container"),
         patch.object(
             backend,
-            "afinalize",
+            "_normalize_mount_ownership",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("afinalize failed"),
+            side_effect=RuntimeError("ownership cleanup failed"),
         ),
-        pytest.raises(RuntimeError, match="afinalize failed"),
+        pytest.raises(RuntimeError, match="ownership cleanup failed"),
     ):
         await backend.aclose()
 

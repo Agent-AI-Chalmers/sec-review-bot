@@ -71,19 +71,32 @@ def _dev_worker_environment(
 
 def _stop_worker_processes(processes: list[subprocess.Popen[bytes]]) -> None:
     """Terminate a worker group, escalating after a shared grace period."""
-    for process in processes:
-        if process.poll() is None:
-            process.terminate()
-    deadline = time.monotonic() + 10
-    for process in processes:
-        if process.poll() is not None:
-            continue
-        timeout = max(0.0, deadline - time.monotonic())
+    # start_new_session makes each worker PID its process-group ID. The group
+    # can outlive its leader, so neither signalling nor escalation uses poll().
+    remaining = {process.pid for process in processes}
+    for pgid in tuple(remaining):
         try:
-            process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+            os.killpg(pgid, signal.SIGTERM)
+        except ProcessLookupError:
+            remaining.remove(pgid)
+    deadline = time.monotonic() + 10
+    while remaining and time.monotonic() < deadline:
+        for process in processes:
+            process.poll()  # Reap leaders so they do not keep an empty group alive.
+        for pgid in tuple(remaining):
+            try:
+                os.killpg(pgid, 0)
+            except ProcessLookupError:
+                remaining.remove(pgid)
+        if remaining:
+            time.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
+    for pgid in remaining:
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    for process in processes:
+        process.wait()
 
 
 def _supervise_dev_workers() -> int:

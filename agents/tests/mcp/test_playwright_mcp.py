@@ -126,9 +126,9 @@ def test_resolver_does_not_close_borrowed_backend_on_failure() -> None:
             "ensure_started",
             side_effect=RuntimeError("start failed"),
         ),
-        patch.object(backend, "close") as close,
+        patch.object(backend, "aclose") as close,
         pytest.raises(RuntimeError, match="start failed"),
     ):
         playwright_mcp_connections_for_backend(backend)
 
-    close.assert_not_called()
+    close.assert_not_awaited()
