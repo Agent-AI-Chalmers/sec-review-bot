@@ -276,7 +276,7 @@ test('mutating one fixture server does not change another server’s run state',
   const parked = (await (await fetch(`${first.base}/api/runs/parked`)).json()) as {
     blocks: { run_id: string; axis: string }[]
   }
-  const runId = parked.blocks.find((block) => block.axis === 'preparation')?.run_id
+  const runId = parked.blocks.find((block) => block.axis === 'execution')?.run_id
   expect.assert(runId)
   const response = await fetch(`${first.base}/api/admin/runs/${encodeURIComponent(runId)}/resume`, {
     method: 'POST',
@@ -287,7 +287,7 @@ test('mutating one fixture server does not change another server’s run state',
     blocks: { run_id: string; axis: string }[]
   }
   expect(remaining.blocks).toContainEqual(
-    expect.objectContaining({ run_id: runId, axis: 'preparation' })
+    expect.objectContaining({ run_id: runId, axis: 'execution' })
   )
 })
 
@@ -451,6 +451,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       extraction_id: string
       source_run_id: string
       source_unit_id: string
+      execution_archive_digest: string
       observations: { observation_id: string; body_markdown: string }[]
     }
 
@@ -459,6 +460,15 @@ test('memory fixtures form one coherent provenance graph', async () => {
         (record: FixtureExtraction) => [record.extraction_id, record] as const
       )
     )
+
+    // Empty extractions have no observation to lead the existing graph walk to their run.
+    for (const extraction of extractionById.values()) {
+      const { run } = (await (
+        await fetch(`${fixture.base}/api/runs/${extraction.source_run_id}`)
+      ).json()) as { run: Run }
+      expect.assert(run.artifact_storage?.status === 'available')
+      expect(extraction.execution_archive_digest).toBe(run.artifact_storage.artifact.digest)
+    }
 
     expect(extractions.next_cursor).toBe(null)
     expect(extractions.extractions).toHaveLength(48)
@@ -768,4 +778,137 @@ test('unconfigured mock servers follow the current clock and regenerate independ
     clock.mockRestore()
     vi.unstubAllEnvs()
   }
+})
+
+// Statistics reconciliation starts only after a terminal execution has been observed.
+test('unconfirmed submission fixtures do not carry settled execution statistics', async () => {
+  const { runs } = (await import('../../mock-api/runs/generate.js')).createRunFixtures(Date.now())
+  const unconfirmed = runs.filter((run) =>
+    ['pending', 'uncertain', 'disconnected', 'queued', 'running', 'skipped'].includes(
+      run.execution.status
+    )
+  )
+  expect(unconfirmed.some((run) => run.execution.status === 'disconnected')).toBe(true)
+  for (const run of unconfirmed) {
+    expect(run.execution_statistics, run.run_id).toBe(null)
+  }
+})
+
+test.each(['execution', 'publication'] as const)(
+  'resume updates only the disconnected %s axis',
+  async (axis) => {
+    const fixture = await startFixtureServer()
+    try {
+      const { blocks } = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+        blocks: { run_id: string; axis: string }[]
+      }
+      const runId = blocks.find((block) => block.axis === axis)!.run_id
+      const { run: before } = (await (await fetch(`${fixture.base}/api/runs/${runId}`)).json()) as {
+        run: Run
+      }
+      const beforeSteps = (await (
+        await fetch(`${fixture.base}/api/runs/${runId}/publication-steps`)
+      ).json()) as {
+        publication_steps: { step_key: string; status: string; attempt_count: number }[]
+      }
+      const abandonment = await fetch(`${fixture.base}/api/admin/runs/${runId}/abandon`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-review-runs-admin-token': 'fixture-admin-token'
+        },
+        body: JSON.stringify({ reason: 'only preparation contradictions can be abandoned' })
+      })
+      expect(abandonment.status).toBe(409)
+      const response = await fetch(`${fixture.base}/api/admin/runs/${runId}/resume`, {
+        method: 'POST',
+        headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
+      })
+      expect(response.status).toBe(200)
+      const { run: after } = (await response.json()) as { run: Run }
+      expect(after.preparation).toStrictEqual(before.preparation)
+      const status = axis === 'execution' ? 'uncertain' : 'pending'
+      expect(after[axis].status).toBe(status)
+      expect(after[axis === 'execution' ? 'publication' : 'execution']).toStrictEqual(
+        before[axis === 'execution' ? 'publication' : 'execution']
+      )
+      for (const notice of before.notices) {
+        expect(after.notices.find((item) => item.notice_id === notice.notice_id)).toStrictEqual({
+          ...notice,
+          status:
+            notice.kind === 'attention' &&
+            notice.axis === axis &&
+            ['pending', 'delivering'].includes(notice.status)
+              ? 'superseded'
+              : notice.status
+        })
+      }
+      const afterSteps = (await (
+        await fetch(`${fixture.base}/api/runs/${runId}/publication-steps`)
+      ).json()) as typeof beforeSteps
+      expect(afterSteps.publication_steps).toStrictEqual(
+        beforeSteps.publication_steps.map((step) =>
+          axis === 'publication' && step.status === 'disconnected'
+            ? { ...step, status: 'pending', attempt_count: 0 }
+            : step
+        )
+      )
+      const events = (await (await fetch(`${fixture.base}/api/runs/${runId}/events`)).json()) as {
+        events: RunEvent[]
+      }
+      expect(events.events).toContainEqual(
+        expect.objectContaining({
+          axis,
+          from_status: 'disconnected',
+          to_status: status,
+          reason_code:
+            axis === 'execution'
+              ? 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR'
+              : 'PUBLICATION_RESUMED_BY_OPERATOR'
+        })
+      )
+      const remaining = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+        blocks: typeof blocks
+      }
+      expect(remaining.blocks.some((block) => block.run_id === runId)).toBe(false)
+      const replay = await fetch(`${fixture.base}/api/admin/runs/${runId}/resume`, {
+        method: 'POST',
+        headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
+      })
+      expect(replay.status).toBe(409)
+    } finally {
+      await fixture.close()
+    }
+  }
+)
+
+test('resume rejects a preparation contradiction after execution has advanced', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    const { blocks } = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+      blocks: { run_id: string; axis: string }[]
+    }
+    const runId = blocks.find((block) => block.axis === 'preparation')!.run_id
+    const before = (await (await fetch(`${fixture.base}/api/runs/${runId}`)).json()) as { run: Run }
+    const response = await fetch(`${fixture.base}/api/admin/runs/${runId}/resume`, {
+      method: 'POST',
+      headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
+    })
+    expect(response.status).toBe(409)
+    expect(await (await fetch(`${fixture.base}/api/runs/${runId}`)).json()).toStrictEqual(before)
+    expect(await (await fetch(`${fixture.base}/api/runs/parked`)).json()).toStrictEqual({ blocks })
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('scenario validation rejects statistics before execution reaches a terminal state', async () => {
+  const { createRunFixtures } = await import('../../mock-api/runs/generate.js')
+  const { validateRun } = await import('../../mock-api/runs/validate.js')
+  const { runs, stepsByRun } = createRunFixtures(Date.now())
+  const active = structuredClone(runs.find((run) => run.execution.status === 'running')!)
+  active.execution_statistics = runs.find(
+    (run) => run.execution_statistics !== null
+  )!.execution_statistics
+  expect(() => validateRun(active, stepsByRun.get(active.run_id) ?? [])).toThrow()
 })

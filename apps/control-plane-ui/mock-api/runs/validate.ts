@@ -160,6 +160,9 @@ export function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): voi
   ) {
     fail('a submitted preparation means the run has moved on to the Execution Gateway lifecycle')
   }
+  if (run.execution_statistics !== null && !['succeeded', 'failed'].includes(execution)) {
+    fail('execution statistics require a terminal execution')
+  }
   if (run.artifact_storage !== null && !['succeeded', 'failed'].includes(execution)) {
     fail('the execution archive is only reported at execution terminal')
   }

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { createMemoryHandler } from './memory/routes.js'
+import { createMemoryHandler, type MemorySourceRuns } from './memory/routes.js'
 import { createRunFixtures } from './runs/generate.js'
 import { createRunsHandler } from './runs/routes.js'
 
@@ -11,7 +11,7 @@ export function createMockApiRouter(
   const fixtures = createRunFixtures(snapshot)
   const { runs } = fixtures
   let signedIn = true
-  const sourceRunIds = Object.fromEntries(
+  const sourceRuns = Object.fromEntries(
     ['repository-review', 'pull-request-review', 'issue-review'].map((workflow) => {
       const run = runs.find(
         (candidate) =>
@@ -21,13 +21,13 @@ export function createMockApiRouter(
           candidate.publication.status === 'published' &&
           candidate.artifact_storage?.status === 'available'
       )
-      if (run === undefined) {
+      if (run?.artifact_storage?.status !== 'available') {
         throw new Error(`mock API needs one completed GitHub ${workflow} run for memory provenance`)
       }
-      return [workflow, run.run_id]
+      return [workflow, { runId: run.run_id, archiveDigest: run.artifact_storage.artifact.digest }]
     })
-  ) as Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
-  const handleMemory = createMemoryHandler(sourceRunIds, snapshot, now)
+  ) as MemorySourceRuns
+  const handleMemory = createMemoryHandler(sourceRuns, snapshot, now)
   const handleRuns = createRunsHandler(fixtures, now)
 
   return async (request, response, next): Promise<void> => {

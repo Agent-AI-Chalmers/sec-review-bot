@@ -21,7 +21,10 @@ const trajectoryContent: TrajectoryContentResponse = {
 
 const LOAD_ERROR_VERSION = 404
 
-type SourceRunIds = Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
+export type MemorySourceRuns = Record<
+  'repository-review' | 'pull-request-review' | 'issue-review',
+  { runId: string; archiveDigest: string }
+>
 
 const trajectoryReference = {
   uri: 's3://sec-review/memory/trajectories/fixture/trajectory.v1.jsonl.zst',
@@ -31,7 +34,7 @@ const trajectoryReference = {
 }
 
 export function createMemoryHandler(
-  sourceRunIds: SourceRunIds,
+  sourceRuns: MemorySourceRuns,
   BASE_TIME: number,
   now: () => number
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
@@ -149,9 +152,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-1',
       source_workflow: 'repository-review',
-      source_run_id: sourceRunIds['repository-review'],
+      source_run_id: sourceRuns['repository-review'].runId,
       source_unit_id: 'case-reachability',
-      execution_archive_digest: `sha256:${'2'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [],
       created_at: new Date(BASE_TIME - 300_000).toISOString()
@@ -159,9 +162,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-2',
       source_workflow: 'repository-review',
-      source_run_id: sourceRunIds['repository-review'],
+      source_run_id: sourceRuns['repository-review'].runId,
       source_unit_id: 'case-authentication',
-      execution_archive_digest: `sha256:${'3'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [
         {
@@ -175,9 +178,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-3',
       source_workflow: 'repository-review',
-      source_run_id: sourceRunIds['repository-review'],
+      source_run_id: sourceRuns['repository-review'].runId,
       source_unit_id: 'case-proxy-boundary',
-      execution_archive_digest: `sha256:${'4'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [
         {
@@ -191,9 +194,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-4',
       source_workflow: 'pull-request-review',
-      source_run_id: sourceRunIds['pull-request-review'],
+      source_run_id: sourceRuns['pull-request-review'].runId,
       source_unit_id: 'pull-request',
-      execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['pull-request-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [
         {
@@ -207,9 +210,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-5',
       source_workflow: 'issue-review',
-      source_run_id: sourceRunIds['issue-review'],
+      source_run_id: sourceRuns['issue-review'].runId,
       source_unit_id: 'issue',
-      execution_archive_digest: `sha256:${'6'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['issue-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [],
       created_at: new Date(BASE_TIME + 240_000).toISOString()
@@ -217,9 +220,9 @@ export function createMemoryHandler(
     {
       extraction_id: 'fixture-extraction-6',
       source_workflow: 'repository-review',
-      source_run_id: sourceRunIds['repository-review'],
+      source_run_id: sourceRuns['repository-review'].runId,
       source_unit_id: 'case-reachability',
-      execution_archive_digest: `sha256:${'7'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [],
       created_at: new Date(BASE_TIME + 300_000).toISOString()
@@ -278,9 +281,9 @@ export function createMemoryHandler(
       extractionRecords.push({
         extraction_id: extractionId,
         source_workflow: 'repository-review',
-        source_run_id: sourceRunIds['repository-review'],
+        source_run_id: sourceRuns['repository-review'].runId,
         source_unit_id: `case-${sampleIndex}`,
-        execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+        execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
         trajectory_reference: trajectoryReference,
         observations: [{ observation_id: 'extraction-1', body_markdown: sample.body }],
         created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
@@ -323,9 +326,9 @@ export function createMemoryHandler(
     extractionRecords.push({
       extraction_id: `fixture-history-${sampleIndex + 1}`,
       source_workflow: 'repository-review',
-      source_run_id: sourceRunIds['repository-review'],
+      source_run_id: sourceRuns['repository-review'].runId,
       source_unit_id: `case-${sampleIndex + 1}`,
-      execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+      execution_archive_digest: sourceRuns['repository-review'].archiveDigest,
       trajectory_reference: trajectoryReference,
       observations: [{ observation_id: 'extraction-1', body_markdown: sample.body }],
       created_at: new Date(BASE_TIME - (historySamples.length - sampleIndex) * 60_000).toISOString()

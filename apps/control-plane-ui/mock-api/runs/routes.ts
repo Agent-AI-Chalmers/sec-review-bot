@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import type {
+  RunEvent,
   ListParkedRunsResponseBody,
   ListRunPublicationStepsResponseBody,
   ListRunEventsResponseBody
@@ -26,11 +27,7 @@ export function createRunsHandler(
   // what makes the abandon button actually work locally: the queue shrinks and the detail
   // page stops offering the decision, instead of the button being permanently inert.
   const abandoned = new Set<string>()
-  // Runs the operator handed back to automatic recovery. The resume button has to do
-  // something locally too, or the console teaches a decision that visibly fails: the real
-  // endpoint moves the row to `uncertain` with a fresh budget, so the detail page must stop
-  // reporting `disconnected` and the run must leave the operator queue.
-  const resumed = new Set<string>()
+  const resumedEvents = new Map<string, RunEvent[]>()
   // Runs the operator stopped waiting for. Giving up is the third decision the queue offers, so
   // it has to work locally too; the run leaves the queue and its disconnected axis ends as the
   // failure Review Runs records, rather than the button failing with a 404.
@@ -60,7 +57,7 @@ export function createRunsHandler(
       if (axis === null) {
         return []
       }
-      if (abandoned.has(run.run_id) || resumed.has(run.run_id) || gaveUp.has(run.run_id)) {
+      if (abandoned.has(run.run_id) || gaveUp.has(run.run_id)) {
         return []
       }
       return [
@@ -284,26 +281,74 @@ export function createRunsHandler(
         return
       }
       const runId = decodeURIComponent(resumeMatch[1] ?? '')
-      if (!blockedRunIds().includes(runId) || abandoned.has(runId) || resumed.has(runId)) {
-        response.statusCode = 409
-        response.end(JSON.stringify({ error: 'not_disconnected' }))
-        return
-      }
       const run = runs.find((item) => item.run_id === runId)
       if (run === undefined) {
         response.statusCode = 404
         response.end(JSON.stringify({ error: 'not_found' }))
         return
       }
-      // The same transition Review Runs performs: preparation returns to `uncertain`
-      // with a fresh attempt budget, and the reason that parked it is cleared. The axes are
-      // left as they are, because resuming asserts nothing about them.
-      run.preparation.status = 'uncertain'
-      run.preparation.disconnect_reason = null
-      run.preparation.attempt_count = 0
-      run.preparation.failure_code = null
-      run.preparation.updated_at = new Date(now()).toISOString()
-      resumed.add(runId)
+      const axis = parkedAxis(run)
+      if (axis === null || (axis === 'preparation' && run.execution.status !== 'pending')) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_resumable' }))
+        return
+      }
+      const steps = stepsByRun.get(runId) ?? []
+      // Preserve the history before resumption; deriving it from the new state would
+      // invent lifecycle edges and lose the operator's actual decision.
+      const events = eventsFor(run, steps)
+      const timestamp = new Date(now()).toISOString()
+      const toStatus = axis === 'publication' ? 'pending' : 'uncertain'
+      const reasonCode =
+        axis === 'preparation'
+          ? 'PREPARATION_RESUMED_BY_OPERATOR'
+          : axis === 'execution'
+            ? 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR'
+            : 'PUBLICATION_RESUMED_BY_OPERATOR'
+      const appendResume = (stepKey: string | null = null): void => {
+        events.push({
+          event_id: Math.max(0, ...events.map((event) => event.event_id)) + 1,
+          axis,
+          step_key: stepKey,
+          from_status: 'disconnected',
+          to_status: toStatus,
+          reason_code: reasonCode,
+          occurred_at: timestamp
+        })
+      }
+      if (axis === 'preparation') {
+        run.preparation.status = 'uncertain'
+        run.preparation.disconnect_reason = null
+        run.preparation.attempt_count = 0
+        run.preparation.failure_code = null
+        run.preparation.updated_at = timestamp
+      } else if (axis === 'execution') {
+        run.execution.status = 'uncertain'
+        run.execution.updated_at = timestamp
+      } else {
+        run.publication.status = 'pending'
+        run.publication.updated_at = timestamp
+      }
+      appendResume()
+      if (axis === 'publication') {
+        for (const step of steps) {
+          if (step.status === 'disconnected') {
+            step.status = 'pending'
+            step.attempt_count = 0
+            appendResume(step.step_key)
+          }
+        }
+      }
+      for (const notice of run.notices) {
+        if (
+          notice.kind === 'attention' &&
+          notice.axis === axis &&
+          ['pending', 'delivering'].includes(notice.status)
+        ) {
+          notice.status = 'superseded'
+        }
+      }
+      resumedEvents.set(runId, events)
       response.end(JSON.stringify({ run }))
       return
     }
@@ -325,6 +370,11 @@ export function createRunsHandler(
       if (run === undefined) {
         response.statusCode = 404
         response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      if (run.preparation.status !== 'disconnected') {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_blocked_preparation' }))
         return
       }
       // The same transition Review Runs performs: conclude the axes that were still
@@ -389,7 +439,7 @@ export function createRunsHandler(
       response.end(
         JSON.stringify({
           run_id: run.run_id,
-          events: eventsFor(run, stepsByRun.get(run.run_id) ?? [])
+          events: resumedEvents.get(run.run_id) ?? eventsFor(run, stepsByRun.get(run.run_id) ?? [])
         } satisfies ListRunEventsResponseBody)
       )
       return

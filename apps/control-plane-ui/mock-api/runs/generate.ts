@@ -974,6 +974,7 @@ export function createRunFixtures(now: number) {
     run.publication.finished_at = null
     // A disconnected execution has no result yet, so there is no execution archive to report.
     run.artifact_storage = null
+    run.execution_statistics = null
     run.failure_code = null
     run.notices = noticesFor(
       {
