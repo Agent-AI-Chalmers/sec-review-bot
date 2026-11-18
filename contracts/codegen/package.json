@@ -20,15 +20,16 @@
     "@kubb/core": "5.15.3",
     "@kubb/plugin-ts": "5.4.0",
     "kubb": "5.15.3",
-    "typescript": "^6.0.3"
+    "oxc-parser": "0.159.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "tsx": "^4.23.15",
-    "vitest": "5.1.0",
     "oxfmt": "0.79.0",
     "oxlint": "1.94.0",
-    "oxlint-tsgolint": "7.0.2007"
+    "oxlint-tsgolint": "7.0.2007",
+    "tsx": "^4.23.15",
+    "vitest": "5.1.0",
+    "typescript": "7.0.2"
   },
   "exports": {
     ".": {

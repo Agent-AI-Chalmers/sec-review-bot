@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 
 const SRC = path.resolve(import.meta.dirname, '../src')
 const AXIS_STORES = [
@@ -24,20 +24,20 @@ const AXIS_STORES = [
  * this check pass no matter what was imported.
  */
 function importedModules(file: string): string[] {
-  const source = ts.createSourceFile(
-    file,
-    readFileSync(path.join(SRC, file), 'utf8'),
-    ts.ScriptTarget.Latest,
-    true
-  )
+  const { program, errors } = parseSync(file, readFileSync(path.join(SRC, file), 'utf8'))
+  expect(errors).toStrictEqual([])
   const modules: string[] = []
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) {
+  for (const statement of program.body) {
+    if (
+      statement.type !== 'ImportDeclaration' &&
+      statement.type !== 'ExportNamedDeclaration' &&
+      statement.type !== 'ExportAllDeclaration'
+    ) {
       continue
     }
-    const specifier = statement.moduleSpecifier
-    if (specifier && ts.isStringLiteral(specifier) && specifier.text.startsWith('.')) {
-      modules.push(path.basename(specifier.text).replace(/\.js$/, '.ts'))
+    const specifier = statement.source?.value
+    if (specifier?.startsWith('.')) {
+      modules.push(path.basename(specifier).replace(/\.js$/, '.ts'))
     }
   }
   return modules

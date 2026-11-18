@@ -11,7 +11,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-26_LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![ECMAScript](https://img.shields.io/badge/ECMAScript-ES2025-4C78A8?logo=javascript&logoColor=white)](https://tc39.es/ecma262/2025/)
 
 [English](README.md) · 中文

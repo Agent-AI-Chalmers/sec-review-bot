@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 
 const sourceRoot = path.resolve(import.meta.dirname, '../browser')
 
@@ -42,13 +42,8 @@ async function localImportGraph(): Promise<Map<string, string[]>> {
   const knownFiles = new Set(files)
   const graph = new Map<string, string[]>()
   for (const file of files) {
-    const source = ts.createSourceFile(
-      file,
-      await readFile(file, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true,
-      file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-    )
+    const { program, errors } = parseSync(file, await readFile(file, 'utf8'))
+    expect(errors).toStrictEqual([])
     const imports: string[] = []
     const recordImport = (specifier: string): void => {
       const resolved = resolveLocalImport(file, specifier, knownFiles)
@@ -56,20 +51,16 @@ async function localImportGraph(): Promise<Map<string, string[]>> {
         imports.push(resolved)
       }
     }
-    const visit = (node: ts.Node): void => {
-      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-        recordImport(node.moduleSpecifier.text)
-      } else if (
-        ts.isCallExpression(node) &&
-        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-        node.arguments.length === 1 &&
-        ts.isStringLiteral(node.arguments[0])
-      ) {
-        recordImport(node.arguments[0].text)
+    new Visitor({
+      ImportDeclaration(node) {
+        recordImport(node.source.value)
+      },
+      ImportExpression(node) {
+        if (node.source.type === 'Literal' && typeof node.source.value === 'string') {
+          recordImport(node.source.value)
+        }
       }
-      ts.forEachChild(node, visit)
-    }
-    visit(source)
+    }).visit(program)
     graph.set(file, imports)
   }
   return graph

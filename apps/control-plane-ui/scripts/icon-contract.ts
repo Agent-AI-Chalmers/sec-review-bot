@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 
 export type IconContractIssue = Readonly<{
   file: string
@@ -6,77 +6,63 @@ export type IconContractIssue = Readonly<{
   message: string
 }>
 
-function lineOf(source: ts.SourceFile, node: ts.Node) {
-  return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
-}
-
-function usesIconScale(attribute: ts.JsxAttribute): boolean {
-  const initializer = attribute.initializer
-  if (!initializer || !ts.isJsxExpression(initializer)) {
-    return false
-  }
-  const expression = initializer.expression
-  return (
-    expression !== undefined &&
-    ts.isPropertyAccessExpression(expression) &&
-    ts.isIdentifier(expression.expression) &&
-    expression.expression.text === 'ICON_SIZE'
-  )
-}
-
 export function validateIconContract(files: Readonly<Record<string, string>>): IconContractIssue[] {
   const issues: IconContractIssue[] = []
 
   for (const [file, sourceText] of Object.entries(files)) {
-    // Use the TypeScript parser so multiline imports and JSX are handled as code,
-    // not as text that happens to look like code.
-    const source = ts.createSourceFile(
-      file,
-      sourceText,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX
-    )
-
-    const visit = (node: ts.Node): void => {
-      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-        const sourceModule = node.moduleSpecifier.text
-        const bindings = node.importClause?.namedBindings
-        if (bindings && ts.isNamedImports(bindings)) {
-          for (const element of bindings.elements) {
-            const importedName = element.propertyName?.text ?? element.name.text
-            if (/^Icon[A-Z]/.test(importedName) && sourceModule !== '@tabler/icons-react') {
-              issues.push({
-                file,
-                line: lineOf(source, element),
-                message: `${importedName} must come from @tabler/icons-react`
-              })
-            }
+    const { program, errors } = parseSync(file, sourceText)
+    if (errors.length) {
+      throw new Error(`Invalid icon source ${file}: ${JSON.stringify(errors)}`)
+    }
+    const lineOf = (start: number) => sourceText.slice(0, start).split('\n').length
+    new Visitor({
+      ImportDeclaration(node) {
+        for (const element of node.specifiers) {
+          if (element.type !== 'ImportSpecifier') {
+            continue
           }
-        }
-      }
-
-      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-        const tagName = node.tagName.getText(source)
-        if (/^Icon(?:[A-Z]|$)/.test(tagName)) {
-          const size = node.attributes.properties.find(
-            (attribute): attribute is ts.JsxAttribute =>
-              ts.isJsxAttribute(attribute) && attribute.name.getText(source) === 'size'
-          )
-          if (!size || !usesIconScale(size)) {
+          const importedName =
+            element.imported.type === 'Identifier'
+              ? element.imported.name
+              : String(element.imported.value)
+          if (/^Icon[A-Z]/.test(importedName) && node.source.value !== '@tabler/icons-react') {
             issues.push({
               file,
-              line: lineOf(source, node),
-              message: `${tagName} size must use ICON_SIZE`
+              line: lineOf(element.start),
+              message: `${importedName} must come from @tabler/icons-react`
             })
           }
         }
+      },
+      JSXOpeningElement(node) {
+        const tagName = sourceText.slice(node.name.start, node.name.end)
+        if (!/^Icon(?:[A-Z]|$)/.test(tagName)) {
+          return
+        }
+        const size = node.attributes.find(
+          (attribute) =>
+            attribute.type === 'JSXAttribute' &&
+            attribute.name.type === 'JSXIdentifier' &&
+            attribute.name.name === 'size'
+        )
+        const expression =
+          size?.type === 'JSXAttribute' && size.value?.type === 'JSXExpressionContainer'
+            ? size.value.expression
+            : undefined
+        if (
+          expression?.type !== 'MemberExpression' ||
+          expression.computed ||
+          expression.object.type !== 'Identifier' ||
+          expression.object.name !== 'ICON_SIZE'
+        ) {
+          issues.push({
+            file,
+            line: lineOf(node.start),
+            message: `${tagName} size must use ICON_SIZE`
+          })
+        }
       }
-
-      ts.forEachChild(node, visit)
-    }
-
-    visit(source)
+    }).visit(program)
   }
 
   return issues.sort((left, right) => left.file.localeCompare(right.file) || left.line - right.line)

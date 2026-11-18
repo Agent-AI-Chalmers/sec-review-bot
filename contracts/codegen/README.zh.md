@@ -12,6 +12,8 @@ Kubb 的 resolver 将操作响应的聚合类型命名为 `…ResponseBodyByStat
 
 渲染器通过 Kubb 支持的 resolver 定制命名，并对状态码映射及聚合类型进行基于语法结构的规范化。不支持的输出会导致生成失败，不会静默保留另一种数据结构。它不会改写无关的 schema 声明或契约数据。
 
+生成器使用 Oxc 解析生成声明并执行局部结构调整，不依赖 TypeScript Compiler API。类型等价测试通过 TypeScript 编译器 CLI 检查最终产物。
+
 在本目录运行检查：
 
 ```bash

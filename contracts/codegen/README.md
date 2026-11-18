@@ -10,6 +10,8 @@ Kubb's resolver names operation aggregates `…ResponseBodyByStatus` and `…Res
 
 The renderer uses Kubb's supported resolver for naming and a syntax-aware normalization for the response map and aggregate. Unsupported output fails generation instead of silently retaining a different shape. It does not rewrite unrelated schema declarations or contract data.
 
+The renderer uses Oxc to parse generated declarations and apply local structural edits, without the TypeScript Compiler API. Type-equivalence tests check the final artifact through the TypeScript compiler CLI.
+
 Run checks from this directory:
 
 ```bash

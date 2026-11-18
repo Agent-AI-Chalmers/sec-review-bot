@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { parse } from 'yaml'
 
 import { staleGeneratedArtifacts } from '../src/check.js'
@@ -43,23 +43,19 @@ interface Manifest {
 }
 
 function exportedTypeNames(source: string): Set<string> {
-  const file = ts.createSourceFile(
-    'generated.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS
-  )
+  const { program, errors } = parseSync('generated.ts', source)
+  expect(errors).toStrictEqual([])
   const names = new Set<string>()
-  for (const statement of file.statements) {
-    if (!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) {
+  for (const statement of program.body) {
+    if (statement.type !== 'ExportNamedDeclaration') {
       continue
     }
-    const exported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
-    )
-    if (exported) {
-      names.add(statement.name.text)
+    const declaration = statement.declaration
+    if (
+      declaration?.type === 'TSInterfaceDeclaration' ||
+      declaration?.type === 'TSTypeAliasDeclaration'
+    ) {
+      names.add(declaration.id.name)
     }
   }
   return names
