@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    // Isolate concurrent package runs (vitest-dev/vitest#11748).
+    fsModuleCachePath: `${import.meta.dirname}/node_modules/.vitest-cache`,
     restoreMocks: true,
     testTimeout: 60_000,
     hookTimeout: 60_000,

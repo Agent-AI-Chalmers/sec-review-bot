@@ -65,12 +65,12 @@ export function transitionExplanation(
     (candidate) =>
       candidate.from === event.from_status && candidate.to === event.to_status
   )
-  const chosen =
-    (event.reason_code === null
+  const exact =
+    event.reason_code === null
       ? undefined
-      : candidates.find(
-          (candidate) => candidate.reason === event.reason_code
-        )) ?? candidates.find((candidate) => candidate.reason === undefined)
+      : candidates.find((candidate) => candidate.reason === event.reason_code)
+  const generic = candidates.find((candidate) => candidate.reason === undefined)
+  const chosen = exact ?? generic
   if (chosen !== undefined) return edgeLabel(machine, chosen)
   // No transition is identified (an unknown reason on a pair with only reason-specific
   // transitions, or a pair the contract does not declare): describe where the event landed

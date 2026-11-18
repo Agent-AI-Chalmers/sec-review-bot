@@ -14,6 +14,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 pytestmark = pytest.mark.integration
 
@@ -39,14 +40,15 @@ class _ModelRequest:
     not _docker_available(),
     reason="Docker runtime is not available in this environment.",
 )
-def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
+@pytest.mark.asyncio
+async def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
     backend = create_backend_with_path_views(
         container_name_prefix="offload-human-test",
         path_views=[],
         backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         middleware = FilesystemMiddleware(
             backend=backend,
             human_message_token_limit_before_evict=1,
@@ -86,14 +88,15 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
     not _docker_available(),
     reason="Docker runtime is not available in this environment.",
 )
-def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
+@pytest.mark.asyncio
+async def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
     backend = create_backend_with_path_views(
         container_name_prefix="offload-tool-test",
         path_views=[],
         backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         middleware = FilesystemMiddleware(
             backend=backend,
             tool_token_limit_before_evict=1,

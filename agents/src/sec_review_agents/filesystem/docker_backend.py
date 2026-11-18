@@ -1,13 +1,10 @@
 """Docker lifecycle and path policy around upstream file operations."""
 
 import asyncio
-import logging
 import os
 import shlex
 import subprocess
 from dataclasses import dataclass
-from types import TracebackType
-from typing import Self
 
 from deepagents.backends.protocol import (
     DeleteResult,
@@ -44,11 +41,6 @@ from sec_review_agents.filesystem.unix_paths import (
     unix_path_has_prefix,
 )
 from sec_review_agents.utils.env import bool_env, int_env
-
-# Standard-library logging, not the project's structlog wrapper: `filesystem` is a foundational
-# package and may not import `observability`. A cleanup failure during an exceptional exit has
-# no other channel, and silence is what makes a stranded container invisible.
-_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -127,40 +119,7 @@ class DockerSandboxBackend(BaseSandbox):
             and (_is_root_docker_user(self.user) or docker_user_matches_host)
         )
 
-    def _normalize_mount_ownership(self) -> None:
-        if not self._should_normalize_ownership():
-            return
-
-        writable_mount_paths = [
-            normalize_unix_path(mount.container_path)
-            for mount in self.mounts
-            if mount.writable and is_absolute_unix_path(mount.container_path)
-        ]
-        if not writable_mount_paths:
-            return
-
-        quoted_paths = " ".join(shlex.quote(path) for path in writable_mount_paths)
-        command = f"chown -R {self.ownership_uid}:{self.ownership_gid} {quoted_paths} 2>/dev/null || true"
-        docker_runtime.exec_shell(
-            container_name=self.container_name,
-            shell=self.shell,
-            command=command,
-            timeout_ms=self.command_timeout_ms,
-            expect_success=False,
-        )
-
-    def finalize(self) -> None:
-        """Normalize writable mounts once before the container is stopped.
-
-        Mount ownership is a host-side cleanup concern. Running a recursive
-        ``chown`` after every file operation makes each read or edit scan the
-        whole workspace and can stall an agent on larger repositories.
-        ``amanaged_backend`` calls this method at the end of the backend
-        lifetime, so normal tool operations never pay that cost.
-        """
-        self._normalize_mount_ownership()
-
-    async def afinalize(self) -> None:
+    async def _normalize_mount_ownership(self) -> None:
         """Normalize writable mounts without blocking an async caller."""
         if not self._should_normalize_ownership():
             return
@@ -183,63 +142,14 @@ class DockerSandboxBackend(BaseSandbox):
             expect_success=False,
         )
 
-    def close(self) -> None:
-        """Finish backend cleanup and stop the owned Docker container."""
-        if self._closed:
-            return
-        # The two failures mean different things, so the flags are decided separately:
-        #
-        # - removing the container failed: nothing was torn down and the caller can retry, so
-        #   this backend stays open;
-        # - removing the container succeeded but `finalize` raised: the container is gone and
-        #   saying otherwise would have the caller believe it is still running.
-        try:
-            self.finalize()
-        finally:
-            self.container.close()
-            if self.container.closed:
-                self._closed = True
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        # A container outlives the interpreter that started it, so a missed cleanup strands it
-        # rather than failing loudly. The two exit paths disagree about what a cleanup failure
-        # means, so they are handled separately:
-        #
-        # - normal exit: nothing else is reporting a problem, so a cleanup failure is the only
-        #   signal the caller has that the sandbox may still be running. It must propagate.
-        # - exceptional exit: the block's exception is what the caller needs to see. A cleanup
-        #   failure is logged instead of replacing it, and the original exception propagates
-        #   with its type unchanged.
-        del exc_type, traceback
-        if exc_value is None:
-            self.close()
-            return
-
-        try:
-            self.close()
-        except Exception:
-            _logger.warning(
-                "Docker sandbox cleanup failed for %s while another exception was propagating",
-                self.container_name,
-                exc_info=True,
-            )
-
     async def aclose(self) -> None:
         """Finish backend cleanup without blocking the async caller."""
         if self._closed:
             return
-        # Same split as `close`: a failed removal stays retryable, a completed removal is
-        # recorded even when `afinalize` raised.
+        # Failed removal stays retryable; successful removal closes the backend even
+        # when ownership normalization failed.
         try:
-            await self.afinalize()
+            await self._normalize_mount_ownership()
         finally:
             await asyncio.to_thread(self.container.close)
             if self.container.closed:

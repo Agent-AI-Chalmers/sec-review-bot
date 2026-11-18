@@ -9,6 +9,7 @@ from deepagents.middleware.skills import SkillsMiddleware
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.path_views import PathView
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
 @pytest.mark.integration
@@ -39,7 +40,7 @@ async def test_legacy_python_skill_discovery_and_transfers(tmp_path: Path) -> No
         ],
     )
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         version = backend.execute(
             "python3 -c 'import sys; assert sys.version_info[:2] in [(3, 5), (3, 6)]'"
         )

@@ -19,6 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.workspace.commits import resolve_workspace_commit
 
 
@@ -35,7 +36,8 @@ pytestmark = [
 ]
 
 
-def test_repository_analyzer_docker_tmp_write_and_execute_contract(
+@pytest.mark.asyncio
+async def test_repository_analyzer_docker_tmp_write_and_execute_contract(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "workspace"
@@ -57,7 +59,7 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
 
     marker = uuid.uuid4().hex
     tmp_file = f"/tmp/ghsb-docker-{marker}.txt"
-    with backend:
+    async with amanaged_backend(backend):
         write_result = backend.write(tmp_file, "ok")
         assert write_result.error is None
 
@@ -68,7 +70,8 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
         )
 
 
-def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
 
@@ -86,7 +89,7 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
         )
     assert isinstance(backend, DockerSandboxBackend)
 
-    with backend:
+    async with amanaged_backend(backend):
         assert hasattr(backend, "execute")
         execute_result = backend.execute("pwd")
         assert execute_result.exit_code == 0, (
@@ -95,11 +98,12 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
         )
 
 
-def test_patch_synthesis_backend_can_commit_delivery(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_patch_synthesis_backend_can_commit_delivery(tmp_path: Path) -> None:
     """Synthesis needs execution to satisfy the committed-delivery contract."""
     backend = create_patch_synthesis_backend(workspace_root_path=tmp_path)
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         result = backend.execute(
             "cd /workspace && git init -q && "
             "git config user.name Probe && git config user.email probe@localhost && "

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 from pathlib import Path
@@ -17,6 +18,7 @@ from sec_review_agents.filesystem.path_views import (
     PathView,
     workspace_view,
 )
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 pytestmark = pytest.mark.integration
 
@@ -29,11 +31,15 @@ def _docker_available() -> bool:
     not _docker_available(),
     reason="Docker runtime is not available in this environment.",
 )
-def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_docker_execute_bounds_large_init_commit_diff_output(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     _create_large_init_commit_repository(workspace)
-    host_result = subprocess.run(
+    host_result = await asyncio.to_thread(
+        subprocess.run,
         ["git", "show", "--stat", "--patch", "--root", "HEAD"],
         cwd=workspace,
         check=True,
@@ -55,7 +61,7 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
         )
 
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         result = backend.execute(
             "git show --stat --patch --root HEAD",
         )
@@ -70,7 +76,10 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
     not _docker_available(),
     reason="Docker runtime is not available in this environment.",
 )
-def test_docker_transfers_reject_symlink_escape_between_routes(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_docker_transfers_reject_symlink_escape_between_routes(
+    tmp_path: Path,
+) -> None:
     """Transfers must not follow container symlinks across route boundaries."""
     workspace = tmp_path / "workspace"
     outside = tmp_path / "outside"
@@ -91,7 +100,7 @@ def test_docker_transfers_reject_symlink_escape_between_routes(tmp_path: Path) -
     )
 
     assert isinstance(backend, DockerSandboxBackend)
-    with backend:
+    async with amanaged_backend(backend):
         result = backend.execute("ln -s /outside /workspace/link")
         assert result.exit_code == 0
         download = backend.download_files(["/workspace/link/secret.txt"])[0]

@@ -1,26 +1,29 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from typing import Any, cast
+
+_logger = logging.getLogger(__name__)
 
 
 async def aclose_backend(backend: Any) -> None:
     """End a backend lifetime without exposing its cleanup implementation.
 
     Async cleanup is preferred; synchronous cleanup runs in a worker thread.
-    Cleanup is best-effort so it does not hide the activity error that triggered
-    teardown.
+    Cleanup is best-effort: failures are logged without changing the stage result.
     """
-    aclose = getattr(backend, "aclose", None)
-    if callable(aclose):
-        with suppress(Exception):
+    try:
+        aclose = getattr(backend, "aclose", None)
+        if callable(aclose):
             await cast(Callable[[], Awaitable[None]], aclose)()
-        return
+            return
 
-    close = getattr(backend, "close", None)
-    if callable(close):
-        with suppress(Exception):
+        close = getattr(backend, "close", None)
+        if callable(close):
             await asyncio.to_thread(close)
+    except Exception:
+        _logger.warning("Backend cleanup failed", exc_info=True)
 
 
 @asynccontextmanager

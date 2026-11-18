@@ -95,7 +95,7 @@ async def test_delivery_replay_validates_cases_before_shared_selection(
             await replay.main()
         assert observed == []
     elif scenario == "blocked":
-        with pytest.raises(RuntimeError, match="does not contain keep case_results"):
+        with pytest.raises(RuntimeError, match="does not contain deliverable cases"):
             await replay.main()
         assert observed == []
     else:
@@ -107,3 +107,38 @@ async def test_delivery_replay_validates_cases_before_shared_selection(
         assert observed[0].mitigator_file_changes == [
             {"path": "unsafe.py", "status": "deleted"}
         ]
+
+
+@pytest.mark.parametrize("case_count", [0, 2])
+def test_delivery_replay_result_matches_execution_contract(case_count: int) -> None:
+    """Delivery replay must publish the same result shape as normal execution."""
+    from sec_review_agents.delivery_stages.result import DeliveryResult
+    from sec_review_agents.entrypoints.execution_api_schema import (
+        validate_execution_api_result,
+    )
+    from sec_review_agents.review_stages.record import build_review_record
+    from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
+
+    cases = [
+        RepositoryCaseResult(
+            case_id=f"case-{index}",
+            deliverable=False,
+            review_record=build_review_record(
+                analysis_result=None,
+                mitigation_result=None,
+                verifier_result=None,
+                cvss_result=None,
+            ),
+        ).model_dump(mode="json")
+        for index in range(case_count)
+    ]
+    result = delivery_execution._repository_result_from_delivery_replay(
+        previous_result={"deletion_review_skipped": True, "case_count": 99},
+        delivery_result=DeliveryResult(status="skipped"),
+        case_results=cases,
+    )
+
+    validate_execution_api_result(result, "repository-review")
+    assert result["case_count"] == case_count
+    assert result["case_results"] == cases
+    assert result["deletion_review_skipped"] is True

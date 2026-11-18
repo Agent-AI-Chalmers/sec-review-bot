@@ -1,6 +1,7 @@
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from deepagents.backends.protocol import BackendProtocol
@@ -455,3 +456,44 @@ def test_patch_synthesis_backend_uses_docker_for_commit_delivery(
         docker_backend_mock.call_args.kwargs["container"].working_directory
         == "/workspace"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_cleanup", [False, True])
+@pytest.mark.parametrize(
+    "body_error", [None, ValueError("body failed"), asyncio.CancelledError()]
+)
+async def test_managed_backend_cleanup_error_policy(
+    async_cleanup: bool,
+    body_error: BaseException | None,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    cleanup_error = RuntimeError("cleanup failed")
+    close = Mock(side_effect=cleanup_error)
+    aclose = AsyncMock(side_effect=cleanup_error)
+    backend = SimpleNamespace(close=close)
+    if async_cleanup:
+        backend.aclose = aclose
+
+    # Cleanup must not turn successful model work into a retryable activity failure.
+    async def run() -> str:
+        async with amanaged_backend(backend):
+            if body_error is not None:
+                raise body_error
+            return "completed"
+
+    if body_error is None:
+        assert await run() == "completed"
+    else:
+        with pytest.raises(type(body_error)) as caught:
+            await run()
+        assert caught.value is body_error
+    assert any(
+        record.exc_info is not None and record.exc_info[1] is cleanup_error
+        for record in caplog.records
+    )
+    if async_cleanup:
+        aclose.assert_awaited_once_with()
+        close.assert_not_called()
+    else:
+        close.assert_called_once_with()
