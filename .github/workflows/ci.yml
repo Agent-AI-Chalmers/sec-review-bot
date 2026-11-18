@@ -322,6 +322,9 @@ jobs:
         with:
           directory: apps/control-plane-ui
 
+      - name: Install Chrome for component tests
+        run: pnpm exec playwright install --with-deps chrome
+
       - name: Check
         run: |
           pnpm run format:check
@@ -332,6 +335,15 @@ jobs:
           pnpm run styles:report
           pnpm test
           pnpm run build
+
+      - name: Upload component diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: control-plane-ui-components
+          path: apps/control-plane-ui/test-results/components/
+          retention-days: 14
+          if-no-files-found: warn
 
   control-plane-ui-browser:
     name: Control Plane UI E2E

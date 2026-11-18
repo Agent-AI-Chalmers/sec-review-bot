@@ -126,12 +126,17 @@ pnpm run build
 
 <!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
-- `pnpm test`：运行逻辑、接口和界面组件测试。
-- `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：只运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/api-error.test.ts`。
+- `pnpm test`：在 Node 中运行逻辑和接口测试，在 Chrome 中运行界面组件测试。
+- `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：通过 Vitest Browser Mode 在真实 Chrome 中运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/api-error.test.ts`。
 - `pnpm run typecheck`：检查浏览器与服务端源码的类型，并报告类型测试结果。CI 使用此命令。需要单独查看类型测试结果时，可运行 `pnpm run test:types`。
 - `pnpm run test:affected`：开发时只重跑上次运行后受源码改动影响的测试。首次运行会为所有选中的测试建立记录；可追加文件路径缩小范围，例如 `pnpm run test:affected test/api-error.test.ts`。此命令使用实验性的依赖跟踪。修改契约、fixture、生成文件、环境或配置后，应显式运行相关测试；完成前仍需运行 `pnpm test` 和其他必要检查。
-- `pnpm run test:browser-component`：在真实 Chrome 中检查编辑器换行，无需启动应用 BFF 或模拟 API。普通渲染和交互继续使用 jsdom 组件测试，需要真实浏览器布局的行为使用此命令。它使用已安装的 Chrome，也可通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定可执行文件。CI 在桌面浏览器任务中运行此检查。
-- `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、滚动、下载等浏览器行为，以及无障碍和视觉效果。
+- `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、编辑器换行、滚动、下载等浏览器行为，以及无障碍和视觉效果。
+
+组件测试加载应用 CSS，并使用浏览器原生交互，替代 DOM 模拟环境；Playwright E2E 继续负责应用导航和完整用户流程。Hook 测试在同一个组件项目中验证 React 生命周期行为，无需引入另一套 DOM 环境。保护异步状态归属或错误处理的测试继续在本地使用模块和 API mock。
+
+<!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
+
+组件测试需要 Chrome。可运行 `pnpm exec playwright install --with-deps chrome` 安装，或通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定已有的可执行文件。CI 在包检查前安装 Chrome，并上传 `test-results/components/` 中的组件失败诊断。普通的 `pnpm test` 和 `pnpm run test:component` 命令已包含这些浏览器测试，不再另设浏览器组件测试套件。
 
 本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
 

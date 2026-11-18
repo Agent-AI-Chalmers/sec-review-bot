@@ -1,5 +1,6 @@
+import { userEvent } from 'vitest/browser'
 import React from 'react'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { FileWorkspace } from '../../browser/features/workspace/FileWorkspace.js'
 import { renderComponent } from './render.js'
@@ -21,16 +22,14 @@ test.each(['new', 'rename'] as const)(
         onFilesChange={onFilesChange}
       />
     )
-    fireEvent.click(
+    await userEvent.click(
       screen.getByRole('button', {
         name: operation === 'new' ? 'New file' : 'Rename file'
       })
     )
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'File path' }), {
-      target: { value: 'MEMORY.md' }
-    })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
+    await userEvent.fill(within(dialog).getByRole('textbox', { name: 'File path' }), 'MEMORY.md')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     expect(onFilesChange).not.toHaveBeenCalled()
     if (operation === 'new') {
       await waitFor(() => expect(within(dialog).getByRole('alert')).toBeVisible())
@@ -38,7 +37,7 @@ test.each(['new', 'rename'] as const)(
   }
 )
 
-test('file navigation exposes current file and directory expansion', () => {
+test('file navigation exposes current file and directory expansion', async () => {
   renderComponent(
     <FileWorkspace
       files={{ 'notes/MEMORY.md': 'Keep this draft' }}
@@ -49,6 +48,6 @@ test('file navigation exposes current file and directory expansion', () => {
   expect(screen.getByRole('button', { name: 'MEMORY.md' })).toHaveAttribute('aria-current', 'true')
   const directory = screen.getByRole('button', { name: 'notes' })
   expect(directory).toHaveAttribute('aria-expanded', 'true')
-  fireEvent.click(directory)
+  await userEvent.click(directory)
   expect(directory).toHaveAttribute('aria-expanded', 'false')
 })

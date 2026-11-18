@@ -124,12 +124,17 @@ Additional UI consistency checks:
 
 <!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
-- `pnpm test`: runs logic, API, and UI component tests.
-- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
+- `pnpm test`: runs logic and API tests in Node and UI component tests in Chrome.
+- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests in real Chrome with Vitest Browser Mode. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
 - `pnpm run typecheck`: checks browser and server source types and reports type-test results. CI uses this command. Use `pnpm run test:types` to view the type-test results separately.
 - `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
-- `pnpm run test:browser-component`: checks editor wrapping in real Chrome without starting the application BFF or fixture API. Use jsdom component tests for ordinary rendering and interaction; reserve this command for behavior that needs browser layout. It uses installed Chrome, with `CONTROL_PLANE_UI_CHROME_PATH` available for a custom executable. CI runs it in the desktop browser job.
-- `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+- `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, editor wrapping, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+
+Component tests mount components with application CSS and use native browser interactions. They replace DOM emulation; Playwright E2E remains responsible for application navigation and complete user flows. Hook tests use the same component project to exercise React lifecycle behavior without introducing another DOM environment. Module and API mocks remain local to tests that protect asynchronous ownership or error behavior.
+
+<!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
+
+Component tests require Chrome. Install it with `pnpm exec playwright install --with-deps chrome`, or set `CONTROL_PLANE_UI_CHROME_PATH` to an installed executable. CI installs Chrome before the package checks and uploads component failure diagnostics from `test-results/components/`. The ordinary `pnpm test` and `pnpm run test:component` commands include these browser tests; there is no separate browser-component suite.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
 

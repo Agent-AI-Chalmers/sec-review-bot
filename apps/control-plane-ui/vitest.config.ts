@@ -1,12 +1,27 @@
 import react from '@vitejs/plugin-react'
+import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom/client',
+      '@mantine/core',
+      '@mantine/hooks',
+      '@tabler/icons-react',
+      '@testing-library/react',
+      'react-markdown',
+      'remark-gfm',
+      'mdast-util-from-markdown'
+    ]
+  },
   test: {
+    attachmentsDir: 'test-results/components',
     // Isolate concurrent package runs (vitest-dev/vitest#11748).
     fsModuleCachePath: `${import.meta.dirname}/node_modules/.vitest-cache`,
-    // jsdom workers are expensive to start; 3 was fastest locally, and one worker per core times out.
+    // Bound concurrent Node workers and browser component files on shared CI runners.
     maxWorkers: 3,
     projects: [
       {
@@ -34,7 +49,22 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'components',
-          environment: 'jsdom',
+          testTimeout: 5_000,
+          browser: {
+            enabled: true,
+            headless: true,
+            screenshotDirectory: 'test-results/components/screenshots',
+            trace: { mode: 'retain-on-failure', tracesDir: 'test-results/components/traces' },
+            provider: playwright({
+              launchOptions: {
+                channel: 'chrome',
+                ...(process.env.CONTROL_PLANE_UI_CHROME_PATH
+                  ? { executablePath: process.env.CONTROL_PLANE_UI_CHROME_PATH }
+                  : {})
+              }
+            }),
+            instances: [{ browser: 'chromium' }]
+          },
           include: ['test/components/**/*.test.tsx'],
           setupFiles: ['./test/components/setup.ts']
         }

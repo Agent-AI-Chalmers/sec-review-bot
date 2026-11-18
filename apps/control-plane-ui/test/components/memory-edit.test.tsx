@@ -1,5 +1,6 @@
+import { userEvent } from 'vitest/browser'
 import React from 'react'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { Memory } from '../../browser/features/memory/Memory.js'
 import { api, apiPost } from '../../browser/shared/api-client.js'
@@ -72,7 +73,7 @@ test.each([
       name: 'Edit current memory'
     })
     await waitFor(() => expect(edit).toBeEnabled())
-    fireEvent.click(edit)
+    await userEvent.click(edit)
     if (delayedLoad) {
       await waitFor(() => expect(releaseContent).toBeDefined())
       currentVersion = 3
@@ -88,7 +89,7 @@ test.each([
     const content = await screen.findByRole('textbox', {
       name: 'Memory content'
     })
-    fireEvent.change(content, { target: { value: 'First edit' } })
+    await userEvent.fill(content, 'First edit')
     currentVersion = 3
     const readsBefore = treeReads
     await act(async () => {
@@ -96,7 +97,7 @@ test.each([
     })
     await waitFor(() => expect(treeReads).toBeGreaterThan(readsBefore))
     const commit = screen.getByRole('button', { name: 'Commit version' })
-    fireEvent.click(commit)
+    await userEvent.click(commit)
     await within(screen.getByRole('dialog', { name: 'Edit memory files' })).findByText(
       'The edit could not be committed.'
     )
@@ -106,12 +107,12 @@ test.each([
       files: { 'MEMORY.md': 'First edit' }
     })
     const first = vi.mocked(apiPost).mock.calls[0][1]
-    fireEvent.click(commit)
+    await userEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2))
     expect(vi.mocked(apiPost).mock.calls[1][1]).toEqual(first)
     await waitFor(() => expect(commit).toBeEnabled())
-    fireEvent.change(content, { target: { value: 'Changed edit' } })
-    fireEvent.click(commit)
+    await userEvent.fill(content, 'Changed edit')
+    await userEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(3))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String) as unknown,
@@ -124,21 +125,21 @@ test.each([
       })
     )
     await waitFor(() => expect(commit).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     const discard = await screen.findByRole('dialog', {
       name: 'Discard memory changes?'
     })
-    fireEvent.click(within(discard).getByRole('button', { name: 'Discard changes' }))
+    await userEvent.click(within(discard).getByRole('button', { name: 'Discard changes' }))
     await waitFor(() =>
       expect(screen.queryByRole('textbox', { name: 'Memory content' })).not.toBeInTheDocument()
     )
-    fireEvent.click(edit)
+    await userEvent.click(edit)
     const reopened = await screen.findByRole('textbox', {
       name: 'Memory content'
     })
     expect(reopened).toHaveValue('Version 3')
-    fireEvent.change(reopened, { target: { value: 'First edit' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Commit version' }))
+    await userEvent.fill(reopened, 'First edit')
+    await userEvent.click(screen.getByRole('button', { name: 'Commit version' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(4))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String) as unknown,

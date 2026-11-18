@@ -1,5 +1,6 @@
+import { userEvent } from 'vitest/browser'
 import React from 'react'
-import { fireEvent, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
 import { MemoryVersionHistory } from '../../browser/features/memory/MemoryVersionHistory.js'
@@ -95,7 +96,7 @@ function historyProps(
 
 test.each(['list', 'graph'])(
   'reorganization has its own label and opens its trajectory in %s view',
-  (view) => {
+  async (view) => {
     const onViewTrajectory = vi.fn()
     renderComponent(
       <MemoryVersionHistory
@@ -114,7 +115,7 @@ test.each(['list', 'graph'])(
     )
     expect(screen.getAllByText(/Reorganization/).length).toBeGreaterThan(0)
     expect(screen.queryByText('Operator edit')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Trajectory' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Trajectory' }))
     expect(onViewTrajectory).toHaveBeenCalledWith(2)
   }
 )
@@ -145,7 +146,7 @@ test.each(['list', 'graph'])(
   'the maintenance report shows the summary and each observation decision in %s view',
   async (view) => {
     renderHistory([learningVersion], view)
-    fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Decisions' }))
     expect(await screen.findByText('Added one lesson and skipped a duplicate.')).toBeInTheDocument()
     expect(screen.queryByText('extraction-1')).not.toBeInTheDocument()
     expect(screen.getByText('Added')).toBeInTheDocument()
@@ -157,7 +158,7 @@ test.each(['list', 'graph'])(
 
 test('a reorganization report states that no observations were consumed', async () => {
   renderHistory([version])
-  fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Decisions' }))
   expect(await screen.findByText('Merged duplicate path topics.')).toBeInTheDocument()
   expect(screen.getByText('No observations were consumed.')).toBeInTheDocument()
 })
@@ -167,11 +168,11 @@ test.each(['list', 'graph'])(
   async (view) => {
     const onRevealObservation = vi.fn()
     renderHistory([learningVersion], view, onRevealObservation)
-    fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Decisions' }))
     const links = await screen.findAllByRole('button', {
       name: 'View observation'
     })
-    fireEvent.click(links[1])
+    await userEvent.click(links[1])
     expect(onRevealObservation).toHaveBeenCalledWith(3, 'extraction-2')
   }
 )
