@@ -18,7 +18,9 @@ export function createStaticRoutes({ assets }: { assets: string }): StaticRoutes
       return true
     }
     try {
-      if (!(await stat(file)).isFile()) file = path.join(assets, 'index.html')
+      if (!(await stat(file)).isFile()) {
+        file = path.join(assets, 'index.html')
+      }
     } catch {
       file = path.join(assets, 'index.html')
     }

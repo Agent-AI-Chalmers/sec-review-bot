@@ -26,13 +26,17 @@ export function Detail(): React.JSX.Element {
   const { run, steps, events, error, load, terminal } = useRunDetail(runId)
   const [, setClockTick] = React.useState(0)
   React.useEffect(() => {
-    if (terminal) return
+    if (terminal) {
+      return
+    }
     const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 10_000)
     return (): void => window.clearInterval(timer)
   }, [terminal])
   const titleRunId = run?.run_id
   React.useEffect(() => {
-    if (titleRunId === undefined) return
+    if (titleRunId === undefined) {
+      return
+    }
     document.title = `${titleRunId} · Control Plane UI`
     return (): void => {
       document.title = 'Control Plane UI'

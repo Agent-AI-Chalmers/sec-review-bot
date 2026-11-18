@@ -40,8 +40,9 @@ test('applies the complete catalog schema as version 1', async () => {
   expect(ledgerInserts.map(({ parameters }) => parameters?.slice(0, 2))).toStrictEqual([
     [1, 'initial_catalog']
   ])
-  for (const insert of ledgerInserts)
+  for (const insert of ledgerInserts) {
     expect(String(insert.parameters?.[2])).toMatch(/^[a-f0-9]{64}$/)
+  }
 })
 
 test('rejects a database schema newer than this catalog understands', async () => {

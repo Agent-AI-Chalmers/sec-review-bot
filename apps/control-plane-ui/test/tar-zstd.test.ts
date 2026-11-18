@@ -17,11 +17,13 @@ test('restricted PAX reader matches the shared corpus', () => {
       void validateRestrictedPaxTar(
         zstdDecompressSync(fs.readFileSync(path.join(corpus, item.file)))
       )
-    if (item.expected === 'valid') expect(read, item.file).not.toThrow()
-    else
+    if (item.expected === 'valid') {
+      expect(read, item.file).not.toThrow()
+    } else {
       expect(read, item.file).toThrow(
         expect.objectContaining({ message: 'invalid_tar_zstd_envelope' })
       )
+    }
   }
 })
 

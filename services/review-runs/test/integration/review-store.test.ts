@@ -12,7 +12,9 @@ const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = (await import(
 
 function databaseUrl() {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!value) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  if (!value) {
+    throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  }
   return value
 }
 
@@ -362,7 +364,9 @@ test('Review Runs readiness route rejects a schema ledger from a newer applicati
     expect(unavailablePool.json()).toStrictEqual({ status: 'unavailable' })
   } finally {
     await app.close()
-    if (!poolClosed) await store.close()
+    if (!poolClosed) {
+      await store.close()
+    }
     await observer.query(`DROP SCHEMA ${schema} CASCADE`)
     await observer.end()
   }

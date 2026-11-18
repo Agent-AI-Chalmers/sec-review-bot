@@ -20,8 +20,12 @@ export interface UpstreamFailure {
  */
 export function upstreamFailure(error: unknown, upstream: UpstreamName): UpstreamFailure {
   const kind = error instanceof UpstreamRequestError ? error.kind : 'unavailable'
-  if (kind === 'too_large') return { status: 502, error: 'upstream_response_too_large' }
-  if (kind === 'timeout') return { status: 504, error: `${upstream}_timeout` }
+  if (kind === 'too_large') {
+    return { status: 502, error: 'upstream_response_too_large' }
+  }
+  if (kind === 'timeout') {
+    return { status: 504, error: `${upstream}_timeout` }
+  }
   return { status: 502, error: `${upstream}_unavailable` }
 }
 

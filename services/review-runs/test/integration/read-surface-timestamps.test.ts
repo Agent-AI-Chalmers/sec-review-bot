@@ -12,7 +12,9 @@ import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!value) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  if (!value) {
+    throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  }
   return value
 }
 
@@ -25,7 +27,9 @@ function assertIsoTimestamp(value: unknown, field: string): void {
 }
 
 function assertIsoTimestampOrNull(value: unknown, field: string): void {
-  if (value !== null) assertIsoTimestamp(value, field)
+  if (value !== null) {
+    assertIsoTimestamp(value, field)
+  }
 }
 
 test('store reads return contract timestamps as ISO strings, not Dates', async () => {
@@ -80,7 +84,9 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
 
     const events = await store.queries.listEvents(runId)
     expect.assert(events.length > 0)
-    for (const event of events) assertIsoTimestamp(event.occurred_at, 'event.occurred_at')
+    for (const event of events) {
+      assertIsoTimestamp(event.occurred_at, 'event.occurred_at')
+    }
 
     const [stepRecord] = await store.publications.listPublicationSteps(runId)
     assertIsoTimestamp(stepRecord?.last_attempt_at, 'step.last_attempt_at')

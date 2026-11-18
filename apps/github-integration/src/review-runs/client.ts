@@ -56,7 +56,9 @@ function contractPath<Id extends OperationId>(
   const template = operationRoutes[operation].path
   return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = (params as Record<string, string | undefined>)[name]
-    if (value === undefined) throw new Error(`Missing path parameter ${name} for ${operation}`)
+    if (value === undefined) {
+      throw new Error(`Missing path parameter ${name} for ${operation}`)
+    }
     return encodeURIComponent(value)
   })
 }
@@ -79,13 +81,17 @@ export class ReviewRunsSubmissionError extends Error {
 
 function serviceUrl(): string {
   const value = process.env.REVIEW_RUNS_SERVICE_URL?.trim()
-  if (!value) throw new Error('REVIEW_RUNS_SERVICE_URL is required.')
+  if (!value) {
+    throw new Error('REVIEW_RUNS_SERVICE_URL is required.')
+  }
   return value.replace(/\/+$/, '')
 }
 
 function serviceToken(): string {
   const value = process.env.REVIEW_RUNS_SERVICE_TOKEN?.trim()
-  if (!value) throw new Error('REVIEW_RUNS_SERVICE_TOKEN is required.')
+  if (!value) {
+    throw new Error('REVIEW_RUNS_SERVICE_TOKEN is required.')
+  }
   return value
 }
 
@@ -114,7 +120,9 @@ async function readBoundedResponseText(response: Response): Promise<string> {
     await response.body?.cancel()
     throw new ReviewRunsResponseTooLargeError()
   }
-  if (response.body === null) return ''
+  if (response.body === null) {
+    return ''
+  }
 
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -125,8 +133,12 @@ async function readBoundedResponseText(response: Response): Promise<string> {
         done: boolean
         value?: unknown
       }
-      if (done) break
-      if (!(value instanceof Uint8Array)) throw new TypeError('Expected response body bytes')
+      if (done) {
+        break
+      }
+      if (!(value instanceof Uint8Array)) {
+        throw new TypeError('Expected response body bytes')
+      }
       size += value.byteLength
       if (size > MAX_REVIEW_RUNS_RESPONSE_BYTES) {
         await reader.cancel()
@@ -150,7 +162,9 @@ async function readBoundedResponseText(response: Response): Promise<string> {
 function parseHttpErrorBody(text: string): HttpErrorBody {
   try {
     const parsed: unknown = JSON.parse(text)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return {}
+    }
     return {
       ...('error' in parsed && typeof parsed.error === 'string' ? { error: parsed.error } : {}),
       ...('code' in parsed && typeof parsed.code === 'string' ? { code: parsed.code } : {})
@@ -215,7 +229,9 @@ class HttpReviewRunsClient {
       try {
         text = await readBoundedResponseText(response)
       } catch (error) {
-        if (!(error instanceof ReviewRunsResponseTooLargeError) || response.ok) throw error
+        if (!(error instanceof ReviewRunsResponseTooLargeError) || response.ok) {
+          throw error
+        }
         throw Object.assign(new Error(`Review Runs returned HTTP ${response.status}.`), {
           code: null,
           status: response.status
@@ -255,7 +271,9 @@ class HttpReviewRunsClient {
 
   private async validateContext(runId: string, context: PublishContext): Promise<PublishContext> {
     const run = await this.getRun(runId)
-    if (run === null) throw new Error(`Review Runs run does not exist: ${runId}`)
+    if (run === null) {
+      throw new Error(`Review Runs run does not exist: ${runId}`)
+    }
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
@@ -396,7 +414,9 @@ class HttpReviewRunsClient {
         wait_ms: waitMs
       }
     )
-    if (work === null) return null
+    if (work === null) {
+      return null
+    }
     try {
       return {
         ...work,

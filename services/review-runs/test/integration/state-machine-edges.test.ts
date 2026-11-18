@@ -27,8 +27,9 @@ import { assertPublicationAxesFollowSteps } from './publication-invariants.js'
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
-  if (!connectionString)
+  if (!connectionString) {
     throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  }
   return connectionString
 }
 
@@ -97,9 +98,12 @@ async function claimNoticeFor(
   try {
     while (Date.now() < deadline) {
       const notice = await store.notices.claimNext()
-      if (notice === null) break
-      if (notice.run_id === runId)
+      if (notice === null) {
+        break
+      }
+      if (notice.run_id === runId) {
         return { notice_id: notice.notice_id, claim_token: notice.claim_token }
+      }
       deferred.push({
         notice_id: notice.notice_id,
         run_id: notice.run_id,
@@ -806,7 +810,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
           status: string
         }
       ).status
-      if (status === 'disconnected') break
+      if (status === 'disconnected') {
+        break
+      }
       await store.publications
         .requirePublicationStepClaim(
           givenUpPublication.runId,
@@ -854,8 +860,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       if (
         (await store.queries.getRun(resumedPublication.runId))?.publication.status ===
         'disconnected'
-      )
+      ) {
         break
+      }
       await store.publications
         .requirePublicationStepClaim(
           resumedPublication.runId,
@@ -895,7 +902,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
       for (const event of await store.queries.listEvents(runId)) {
-        if (event.from_status === null) continue
+        if (event.from_status === null) {
+          continue
+        }
         recorded.push({
           machine: machineName(event),
           edge: `${event.from_status}->${event.to_status}`,
@@ -985,7 +994,9 @@ test('a reason the audit log writes is the reason the contract declares', async 
     const expected = declared.get(key)
     expect.assert(expected !== undefined, `${key} is not declared`)
     // An edge that accepts any reason makes the whole pair open.
-    if (expected.some((value) => value === null)) continue
+    if (expected.some((value) => value === null)) {
+      continue
+    }
     expect(
       expected,
       `${key} was recorded with ${String(reason)} but the contract declares ${expected.join(' or ')}`

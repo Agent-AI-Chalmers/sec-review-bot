@@ -20,7 +20,9 @@ export function applySecurityHeaders(response: ServerResponse): void {
 function isSameOrigin(request: IncomingMessage): boolean {
   const source = request.headers.origin ?? request.headers.referer
   const host = request.headers.host
-  if (source === undefined || host === undefined) return false
+  if (source === undefined || host === undefined) {
+    return false
+  }
   try {
     return new URL(source).host === host
   } catch {
@@ -35,7 +37,9 @@ function isSameOrigin(request: IncomingMessage): boolean {
  * same policy. Callers return early when this sends the refusal.
  */
 export function requireSameOrigin(request: IncomingMessage, response: ServerResponse): boolean {
-  if (isSameOrigin(request)) return true
+  if (isSameOrigin(request)) {
+    return true
+  }
   sendJson(response, 403, { error: 'cross_site_request' })
   return false
 }

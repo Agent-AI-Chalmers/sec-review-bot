@@ -41,7 +41,9 @@ export function useMemoryEditor(): MemoryEditor {
   const close = (): void => setSession(undefined)
 
   const commit = async (): Promise<void> => {
-    if (session === undefined) return
+    if (session === undefined) {
+      return
+    }
     const content = JSON.stringify(
       Object.entries(session.files).sort(([a], [b]) => a.localeCompare(b))
     )

@@ -24,12 +24,16 @@ function enumFor(spec: Spec, field: string): string[] {
   const direct = spec.components?.schemas?.[schemaName] as
     | { properties?: Record<string, { enum?: unknown }> }
     | undefined
-  if (direct !== undefined) return asEnum(direct.properties?.[member]?.enum, field)
+  if (direct !== undefined) {
+    return asEnum(direct.properties?.[member]?.enum, field)
+  }
   const observed = spec.components?.schemas?.ObservedRun as
     | { properties?: Record<string, unknown> }
     | undefined
   const props = observed?.properties
-  if (props === undefined) throw new Error('ObservedRun has no properties')
+  if (props === undefined) {
+    throw new Error('ObservedRun has no properties')
+  }
   // An axis field is `<axis>.<member>` (preparation.status, execution.status,
   // publication.status, ...). Each axis is a `$ref` to its summary schema, so its properties
   // are not inlined here; resolve the ref to the component it names.
@@ -62,7 +66,9 @@ const ALL_MACHINES: ReadonlyArray<[string, MachineBody]> = STATE_MACHINES.flatMa
 )
 
 function asEnum(value: unknown, field: string): string[] {
-  if (!Array.isArray(value)) throw new Error(`${field} has no enum`)
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} has no enum`)
+  }
   // Nullable enums include null; state machines only describe named string states.
   return value.filter((item): item is string => typeof item === 'string')
 }
@@ -84,11 +90,12 @@ test('every state declares a label and hover description in both languages', () 
     for (const state of machine.states) {
       const detail = machine.details[state]
       expect.assert(detail, `${name}.${state} has no details`)
-      for (const key of ['label', 'description'] as const)
+      for (const key of ['label', 'description'] as const) {
         expect.assert(
           detail[key] && detail[key].trim().length > 0,
           `${name}.${state}.${key} must be non-empty`
         )
+      }
     }
     // The details map must not describe states the machine does not declare.
     expect(
@@ -102,8 +109,9 @@ test('every transition names states the machine declares, and every state is rea
   for (const [name, machine] of ALL_MACHINES) {
     const states = new Set(machine.states)
     expect.assert(states.has(machine.initial), `${name} initial is a state`)
-    for (const terminal of machine.terminal)
+    for (const terminal of machine.terminal) {
       expect.assert(states.has(terminal), `${name} terminal ${terminal} is a state`)
+    }
     const reached = new Set<string>([machine.initial])
     // Breadth-first over the declared edges: a state with no path from the initial one is a
     // diagram lie (it would be drawn but never entered).
@@ -121,7 +129,8 @@ test('every transition names states the machine declares, and every state is rea
         }
       }
     }
-    for (const state of machine.states)
+    for (const state of machine.states) {
       expect.assert(reached.has(state), `${name} state ${state} is unreachable`)
+    }
   }
 })

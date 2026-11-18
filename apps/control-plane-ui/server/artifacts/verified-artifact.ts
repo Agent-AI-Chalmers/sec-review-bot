@@ -72,15 +72,18 @@ async function streamVerifiedArtifact(
 
   try {
     resetIdleTimeout()
-    if (options.signal?.aborted) controller.abort()
+    if (options.signal?.aborted) {
+      controller.abort()
+    }
     const object = await artifactStore.getObject(artifact.key, controller.signal)
     body = object.body
     resetIdleTimeout()
     if (
       object.contentLength !== undefined &&
       (object.contentLength !== artifact.sizeBytes || object.contentLength > artifact.maximumSize)
-    )
+    ) {
       throw new Error('artifact_identity_mismatch')
+    }
 
     const digest = crypto.createHash('sha256')
     let size = 0
@@ -99,15 +102,20 @@ async function streamVerifiedArtifact(
     })
     await pipeline(body, verify, sink, { signal: controller.signal })
     clearTimeout(idleTimeout)
-    if (size !== artifact.sizeBytes || `sha256:${digest.digest('hex')}` !== artifact.digest)
+    if (size !== artifact.sizeBytes || `sha256:${digest.digest('hex')}` !== artifact.digest) {
       throw new Error('artifact_identity_mismatch')
+    }
   } catch (error) {
-    if (timedOut) throw new ArtifactDownloadTimeoutError()
+    if (timedOut) {
+      throw new ArtifactDownloadTimeoutError()
+    }
     throw error
   } finally {
     clearTimeout(idleTimeout)
     options.signal?.removeEventListener('abort', abortFromCaller)
-    if (body !== undefined && !body.destroyed) body.destroy()
+    if (body !== undefined && !body.destroyed) {
+      body.destroy()
+    }
     sink.destroy()
     await sinkClosed
   }

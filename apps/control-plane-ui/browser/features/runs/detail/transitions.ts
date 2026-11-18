@@ -27,9 +27,12 @@ export function actualTransitions(events: RunEvent[]): RunEvent[] {
 export function latestTransitionAxis(events: RunEvent[]): CoordinationAxis {
   let latest: RunEvent | undefined
   for (const event of events) {
-    if (event.from_status === null) continue
-    if (latest === undefined || Date.parse(event.occurred_at) > Date.parse(latest.occurred_at))
+    if (event.from_status === null) {
+      continue
+    }
+    if (latest === undefined || Date.parse(event.occurred_at) > Date.parse(latest.occurred_at)) {
       latest = event
+    }
   }
   return latest?.axis ?? 'execution'
 }
@@ -39,7 +42,9 @@ export function stateLabelForEvent(
   state: string | null,
   language: Language
 ): string {
-  if (state === null) return '—'
+  if (state === null) {
+    return '—'
+  }
   const machine = machineForEvent(event, language)
   return machine === undefined ? state : stateLabel(machine, state)
 }
@@ -48,7 +53,9 @@ export function stateLabelForEvent(
  * event, else the one without a reason, else the summary of the state it reached. */
 export function transitionExplanation(event: RunEvent, language: Language): string | null {
   const machine = machineForEvent(event, language)
-  if (machine === undefined) return null
+  if (machine === undefined) {
+    return null
+  }
   const candidates = machine.transitions.filter(
     (candidate) => candidate.from === event.from_status && candidate.to === event.to_status
   )
@@ -58,7 +65,9 @@ export function transitionExplanation(event: RunEvent, language: Language): stri
       : candidates.find((candidate) => candidate.reason === event.reason_code)
   const generic = candidates.find((candidate) => candidate.reason === undefined)
   const chosen = exact ?? generic
-  if (chosen !== undefined) return edgeLabel(machine, chosen)
+  if (chosen !== undefined) {
+    return edgeLabel(machine, chosen)
+  }
   // No transition is identified (an unknown reason on a pair with only reason-specific
   // transitions, or a pair the contract does not declare): describe where the event landed
   // rather than guessing which decision it was.
@@ -90,8 +99,9 @@ export function transitionDuration(
   if (
     run[event.axis].finished_at !== null ||
     (machine !== undefined && machine.terminal.includes(event.to_status))
-  )
+  ) {
     return { kind: 'final' }
+  }
   return {
     kind: 'duration',
     ms: Math.max(0, now - Date.parse(event.occurred_at))

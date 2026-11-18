@@ -49,7 +49,9 @@ function record(key: string, value: string): Buffer {
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
     const bytes = Buffer.from(`${length} ${payload}`)
-    if (bytes.length === length) return bytes
+    if (bytes.length === length) {
+      return bytes
+    }
     length = bytes.length
   }
 }

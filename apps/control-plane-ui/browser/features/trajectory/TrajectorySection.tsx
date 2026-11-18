@@ -52,7 +52,9 @@ export function TrajectorySection({
   const [opened, setOpened] = React.useState(openedInitially)
   const previousForce = React.useRef(force)
   React.useEffect(() => {
-    if (force === previousForce.current) return
+    if (force === previousForce.current) {
+      return
+    }
     previousForce.current = force
     setOpened(force > 0)
   }, [force])

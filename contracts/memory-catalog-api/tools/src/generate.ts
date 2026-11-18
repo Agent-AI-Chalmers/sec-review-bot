@@ -23,12 +23,16 @@ const outputPaths = [
 
 function renderOperationOptionsById(spec: unknown): string {
   const paths = (spec as { paths?: Record<string, Record<string, unknown>> }).paths
-  if (paths === undefined) throw new Error('Memory Catalog API has no paths')
+  if (paths === undefined) {
+    throw new Error('Memory Catalog API has no paths')
+  }
   const entries: string[] = []
   for (const pathItem of Object.values(paths)) {
     for (const operation of Object.values(pathItem)) {
       const operationId = (operation as { operationId?: unknown }).operationId
-      if (typeof operationId !== 'string') continue
+      if (typeof operationId !== 'string') {
+        continue
+      }
       const typeName = operationId.charAt(0).toUpperCase() + operationId.slice(1)
       entries.push(`  ${operationId}: ${typeName}Options`)
     }

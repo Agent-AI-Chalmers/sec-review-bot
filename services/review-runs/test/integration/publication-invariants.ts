@@ -12,7 +12,9 @@ export async function assertPublicationAxesFollowSteps(
   pool: Pool,
   connectorIds: readonly string[]
 ): Promise<void> {
-  if (connectorIds.length === 0) return
+  if (connectorIds.length === 0) {
+    return
+  }
   const drift = await pool.query<{
     run_id: string
     stored: string

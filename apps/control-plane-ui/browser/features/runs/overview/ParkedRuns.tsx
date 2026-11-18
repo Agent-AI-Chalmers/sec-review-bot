@@ -15,10 +15,14 @@ export function ParkedRuns({ blocked }: { blocked: ParkedRun[] }): React.JSX.Ele
   const t = useMessages()
   const now = useNow()
   const [opened, setOpened] = React.useState(false)
-  if (blocked.length === 0) return null
+  if (blocked.length === 0) {
+    return null
+  }
   const oldestWait = blocked.reduce<number | null>((oldest, block) => {
     const parkedAt = Date.parse(block.parked_at)
-    if (!Number.isFinite(parkedAt)) return oldest
+    if (!Number.isFinite(parkedAt)) {
+      return oldest
+    }
     const wait = Math.max(0, now - parkedAt)
     return oldest === null || wait > oldest ? wait : oldest
   }, null)
@@ -80,7 +84,9 @@ export function ParkedRuns({ blocked }: { blocked: ParkedRun[] }): React.JSX.Ele
           <Stack gap="xl">
             {(['preparation', 'execution', 'publication'] as const).map((axis) => {
               const runs = blocked.filter((block) => block.axis === axis)
-              if (runs.length === 0) return null
+              if (runs.length === 0) {
+                return null
+              }
               return (
                 <Stack gap="sm" key={axis}>
                   <Text size="xs" fw={600} c="dimmed" tt="uppercase">

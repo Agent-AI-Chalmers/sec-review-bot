@@ -420,8 +420,9 @@ test('a delivery reconciliation that cannot reach GitHub is recorded once and se
   } satisfies PublicationStepStore
 
   const { octokit } = fakeGitHub(({ method, url }) => {
-    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET') {
       return githubJson({ message: 'Bad Gateway' }, 502)
+    }
     return githubJson({})
   })
 
@@ -473,10 +474,11 @@ test('a deterministic reconciliation failure skips only its delivery', async () 
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
-      if (stepKey === 'repository:delivery:delivery-a')
+      if (stepKey === 'repository:delivery:delivery-a') {
         throw Object.assign(new Error('no attempts left'), {
           code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
         })
+      }
     },
     completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
       writes.push(`complete ${stepKey}`)
@@ -499,8 +501,9 @@ test('a deterministic reconciliation failure skips only its delivery', async () 
   } satisfies PublicationStepStore
 
   const { octokit } = fakeGitHub(({ method, url }) => {
-    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET') {
       return githubJson({ message: 'Not Found' }, 404)
+    }
     return githubJson({})
   })
 
@@ -552,10 +555,11 @@ test('a transient reconciliation failure still lets later deliveries publish bef
     initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
-      if (stepKey === 'repository:delivery:delivery-a')
+      if (stepKey === 'repository:delivery:delivery-a') {
         throw Object.assign(new Error('no attempts left'), {
           code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
         })
+      }
     },
     completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
       writes.push(`complete ${stepKey}`)
@@ -578,8 +582,9 @@ test('a transient reconciliation failure still lets later deliveries publish bef
   } satisfies PublicationStepStore
 
   const { octokit } = fakeGitHub(({ method, url }) => {
-    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET')
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET') {
       return githubJson({ message: 'Bad Gateway' }, 502)
+    }
     return githubJson({})
   })
 

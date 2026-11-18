@@ -105,7 +105,9 @@ export class PreparationStore {
         [this.connectorId]
       )
       const work = candidate.rows[0]
-      if (work === undefined) return null
+      if (work === undefined) {
+        return null
+      }
       const token = crypto.randomUUID()
       // Claiming a retry starts a new attempt: both failure fields describe the attempt that
       // just ended, so they go back to NULL. `last_failure_code`/`last_failure_message` are the
@@ -119,8 +121,9 @@ export class PreparationStore {
          WHERE run_id=$1 AND connector_id=$3 AND status=$4`,
         [work.run_id, token, this.connectorId, work.from_status]
       )
-      if (claimed.rowCount !== 1)
+      if (claimed.rowCount !== 1) {
         throw new Error(`Preparation ${work.run_id} could not be claimed.`)
+      }
       await appendEvent(client, {
         runId: work.run_id,
         connectorId: this.connectorId,
@@ -147,8 +150,9 @@ export class PreparationStore {
        WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
       [runId, this.connectorId, token, JSON.stringify(input)]
     )
-    if (result.rowCount !== 1)
+    if (result.rowCount !== 1) {
       throw new Error(`Preparation claim was lost before checkpointing input for ${runId}.`)
+    }
   }
 
   heartbeatIntervalMs(): number {
@@ -194,7 +198,9 @@ export class PreparationStore {
           await client.query(`RELEASE SAVEPOINT ${savepoint}`)
           concluded += 1
         } catch (error) {
-          if (!(error instanceof ExpiryUnreconcilableError)) throw error
+          if (!(error instanceof ExpiryUnreconcilableError)) {
+            throw error
+          }
           // Roll the row's partial writes back before recording why it was left alone. The block
           // marker itself must survive, which is why it is written after the rollback rather than
           // inside the aborted savepoint.
@@ -278,7 +284,9 @@ export class PreparationStore {
       [runId, this.connectorId, exhausted]
     )
     const row = expired.rows[0]
-    if (row === undefined) throw new Error(`Expired preparation ${runId} could not be concluded.`)
+    if (row === undefined) {
+      throw new Error(`Expired preparation ${runId} could not be concluded.`)
+    }
     const preparationEventId = await appendEvent(client, {
       runId,
       connectorId: this.connectorId,
@@ -287,17 +295,20 @@ export class PreparationStore {
       toStatus: row.status,
       reasonCode: row.status === 'failed' ? row.failure_code : null
     })
-    if (row.status !== 'failed') return
+    if (row.status !== 'failed') {
+      return
+    }
 
     // Execution never ran, so it is skipped, not failed. The failure reason stays on the
     // preparation row (and is surfaced through the run's preparation summary). A run whose
     // execution already left `pending` contradicts that premise: refuse to overwrite it.
     const skippedRuns = await skipPendingExecutions(client, this.connectorId, [runId])
-    if (skippedRuns.length !== 1)
+    if (skippedRuns.length !== 1) {
       throw new ExpiryUnreconcilableError(
         'EXECUTION_ALREADY_ADVANCED',
         `preparation ${runId} expired with its execution no longer pending`
       )
+    }
     // Publication is not applicable either; the helper converges an in-flight publication too.
     const abandoned = await abandonInFlightPublications(client, this.connectorId, [runId])
     await queueRunNotice(client, {
@@ -388,12 +399,14 @@ export class PreparationStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (prepared.rowCount !== 1)
-        // Losing the compare-and-set is the expected result when a lease expiry or another
-        // owner concludes this preparation first. The token fence did its job: this caller must
-        // not write a second terminal transition, but it also must not turn the winner's valid
-        // transition into a server error. `false` means that this invocation scheduled no retry;
-        // the durable row and its audit event belong to whichever owner won the fence.
+      // Losing the compare-and-set is the expected result when a lease expiry or another
+      // owner concludes this preparation first. The token fence did its job: this caller must
+      // not write a second terminal transition, but it also must not turn the winner's valid
+      // transition into a server error. `false` means that this invocation scheduled no retry;
+      // the durable row and its audit event belong to whichever owner won the fence.
+      {
         return { retry_scheduled: false }
+      }
       // An `uncertain` execution deliberately keeps `started_at` NULL: the submission may never
       // have been accepted, so the phase has not provably begun. `completeSubmissionRecovery`
       // fills the start once a replay is accepted; do not set it here.
@@ -407,15 +420,17 @@ export class PreparationStore {
           )
         : undefined
       if (submissionUncertain) {
-        if (result?.rowCount !== 1)
+        if (result?.rowCount !== 1) {
           throw new Error(`Preparation claim was lost before failing review run ${runId}.`)
+        }
       } else {
         // Execution never ran, so it is skipped rather than failed. The reason stays on the
         // preparation row. Comparing the returned ids against the request makes a run that was
         // no longer `pending` surface as a lost transition instead of passing silently.
         const skipped = await skipPendingExecutions(client, this.connectorId, [runId])
-        if (skipped.length !== 1)
+        if (skipped.length !== 1) {
           throw new Error(`Execution for ${runId} was not pending when preparation failed.`)
+        }
       }
       // Publication is only "not applicable" once execution is conclusively skipped. An
       // uncertain submission may still be accepted, so its publication stays `pending`: ruling

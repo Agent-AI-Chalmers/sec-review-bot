@@ -116,7 +116,9 @@ async function readBoundedResponseText(response: Response): Promise<string> {
     const body = await readBoundedResponseBody(response, MAX_EXECUTION_RESPONSE_BYTES)
     return new TextDecoder().decode(body)
   } catch (error) {
-    if (!(error instanceof ResponseTooLargeError)) throw error
+    if (!(error instanceof ResponseTooLargeError)) {
+      throw error
+    }
     throw new ExecutionProtocolError(
       'EXECUTION_RESPONSE_TOO_LARGE',
       'Execution returned a response larger than the protocol budget.',
@@ -157,11 +159,12 @@ function isWorkflow(value: unknown): value is ReviewRunWorkflow {
 }
 
 function parseArtifactStorage(value: unknown, runId: string): ExecutionArtifactStorage {
-  if (!isRecord(value) || !['available', 'unavailable', 'failed'].includes(String(value.status)))
+  if (!isRecord(value) || !['available', 'unavailable', 'failed'].includes(String(value.status))) {
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_ARTIFACT_STORAGE',
       `Execution returned invalid artifact storage metadata for ${runId}.`
     )
+  }
   const status = value.status as ExecutionArtifactStorage['status']
   if (status !== 'available') {
     if (
@@ -169,11 +172,12 @@ function parseArtifactStorage(value: unknown, runId: string): ExecutionArtifactS
       Object.keys(value).some((key) => !['status', 'error_code', 'message'].includes(key)) ||
       (value.error_code !== undefined && typeof value.error_code !== 'string') ||
       (value.message !== undefined && typeof value.message !== 'string')
-    )
+    ) {
       throw new ExecutionProtocolError(
         'EXECUTION_INVALID_ARTIFACT_STORAGE',
         `Execution returned invalid artifact storage metadata for ${runId}.`
       )
+    }
     return {
       status,
       ...(typeof value.error_code === 'string' ? { error_code: value.error_code } : {}),
@@ -198,11 +202,12 @@ function parseArtifactStorage(value: unknown, runId: string): ExecutionArtifactS
     !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
     !Number.isSafeInteger(artifact.size_bytes) ||
     (artifact.size_bytes as number) < 0
-  )
+  ) {
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_ARTIFACT_STORAGE',
       `Execution returned invalid artifact storage metadata for ${runId}.`
     )
+  }
   return {
     status,
     artifact: {
@@ -217,7 +222,9 @@ function parseArtifactStorage(value: unknown, runId: string): ExecutionArtifactS
 }
 
 function parseExecutionArchiveUri(value: unknown, runId: string): string | undefined {
-  if (typeof value !== 'string') return undefined
+  if (typeof value !== 'string') {
+    return undefined
+  }
   let uri: URL
   try {
     uri = new URL(value)
@@ -233,22 +240,26 @@ function parseExecutionArchiveUri(value: unknown, runId: string): string | undef
     uri.search !== '' ||
     uri.hash !== '' ||
     uri.pathname !== `/runs/${runId}/artifacts/execution-archive.v1.tar.zst`
-  )
+  ) {
     return undefined
+  }
   return value
 }
 
 function serviceUrl(): string {
   const value = process.env.EXECUTION_API_URL?.trim()
-  if (!value)
+  if (!value) {
     throw Object.assign(new Error('EXECUTION_API_URL is required.'), {
       code: 'EXECUTION_API_URL_MISSING'
     })
+  }
   return value.replace(/\/+$/, '')
 }
 
 function isLoopback(hostname: string): boolean {
-  if (hostname === 'localhost') return true
+  if (hostname === 'localhost') {
+    return true
+  }
   const value =
     hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
   return (
@@ -325,22 +336,29 @@ async function request(
       try {
         text = await readBoundedResponseText(response)
       } catch (error) {
-        if (!(error instanceof ExecutionProtocolError)) throw error
+        if (!(error instanceof ExecutionProtocolError)) {
+          throw error
+        }
         bodyParseError = error
       }
       if (bodyParseError === undefined && text.trim()) {
         try {
           body = JSON.parse(text)
         } catch (error) {
-          if (!(error instanceof SyntaxError)) throw error
+          if (!(error instanceof SyntaxError)) {
+            throw error
+          }
           bodyParseError = error
         }
       }
-      if (!isRetryableStatus(response.status) || attempt === retries)
+      if (!isRetryableStatus(response.status) || attempt === retries) {
         return { response, body, ...(bodyParseError ? { bodyParseError } : {}) }
+      }
     } catch (error) {
       lastError = error
-      if (!isTransientTransportError(error) || attempt === retries) throw error
+      if (!isTransientTransportError(error) || attempt === retries) {
+        throw error
+      }
     } finally {
       clearTimeout(timer)
     }
@@ -354,22 +372,24 @@ function parseResponse(
   expectedRunId: string,
   expectedWorkflow?: ReviewRunWorkflow
 ): ValidatedRunResponse {
-  if (!isRecord(body) || typeof body.status !== 'string')
+  if (!isRecord(body) || typeof body.status !== 'string') {
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_RESPONSE',
       'Execution returned an invalid run response.'
     )
+  }
   if (!isExecutionStatus(body.status)) {
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_STATUS',
       `Execution returned an unknown status: ${body.status}.`
     )
   }
-  if (body.run_id !== expectedRunId)
+  if (body.run_id !== expectedRunId) {
     throw new ExecutionProtocolError(
       'EXECUTION_IDENTITY_MISMATCH',
       `Execution returned an unexpected run_id for ${expectedRunId}.`
     )
+  }
   if (
     !isWorkflow(body.workflow) ||
     (expectedWorkflow !== undefined && body.workflow !== expectedWorkflow)
@@ -421,7 +441,9 @@ export async function submitExecutionRun({
     throw executionError(result.body, result.response.status)
   }
   try {
-    if (result.bodyParseError) throw result.bodyParseError
+    if (result.bodyParseError) {
+      throw result.bodyParseError
+    }
     parseResponse(result.body, run_id, workflow)
   } catch (error) {
     throw new ExecutionSubmissionUncertainError(
@@ -480,7 +502,9 @@ export async function getExecutionRunStatuses(
     )
     runs.push(...batch.runs)
     missing.push(...batch.missing)
-    for (const [runId, status] of batch.byRunId) byRunId.set(runId, status)
+    for (const [runId, status] of batch.byRunId) {
+      byRunId.set(runId, status)
+    }
   }
 
   return { runs, missing, byRunId }
@@ -495,9 +519,13 @@ async function readExecutionRunStatuses(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ run_ids: [...runIds] })
   })
-  if (!response.ok) throw executionError(body, response.status)
+  if (!response.ok) {
+    throw executionError(body, response.status)
+  }
   if (bodyParseError) {
-    if (bodyParseError instanceof ExecutionProtocolError) throw bodyParseError
+    if (bodyParseError instanceof ExecutionProtocolError) {
+      throw bodyParseError
+    }
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_JSON',
       'Execution returned invalid JSON for a status query.',
@@ -540,9 +568,13 @@ export async function getExecutionRunStatus(
     `/v1/runs/${encodeURIComponent(runId)}`,
     { method: 'GET' }
   )
-  if (!response.ok) throw executionError(body, response.status)
+  if (!response.ok) {
+    throw executionError(body, response.status)
+  }
   if (bodyParseError) {
-    if (bodyParseError instanceof ExecutionProtocolError) throw bodyParseError
+    if (bodyParseError instanceof ExecutionProtocolError) {
+      throw bodyParseError
+    }
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_JSON',
       `Execution returned invalid JSON for ${runId}.`,

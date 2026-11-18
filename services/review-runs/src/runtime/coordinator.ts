@@ -55,7 +55,9 @@ export async function coordinateReviewRunsOnce(
   for (const droppedRow of dropped) {
     handlers.onDroppedRunRow(droppedRow)
   }
-  if (active.length === 0) return
+  if (active.length === 0) {
+    return
+  }
   // One request for the whole pass rather than one per run. The per-run shape made the
   // number of requests grow with the number of runs in flight, so the busiest moments
   // were the ones that checked least often.
@@ -84,7 +86,9 @@ export function startReviewRunCoordinatorLoop({
   let stopped = false
   let active: Promise<void> | null = null
   const tick = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = runOnce()
       .catch(onError)
       .finally(() => {

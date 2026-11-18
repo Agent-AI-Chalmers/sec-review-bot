@@ -11,7 +11,9 @@ const endpoint = process.env['SEC_REVIEW_TEST_S3_ENDPOINT']
 const bucket = process.env['SEC_REVIEW_TEST_S3_BUCKET']
 
 test.skipIf(!endpoint || !bucket)('S3 input upload is immutable and idempotent', async () => {
-  if (!endpoint || !bucket) throw new Error('S3 integration environment is not configured.')
+  if (!endpoint || !bucket) {
+    throw new Error('S3 integration environment is not configured.')
+  }
 
   process.env['SEC_REVIEW_ARTIFACT_STORE'] = 's3'
   process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT'] = endpoint

@@ -69,7 +69,9 @@ test('response object validation accepts and rejects the shared schema cases', a
         value = contractFixture(name)
         const response = await app.inject(`/fixture/${schema}`)
         expect(response.statusCode, name).toBe(valid ? 200 : 500)
-        if (valid) expect(response.json(), name).toStrictEqual({ value })
+        if (valid) {
+          expect(response.json(), name).toStrictEqual({ value })
+        }
       }
     }
   } finally {
@@ -103,23 +105,29 @@ test('actual catalog routes reject malformed query results before emitting succe
         [manifest.invalid_schema_fixtures, false]
       ] as const) {
         for (const [name, caseSchema] of Object.entries(cases)) {
-          if (caseSchema !== schema) continue
+          if (caseSchema !== schema) {
+            continue
+          }
           value = contractFixture(name)
           // Catalog handlers produce response objects; pre-serialized payloads are outside
           // this hook's scope. Nested values remain covered by the shared schema cases.
-          if (value === null || typeof value !== 'object') continue
+          if (value === null || typeof value !== 'object') {
+            continue
+          }
           const response = await app.inject({
             method: 'GET',
             url: url!,
             headers: { authorization: 'Bearer worker' }
           })
           expect(response.statusCode, name).toBe(valid ? 200 : 500)
-          if (valid) expect(response.json(), name).toStrictEqual(value)
-          else
+          if (valid) {
+            expect(response.json(), name).toStrictEqual(value)
+          } else {
             expect(response.json(), name).toStrictEqual({
               error: 'Internal server error',
               code: 'INTERNAL_ERROR'
             })
+          }
         }
       }
     }
@@ -181,7 +189,9 @@ test('actual write routes reject shared malformed requests before reaching the s
         [manifest.invalid_schema_fixtures, false]
       ] as const) {
         for (const [name, caseSchema] of Object.entries(cases)) {
-          if (caseSchema !== schema) continue
+          if (caseSchema !== schema) {
+            continue
+          }
           const payload = contractFixture(name)
           const source = (payload as { source?: { kind?: string } }).source
           const role = source?.kind === 'manual' ? 'operator' : token

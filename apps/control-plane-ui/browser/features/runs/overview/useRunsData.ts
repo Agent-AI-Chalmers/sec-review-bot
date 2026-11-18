@@ -43,7 +43,9 @@ export function useRunsData(query: string): RunsData {
         }
       })
       .catch((value: unknown) => {
-        if (latestQuery.current === requestedQuery) setAuxiliaryError(value)
+        if (latestQuery.current === requestedQuery) {
+          setAuxiliaryError(value)
+        }
         // The queue is an operator aid, not a precondition for reading runs.
       })
     try {
@@ -52,8 +54,9 @@ export function useRunsData(query: string): RunsData {
         setResult({ query: requestedQuery, data: nextData })
       }
     } catch (value) {
-      if (latestQuery.current === requestedQuery)
+      if (latestQuery.current === requestedQuery) {
         setFailure({ query: requestedQuery, error: value })
+      }
     }
     await parkedRequest
   }, [query])

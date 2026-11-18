@@ -12,7 +12,9 @@ test('every emitted operation response alias indexes its status map', async () =
   )
   let checked = 0
   for (const [name, alias] of aliases) {
-    if (!name.endsWith('ResponseBody') || !aliases.has(`${name}ByStatus`)) continue
+    if (!name.endsWith('ResponseBody') || !aliases.has(`${name}ByStatus`)) {
+      continue
+    }
     expect.assert(ts.isIndexedAccessTypeNode(alias.type), `${name} must index its status map`)
     expect.assert(ts.isTypeReferenceNode(alias.type.objectType))
     expect(alias.type.objectType.typeName.getText(file)).toBe(`${name}ByStatus`)

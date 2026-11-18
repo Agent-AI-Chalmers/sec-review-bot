@@ -17,7 +17,9 @@ export function MarkdownPreview({
           <a
             href={href}
             onClick={(event) => {
-              if (href !== undefined && onOpenLink(href)) event.preventDefault()
+              if (href !== undefined && onOpenLink(href)) {
+                event.preventDefault()
+              }
             }}
           >
             {children}

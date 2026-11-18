@@ -8,8 +8,11 @@ const READ_ADDRESSING_STYLE_SCRIPT =
 
 function readConfiguredPort(value?: string) {
   const env = { ...process.env }
-  if (value === undefined) delete env.PORT
-  else env.PORT = value
+  if (value === undefined) {
+    delete env.PORT
+  } else {
+    env.PORT = value
+  }
 
   return spawnSync(process.execPath, ['--import', 'tsx', '--eval', READ_PORT_SCRIPT], {
     cwd: process.cwd(),
@@ -20,8 +23,11 @@ function readConfiguredPort(value?: string) {
 
 function readConfiguredAddressingStyle(value?: string) {
   const env = { ...process.env }
-  if (value === undefined) delete env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE
-  else env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE = value
+  if (value === undefined) {
+    delete env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE
+  } else {
+    env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE = value
+  }
 
   return spawnSync(process.execPath, ['--import', 'tsx', '--eval', READ_ADDRESSING_STYLE_SCRIPT], {
     cwd: process.cwd(),

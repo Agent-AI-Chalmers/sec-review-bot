@@ -36,7 +36,9 @@ export class PublicationClaimStore {
         [runId, this.connectorId]
       )
       const prior = previous.rows[0]
-      if (prior === undefined) return null
+      if (prior === undefined) {
+        return null
+      }
       const result = await client.query<{
         claim_token: string
         to_status: PublicationStatus
@@ -66,7 +68,9 @@ export class PublicationClaimStore {
         [runId, token, this.connectorId, this.claimTimeoutMs]
       )
       const claimed = result.rows[0]
-      if (claimed === undefined) return null
+      if (claimed === undefined) {
+        return null
+      }
       await this.appendClaimEvent(client, runId, prior.status, claimed.to_status)
       return claimed.claim_token
     })
@@ -78,7 +82,9 @@ export class PublicationClaimStore {
     const deadline = Date.now() + boundedWaitMs
     for (;;) {
       const work = await this.claimNextOnce()
-      if (work !== null || Date.now() >= deadline) return work
+      if (work !== null || Date.now() >= deadline) {
+        return work
+      }
       await new Promise((resolve) => setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS))
     }
   }
@@ -106,7 +112,9 @@ export class PublicationClaimStore {
         [this.connectorId, this.claimTimeoutMs]
       )
       const candidateRow = candidate.rows[0]
-      if (candidateRow === undefined) return null
+      if (candidateRow === undefined) {
+        return null
+      }
       const runId = candidateRow.run_id
       const token = crypto.randomUUID()
       // Restate every claimability condition in the UPDATE. The SELECT lock serializes current
@@ -139,8 +147,9 @@ export class PublicationClaimStore {
         [runId, this.connectorId, token, candidateRow.status, this.claimTimeoutMs]
       )
       const updated = claimed.rows[0]
-      if (updated === undefined)
+      if (updated === undefined) {
         throw new Error(`Publication work changed while being claimed: ${runId}`)
+      }
       await this.appendClaimEvent(client, runId, candidateRow.status, updated.to_status)
       const result = await client.query<ReviewRunRow>(
         `${RUN_SELECT}
@@ -148,8 +157,9 @@ export class PublicationClaimStore {
         [runId, this.connectorId]
       )
       const row = result.rows[0]
-      if (row === undefined || row.execution.workflow_result === null)
+      if (row === undefined || row.execution.workflow_result === null) {
         throw new Error(`Claimed publication work is incomplete: ${runId}`)
+      }
       return {
         ...rowToRecord(row),
         workflow_result: row.execution.workflow_result,

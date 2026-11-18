@@ -33,7 +33,9 @@ test('filters and visual tones cover exactly the contract state machines', () =>
       [machine, STATE_TONES[machine.axis]],
       [machine.step, STATE_TONES.publication_step]
     ] as const) {
-      if (body === undefined) continue
+      if (body === undefined) {
+        continue
+      }
       expect(Object.keys(tones).sort()).toStrictEqual([...body.states].sort())
     }
   }
@@ -55,7 +57,9 @@ test('summaries, filters, diagrams, and event history use the same localized sta
         const label = summary[machine.axis] as (status: string, language: Language) => string
         expect(label(state, language)).toBe(expected)
       }
-      if (machine.step === undefined) continue
+      if (machine.step === undefined) {
+        continue
+      }
       for (const state of machine.step.states) {
         const event = { axis: machine.axis, step_key: 'delivery' } as RunEvent
         const labelled = machineForEvent(event, language)

@@ -32,10 +32,13 @@ function importedModules(file: string): string[] {
   )
   const modules: string[] = []
   for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
+    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) {
+      continue
+    }
     const specifier = statement.moduleSpecifier
-    if (specifier && ts.isStringLiteral(specifier) && specifier.text.startsWith('.'))
+    if (specifier && ts.isStringLiteral(specifier) && specifier.text.startsWith('.')) {
       modules.push(path.basename(specifier.text).replace(/\.js$/, '.ts'))
+    }
   }
   return modules
 }
@@ -44,7 +47,9 @@ test('single-axis stores do not depend on each other', () => {
   for (const store of AXIS_STORES) {
     const dependencies = importedModules(store)
     for (const other of AXIS_STORES) {
-      if (other === store) continue
+      if (other === store) {
+        continue
+      }
       const otherName = path.basename(other)
       expect(
         dependencies,

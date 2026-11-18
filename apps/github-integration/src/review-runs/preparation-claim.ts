@@ -32,7 +32,9 @@ export async function startPreparationClaimHeartbeat(
 
   const renew = async (): Promise<void> => {
     try {
-      if (!(await store.renewPreparationClaim(runId, token))) lost = true
+      if (!(await store.renewPreparationClaim(runId, token))) {
+        lost = true
+      }
     } catch (error) {
       // A transport failure does not prove that ownership was lost. Keep
       // retrying; the token-fenced submission remains the final authority.
@@ -41,7 +43,9 @@ export async function startPreparationClaimHeartbeat(
     }
   }
   const renewWithoutOverlap = async (): Promise<void> => {
-    if (stopped) return
+    if (stopped) {
+      return
+    }
     // Timer and final ownership checks share one in-flight renewal so a slow
     // Review Runs response cannot create overlapping heartbeat requests.
     active ??= renew().finally(() => {
@@ -53,7 +57,9 @@ export async function startPreparationClaimHeartbeat(
   // Refresh once before returning control to potentially slow GitHub and
   // archive operations; do not wait for the first timer tick to prove ownership.
   await renewWithoutOverlap()
-  if (lost) throw new PreparationClaimLostError(runId)
+  if (lost) {
+    throw new PreparationClaimLostError(runId)
+  }
 
   const timer = setInterval(() => {
     void renewWithoutOverlap().catch(() => undefined)
@@ -65,14 +71,18 @@ export async function startPreparationClaimHeartbeat(
       stopped = true
       clearInterval(timer)
     }
-    if (active !== null) await active.catch(() => undefined)
+    if (active !== null) {
+      await active.catch(() => undefined)
+    }
     return !lost
   }
 
   return {
     assertOwned: async () => {
       await renewWithoutOverlap()
-      if (lost) throw new PreparationClaimLostError(runId)
+      if (lost) {
+        throw new PreparationClaimLostError(runId)
+      }
     },
     stop
   }

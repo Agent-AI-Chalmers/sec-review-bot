@@ -16,10 +16,13 @@ export interface ArtifactStore {
 }
 
 export function artifactStorageStatus(error: unknown): number | undefined {
-  if (typeof error !== 'object' || error === null) return undefined
-  const metadata = '$metadata' in error ? error.$metadata : undefined
-  if (typeof metadata !== 'object' || metadata === null || !('httpStatusCode' in metadata))
+  if (typeof error !== 'object' || error === null) {
     return undefined
+  }
+  const metadata = '$metadata' in error ? error.$metadata : undefined
+  if (typeof metadata !== 'object' || metadata === null || !('httpStatusCode' in metadata)) {
+    return undefined
+  }
   return typeof metadata.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined
 }
 
@@ -30,14 +33,17 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
   const addressingStyle = process.env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE?.trim() || 'auto'
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim()
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim()
-  if (!endpoint && !bucket) return undefined
+  if (!endpoint && !bucket) {
+    return undefined
+  }
   if (
     bucket !== ARTIFACT_BUCKET ||
     !accessKeyId ||
     !secretAccessKey ||
     !['auto', 'path', 'virtual'].includes(addressingStyle)
-  )
+  ) {
     throw new Error('Control Plane UI artifact storage configuration is invalid.')
+  }
   const client = new S3Client({
     ...(endpoint ? { endpoint } : {}),
     region: process.env.AWS_REGION ?? 'us-east-1',
@@ -51,7 +57,9 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
         new GetObjectCommand({ Bucket: ARTIFACT_BUCKET, Key: key }),
         { abortSignal: signal }
       )
-      if (!(object.Body instanceof Readable)) throw new Error('RustFS returned no readable body.')
+      if (!(object.Body instanceof Readable)) {
+        throw new Error('RustFS returned no readable body.')
+      }
       return {
         body: object.Body,
         ...(object.ContentLength === undefined ? {} : { contentLength: object.ContentLength })
@@ -69,11 +77,14 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
           existing.ContentLength !== artifact.sizeBytes ||
           existing.ContentType !== artifact.mediaType ||
           existing.Metadata?.sha256 !== artifact.digest.slice('sha256:'.length)
-        )
+        ) {
           throw new Error('memory_artifact_identity_mismatch')
+        }
         return
       } catch (error) {
-        if (artifactStorageStatus(error) !== 404) throw error
+        if (artifactStorageStatus(error) !== 404) {
+          throw error
+        }
       }
       try {
         await client.send(
@@ -90,7 +101,9 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
           })
         )
       } catch (error) {
-        if (artifactStorageStatus(error) !== 412) throw error
+        if (artifactStorageStatus(error) !== 412) {
+          throw error
+        }
         const existing = await client.send(
           new HeadObjectCommand({
             Bucket: ARTIFACT_BUCKET,
@@ -101,8 +114,9 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
           existing.ContentLength !== artifact.sizeBytes ||
           existing.ContentType !== artifact.mediaType ||
           existing.Metadata?.sha256 !== artifact.digest.slice('sha256:'.length)
-        )
+        ) {
           throw new Error('memory_artifact_identity_mismatch', { cause: error })
+        }
       }
     }
   }

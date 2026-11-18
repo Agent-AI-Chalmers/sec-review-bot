@@ -60,9 +60,12 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   // real request this test can assert on.
   const client = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/comments') && method === 'GET') return githubJson([])
-    if (pathname.endsWith('/comments'))
+    if (pathname.endsWith('/comments') && method === 'GET') {
+      return githubJson([])
+    }
+    if (pathname.endsWith('/comments')) {
       return githubJson({ id: 9, html_url: 'https://example.test/comment/9' })
+    }
     return githubJson({ full_name: 'octo/example' })
   })
   const { app, requests } = fakeApp({
@@ -122,16 +125,20 @@ test('a repository scan failure reports into the repository summary issue', asyn
   const client = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
     // The summary issue already exists: the reply must comment on it, not create a new one.
-    if (pathname.endsWith('/issues') && method === 'GET')
+    if (pathname.endsWith('/issues') && method === 'GET') {
       return githubJson([
         {
           number: 77,
           title: '[sec-review-bot] Repository Security Review Summary'
         }
       ])
-    if (pathname.endsWith('/comments') && method === 'GET') return githubJson([])
-    if (pathname.endsWith('/comments') && method === 'POST')
+    }
+    if (pathname.endsWith('/comments') && method === 'GET') {
+      return githubJson([])
+    }
+    if (pathname.endsWith('/comments') && method === 'POST') {
       return githubJson({ id: 5, html_url: 'https://example.test/comment/5' })
+    }
     return githubJson({ full_name: 'octo/example' })
   })
   const { app } = fakeApp({
@@ -539,7 +546,9 @@ test('a claimed synchronize preparation recovers from the payload admission pers
   // silently widens the run to the whole pull request.
   const client = fakeGitHub(({ url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/comments')) return githubJson([])
+    if (pathname.endsWith('/comments')) {
+      return githubJson([])
+    }
     return githubJson({
       id: 7,
       number: 7,
@@ -568,7 +577,9 @@ test('a claimed synchronize preparation recovers from the payload admission pers
   let claimed = false
   const store = {
     claimNextPreparation: async () => {
-      if (claimed) return null
+      if (claimed) {
+        return null
+      }
       claimed = true
       return {
         run_id: 'run-recover',

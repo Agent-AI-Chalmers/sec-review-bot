@@ -9,8 +9,9 @@ test('narrow version selection keeps its actions on screen', async ({ page }) =>
   await expect(selection).toBeFocused()
   await expect(selection).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
-  for (const button of await selection.getByRole('button').all())
+  for (const button of await selection.getByRole('button').all()) {
     await expect(button).toBeInViewport()
+  }
 })
 
 test('long uploaded names fit the Viewer before and after editing input', async ({ page }) => {
@@ -57,7 +58,9 @@ test('failed file previews retry in place', async ({ page }) => {
     if (!failed) {
       failed = true
       await route.fulfill({ status: 500, json: { error: 'temporary' } })
-    } else await route.continue()
+    } else {
+      await route.continue()
+    }
   })
   await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Retry', exact: true }).click()

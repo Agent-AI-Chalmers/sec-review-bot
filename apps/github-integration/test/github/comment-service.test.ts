@@ -14,8 +14,12 @@ function countingGitHub(respond: Parameters<typeof fakeGitHub>[0]) {
   const harness = fakeGitHub((request) => {
     if (request.method === 'POST') {
       const path = new URL(request.url).pathname
-      if (/\/comments$/.test(path)) counts.createComment += 1
-      if (/\/reviews$/.test(path)) counts.createReview += 1
+      if (/\/comments$/.test(path)) {
+        counts.createComment += 1
+      }
+      if (/\/reviews$/.test(path)) {
+        counts.createReview += 1
+      }
     }
     return respond(request)
   })
@@ -30,7 +34,7 @@ beforeEach(() => {
 
 test('createIssueCommentUnlessMarkerExists skips creation when marker already exists', async () => {
   const { octokit, counts } = countingGitHub(({ method }) => {
-    if (method === 'GET')
+    if (method === 'GET') {
       return githubJson([
         {
           id: 123,
@@ -39,6 +43,7 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
           user: { login: 'sec-review-bot[bot]', type: 'Bot' }
         }
       ])
+    }
     return githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
   })
 
@@ -59,7 +64,7 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
 test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', async () => {
   const marker = '<!-- sec-review-bot:repository-summary-run:run-1 -->'
   const { octokit, counts } = countingGitHub(({ method }) => {
-    if (method === 'GET')
+    if (method === 'GET') {
       return githubJson([
         {
           id: 123,
@@ -68,6 +73,7 @@ test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', a
           user: { login: 'other-bot[bot]', type: 'Bot' }
         }
       ])
+    }
     return githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
   })
 
@@ -131,7 +137,7 @@ test('issue comment creation stops after marker lookup when publication claim is
 test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', async () => {
   const marker = '<!-- sec-review-bot:pull-request-review-run:run-1 -->'
   const { octokit, counts } = countingGitHub(({ method }) => {
-    if (method === 'GET')
+    if (method === 'GET') {
       return githubJson([
         {
           id: 123,
@@ -141,6 +147,7 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
           user: { login: 'sec-review-bot[bot]', type: 'Bot' }
         }
       ])
+    }
     throw new Error('createReview should not be called')
   })
 
@@ -198,13 +205,16 @@ test('approval fallback rechecks publication ownership before creating a comment
   let ownershipChecks = 0
   let reviewAttempts = 0
   const { octokit, counts } = countingGitHub(({ method }) => {
-    if (method === 'GET') return githubJson([])
+    if (method === 'GET') {
+      return githubJson([])
+    }
     reviewAttempts += 1
     // The first attempt is rejected the way GitHub rejects approving your own PR. Returning a
     // response (rather than throwing) is what a real API does, so Octokit maps it to a
     // RequestError with status 422 and the code under test takes its fallback path.
-    if (reviewAttempts === 1)
+    if (reviewAttempts === 1) {
       return githubJson({ message: 'Cannot approve your own pull request' }, 422)
+    }
     return githubJson({
       id: 456,
       html_url: 'https://example.test/review/456',

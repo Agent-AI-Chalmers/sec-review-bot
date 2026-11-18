@@ -4,7 +4,9 @@ import { Pool } from 'pg'
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!value) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  if (!value) {
+    throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
+  }
   return value
 }
 

@@ -111,7 +111,9 @@ export async function observeExecutionRun(
           },
       status.artifact_storage
     )
-    if (!recorded) return 'failed'
+    if (!recorded) {
+      return 'failed'
+    }
     onEvent({
       kind: 'execution_terminal_recorded',
       run_id: run.run_id,

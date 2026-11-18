@@ -2,15 +2,25 @@ import { ApiError } from './api-client.js'
 import type { Translator } from './i18n.js'
 
 export function workflowLabel(workflow: string, t: Translator): string {
-  if (workflow === 'issue-review') return t('workflowIssueReview')
-  if (workflow === 'pull-request-review') return t('workflowPullRequestReview')
-  if (workflow === 'repository-review') return t('workflowRepositoryReview')
+  if (workflow === 'issue-review') {
+    return t('workflowIssueReview')
+  }
+  if (workflow === 'pull-request-review') {
+    return t('workflowPullRequestReview')
+  }
+  if (workflow === 'repository-review') {
+    return t('workflowRepositoryReview')
+  }
   return workflow
 }
 
 export function formatBytes(value: number): string {
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  if (value < 1024) {
+    return `${value} B`
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KiB`
+  }
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
@@ -19,10 +29,20 @@ export function abbreviate(value: string, head: number, tail: number): string {
 }
 
 export function failureReason(error: unknown, t: Translator): string | undefined {
-  if (!(error instanceof ApiError)) return undefined
-  if (error.code === 'review_runs_timeout') return t('errorTimeout')
-  if (error.code === 'review_runs_unavailable') return t('errorUnreachable')
-  if (error.code === 'memory_catalog_timeout') return t('errorMemoryTimeout')
-  if (error.code === 'memory_catalog_unavailable') return t('errorMemoryUnreachable')
+  if (!(error instanceof ApiError)) {
+    return undefined
+  }
+  if (error.code === 'review_runs_timeout') {
+    return t('errorTimeout')
+  }
+  if (error.code === 'review_runs_unavailable') {
+    return t('errorUnreachable')
+  }
+  if (error.code === 'memory_catalog_timeout') {
+    return t('errorMemoryTimeout')
+  }
+  if (error.code === 'memory_catalog_unavailable') {
+    return t('errorMemoryUnreachable')
+  }
   return error.status >= 500 ? t('errorStatus', { status: String(error.status) }) : undefined
 }

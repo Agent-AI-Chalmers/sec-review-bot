@@ -57,10 +57,16 @@ export function createRunsHandler(): (
       // merely happens to be `disconnected` (the lifecycle scenarios, repeated across the
       // page) is not an operator backlog: listing all of them turned four sample states into
       // thirteen queue entries. The parked ones are what an operator is actually shown.
-      if (!parkedIndexes.has(index)) return []
+      if (!parkedIndexes.has(index)) {
+        return []
+      }
       const axis = parkedAxis(run)
-      if (axis === null) return []
-      if (abandoned.has(run.run_id) || resumed.has(run.run_id) || gaveUp.has(run.run_id)) return []
+      if (axis === null) {
+        return []
+      }
+      if (abandoned.has(run.run_id) || resumed.has(run.run_id) || gaveUp.has(run.run_id)) {
+        return []
+      }
       return [
         {
           run_id: run.run_id,
@@ -78,7 +84,9 @@ export function createRunsHandler(): (
   const blockedRunIds = (): string[] => blockedRuns().map((block) => block.run_id)
   return async (request, response): Promise<void> => {
     const requestUrl = request.url
-    if (requestUrl === undefined) return
+    if (requestUrl === undefined) {
+      return
+    }
     if (requestUrl.startsWith('/api/runs?')) {
       const url = new URL(requestUrl, 'http://fixture.local')
       const unknown = [...url.searchParams.keys()].filter(
@@ -203,7 +211,9 @@ export function createRunsHandler(): (
       }
       const runId = decodeURIComponent(giveUpMatch[1] ?? '')
       const chunks: Buffer[] = []
-      for await (const chunk of request as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
       const body = ((): Record<string, unknown> => {
         try {
           return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>

@@ -1103,7 +1103,9 @@ export const STATE_MACHINES: readonly StateMachine[] = STATE_MACHINES_BY_LANGUAG
 /** The machine for one axis, with its text in `language`. */
 export function stateMachine(axis: CoordinationAxis, language: Language = 'en'): StateMachine {
   const machine = STATE_MACHINES_BY_LANGUAGE[language].find((candidate) => candidate.axis === axis)
-  if (machine === undefined) throw new Error(`no state machine for ${axis}`)
+  if (machine === undefined) {
+    throw new Error(`no state machine for ${axis}`)
+  }
   return machine
 }
 

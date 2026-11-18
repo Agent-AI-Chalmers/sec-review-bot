@@ -27,10 +27,12 @@ export function createLogThrottle({
   maxKeys: number
   now?: () => number
 }): (key: string) => boolean {
-  if (!Number.isFinite(minIntervalMs) || minIntervalMs < 0)
+  if (!Number.isFinite(minIntervalMs) || minIntervalMs < 0) {
     throw new Error('minIntervalMs must be a non-negative finite number.')
-  if (!Number.isInteger(maxKeys) || maxKeys < 1)
+  }
+  if (!Number.isInteger(maxKeys) || maxKeys < 1) {
     throw new Error('maxKeys must be a positive integer.')
+  }
 
   const lastSeen = new Map<string, number>()
   return (key: string): boolean => {
@@ -39,7 +41,9 @@ export function createLogThrottle({
     if (previous !== undefined) {
       // An unexpired sighting suppresses the log. A rolling wall clock that moved backwards
       // (`current < previous`) must not open the gate, so only a full interval past suppresses.
-      if (current - previous < minIntervalMs) return false
+      if (current - previous < minIntervalMs) {
+        return false
+      }
       lastSeen.set(key, current)
       return true
     }

@@ -60,7 +60,9 @@ async function reconcileClaimedWork(
     }
     onError(work, error)
     const result = await store.recordFailure(work, maxConsecutiveFailures, retryDelayMs)
-    if (result === 'unavailable') onResult(work, result)
+    if (result === 'unavailable') {
+      onResult(work, result)
+    }
     return
   }
   // Persistence failures are local coordination failures, not evidence that Langfuse is down.
@@ -86,7 +88,9 @@ export async function reconcileExecutionStatisticsPass({
   let processed = 0
   while (processed < maxItems) {
     const work = await store.claimNext()
-    if (work === null) break
+    if (work === null) {
+      break
+    }
     await reconcileClaimedWork(work, {
       store,
       langfuse,

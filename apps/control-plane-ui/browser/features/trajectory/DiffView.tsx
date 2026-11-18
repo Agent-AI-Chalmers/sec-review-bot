@@ -8,12 +8,21 @@ import { HighlightText } from './TrajectoryText.js'
 import { parsePatch, type DiffFile, type DiffRow, type DiffRowKind } from './diff-parse.js'
 
 function patchLineKind(line: string): string {
-  if (line.startsWith('*** ')) return 'file'
-  if (line.startsWith('Index: ') || line.startsWith('--- ') || line.startsWith('+++ '))
+  if (line.startsWith('*** ')) {
     return 'file'
-  if (line.startsWith('@@')) return 'hunk'
-  if (line.startsWith('+')) return 'add'
-  if (line.startsWith('-')) return 'remove'
+  }
+  if (line.startsWith('Index: ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
+    return 'file'
+  }
+  if (line.startsWith('@@')) {
+    return 'hunk'
+  }
+  if (line.startsWith('+')) {
+    return 'add'
+  }
+  if (line.startsWith('-')) {
+    return 'remove'
+  }
   return 'context'
 }
 
@@ -101,7 +110,7 @@ function splitRows(rows: DiffRow[]): SplitRow[] {
     }
     while (pendingRemovals.length > 0) {
       const removal = pendingRemovals.shift()
-      if (removal)
+      if (removal) {
         split.push({
           kind: 'remove',
           oldText: removal.text,
@@ -109,6 +118,7 @@ function splitRows(rows: DiffRow[]): SplitRow[] {
           oldChanged: true,
           newChanged: false
         })
+      }
     }
     split.push({
       kind: 'context',
@@ -120,7 +130,7 @@ function splitRows(rows: DiffRow[]): SplitRow[] {
   }
   while (pendingRemovals.length > 0) {
     const removal = pendingRemovals.shift()
-    if (removal)
+    if (removal) {
       split.push({
         kind: 'remove',
         oldText: removal.text,
@@ -128,6 +138,7 @@ function splitRows(rows: DiffRow[]): SplitRow[] {
         oldChanged: true,
         newChanged: false
       })
+    }
   }
   return split
 }
@@ -167,8 +178,11 @@ function fileStats(file: DiffFile): { adds: number; removes: number } {
   let removes = 0
   for (const hunk of file.hunks) {
     for (const row of hunk.rows) {
-      if (row.kind === 'add') adds += 1
-      else if (row.kind === 'remove') removes += 1
+      if (row.kind === 'add') {
+        adds += 1
+      } else if (row.kind === 'remove') {
+        removes += 1
+      }
     }
   }
   return { adds, removes }
@@ -192,7 +206,7 @@ export function DiffView({
   const [mode, setMode] = React.useState<'unified' | 'side-by-side'>('unified')
   const parsed = React.useMemo(() => parsePatch(text), [text])
   const files = parsed.files
-  if (files.length === 0)
+  if (files.length === 0) {
     return (
       <div className="trajectory-diff-view">
         {truncated && (
@@ -206,6 +220,7 @@ export function DiffView({
         <PatchView text={text} query={query} />
       </div>
     )
+  }
   const toggle = (
     <SegmentedControl
       size="xs"

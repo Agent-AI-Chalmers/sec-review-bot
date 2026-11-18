@@ -34,7 +34,9 @@ export function DiffEditor({
   const hostRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
-    if (!hostRef.current) return
+    if (!hostRef.current) {
+      return
+    }
     if (mode === 'side-by-side') {
       const merge = new MergeView({
         parent: hostRef.current,

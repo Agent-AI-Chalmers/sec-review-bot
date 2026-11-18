@@ -28,12 +28,15 @@ function statusPresentation(statistics: Statistics): {
   color: string
   label: 'statisticsPending' | 'statisticsReconciling' | 'statisticsUnavailable'
 } | null {
-  if (statistics.reconciliation_status === 'pending')
+  if (statistics.reconciliation_status === 'pending') {
     return { color: 'gray', label: 'statisticsPending' }
-  if (statistics.reconciliation_status === 'reconciling')
+  }
+  if (statistics.reconciliation_status === 'reconciling') {
     return { color: 'blue', label: 'statisticsReconciling' }
-  if (statistics.reconciliation_status === 'unavailable')
+  }
+  if (statistics.reconciliation_status === 'unavailable') {
     return { color: 'red', label: 'statisticsUnavailable' }
+  }
   return null
 }
 
@@ -96,12 +99,17 @@ function phaseLabel(group: StatisticsGroup, t: ReturnType<typeof useMessages>): 
     const label = t('statisticsFeedbackRetry')
     return group.feedback_retry_index === null ? label : `${label} ${group.feedback_retry_index}`
   }
-  if (group.agent_phase === 'initial') return t('statisticsInitialReview')
-  if (group.agent_phase === 'draft')
+  if (group.agent_phase === 'initial') {
+    return t('statisticsInitialReview')
+  }
+  if (group.agent_phase === 'draft') {
     return group.batch_index === null
       ? t('statisticsDraft')
       : `${t('statisticsDraftBatch')} ${group.batch_index}`
-  if (group.agent_phase === 'refinement') return t('statisticsRefinement')
+  }
+  if (group.agent_phase === 'refinement') {
+    return t('statisticsRefinement')
+  }
   return t('statisticsUnclassified')
 }
 
@@ -129,7 +137,9 @@ function groupCallCount(groups: StatisticsGroup[]) {
 function groupTokenCount(groups: StatisticsGroup[]): number | null {
   let total = 0
   for (const group of groups) {
-    if (group.token_usage.total_tokens === null) return null
+    if (group.token_usage.total_tokens === null) {
+      return null
+    }
     total += group.token_usage.total_tokens
   }
   return total
@@ -144,7 +154,9 @@ function summedUsage(groups: StatisticsGroup[]): Usage {
     let total = 0
     for (const group of groups) {
       const value = read(group.token_usage)
-      if (value === null) return null
+      if (value === null) {
+        return null
+      }
       total += value
     }
     return total
@@ -347,7 +359,9 @@ function StatisticsTable({
                     aria-expanded={expanded}
                     onClick={() => toggleGroup(key)}
                     onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      if (event.key !== 'Enter' && event.key !== ' ') {
+                        return
+                      }
                       event.preventDefault()
                       toggleGroup(key)
                     }}
@@ -448,7 +462,9 @@ function RepositoryBreakdown({
     group.agent_name === 'repository-triager' ? phaseLabel(group, t) : group.chunk_id
   )
   const deliverySummary = summarizeAgents(deliveryStageGroups, (group) => {
-    if (group.agent_name === 'repository-delivery-planner') return phaseLabel(group, t)
+    if (group.agent_name === 'repository-delivery-planner') {
+      return phaseLabel(group, t)
+    }
     return group.delivery_id
   })
 
@@ -645,7 +661,9 @@ export function ExecutionStatistics({
   const [openStages, setOpenStages] = React.useState<string[]>([])
   const [openCases, setOpenCases] = React.useState<string[]>([])
   const detailsRef = React.useRef<HTMLDivElement>(null)
-  if (statistics === null) return null
+  if (statistics === null) {
+    return null
+  }
   const status = statusPresentation(statistics)
   const noObservations = statistics.ingestion_status === 'no_observations'
   const partial =
@@ -673,8 +691,11 @@ export function ExecutionStatistics({
   const toggleGroup = (key: string): void => {
     setExpandedGroups((current) => {
       const next = new Set(current)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
       return next
     })
   }
@@ -682,7 +703,9 @@ export function ExecutionStatistics({
     setOpenStages(stageIds)
     setOpenCases(caseIds)
     const root = detailsRef.current
-    if (root === null) return
+    if (root === null) {
+      return
+    }
     const keys = [...root.querySelectorAll<HTMLElement>('.statistics-group-row')]
       .map((row) => row.dataset.groupKey)
       .filter((key): key is string => key !== undefined)

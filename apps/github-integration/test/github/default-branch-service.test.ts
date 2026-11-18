@@ -44,8 +44,9 @@ function makeOctokit(options: {
       const branch = decodeURIComponent(branchMatch[1] ?? '')
       calls.branchGet.push({ owner, repo, branch })
       options.onBranchGet?.({ owner, repo, branch })
-      if (options.branchStatus !== undefined)
+      if (options.branchStatus !== undefined) {
         return githubJson({ message: 'not found' }, options.branchStatus)
+      }
       return githubJson({
         commit: { sha: options.head_sha ?? 'default-sha' }
       })
@@ -57,8 +58,9 @@ function makeOctokit(options: {
 
     calls.repoGet.push({ owner, repo })
     options.onRepoGet?.({ owner, repo })
-    if (options.getStatus !== undefined)
+    if (options.getStatus !== undefined) {
       return githubJson({ message: 'forbidden' }, options.getStatus)
+    }
     return githubJson({ default_branch: options.default_branch ?? 'main' })
   })
   return { octokit, calls, requests }

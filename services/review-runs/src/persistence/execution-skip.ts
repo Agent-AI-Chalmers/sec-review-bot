@@ -26,7 +26,9 @@ export async function skipPendingExecutions(
   connectorId: string,
   runIds: readonly string[]
 ): Promise<string[]> {
-  if (runIds.length === 0) return []
+  if (runIds.length === 0) {
+    return []
+  }
   const result = await client.query<{ run_id: string }>(
     `UPDATE executions SET status='skipped',
        failure_code=NULL, failure_message=NULL,

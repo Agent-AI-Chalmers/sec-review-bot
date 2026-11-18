@@ -745,7 +745,7 @@ test('maintenance reports must match consumed extractions before reaching the st
   ]
   const app = await createApp({ store, ...auth })
   try {
-    for (const source of invalidSources)
+    for (const source of invalidSources) {
       for (const url of [
         '/v1/memory-tree/versions',
         '/v1/memory-tree/versions/publications/reserve',
@@ -764,6 +764,7 @@ test('maintenance reports must match consumed extractions before reaching the st
         expect(response.statusCode, `${url} ${source.maintenance_report.summary}`).toBe(400)
         expect(responseCode(response)).toBe('INVALID_BODY')
       }
+    }
   } finally {
     await app.close()
   }

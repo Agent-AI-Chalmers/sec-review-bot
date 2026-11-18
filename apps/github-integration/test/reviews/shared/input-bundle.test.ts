@@ -54,7 +54,9 @@ function octokitForContent(
     requests.push({ path, ...(ref !== undefined ? { ref } : {}) })
     const content = files[path]
     // A missing entry is a real 404, the only status that means "no declaration".
-    if (content === undefined) return githubJson({ message: 'Not Found' }, 404)
+    if (content === undefined) {
+      return githubJson({ message: 'Not Found' }, 404)
+    }
     return githubFile(content, path)
   }).octokit
 }
@@ -212,7 +214,9 @@ for (const failingPath of ['/git/trees/' + '1'.repeat(40), '/contents/.sec-revie
   test(`readSetupDeclaration propagates a read failure at ${failingPath}`, async () => {
     const octokit = fakeGitHub(({ url }) => {
       const pathname = decodeURIComponent(new URL(url).pathname)
-      if (pathname.endsWith(failingPath)) return githubJson({ message: 'Forbidden' }, 403)
+      if (pathname.endsWith(failingPath)) {
+        return githubJson({ message: 'Forbidden' }, 403)
+      }
       const root = pathname.endsWith('/' + 'a'.repeat(40))
       return githubJson({
         truncated: false,
@@ -254,12 +258,13 @@ test('readSetupDeclaration accepts executable files and checks trees at pinned S
   const subtree = 'b'.repeat(40)
   const { octokit, requests } = fakeGitHub(({ url }) => {
     const pathname = decodeURIComponent(new URL(url).pathname)
-    if (pathname.endsWith(`/git/trees/${sha}`))
+    if (pathname.endsWith(`/git/trees/${sha}`)) {
       return githubJson({
         truncated: false,
         tree: [{ path: '.sec-review', type: 'tree', mode: '040000', sha: subtree }]
       })
-    if (pathname.endsWith(`/git/trees/${subtree}`))
+    }
+    if (pathname.endsWith(`/git/trees/${subtree}`)) {
       return githubJson({
         truncated: false,
         tree: [
@@ -271,6 +276,7 @@ test('readSetupDeclaration accepts executable files and checks trees at pinned S
           }
         ]
       })
+    }
     if (pathname.endsWith('/contents/.sec-review/setup.yml')) {
       expect(new URL(url).searchParams.get('ref')).toBe(sha)
       return githubFile('setup:\n  - run: echo hi\n', '.sec-review/setup.yml')

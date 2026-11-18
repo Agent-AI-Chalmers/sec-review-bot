@@ -68,18 +68,29 @@ function coerceQueryStrings(request: FastifyRequest): void {
   const properties = (
     querystring as { properties?: Record<string, { type?: QueryScalarType }> } | undefined
   )?.properties
-  if (properties === undefined) return
+  if (properties === undefined) {
+    return
+  }
   const query = request.query as Record<string, unknown> | null
-  if (query === null || typeof query !== 'object') return
+  if (query === null || typeof query !== 'object') {
+    return
+  }
   for (const [name, value] of Object.entries(query)) {
-    if (typeof value !== 'string') continue
+    if (typeof value !== 'string') {
+      continue
+    }
     const type = properties[name]?.type
     if (type === 'integer' || type === 'number') {
       const parsed = Number(value)
-      if (value.trim() !== '' && Number.isFinite(parsed)) query[name] = parsed
+      if (value.trim() !== '' && Number.isFinite(parsed)) {
+        query[name] = parsed
+      }
     } else if (type === 'boolean') {
-      if (value === 'true') query[name] = true
-      else if (value === 'false') query[name] = false
+      if (value === 'true') {
+        query[name] = true
+      } else if (value === 'false') {
+        query[name] = false
+      }
     }
   }
 }
@@ -122,7 +133,9 @@ function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error:
  * differ in length, which is why the length is compared first: the length of the expected
  * token is not the secret, and a mismatch is a plain rejection. */
 function bearerTokenMatches(header: string | undefined, expected: string): boolean {
-  if (header === undefined) return false
+  if (header === undefined) {
+    return false
+  }
   const provided = Buffer.from(header)
   const want = Buffer.from(`Bearer ${expected}`)
   return provided.length === want.length && timingSafeEqual(provided, want)
@@ -146,12 +159,16 @@ interface ReviewRunsRouteDeps {
  * (tsx) falls back to the repository's contracts tree. */
 function resolveSpecPath(): string {
   const built = path.resolve(import.meta.dirname, '../openapi.yaml')
-  if (existsSync(built)) return built
+  if (existsSync(built)) {
+    return built
+  }
   const fromSource = path.resolve(
     import.meta.dirname,
     '../../../../contracts/review-runs-api/v1/openapi.yaml'
   )
-  if (existsSync(fromSource)) return fromSource
+  if (existsSync(fromSource)) {
+    return fromSource
+  }
   throw new Error(
     `OpenAPI contract not found next to the module (${built}) or in the ` +
       `repository tree (${fromSource}).`

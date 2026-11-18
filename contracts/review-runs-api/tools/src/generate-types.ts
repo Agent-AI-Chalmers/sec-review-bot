@@ -259,7 +259,9 @@ export function listRunQueryParameters(spec: OpenApiDocument): string[] {
         additionalProperties?: unknown
       }
     }
-    if (candidate.in !== 'query') continue
+    if (candidate.in !== 'query') {
+      continue
+    }
     if (
       candidate.style !== 'form' ||
       candidate.explode !== true ||

@@ -21,10 +21,18 @@ export type PublicationStepStatus = PublicationStep['status']
 type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral' | 'retry'
 
 export function statusToneColor(tone: StatusTone): string {
-  if (tone === 'active') return 'blue'
-  if (tone === 'complete') return 'green'
-  if (tone === 'failed') return 'red'
-  if (tone === 'retry') return 'yellow'
+  if (tone === 'active') {
+    return 'blue'
+  }
+  if (tone === 'complete') {
+    return 'green'
+  }
+  if (tone === 'failed') {
+    return 'red'
+  }
+  if (tone === 'retry') {
+    return 'yellow'
+  }
   return 'gray'
 }
 
@@ -129,11 +137,21 @@ export function PublicationStatus({
 }
 
 export function statusBullet(tone: StatusTone): React.ReactNode {
-  if (tone === 'active') return <IconPlayerPlay size={ICON_SIZE.sm} />
-  if (tone === 'complete') return <IconCheck size={ICON_SIZE.sm} />
-  if (tone === 'failed') return <IconAlertTriangle size={ICON_SIZE.sm} />
-  if (tone === 'retry') return <IconAlertTriangle size={ICON_SIZE.sm} />
-  if (tone === 'neutral') return <IconMinus size={ICON_SIZE.sm} />
+  if (tone === 'active') {
+    return <IconPlayerPlay size={ICON_SIZE.sm} />
+  }
+  if (tone === 'complete') {
+    return <IconCheck size={ICON_SIZE.sm} />
+  }
+  if (tone === 'failed') {
+    return <IconAlertTriangle size={ICON_SIZE.sm} />
+  }
+  if (tone === 'retry') {
+    return <IconAlertTriangle size={ICON_SIZE.sm} />
+  }
+  if (tone === 'neutral') {
+    return <IconMinus size={ICON_SIZE.sm} />
+  }
   return <IconClock size={ICON_SIZE.sm} />
 }
 
@@ -170,7 +188,9 @@ export function executionStatusLabel(
 
 function axisStatuses<A extends CoordinationAxis>(axis: A): Run[A]['status'][] {
   const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
-  if (machine === undefined) throw new Error(`Missing state machine: ${axis}`)
+  if (machine === undefined) {
+    throw new Error(`Missing state machine: ${axis}`)
+  }
   return machine.states.map((state) => state as Run[A]['status'])
 }
 
@@ -196,7 +216,9 @@ export function eventAxisLabel(
   event: Pick<RunEvent, 'axis' | 'step_key'>,
   t: ReturnType<typeof useMessages>
 ): string {
-  if (event.step_key !== null) return t('axisPublicationStep', { step: event.step_key })
+  if (event.step_key !== null) {
+    return t('axisPublicationStep', { step: event.step_key })
+  }
   return axisLabel(event.axis, t)
 }
 
@@ -224,13 +246,21 @@ export function artifactStatusLabel(
   status: NonNullable<ArtifactStorage>['status'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'available') return t('artifactAvailable')
-  if (status === 'unavailable') return t('artifactUnavailable')
+  if (status === 'available') {
+    return t('artifactAvailable')
+  }
+  if (status === 'unavailable') {
+    return t('artifactUnavailable')
+  }
   return t('statusFailed')
 }
 
 export function artifactStatusColor(status: NonNullable<ArtifactStorage>['status']): string {
-  if (status === 'available') return 'green'
-  if (status === 'unavailable') return 'yellow'
+  if (status === 'available') {
+    return 'green'
+  }
+  if (status === 'unavailable') {
+    return 'yellow'
+  }
   return 'red'
 }

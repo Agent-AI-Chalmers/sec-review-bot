@@ -165,8 +165,12 @@ function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
 function decodeGitPatchPath(value: string): string {
   // Git terminates unquoted headers containing spaces with a tab. Literal
   // tabs in filenames are quoted and escaped instead.
-  if (!value.startsWith('"')) return value.split('\t', 1)[0]!
-  if (!value.endsWith('"')) throw new Error('Unterminated quoted Git path.')
+  if (!value.startsWith('"')) {
+    return value.split('\t', 1)[0]!
+  }
+  if (!value.endsWith('"')) {
+    throw new Error('Unterminated quoted Git path.')
+  }
   const bytes: number[] = []
   const escapes: Record<string, number> = {
     a: 7,
@@ -194,10 +198,14 @@ function decodeGitPatchPath(value: string): string {
         bytes.push(escapes[escaped]!)
       }
     } else {
-      if (char === '"') throw new Error('Unexpected quote in Git path.')
+      if (char === '"') {
+        throw new Error('Unexpected quote in Git path.')
+      }
       const codepoint = value.codePointAt(index)!
       bytes.push(...Buffer.from(String.fromCodePoint(codepoint), 'utf8'))
-      if (codepoint > 0xffff) index++
+      if (codepoint > 0xffff) {
+        index++
+      }
     }
   }
   return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes))

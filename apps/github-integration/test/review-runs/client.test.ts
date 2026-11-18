@@ -54,10 +54,16 @@ test('repository preparation can replace the admitted empty publish context', as
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -141,12 +147,21 @@ test('Review Runs calls have a bounded request timeout', async (t) => {
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS = '10'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
-    if (previousTimeout === undefined) delete process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS
-    else process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS = previousTimeout
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
+    if (previousTimeout === undefined) {
+      delete process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS
+    } else {
+      process.env.REVIEW_RUNS_REQUEST_TIMEOUT_MS = previousTimeout
+    }
   })
   vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (_input: string | URL | Request, init?: RequestInit): Promise<Response> =>
@@ -173,10 +188,16 @@ test('Review Runs success responses have a bounded body', async (t) => {
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
   let bodyCancelled = false
   vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -207,10 +228,16 @@ test('run notice lease operations use the notice claim routes', async (t) => {
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
 
   const requests: Array<{ url: string; method: string; body?: unknown }> = []
@@ -222,8 +249,12 @@ test('run notice lease operations use the notice claim routes', async (t) => {
         method: init?.method ?? 'GET',
         ...(init?.body === undefined ? {} : { body: sentBody(init) })
       })
-      if (url.endsWith('/v1/run-notices/notice-1/claim')) return Response.json(true)
-      if (url.endsWith('/v1/config/run-notice-heartbeat-interval')) return Response.json(20_000)
+      if (url.endsWith('/v1/run-notices/notice-1/claim')) {
+        return Response.json(true)
+      }
+      if (url.endsWith('/v1/config/run-notice-heartbeat-interval')) {
+        return Response.json(20_000)
+      }
       return Response.json({ error: 'not_found' }, { status: 404 })
     }
   )
@@ -249,10 +280,16 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
   const requests: Array<{
     url: string
@@ -307,10 +344,16 @@ test('void operations accept the empty 200 body the real server sends', async (t
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('', { status: 200 }))
@@ -344,10 +387,16 @@ test('a Review Runs refusal carries the HTTP status that tells it apart from a f
   process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
   process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
   t.onTestFinished(() => {
-    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
-    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
-    if (previousToken === undefined) delete process.env.REVIEW_RUNS_SERVICE_TOKEN
-    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    if (previousUrl === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_URL
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    }
+    if (previousToken === undefined) {
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    } else {
+      process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+    }
   })
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>

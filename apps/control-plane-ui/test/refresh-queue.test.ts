@@ -105,7 +105,9 @@ test('a throwing start notification cannot block the attempt or later requests',
   const queue = new RefreshQueue(
     () => gates[runs++].promise,
     (running) => {
-      if (running) throw new Error('controlled start notification failure')
+      if (running) {
+        throw new Error('controlled start notification failure')
+      }
     }
   )
 
@@ -147,7 +149,9 @@ test('a throwing end notification leaves the queue ready for another request', a
   const queue = new RefreshQueue(
     () => gates[runs++].promise,
     (running) => {
-      if (!running) throw new Error('controlled end notification failure')
+      if (!running) {
+        throw new Error('controlled end notification failure')
+      }
     }
   )
 

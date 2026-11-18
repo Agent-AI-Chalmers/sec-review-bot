@@ -99,9 +99,13 @@ async function handleAppHttpRequest(
   }
 
   function enforceWebhookBodyLimit(chunk: Buffer | string): void {
-    if (rejected) return
+    if (rejected) {
+      return
+    }
     receivedBytes += Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(chunk)
-    if (receivedBytes <= webhook_max_body_bytes) return
+    if (receivedBytes <= webhook_max_body_bytes) {
+      return
+    }
     rejected = true
     cleanup()
     if (!response.headersSent && !response.writableEnded) {

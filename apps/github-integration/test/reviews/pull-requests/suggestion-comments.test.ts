@@ -34,7 +34,9 @@ function postedReview(requests: Array<{ method: string; url: string; body: unkno
 function clients() {
   return fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       const payload = (body ?? {}) as { comments?: unknown }
       expect.assert(Array.isArray(payload.comments))

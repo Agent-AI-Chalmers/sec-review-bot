@@ -9,7 +9,9 @@ import { ExecutionStatisticsStore } from '../../src/statistics/execution-statist
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
-  if (value === undefined) throw new Error('A disposable test database is required.')
+  if (value === undefined) {
+    throw new Error('A disposable test database is required.')
+  }
   return value
 }
 

@@ -58,7 +58,9 @@ function exportedTypeNames(source: string): Set<string> {
     const exported = statement.modifiers?.some(
       (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
     )
-    if (exported) names.add(statement.name.text)
+    if (exported) {
+      names.add(statement.name.text)
+    }
   }
   return names
 }
@@ -214,7 +216,9 @@ test('the selected workflow schemas declare the generated contract version', () 
 /** Does any glob in `patterns` cover `filePath`? Supports `**` and `*`; exact strings match. */
 function globCovers(patterns: string[], filePath: string): boolean {
   return patterns.some((pattern) => {
-    if (pattern === filePath) return true
+    if (pattern === filePath) {
+      return true
+    }
     const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
     const regex = new RegExp(
       '^' +

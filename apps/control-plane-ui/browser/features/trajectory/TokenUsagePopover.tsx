@@ -20,7 +20,9 @@ function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
     value: number | undefined,
     subsets: ReadonlyArray<readonly [string, number | undefined]> = []
   ): React.JSX.Element | null => {
-    if (value === undefined && subsets.every(([, item]) => item === undefined)) return null
+    if (value === undefined && subsets.every(([, item]) => item === undefined)) {
+      return null
+    }
     return (
       <div className="trajectory-usage-group">
         <div className="trajectory-usage-metric">

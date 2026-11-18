@@ -17,12 +17,16 @@ import { executionError, TemporalExecutionClient } from './temporal-execution-cl
 function specPath(): string {
   const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
-  if (existsSync(built)) return built
+  if (existsSync(built)) {
+    return built
+  }
   return path.resolve(contractsRoot(), 'execution-api/v1/openapi.yaml')
 }
 
 function tokenMatches(header: string | undefined, expected: string): boolean {
-  if (!header?.startsWith('Bearer ')) return false
+  if (!header?.startsWith('Bearer ')) {
+    return false
+  }
   const actual = Buffer.from(header.slice('Bearer '.length))
   const wanted = Buffer.from(expected)
   return actual.length === wanted.length && timingSafeEqual(actual, wanted)
@@ -105,7 +109,9 @@ export async function registerExecutionGatewayRoutes(
       getRun: async (request: FastifyRequest, reply: FastifyReply) => {
         const { run_id: runId } = request.params as PathParameters<'getRun'>
         const record = await client.get(runId)
-        if (record) return response(record)
+        if (record) {
+          return response(record)
+        }
         return await reply.status(404).send({
           run_id: runId,
           error: semanticError('EXECUTION_RUN_NOT_FOUND', 'runtime', 'Execution run not found.')

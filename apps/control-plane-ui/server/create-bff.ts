@@ -94,14 +94,20 @@ export function createControlPlaneUiBffServer({
       response.end('{"status":"ok"}')
       return
     }
-    if (await sessionRoutes.handle(request, response)) return
+    if (await sessionRoutes.handle(request, response)) {
+      return
+    }
     if (request.url?.startsWith('/api/')) {
       if (!sessionRoutes.authenticated(request)) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')
         return
       }
-      for (const routes of apiRoutes) if (await routes.handle(request, response)) return
+      for (const routes of apiRoutes) {
+        if (await routes.handle(request, response)) {
+          return
+        }
+      }
       response.writeHead(404)
       response.end()
       return

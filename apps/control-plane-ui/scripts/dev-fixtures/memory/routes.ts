@@ -37,8 +37,9 @@ export function createMemoryHandler(
   // E2E pins the clock; interactive fixture previews stay relative to now.
   const fixtureTime = process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME
   const BASE_TIME = fixtureTime ? Date.parse(fixtureTime) : RUNS_BASE_TIME
-  if (!Number.isFinite(BASE_TIME))
+  if (!Number.isFinite(BASE_TIME)) {
     throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
+  }
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
     version: 1,
@@ -238,10 +239,11 @@ export function createMemoryHandler(
   // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
   // Provenance is replaced; chronology, operator edits and reorganization are
   // illustrative. Each observation is registered once, including pending work.
-  for (const record of [...memoryVersions, ...extractionRecords])
+  for (const record of [...memoryVersions, ...extractionRecords]) {
     record.created_at = new Date(
       Date.parse(String(record.created_at)) - 64 * 3_600_000
     ).toISOString()
+  }
   let sampleIndex = 0
   for (let version = 4; version <= 60; version += 1) {
     const predecessor = version === 4 ? 2 : version === 56 ? 53 : version - 1
@@ -288,12 +290,13 @@ export function createMemoryHandler(
         observations: [{ observation_id: 'extraction-1', body_markdown: sample.body }],
         created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
       })
-      if (sample.action !== 'skipped')
+      if (sample.action !== 'skipped') {
         for (const topic of sample.topics) {
           const path = topic.replace('/memory/', '')
           files[path] =
             `${files[path] ?? '# Review guidance\n'}\n${sample.action === 'conflict' ? '## Unresolved conflict\n\n' : ''}${sample.body}\n`
         }
+      }
       source = {
         kind: 'learning',
         operation_id: `fixture-learning-${version}`,
@@ -336,9 +339,11 @@ export function createMemoryHandler(
   // The operator restored the predecessor after inspecting the latest reorganization.
   activeMemoryVersion = 59
   extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
-  for (const record of extractionRecords)
-    for (const [index, observation] of record.observations.entries())
+  for (const record of extractionRecords) {
+    for (const [index, observation] of record.observations.entries()) {
       observation.observation_id = `observation-${record.extraction_id}-${index + 1}`
+    }
+  }
   const authenticationExtraction = extractionRecords.find(
     (record) => record.extraction_id === 'fixture-extraction-2'
   )!
@@ -376,13 +381,18 @@ export function createMemoryHandler(
       units_without_observation_count: 0
     }
     current.extracted_unit_count += 1
-    if (outcome.hasObservation) current.units_with_observation_count += 1
-    else current.units_without_observation_count += 1
+    if (outcome.hasObservation) {
+      current.units_with_observation_count += 1
+    } else {
+      current.units_without_observation_count += 1
+    }
     workflowOutcomes.set(outcome.source_workflow, current)
   }
   return async (request, response): Promise<void> => {
     const requestUrl = request.url
-    if (requestUrl === undefined) return
+    if (requestUrl === undefined) {
+      return
+    }
     if (requestUrl === '/api/memory/tree/automation' && request.method === 'GET') {
       response.end(JSON.stringify(memoryAutomation))
       return
@@ -425,7 +435,9 @@ export function createMemoryHandler(
             const period = date.toISOString().slice(0, range === 'all' ? 7 : 10)
             const units = new Map<string, boolean>()
             for (const record of extractionRecords) {
-              if (!record.created_at.startsWith(period)) continue
+              if (!record.created_at.startsWith(period)) {
+                continue
+              }
               const key = `${record.source_run_id}:${record.source_unit_id}`
               units.set(key, (units.get(key) ?? false) || record.observations.length > 0)
             }
@@ -493,7 +505,9 @@ export function createMemoryHandler(
     if (request.method === 'GET' && memoryVersionMatch !== null) {
       const version = Number(memoryVersionMatch[1])
       const record = memoryVersions.find((item) => Number(item.version) === version)
-      if (record === undefined) response.statusCode = 404
+      if (record === undefined) {
+        response.statusCode = 404
+      }
       response.end(JSON.stringify(record ?? { error: 'version_not_found' }))
       return
     }
@@ -545,7 +559,9 @@ export function createMemoryHandler(
         return
       }
       const files = memoryFilesByVersion.get(version)
-      if (files === undefined) response.statusCode = 404
+      if (files === undefined) {
+        response.statusCode = 404
+      }
       response.end(
         JSON.stringify(
           files === undefined
@@ -559,7 +575,9 @@ export function createMemoryHandler(
       /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(requestUrl)
     if (request.method === 'POST' && memoryWriteMatch !== null) {
       const chunks: Buffer[] = []
-      for await (const chunk of request as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
       const action = memoryWriteMatch[1] ?? memoryWriteMatch[2]
       if (action === 'pause' || action === 'resume') {

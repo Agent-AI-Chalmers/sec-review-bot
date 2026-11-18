@@ -18,8 +18,9 @@ import type {
 import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
-if (databaseUrl === undefined)
+if (databaseUrl === undefined) {
   throw new Error('TEST_DATABASE_URL is required for integration tests.')
+}
 
 function artifact(name: string, digestCharacter: string): ArtifactReference {
   return {

@@ -46,7 +46,9 @@ export function MemoryObservationList({
     highlightedObservation !== undefined &&
     observations.some((item) => item.observation_id === highlightedObservation)
   React.useEffect(() => {
-    if (highlightedObservation === undefined || !targetLoaded) return
+    if (highlightedObservation === undefined || !targetLoaded) {
+      return
+    }
     const frame = requestAnimationFrame(() => {
       const row = document.querySelector<HTMLElement>(
         `[data-observation-row="${CSS.escape(highlightedObservation)}"]`
@@ -70,13 +72,14 @@ export function MemoryObservationList({
   )
 
   // An empty later page is not an empty list, so only page one shows the empty state.
-  if (!loading && observations.length === 0 && !error && pagination.page === 1)
+  if (!loading && observations.length === 0 && !error && pagination.page === 1) {
     return (
       <>
         {filterBanner}
         <EmptyState message={t('noObservations')} />
       </>
     )
+  }
 
   return (
     <>
@@ -114,8 +117,9 @@ export function MemoryObservationList({
                   if (
                     event.currentTarget === event.target &&
                     item.observation_id === highlightedObservation
-                  )
+                  ) {
                     onHighlightEnd()
+                  }
                 }}
               >
                 {/* This is deliberately a display index, not an extraction identity. */}

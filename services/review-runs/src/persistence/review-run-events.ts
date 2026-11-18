@@ -58,7 +58,9 @@ export async function appendEvent(client: PoolClient, args: AppendEventArgs): Pr
     ]
   )
   const event = result.rows[0]
-  if (event === undefined) throw new Error('Appending a coordination event returned no id.')
+  if (event === undefined) {
+    throw new Error('Appending a coordination event returned no id.')
+  }
   return event.event_id
 }
 

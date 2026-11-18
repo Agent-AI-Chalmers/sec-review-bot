@@ -21,7 +21,9 @@ export class RefreshQueue {
       this.activeWaiters = [resolve]
       shouldStart = true
     }
-    if (shouldStart) void this.drain()
+    if (shouldStart) {
+      void this.drain()
+    }
     return completion
   }
 
@@ -34,9 +36,13 @@ export class RefreshQueue {
         // Query owners retain their error state; queue completion means the attempt settled.
       } finally {
         this.notify(this.onAttemptSettled)
-        for (const resolve of this.activeWaiters) resolve()
+        for (const resolve of this.activeWaiters) {
+          resolve()
+        }
       }
-      if (!this.queued) break
+      if (!this.queued) {
+        break
+      }
       this.queued = false
       this.activeWaiters = this.queuedWaiters
       this.queuedWaiters = []

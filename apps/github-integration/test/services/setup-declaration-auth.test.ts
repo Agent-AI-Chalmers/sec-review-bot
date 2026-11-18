@@ -135,7 +135,9 @@ function octokitWithSetupDeclaration(
         ...(ref !== undefined ? { ref } : {})
       })
       const content = files[path]
-      if (content === undefined) return githubJson({ message: 'Not Found' }, 404)
+      if (content === undefined) {
+        return githubJson({ message: 'Not Found' }, 404)
+      }
       return githubFile(content, path)
     }
     if (tail.startsWith('/commits/')) {
@@ -145,8 +147,12 @@ function octokitWithSetupDeclaration(
     if (tail.startsWith('/compare/')) {
       return githubJson({ status: 'ahead', files: [], commits: [] })
     }
-    if (tail.startsWith('/commits')) return githubJson([])
-    if (tail.startsWith('/contributors')) return githubJson([])
+    if (tail.startsWith('/commits')) {
+      return githubJson([])
+    }
+    if (tail.startsWith('/contributors')) {
+      return githubJson([])
+    }
     if (tail.startsWith('/branches/')) {
       return githubJson({ commit: { sha } })
     }
@@ -215,10 +221,16 @@ test(
         }
       ])
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
-      else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
+      if (previousBundleRoot === undefined) {
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      } else {
+        process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      }
       await fs.rm(root, { recursive: true, force: true })
     }
   }
@@ -255,10 +267,16 @@ test(
         }
       ])
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
-      else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
+      if (previousBundleRoot === undefined) {
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      } else {
+        process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      }
       await fs.rm(root, { recursive: true, force: true })
     }
   }
@@ -338,10 +356,16 @@ test(
         }
       ])
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
-      else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
+      if (previousBundleRoot === undefined) {
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      } else {
+        process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
+      }
       await fs.rm(root, { recursive: true, force: true })
     }
   }

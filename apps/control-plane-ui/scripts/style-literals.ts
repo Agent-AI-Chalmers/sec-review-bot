@@ -17,9 +17,15 @@ const SPACING_PROPERTY =
 const NONZERO_LENGTH = /(?:^|[^\w.-])(?:\d*\.\d+|[1-9]\d*)(?:px|rem)\b/i
 
 function literalKind(property: string): StyleLiteralKind | undefined {
-  if (property === 'font-size') return 'font-size'
-  if (property === 'border-radius') return 'radius'
-  if (SPACING_PROPERTY.test(property)) return 'spacing'
+  if (property === 'font-size') {
+    return 'font-size'
+  }
+  if (property === 'border-radius') {
+    return 'radius'
+  }
+  if (SPACING_PROPERTY.test(property)) {
+    return 'spacing'
+  }
   return undefined
 }
 
@@ -30,7 +36,9 @@ export function findStyleLiterals(stylesheets: Readonly<Record<string, string>>)
     const root = postcss.parse(source, { from: file })
     root.walkDecls((declaration) => {
       const kind = literalKind(declaration.prop)
-      if (!kind || !NONZERO_LENGTH.test(declaration.value)) return
+      if (!kind || !NONZERO_LENGTH.test(declaration.value)) {
+        return
+      }
 
       findings.push({
         kind,

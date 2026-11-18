@@ -5,7 +5,9 @@ import { abbreviate, failureReason, formatBytes, workflowLabel } from '../../sha
 export { abbreviate, failureReason, formatBytes, workflowLabel }
 
 export function safeExternalUrl(value: string | null): string | undefined {
-  if (value === null) return undefined
+  if (value === null) {
+    return undefined
+  }
   try {
     const url = new URL(value)
     return url.protocol === 'https:' ? url.toString() : undefined
@@ -39,10 +41,12 @@ export function parkedSince(
 ): string {
   let latest: string | null = null
   for (const event of events) {
-    if (event.axis !== axis || event.step_key !== null || event.to_status !== 'disconnected')
+    if (event.axis !== axis || event.step_key !== null || event.to_status !== 'disconnected') {
       continue
-    if (latest === null || Date.parse(event.occurred_at) > Date.parse(latest))
+    }
+    if (latest === null || Date.parse(event.occurred_at) > Date.parse(latest)) {
       latest = event.occurred_at
+    }
   }
   return latest ?? run[axis].updated_at
 }
@@ -51,14 +55,20 @@ export function canResumeRun(run: Run): boolean {
   if (run.preparation.status === 'disconnected') {
     return run.execution.status === 'pending'
   }
-  if (run.execution.status === 'disconnected') return true
-  if (run.publication.status === 'disconnected') return true
+  if (run.execution.status === 'disconnected') {
+    return true
+  }
+  if (run.publication.status === 'disconnected') {
+    return true
+  }
   return false
 }
 
 export function isRunTerminal(run: Run): boolean {
   // `uncertain` is not terminal: a recovery will resolve it to queued or failed.
-  if (run.execution.status === 'failed' || run.execution.status === 'skipped') return true
+  if (run.execution.status === 'failed' || run.execution.status === 'skipped') {
+    return true
+  }
   return (
     run.execution.status === 'succeeded' &&
     ['published', 'failed', 'skipped'].includes(run.publication.status)
@@ -119,9 +129,15 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
  * 401 and the BFF proxied that status through. Only the first means the token was wrong; the
  * others would send the operator to re-type a token that was fine. */
 export function abandonFailureMessageKey(error: unknown): Message {
-  if (!(error instanceof ApiError)) return 'abandonFailed'
-  if (error.code === 'admin_token_required') return 'abandonWrongToken'
-  if (error.code === 'unauthorized') return 'sessionExpired'
+  if (!(error instanceof ApiError)) {
+    return 'abandonFailed'
+  }
+  if (error.code === 'admin_token_required') {
+    return 'abandonWrongToken'
+  }
+  if (error.code === 'unauthorized') {
+    return 'sessionExpired'
+  }
   return 'abandonFailed'
 }
 
@@ -163,7 +179,9 @@ export function phaseElapsed(startAt: string, endAt: string | null, t: Translato
  * observation heartbeat, so its age is how long ago we last confirmed the state. Outside those
  * states nothing is polling, so there is no freshness to report and this returns null. */
 export function observationAgeMs(run: Run, now: number = Date.now()): number | null {
-  if (run.execution.status !== 'queued' && run.execution.status !== 'running') return null
+  if (run.execution.status !== 'queued' && run.execution.status !== 'running') {
+    return null
+  }
   return Math.max(0, now - Date.parse(run.execution.updated_at))
 }
 
@@ -184,9 +202,17 @@ export function formatDuration(milliseconds: number, t: Translator): string {
   const minutes = Math.floor((totalSeconds % 3_600) / 60)
   const seconds = totalSeconds % 60
   const parts: string[] = []
-  if (days > 0) parts.push(`${days}${t('durationDays')}`)
-  if (hours > 0) parts.push(`${hours}${t('durationHours')}`)
-  if (minutes > 0) parts.push(`${minutes}${t('durationMinutes')}`)
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}${t('durationSeconds')}`)
+  if (days > 0) {
+    parts.push(`${days}${t('durationDays')}`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}${t('durationHours')}`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}${t('durationMinutes')}`)
+  }
+  if (seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds}${t('durationSeconds')}`)
+  }
   return parts.slice(0, 2).join(' ')
 }

@@ -145,7 +145,9 @@ function createOctokitMock({
       })
       // A 422 "Reference already exists" is what GitHub answers for a duplicate branch.
       // A real duplicate-ref reply: `isBranchAlreadyExists` reads `response.data.message`.
-      if (branchAlreadyExists) return githubJson({ message: 'Reference already exists' }, 422)
+      if (branchAlreadyExists) {
+        return githubJson({ message: 'Reference already exists' }, 422)
+      }
       return githubJson({})
     }
     if (pathname.includes('/git/commits/')) {
@@ -159,7 +161,9 @@ function createOctokitMock({
           : { tree: { sha: 'base-tree-sha' } }
       )
     }
-    if (pathname.endsWith('/pulls') && method === 'GET') return githubJson(existingPullRequests)
+    if (pathname.endsWith('/pulls') && method === 'GET') {
+      return githubJson(existingPullRequests)
+    }
     if (pathname.endsWith('/pulls') && method === 'POST') {
       calls.pulls.push({
         title: String(payload.title),
@@ -327,7 +331,9 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
       }),
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-12345678')
+        if (ownershipChecks === 2) {
+          throw new PublicationClaimLostError('run-12345678')
+        }
       }
     })
   ).rejects.toThrow(PublicationClaimLostError)

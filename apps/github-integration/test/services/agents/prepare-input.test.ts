@@ -40,8 +40,11 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  if (previousInputBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
-  else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousInputBundleRoot
+  if (previousInputBundleRoot === undefined) {
+    delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+  } else {
+    process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousInputBundleRoot
+  }
   await fs.rm(suiteTempRoot, { recursive: true, force: true })
 })
 
@@ -93,7 +96,9 @@ async function createGitFixture(
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {
-    for (const item of value) collectKeys(item, keys)
+    for (const item of value) {
+      collectKeys(item, keys)
+    }
   } else if (typeof value === 'object' && value !== null) {
     for (const [key, item] of Object.entries(value)) {
       keys.add(key)
@@ -195,7 +200,9 @@ function repositoryOctokit(refs: { base_sha: string; head_sha: string }): Octoki
       const ref = decodeURIComponent(pathname.split('/commits/')[1] ?? '')
       return githubJson({ sha: ref })
     }
-    if (pathname.includes('/git/trees/')) return githubJson({ tree: [], truncated: false })
+    if (pathname.includes('/git/trees/')) {
+      return githubJson({ tree: [], truncated: false })
+    }
     if (pathname.includes('/contents/')) {
       return githubJson({ message: 'Not Found' }, 404)
     }
@@ -256,10 +263,18 @@ test(
 
       const octokit = fakeGitHub(({ url }) => {
         const pathname = new URL(url).pathname
-        if (pathname.includes('/git/trees/')) return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/')) return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/')) return githubJson({ commit: { sha: head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        if (pathname.includes('/git/trees/')) {
+          return githubJson({ tree: [], truncated: false })
+        }
+        if (pathname.includes('/contents/')) {
+          return githubJson({ message: 'Not Found' }, 404)
+        }
+        if (pathname.includes('/branches/')) {
+          return githubJson({ commit: { sha: head_sha } })
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
 
@@ -389,10 +404,18 @@ test(
             }
           })
         }
-        if (pathname.includes('/git/trees/')) return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/')) return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/')) return githubJson({ commit: { sha: refs.head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        if (pathname.includes('/git/trees/')) {
+          return githubJson({ tree: [], truncated: false })
+        }
+        if (pathname.includes('/contents/')) {
+          return githubJson({ message: 'Not Found' }, 404)
+        }
+        if (pathname.includes('/branches/')) {
+          return githubJson({ commit: { sha: refs.head_sha } })
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
       const prepared = await preparePullRequestReviewInput({
@@ -462,8 +485,11 @@ test(
           .then(Boolean)
       ).toBe(true)
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }
@@ -598,8 +624,11 @@ test(
       expect(scan_window['head_sha']).toBe(refs.head_sha)
       expect(typeof scan_window['changed_file_count']).toBe('number')
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }
@@ -670,10 +699,18 @@ test(
             }
           })
         }
-        if (pathname.includes('/git/trees/')) return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/')) return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/')) return githubJson({ commit: { sha: refs.head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        if (pathname.includes('/git/trees/')) {
+          return githubJson({ tree: [], truncated: false })
+        }
+        if (pathname.includes('/contents/')) {
+          return githubJson({ message: 'Not Found' }, 404)
+        }
+        if (pathname.includes('/branches/')) {
+          return githubJson({ commit: { sha: refs.head_sha } })
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
 
@@ -725,8 +762,11 @@ test(
       )
       expect(prepared.files[0]?.patch ?? '').toMatch(/^\+export const value = 3$/m)
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }

@@ -81,7 +81,9 @@ export function createRunArtifactRoutes({
         } satisfies RunArtifactContentResponse)
       )
     } catch (error) {
-      if (response.headersSent || response.destroyed) return
+      if (response.headersSent || response.destroyed) {
+        return
+      }
       const message = error instanceof Error ? error.message : ''
       const timedOut =
         error instanceof ArtifactDownloadTimeoutError ||
@@ -112,7 +114,9 @@ export function createRunArtifactRoutes({
     const downloadController = new AbortController()
     request.once('aborted', () => downloadController.abort())
     response.once('close', () => {
-      if (!response.writableEnded) downloadController.abort()
+      if (!response.writableEnded) {
+        downloadController.abort()
+      }
     })
     try {
       const upstream = await reviewRuns.getRun(runId)
@@ -157,7 +161,9 @@ export function createRunArtifactRoutes({
         }
       )
     } catch (error) {
-      if (response.headersSent || response.destroyed) return
+      if (response.headersSent || response.destroyed) {
+        return
+      }
       const status = artifactStorageStatus(error)
       const identityMismatch =
         error instanceof Error && error.message === 'artifact_identity_mismatch'
@@ -179,7 +185,9 @@ export function createRunArtifactRoutes({
   }
 
   const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
-    if (request.method !== 'GET') return false
+    if (request.method !== 'GET') {
+      return false
+    }
     const contentMatch = /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(request.url ?? '')
     if (contentMatch !== null) {
       const runId = decodeRunId(contentMatch[1])

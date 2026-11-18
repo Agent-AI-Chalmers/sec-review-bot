@@ -20,10 +20,11 @@ export function createFixtureRouter(): (
           candidate.publication.status === 'published' &&
           candidate.artifact_storage?.status === 'available'
       )
-      if (run === undefined)
+      if (run === undefined) {
         throw new Error(
           `dev fixtures need one completed GitHub ${workflow} run for memory provenance`
         )
+      }
       return [workflow, run.run_id]
     })
   ) as Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
@@ -31,7 +32,9 @@ export function createFixtureRouter(): (
   const handleRuns = createRunsHandler()
 
   return async (request, response, next): Promise<void> => {
-    if (!request.url?.startsWith('/api/')) return next()
+    if (!request.url?.startsWith('/api/')) {
+      return next()
+    }
     response.setHeader('content-type', 'application/json')
 
     if (

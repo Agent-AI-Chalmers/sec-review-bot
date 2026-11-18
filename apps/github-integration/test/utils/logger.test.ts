@@ -30,8 +30,9 @@ test('an error field keeps its name, code, status, and cause', () => {
     status: 502
   })
   const line = captureError({ error })
-  for (const part of ['TypeError', 'fetch failed', 'ECONNRESET', '502', 'socket hang up'])
+  for (const part of ['TypeError', 'fetch failed', 'ECONNRESET', '502', 'socket hang up']) {
     expect(line, `${part} is missing from ${line}`).toContain(part)
+  }
 })
 
 test('a plain object field is still logged as JSON', () => {

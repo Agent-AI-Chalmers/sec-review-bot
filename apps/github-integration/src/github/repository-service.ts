@@ -105,9 +105,13 @@ export async function findRepositorySecuritySummaryIssue(
  * the reply target therefore resolve the value through this one function, so they cannot
  * disagree about whether a notice names a repository at all. */
 export function repositoryFullName(value: unknown): string | null {
-  if (typeof value !== 'string') return null
+  if (typeof value !== 'string') {
+    return null
+  }
   const segments = value.trim().split('/')
-  if (segments.length !== 2) return null
+  if (segments.length !== 2) {
+    return null
+  }
   const [owner, repo] = segments
   return owner && repo ? `${owner}/${repo}` : null
 }

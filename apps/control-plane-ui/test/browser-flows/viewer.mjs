@@ -93,7 +93,9 @@ export async function runViewerFlow({ page }) {
     previousHeight = height
     await page.waitForTimeout(100)
   }
-  if (!settled) throw new Error('trajectory layout did not settle before minimap checks')
+  if (!settled) {
+    throw new Error('trajectory layout did not settle before minimap checks')
+  }
 
   if ((page.viewportSize()?.width ?? 0) > 700) {
     const minimap = page.getByRole('navigation', {
@@ -193,7 +195,9 @@ export async function runViewerFlow({ page }) {
       () => {
         const messages = document.querySelectorAll('.trajectory-timeline .trajectory-message')
         const element = messages[1]
-        if (element === undefined) return false
+        if (element === undefined) {
+          return false
+        }
         const rect = element.getBoundingClientRect()
         return rect.bottom > 0 && rect.top < globalThis.innerHeight
       },

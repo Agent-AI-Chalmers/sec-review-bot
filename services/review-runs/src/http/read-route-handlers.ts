@@ -16,8 +16,9 @@ function parseListQuery(
   query: NonNullable<OperationRequest<'listRuns'>['query']>
 ): ListQueryOptions {
   const { from, to, ...filters } = query
-  if (filters.cursor !== undefined && decodeRunListCursor(filters.cursor) === null)
+  if (filters.cursor !== undefined && decodeRunListCursor(filters.cursor) === null) {
     throw invalidQuery('cursor must be a valid run list cursor.')
+  }
   return {
     ...filters,
     limit: filters.limit ?? 50,
@@ -53,7 +54,9 @@ export function buildReadRouteHandlers({
         parseListQuery(request.query ?? {})
       )
       const statistics = await store.queries.getExecutionStatistics(runs.map((run) => run.run_id))
-      for (const droppedRow of dropped) logDroppedRunRow(droppedRow)
+      for (const droppedRow of dropped) {
+        logDroppedRunRow(droppedRow)
+      }
       return {
         runs: runs.map((run) => observeRun(run, statistics.get(run.run_id) ?? null)),
         next_cursor
@@ -63,7 +66,9 @@ export function buildReadRouteHandlers({
     getRun: async (request, reply) => {
       const { runId } = request.params
       const run = await store.queries.getRun(runId)
-      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      if (run === null) {
+        return reply.code(404).send({ error: 'run_not_found' })
+      }
       const statistics = await store.queries.getExecutionStatistics([run.run_id])
       return { run: observeRun(run, statistics.get(run.run_id) ?? null) }
     },
@@ -71,7 +76,9 @@ export function buildReadRouteHandlers({
     listRunPublicationSteps: async (request, reply) => {
       const { runId } = request.params
       const run = await store.queries.getRun(runId)
-      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      if (run === null) {
+        return reply.code(404).send({ error: 'run_not_found' })
+      }
       const steps = await store.publications.listPublicationSteps(run.run_id)
       return {
         run_id: run.run_id,
@@ -81,8 +88,9 @@ export function buildReadRouteHandlers({
 
     listRunEvents: async (request, reply) => {
       const { runId } = request.params
-      if (!(await store.queries.runExists(runId)))
+      if (!(await store.queries.runExists(runId))) {
         return reply.code(404).send({ error: 'run_not_found' })
+      }
       return { run_id: runId, events: await store.queries.listEvents(runId) }
     }
   } satisfies Partial<OperationHandlers>

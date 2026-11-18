@@ -51,8 +51,9 @@ export async function recoverReviewRunSubmission(
       run.run_id,
       MAX_UNRESOLVED_SUBMISSION_RECOVERIES
     )
-  )
+  ) {
     return { outcome: 'disconnected' }
+  }
 
   // Claiming also checks the budget atomically: another owner may have spent it since the
   // disconnect check. A live lease or changed state makes either operation a no-op.
@@ -60,7 +61,9 @@ export async function recoverReviewRunSubmission(
     run.run_id,
     MAX_UNRESOLVED_SUBMISSION_RECOVERIES
   )
-  if (claimToken === null) return { outcome: 'claim_unavailable' }
+  if (claimToken === null) {
+    return { outcome: 'claim_unavailable' }
+  }
 
   if (run.execution_input === undefined) {
     const recorded = await store.submissionTransitions.failSubmissionRecovery(

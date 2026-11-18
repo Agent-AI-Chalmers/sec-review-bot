@@ -25,7 +25,9 @@ export async function requirePreparationClaim(
      FOR UPDATE`,
     [runId, connectorId, token, timeoutMs]
   )
-  if (result.rowCount !== 1) throw new Error(`Preparation claim was lost for ${runId}.`)
+  if (result.rowCount !== 1) {
+    throw new Error(`Preparation claim was lost for ${runId}.`)
+  }
 }
 
 const projection = 'run_id,digest,reference,input,publish_context,status'
@@ -50,10 +52,12 @@ export class InputBundleCandidateStore {
       ref.media_type !== 'application/tar+zstd' ||
       !Number.isSafeInteger(ref.size_bytes) ||
       ref.size_bytes < 0
-    )
+    ) {
       throw new Error('Invalid input bundle reference.')
-    if (ref.uri.trim() !== ref.uri || /\s/.test(ref.uri))
+    }
+    if (ref.uri.trim() !== ref.uri || /\s/.test(ref.uri)) {
       throw new Error('Invalid input bundle URI.')
+    }
     const uri = new URL(ref.uri)
     if (
       !['s3:', 'file:'].includes(uri.protocol) ||
@@ -62,13 +66,15 @@ export class InputBundleCandidateStore {
       uri.username ||
       uri.password ||
       uri.port
-    )
+    ) {
       throw new Error('Invalid input bundle URI.')
+    }
     if (
       uri.protocol === 's3:' &&
       uri.pathname !== `/runs/${runId}/input/${ref.digest.slice(7)}/input-bundle.v1.tar.zst`
-    )
+    ) {
       throw new Error('Input bundle URI does not match its run and digest.')
+    }
     return await transaction(this.database.pool(), async (client) => {
       await requirePreparationClaim(client, runId, this.connectorId, token, this.claimTimeoutMs)
       const result = await client.query<InputBundleCandidate>(
@@ -92,8 +98,9 @@ export class InputBundleCandidateStore {
           token
         ]
       )
-      if (!result.rows[0])
+      if (!result.rows[0]) {
         throw new Error('Input bundle reservation conflicts with an immutable intent.')
+      }
       return result.rows[0]
     })
   }
@@ -127,7 +134,9 @@ export class InputBundleCandidateStore {
          RETURNING ${projection}`,
         [runId, this.connectorId, digest, status]
       )
-      if (!result.rows[0]) throw new Error('Input bundle candidate cannot make this transition.')
+      if (!result.rows[0]) {
+        throw new Error('Input bundle candidate cannot make this transition.')
+      }
       return result.rows[0]
     })
   }

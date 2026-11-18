@@ -111,15 +111,19 @@ function buildHarness({
 
   const { octokit } = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.includes('/comments') && method === 'GET')
+    if (pathname.includes('/comments') && method === 'GET') {
       return githubJson(existingComment === null ? [] : [existingComment])
+    }
     if (pathname.includes('/comments') && method === 'POST') {
       postedComments.push({ method })
       return githubJson({ id: 99, html_url: 'https://example.test/c/99' })
     }
-    if (pathname.includes('/pulls') && method === 'GET') return githubJson([])
-    if (pathname.includes('/branches/'))
+    if (pathname.includes('/pulls') && method === 'GET') {
+      return githubJson([])
+    }
+    if (pathname.includes('/branches/')) {
       return githubJson({ commit: { sha: 'resolved-default-sha' } })
+    }
     return githubJson({ default_branch: 'main' })
   })
 
@@ -346,10 +350,11 @@ test('a lookup failure whose first report is lost is recorded by the retry', asy
       settleExhaustedPublicationStep: async () => true,
       failPublicationStep: async () => {
         calls += 1
-        if (calls === 1)
+        if (calls === 1) {
           throw Object.assign(new Error('Review Runs timed out'), {
             status: 504
           })
+        }
         return true
       }
     } as unknown as PublicationStepStore,

@@ -29,8 +29,9 @@ test('a cursor missing either part names no row', () => {
     `${CURSOR.created_at_cursor}|`,
     CURSOR.created_at_cursor,
     ''
-  ])
+  ]) {
     expect(decodeRunListCursor(Buffer.from(decoded).toString('base64url')), decoded).toBe(null)
+  }
 })
 
 test('a cursor whose timestamp cannot be ordered names no row', () => {

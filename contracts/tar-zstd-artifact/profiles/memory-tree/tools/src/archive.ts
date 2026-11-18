@@ -48,7 +48,9 @@ export function sha256(bytes: Buffer): string {
 
 function writeString(target: Buffer, offset: number, length: number, value: string): void {
   const bytes = Buffer.from(value)
-  if (bytes.length > length) throw new Error(`tar field is too long: ${value}`)
+  if (bytes.length > length) {
+    throw new Error(`tar field is too long: ${value}`)
+  }
   bytes.copy(target, offset)
 }
 
@@ -58,7 +60,9 @@ function writeOctal(target: Buffer, offset: number, length: number, value: numbe
 }
 
 function splitUstarPath(entryPath: string): { name: string; prefix: string } {
-  if (Buffer.byteLength(entryPath) <= 100) return { name: entryPath, prefix: '' }
+  if (Buffer.byteLength(entryPath) <= 100) {
+    return { name: entryPath, prefix: '' }
+  }
   for (
     let index = entryPath.lastIndexOf('/');
     index > 0;
@@ -102,7 +106,9 @@ function tarHeader(entry: ArchiveEntry): Buffer {
   writeOctal(header, 136, 12, 0)
   header.fill(0x20, 148, 156)
   writeString(header, 156, 1, typeFlag)
-  if (entry.linkPath !== undefined) writeString(header, 157, 100, entry.linkPath)
+  if (entry.linkPath !== undefined) {
+    writeString(header, 157, 100, entry.linkPath)
+  }
   writeString(header, 257, 6, 'ustar\0')
   writeString(header, 263, 2, '00')
   writeString(header, 345, 155, prefix)
@@ -121,7 +127,9 @@ export function buildArchive(entries: ArchiveEntry[]): Buffer {
         : Buffer.alloc(0)
     blocks.push(tarHeader(entry), body)
     const padding = (BLOCK_SIZE - (body.length % BLOCK_SIZE)) % BLOCK_SIZE
-    if (padding > 0) blocks.push(Buffer.alloc(padding))
+    if (padding > 0) {
+      blocks.push(Buffer.alloc(padding))
+    }
   }
   blocks.push(Buffer.alloc(BLOCK_SIZE * 2))
   return zstdCompressSync(Buffer.concat(blocks))
@@ -135,7 +143,9 @@ function readString(block: Buffer, offset: number, length: number): string {
 
 function readOctal(block: Buffer, offset: number, length: number): number {
   const value = readString(block, offset, length).trim()
-  if (!/^[0-7]+$/.test(value)) throw new ArchiveError('INVALID_TAR', 'invalid octal field')
+  if (!/^[0-7]+$/.test(value)) {
+    throw new ArchiveError('INVALID_TAR', 'invalid octal field')
+  }
   return Number.parseInt(value, 8)
 }
 
@@ -144,20 +154,32 @@ function parsePaxPath(body: Buffer): string {
   let path: string | undefined
   while (position < body.length) {
     const space = body.indexOf(0x20, position)
-    if (space < 0) throw new ArchiveError('INVALID_PAX', 'missing record length')
+    if (space < 0) {
+      throw new ArchiveError('INVALID_PAX', 'missing record length')
+    }
     const lengthText = body.subarray(position, space).toString('ascii')
-    if (!/^\d+$/.test(lengthText)) throw new ArchiveError('INVALID_PAX', 'invalid record length')
+    if (!/^\d+$/.test(lengthText)) {
+      throw new ArchiveError('INVALID_PAX', 'invalid record length')
+    }
     const end = position + Number.parseInt(lengthText, 10)
-    if (end > body.length || body[end - 1] !== 0x0a)
+    if (end > body.length || body[end - 1] !== 0x0a) {
       throw new ArchiveError('INVALID_PAX', 'invalid record boundary')
+    }
     const record = body.subarray(space + 1, end - 1)
     const equals = record.indexOf(0x3d)
-    if (equals < 0 || record.subarray(0, equals).toString('ascii') !== 'path' || path !== undefined)
+    if (
+      equals < 0 ||
+      record.subarray(0, equals).toString('ascii') !== 'path' ||
+      path !== undefined
+    ) {
       throw new ArchiveError('UNSUPPORTED_PAX', 'unsupported PAX metadata')
+    }
     path = UTF8_DECODER.decode(record.subarray(equals + 1))
     position = end
   }
-  if (path === undefined) throw new ArchiveError('INVALID_PAX', 'PAX header has no path')
+  if (path === undefined) {
+    throw new ArchiveError('INVALID_PAX', 'PAX header has no path')
+  }
   return path
 }
 
@@ -189,8 +211,9 @@ function parseTar(tar: Buffer): ParsedEntry[] {
       foundTerminator = true
       break
     }
-    if (readString(header, 257, 6) !== 'ustar')
+    if (readString(header, 257, 6) !== 'ustar') {
       throw new ArchiveError('INVALID_TAR', 'entry is not ustar')
+    }
     const storedChecksum = readOctal(header, 148, 8)
     const checksumHeader = Buffer.from(header)
     checksumHeader.fill(0x20, 148, 156)
@@ -202,16 +225,19 @@ function parseTar(tar: Buffer): ParsedEntry[] {
     const entryPath = prefix ? `${prefix}/${name}` : name
     const size = readOctal(header, 124, 12)
     const paddedSize = Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE
-    if (offset + paddedSize > tar.length)
+    if (offset + paddedSize > tar.length) {
       throw new ArchiveError('INVALID_TAR', 'truncated entry body')
+    }
     const typeFlag = readString(header, 156, 1) || '0'
     const body = tar.subarray(offset, offset + size)
     offset += paddedSize
-    if (['g', 'L', 'K', 'S'].includes(typeFlag))
+    if (['g', 'L', 'K', 'S'].includes(typeFlag)) {
       throw new ArchiveError('UNSUPPORTED_PAX', 'unsupported tar extension')
+    }
     if (typeFlag === 'x') {
-      if (pendingPath !== undefined)
+      if (pendingPath !== undefined) {
         throw new ArchiveError('INVALID_PAX', 'consecutive PAX headers')
+      }
       pendingPath = parsePaxPath(body)
       continue
     }
@@ -229,7 +255,9 @@ function parseTar(tar: Buffer): ParsedEntry[] {
     })
     pendingPath = undefined
   }
-  if (pendingPath !== undefined) throw new ArchiveError('INVALID_PAX', 'orphan PAX header')
+  if (pendingPath !== undefined) {
+    throw new ArchiveError('INVALID_PAX', 'orphan PAX header')
+  }
   if (!foundTerminator || tar.subarray(offset).some((byte) => byte !== 0)) {
     throw new ArchiveError('INVALID_TAR', 'missing terminator or non-zero trailing bytes')
   }
@@ -238,9 +266,12 @@ function parseTar(tar: Buffer): ParsedEntry[] {
 
 function canonicalPath(entry: ParsedEntry): boolean {
   const isDirectory = entry.typeFlag === '5'
-  if (entry.path.includes('\\') || entry.path.includes('\0') || entry.path.startsWith('/'))
+  if (entry.path.includes('\\') || entry.path.includes('\0') || entry.path.startsWith('/')) {
     return false
-  if (isDirectory ? !entry.path.endsWith('/') : entry.path.endsWith('/')) return false
+  }
+  if (isDirectory ? !entry.path.endsWith('/') : entry.path.endsWith('/')) {
+    return false
+  }
   const withoutTrailingSlash = isDirectory ? entry.path.slice(0, -1) : entry.path
   const segments = withoutTrailingSlash.split('/')
   return (
@@ -250,33 +281,47 @@ function canonicalPath(entry: ParsedEntry): boolean {
 }
 
 function allowedPath(entry: ParsedEntry): boolean {
-  if (entry.path === 'manifest.json') return entry.typeFlag === '0'
-  if (entry.path === 'memory/' || entry.path === 'memory/topics/') return entry.typeFlag === '5'
-  if (entry.path === 'memory/MEMORY.md') return entry.typeFlag === '0'
-  if (!entry.path.startsWith('memory/topics/')) return false
-  if (entry.typeFlag === '5') return true
+  if (entry.path === 'manifest.json') {
+    return entry.typeFlag === '0'
+  }
+  if (entry.path === 'memory/' || entry.path === 'memory/topics/') {
+    return entry.typeFlag === '5'
+  }
+  if (entry.path === 'memory/MEMORY.md') {
+    return entry.typeFlag === '0'
+  }
+  if (!entry.path.startsWith('memory/topics/')) {
+    return false
+  }
+  if (entry.typeFlag === '5') {
+    return true
+  }
   return entry.typeFlag === '0' && entry.path.endsWith('.md')
 }
 
 function validateEntries(entries: ParsedEntry[]): ValidationResult {
-  if (entries.length > MAX_ENTRIES)
+  if (entries.length > MAX_ENTRIES) {
     throw new ArchiveError('TOO_MANY_ENTRIES', 'entry count exceeds limit')
+  }
   if (entries.length === 0 || entries[0]?.path !== 'manifest.json') {
     throw new ArchiveError('MANIFEST_NOT_FIRST', 'manifest.json must be first')
   }
   const paths = new Set<string>()
   let extractedBytes = 0
   for (const entry of entries) {
-    if (paths.has(entry.path))
+    if (paths.has(entry.path)) {
       throw new ArchiveError('DUPLICATE_PATH', `duplicate path ${entry.path}`)
+    }
     paths.add(entry.path)
-    if (!canonicalPath(entry))
+    if (!canonicalPath(entry)) {
       throw new ArchiveError('INVALID_PATH', `non-canonical path ${entry.path}`)
+    }
     if (entry.typeFlag !== '0' && entry.typeFlag !== '5') {
       throw new ArchiveError('UNSUPPORTED_TYPE', `unsupported type for ${entry.path}`)
     }
-    if (!allowedPath(entry))
+    if (!allowedPath(entry)) {
       throw new ArchiveError('UNEXPECTED_PATH', `unexpected path ${entry.path}`)
+    }
     const directory = entry.typeFlag === '5'
     if (
       entry.uid !== 0 ||
@@ -297,8 +342,9 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
       )
     }
     if (!directory) {
-      if (entry.size > MAX_FILE_BYTES)
+      if (entry.size > MAX_FILE_BYTES) {
         throw new ArchiveError('FILE_TOO_LARGE', `${entry.path} exceeds limit`)
+      }
       extractedBytes += entry.size
       if (extractedBytes > MAX_EXTRACTED_BYTES) {
         throw new ArchiveError('EXTRACTED_TOO_LARGE', 'extracted bytes exceed limit')
@@ -311,7 +357,9 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
     }
   }
   for (const required of ['manifest.json', 'memory/', 'memory/MEMORY.md', 'memory/topics/']) {
-    if (!paths.has(required)) throw new ArchiveError('MISSING_REQUIRED_PATH', `missing ${required}`)
+    if (!paths.has(required)) {
+      throw new ArchiveError('MISSING_REQUIRED_PATH', `missing ${required}`)
+    }
   }
   if (!entries[0]?.body.equals(CANONICAL_MANIFEST)) {
     throw new ArchiveError('INVALID_MANIFEST', 'manifest bytes are not canonical v1 JSON')
@@ -333,17 +381,19 @@ function validateEntries(entries: ParsedEntry[]): ValidationResult {
 
 export function validateArchive(archive: Buffer): ValidationResult {
   try {
-    if (archive.length > MAX_ARCHIVE_BYTES)
+    if (archive.length > MAX_ARCHIVE_BYTES) {
       throw new ArchiveError('ARCHIVE_TOO_LARGE', 'archive exceeds limit')
+    }
     return validateEntries(parseTar(zstdDecompressSync(archive)))
   } catch (error) {
-    if (error instanceof ArchiveError)
+    if (error instanceof ArchiveError) {
       return {
         valid: false,
         code: error.code,
         entryCount: 0,
         extractedBytes: 0
       }
+    }
     return {
       valid: false,
       code: 'INVALID_ZSTD',

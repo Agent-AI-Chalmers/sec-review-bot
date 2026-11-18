@@ -22,7 +22,9 @@ function paxRecord(key: string, value: string): Buffer {
   for (;;) {
     const record = `${length} ${payload}`
     const actual = Buffer.byteLength(record)
-    if (actual === length) return Buffer.from(record)
+    if (actual === length) {
+      return Buffer.from(record)
+    }
     length = actual
   }
 }

@@ -29,7 +29,9 @@ function componentSchema(name: string): unknown {
     components?: { schemas?: Record<string, unknown> }
   }
   const schema = spec.components?.schemas?.[name]
-  if (schema === undefined) throw new Error(`openapi.yaml has no component schema ${name}`)
+  if (schema === undefined) {
+    throw new Error(`openapi.yaml has no component schema ${name}`)
+  }
   return schema
 }
 
@@ -44,8 +46,12 @@ function componentSchema(name: string): unknown {
  * than what openapi.yaml says. Nothing in the current contract does this, so failing loudly
  * costs nothing today and prevents a silent mistranslation later. */
 function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unknown {
-  if (Array.isArray(node)) return node.map((item) => inlineLocalRefs(item, schemas))
-  if (typeof node !== 'object' || node === null) return node
+  if (Array.isArray(node)) {
+    return node.map((item) => inlineLocalRefs(item, schemas))
+  }
+  if (typeof node !== 'object' || node === null) {
+    return node
+  }
   const record = node as Record<string, unknown>
   if (typeof record.$ref === 'string' && record.$ref.startsWith('#/components/schemas/')) {
     const siblings = Object.keys(record).filter((key) => key !== '$ref')
@@ -57,7 +63,9 @@ function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unkno
     }
     const target = record.$ref.slice('#/components/schemas/'.length)
     const schema = schemas[target]
-    if (schema === undefined) throw new Error(`dangling $ref to ${record.$ref}`)
+    if (schema === undefined) {
+      throw new Error(`dangling $ref to ${record.$ref}`)
+    }
     return inlineLocalRefs(schema, schemas)
   }
   const out: Record<string, unknown> = {}

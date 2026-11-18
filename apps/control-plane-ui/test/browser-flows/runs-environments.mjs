@@ -4,7 +4,9 @@ async function readContrast(page) {
   return page.evaluate(() => {
     const parseColour = (value) => {
       const match = value.match(/rgba?\(([^)]+)\)/)
-      if (match === null) return null
+      if (match === null) {
+        return null
+      }
       const [r, g, b, a = 1] = match[1].split(',').map((part) => Number.parseFloat(part))
       return { r, g, b, a }
     }
@@ -18,14 +20,20 @@ async function readContrast(page) {
     const background = (element) => {
       for (let node = element; node !== null; node = node.parentElement) {
         const colour = parseColour(getComputedStyle(node).backgroundColor)
-        if (colour !== null && colour.a > 0.9) return colour
+        if (colour !== null && colour.a > 0.9) {
+          return colour
+        }
       }
       return { r: 255, g: 255, b: 255, a: 1 }
     }
     const ratio = (element) => {
-      if (element === null) return null
+      if (element === null) {
+        return null
+      }
       const foreground = parseColour(getComputedStyle(element).color)
-      if (foreground === null) return null
+      if (foreground === null) {
+        return null
+      }
       const foregroundLuminance = luminance(foreground)
       const backgroundLuminance = luminance(background(element))
       return (

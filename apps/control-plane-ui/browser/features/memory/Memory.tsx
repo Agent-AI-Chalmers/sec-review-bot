@@ -96,7 +96,9 @@ export function Memory(): React.JSX.Element {
   }
 
   const automationAction = async (action: 'pause' | 'resume'): Promise<void> => {
-    if (automation.data === undefined) return
+    if (automation.data === undefined) {
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -107,7 +109,9 @@ export function Memory(): React.JSX.Element {
       await apiPost(`/memory/tree/automation/${action}`, request)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryAutomationConflict')
@@ -118,24 +122,33 @@ export function Memory(): React.JSX.Element {
     }
   }
   const beginEdit = async (): Promise<void> => {
-    if (activeVersion === undefined) return
+    if (activeVersion === undefined) {
+      return
+    }
     setEditError('')
     try {
       await editor.begin(activeVersion)
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
-      else setError(t('memoryLoadFailed'))
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      } else {
+        setError(t('memoryLoadFailed'))
+      }
     }
   }
   const commitEdit = async (): Promise<void> => {
-    if (editor.session === undefined) return
+    if (editor.session === undefined) {
+      return
+    }
     setBusy(true)
     setEditError('')
     try {
       await editor.commit()
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setEditError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryVersionConflict')
@@ -146,7 +159,9 @@ export function Memory(): React.JSX.Element {
     }
   }
   const restore = async (): Promise<void> => {
-    if (restoreVersion === undefined || activeVersion === undefined) return
+    if (restoreVersion === undefined || activeVersion === undefined) {
+      return
+    }
     setBusy(true)
     setRestoreError('')
     try {
@@ -159,7 +174,9 @@ export function Memory(): React.JSX.Element {
       setRestoreVersion(undefined)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setRestoreError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRestoreConflict')
@@ -225,8 +242,9 @@ export function Memory(): React.JSX.Element {
         refreshing={refreshing}
         lastChecked={lastChecked}
         onToggleAutomation={() => {
-          if (automation.data)
+          if (automation.data) {
             void automationAction(automation.data.state === 'enabled' ? 'pause' : 'resume')
+          }
         }}
         onEdit={() => void beginEdit()}
       />
@@ -375,7 +393,9 @@ function pagination<Filter, Cursor, Page>(
     onPageSizeChange: (value) => void paged.openFirst({ limit: Number(value) }),
     onPreviousPage: () => void paged.openPrevious(),
     onNextPage: (): void => {
-      if (next != null) void paged.openNext(next)
+      if (next != null) {
+        void paged.openNext(next)
+      }
     }
   }
 }

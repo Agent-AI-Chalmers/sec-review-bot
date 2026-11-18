@@ -38,8 +38,11 @@ export function MemoryEditorDialog({
   )
 
   const requestClose = (): void => {
-    if (dirty) setDiscardOpen(true)
-    else onClose()
+    if (dirty) {
+      setDiscardOpen(true)
+    } else {
+      onClose()
+    }
   }
 
   return (

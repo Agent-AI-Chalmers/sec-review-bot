@@ -37,21 +37,30 @@ function stubOctokit(
 
     // The installation guard reads the repository first.
     if (tail === '') {
-      if (options.repoLookupFailsWith !== undefined)
+      if (options.repoLookupFailsWith !== undefined) {
         return githubJson({ message: 'Server Error' }, options.repoLookupFailsWith)
-      if (!installed.has(`${owner}/${repo}`)) return githubJson({ message: 'Not Found' }, 404)
+      }
+      if (!installed.has(`${owner}/${repo}`)) {
+        return githubJson({ message: 'Not Found' }, 404)
+      }
       return githubJson({ full_name: `${owner}/${repo}` })
     }
-    if (tail.endsWith('/issues') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/issues') && method === 'GET') {
+      return githubJson([])
+    }
     if (tail.endsWith('/issues') && method === 'POST') {
       report.created.push({ owner, repo })
       return githubJson({ number: 9 })
     }
-    if (tail.endsWith('/comments') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/comments') && method === 'GET') {
+      return githubJson([])
+    }
     if (tail.endsWith('/comments') && method === 'POST') {
       report.commented.push(Number(tail.split('/').at(-2)))
       const posted = body as { body?: unknown } | undefined
-      if (typeof posted?.body === 'string') report.bodies?.push(posted.body)
+      if (typeof posted?.body === 'string') {
+        report.bodies?.push(posted.body)
+      }
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
     return githubJson({})
@@ -339,7 +348,9 @@ for (const limited of [true, false]) {
     ).rejects.toSatisfy((error: unknown) => {
       const classification = classifyPreparationFailure(error, 1)
       expect(classification.retry).toBe(limited)
-      if (limited) expect(classification.retryAfterMs).toBe(60_000)
+      if (limited) {
+        expect(classification.retryAfterMs).toBe(60_000)
+      }
       return true
     })
   })

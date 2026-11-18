@@ -89,13 +89,14 @@ export function classifyPublicationFailure(error: unknown): PublishFailureClassi
   }
 
   const responseStatus = asErrorWithResponse(error).status
-  if (responseStatus === undefined)
+  if (responseStatus === undefined) {
     return {
       retry: true,
       scope: 'publication',
       code: errorCode(error),
       reason: 'unknown-publish-error'
     }
+  }
   if (
     responseStatus >= 500 ||
     responseStatus === 408 ||

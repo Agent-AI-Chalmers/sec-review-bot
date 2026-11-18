@@ -36,10 +36,11 @@ export async function submitPreparedRun(
   status: 'queued'
 }> {
   const run = await store.queries.getRun(args.runId)
-  if (run === null)
+  if (run === null) {
     throw Object.assign(new Error(`Review run does not exist: ${args.runId}`), {
       code: 'REVIEW_RUN_NOT_FOUND'
     })
+  }
   let executionAccepted = false
   let submissionStarted = false
   try {

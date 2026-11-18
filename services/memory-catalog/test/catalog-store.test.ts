@@ -39,19 +39,24 @@ test('extraction registration atomically stores its optional observation', async
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select digest from extraction_publications'))
+      }
+      if (sql.includes('select digest from extraction_publications')) {
         return Promise.resolve({
           rows: [{ digest: extractionTrajectory.digest }],
           rowCount: 1
         })
+      }
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('insert into extractions')) return Promise.resolve({ rows: [], rowCount: 1 })
+      }
+      if (sql.includes('insert into extractions')) {
+        return Promise.resolve({ rows: [], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -94,21 +99,27 @@ test('extraction replay compares the optional observation as part of identity', 
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select digest from extraction_publications'))
+      }
+      if (sql.includes('select digest from extraction_publications')) {
         return Promise.resolve({
           rows: [{ digest: extractionTrajectory.digest }],
           rowCount: 1
         })
+      }
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('insert into extractions')) return Promise.resolve({ rows: [], rowCount: 0 })
-      if (sql.includes('as identical'))
+      }
+      if (sql.includes('insert into extractions')) {
+        return Promise.resolve({ rows: [], rowCount: 0 })
+      }
+      if (sql.includes('as identical')) {
         return Promise.resolve({ rows: [{ identical: false }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -140,19 +151,24 @@ test('learning commit records immutable history before moving the active pointer
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select active_version as version from memory_tree_state'))
+      }
+      if (sql.includes('select active_version as version from memory_tree_state')) {
         return Promise.resolve({ rows: [{ version: '3' }], rowCount: 1 })
-      if (sql.includes('select state from memory_tree_automation'))
+      }
+      if (sql.includes('select state from memory_tree_automation')) {
         return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
-      if (sql.includes('select observation_id from observations'))
+      }
+      if (sql.includes('select observation_id from observations')) {
         return Promise.resolve({
           rows: [{ observation_id: 'extraction-1' }],
           rowCount: 1
         })
-      if (sql.includes('coalesce(max(version)'))
+      }
+      if (sql.includes('coalesce(max(version)')) {
         return Promise.resolve({ rows: [{ version: '4' }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -215,14 +231,18 @@ test('reorganization commit records history without consuming observations', asy
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select active_version as version'))
+      }
+      if (sql.includes('select active_version as version')) {
         return Promise.resolve({ rows: [{ version: '3' }], rowCount: 1 })
-      if (sql.includes('select state from memory_tree_automation'))
+      }
+      if (sql.includes('select state from memory_tree_automation')) {
         return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
-      if (sql.includes('coalesce(max(version)'))
+      }
+      if (sql.includes('coalesce(max(version)')) {
         return Promise.resolve({ rows: [{ version: '4' }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -275,8 +295,9 @@ test('an identical learning operation id replays the created version', async () 
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
+      }
       if (sql.includes('version.operation_id=$1')) {
         return Promise.resolve({
           rows: [{ version: '4', identical: true }],
@@ -319,11 +340,13 @@ test('paused control rejects a new automatic version commit before active CAS', 
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
+      }
       statements.push(sql)
-      if (sql.includes('select state from memory_tree_automation'))
+      if (sql.includes('select state from memory_tree_automation')) {
         return Promise.resolve({ rows: [{ state: 'paused' }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 0 })
     },
     release: () => undefined
@@ -361,12 +384,15 @@ test('manual edit commits without consuming observations', async () => {
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select active_version as version'))
+      }
+      if (sql.includes('select active_version as version')) {
         return Promise.resolve({ rows: [{ version: '1' }], rowCount: 1 })
-      if (sql.includes('coalesce(max(version)'))
+      }
+      if (sql.includes('coalesce(max(version)')) {
         return Promise.resolve({ rows: [{ version: '3' }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -410,13 +436,15 @@ test('manual operation id replays identical content and rejects drift', async ()
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('version.operation_id=$1'))
+      }
+      if (sql.includes('version.operation_id=$1')) {
         return Promise.resolve({
           rows: [{ version: '5', identical }],
           rowCount: 1
         })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -452,18 +480,22 @@ test('restore moves the active pointer without creating a version', async () => 
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
+      }
       statements.push(sql)
       if (
         sql.includes('select 1 from memory_version_publications') &&
         sql.includes('and tree_digest=$3')
-      )
+      ) {
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('select active_version as version'))
+      }
+      if (sql.includes('select active_version as version')) {
         return Promise.resolve({ rows: [{ version: '4' }], rowCount: 1 })
-      if (sql.includes('select 1 from memory_tree_versions'))
+      }
+      if (sql.includes('select 1 from memory_tree_versions')) {
         return Promise.resolve({ rows: [{ found: 1 }], rowCount: 1 })
+      }
       return Promise.resolve({ rows: [], rowCount: 1 })
     },
     release: () => undefined
@@ -516,10 +548,11 @@ test('control replay is checked under the lock and precedes version checks', asy
           if (
             sql.includes('select 1 from memory_version_publications') &&
             sql.includes('and tree_digest=$3')
-          )
+          ) {
             return Promise.resolve({ rows: [{}], rowCount: 1 })
+          }
           statements.push(sql)
-          if (sql.includes('from memory_tree_automation_operations'))
+          if (sql.includes('from memory_tree_automation_operations')) {
             return Promise.resolve({
               rows: [
                 {
@@ -532,6 +565,7 @@ test('control replay is checked under the lock and precedes version checks', asy
               ],
               rowCount: 1
             })
+          }
           return Promise.resolve({ rows: [], rowCount: 0 })
         },
         release: () => undefined
@@ -570,17 +604,20 @@ test('new control operation locks, checks, updates, and records the transition',
           if (
             sql.includes('select 1 from memory_version_publications') &&
             sql.includes('and tree_digest=$3')
-          )
+          ) {
             return Promise.resolve({ rows: [{}], rowCount: 1 })
+          }
           statements.push(sql)
-          if (sql.includes('from memory_tree_automation_operations'))
+          if (sql.includes('from memory_tree_automation_operations')) {
             return Promise.resolve({ rows: [], rowCount: 0 })
-          if (sql.includes('select state, version from memory_tree_automation'))
+          }
+          if (sql.includes('select state, version from memory_tree_automation')) {
             return Promise.resolve({
               rows: [{ state: 'enabled', version: '3' }],
               rowCount: 1
             })
-          if (sql.includes('update memory_tree_automation'))
+          }
+          if (sql.includes('update memory_tree_automation')) {
             return Promise.resolve({
               rows: [
                 {
@@ -592,6 +629,7 @@ test('new control operation locks, checks, updates, and records the transition',
               ],
               rowCount: 1
             })
+          }
           return Promise.resolve({ rows: [], rowCount: 1 })
         },
         release: () => undefined

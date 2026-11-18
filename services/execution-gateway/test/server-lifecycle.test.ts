@@ -29,11 +29,17 @@ async function setup(t: TestContext) {
   }
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
-    if (value === undefined) delete process.env[name]
-    else process.env[name] = value
+    if (value === undefined) {
+      delete process.env[name]
+    } else {
+      process.env[name] = value
+    }
     t.onTestFinished(() => {
-      if (previous === undefined) delete process.env[name]
-      else process.env[name] = previous
+      if (previous === undefined) {
+        delete process.env[name]
+      } else {
+        process.env[name] = previous
+      }
     })
   }
   let opens = 0

@@ -120,7 +120,9 @@ function positiveInteger(value: unknown, path: string): number {
 }
 
 function nullableText(value: unknown, path: string): string | null {
-  if (value !== null && typeof value !== 'string') invalid(path, 'a string or null')
+  if (value !== null && typeof value !== 'string') {
+    invalid(path, 'a string or null')
+  }
   return value
 }
 
@@ -268,7 +270,9 @@ export function parsePullRequestReviewPublishContext(
   value: unknown
 ): PullRequestReviewPublishContext {
   const context = object(value, 'publish_context')
-  if (!Array.isArray(context.files)) invalid('publish_context.files', 'an array')
+  if (!Array.isArray(context.files)) {
+    invalid('publish_context.files', 'an array')
+  }
   return {
     pr: pullRequest(context.pr),
     files: context.files.map(pullRequestFile),
@@ -294,8 +298,14 @@ export function parseRepositoryReviewPublishContext(
 }
 
 export function parsePublishContextForWorkflow(workflow: string, value: unknown): PublishContext {
-  if (workflow === 'issue-review') return parseIssueReviewPublishContext(value)
-  if (workflow === 'pull-request-review') return parsePullRequestReviewPublishContext(value)
-  if (workflow === 'repository-review') return parseRepositoryReviewPublishContext(value)
+  if (workflow === 'issue-review') {
+    return parseIssueReviewPublishContext(value)
+  }
+  if (workflow === 'pull-request-review') {
+    return parsePullRequestReviewPublishContext(value)
+  }
+  if (workflow === 'repository-review') {
+    return parseRepositoryReviewPublishContext(value)
+  }
   return invalid('workflow', 'a supported review workflow')
 }

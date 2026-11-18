@@ -10,8 +10,11 @@ async function sourceFiles(directory = sourceRoot): Promise<string[]> {
   const files: string[] = []
   for (const entry of entries) {
     const entryPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...(await sourceFiles(entryPath)))
-    else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) files.push(entryPath)
+    if (entry.isDirectory()) {
+      files.push(...(await sourceFiles(entryPath)))
+    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+      files.push(entryPath)
+    }
   }
   return files
 }
@@ -21,11 +24,15 @@ function resolveLocalImport(
   specifier: string,
   knownFiles: ReadonlySet<string>
 ): string | null {
-  if (!specifier.startsWith('.')) return null
+  if (!specifier.startsWith('.')) {
+    return null
+  }
   const base = path.resolve(path.dirname(from), specifier.replace(/\.js$/, ''))
   for (const extension of ['.ts', '.tsx']) {
     const candidate = `${base}${extension}`
-    if (candidate.startsWith(sourceRoot) && knownFiles.has(candidate)) return candidate
+    if (candidate.startsWith(sourceRoot) && knownFiles.has(candidate)) {
+      return candidate
+    }
   }
   return null
 }
@@ -45,7 +52,9 @@ async function localImportGraph(): Promise<Map<string, string[]>> {
     const imports: string[] = []
     const recordImport = (specifier: string): void => {
       const resolved = resolveLocalImport(file, specifier, knownFiles)
-      if (resolved) imports.push(resolved)
+      if (resolved) {
+        imports.push(resolved)
+      }
     }
     const visit = (node: ts.Node): void => {
       if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
@@ -71,8 +80,12 @@ function reaches(graph: Map<string, string[]>, start: string, target: string): b
   const visited = new Set<string>()
   while (pending.length > 0) {
     const current = pending.pop()!
-    if (current === target) return true
-    if (visited.has(current)) continue
+    if (current === target) {
+      return true
+    }
+    if (visited.has(current)) {
+      continue
+    }
     visited.add(current)
     pending.push(...(graph.get(current) ?? []))
   }

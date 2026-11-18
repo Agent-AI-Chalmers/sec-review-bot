@@ -25,8 +25,9 @@ function replyTarget(input: Record<string, unknown>): {
     typeof source.owner_login !== 'string' ||
     typeof source.repo_name !== 'string' ||
     (typeof source.issue_number !== 'number' && typeof source.pr_number !== 'number')
-  )
+  ) {
     return null
+  }
   return {
     owner_login: source.owner_login,
     repo_name: source.repo_name,
@@ -55,13 +56,19 @@ function repositoryScope(input: Record<string, unknown>): {
   owner_login: string
   repo_name: string
 } | null {
-  if (input.kind !== 'github_repository_review') return null
+  if (input.kind !== 'github_repository_review') {
+    return null
+  }
   // The same normalization the installation lookup uses, so a value one path rejects is also
   // rejected here instead of being posted to a repository the scan never named.
   const fullName = repositoryFullName(input.verified_repository)
-  if (fullName === null) return null
+  if (fullName === null) {
+    return null
+  }
   const [owner_login, repo_name] = fullName.split('/')
-  if (!owner_login || !repo_name) return null
+  if (!owner_login || !repo_name) {
+    return null
+  }
   return { owner_login, repo_name }
 }
 
@@ -152,7 +159,9 @@ export async function sendRunNoticeReply(
   } else {
     // Neither a conversation nor a repository to report to: there is nowhere for the requester
     // to read the outcome, which the caller records as a failed delivery.
-    if (scanScope === null) return null
+    if (scanScope === null) {
+      return null
+    }
     await assertRepositoryAccessible(octokit, scanScope)
     target = {
       ...scanScope,

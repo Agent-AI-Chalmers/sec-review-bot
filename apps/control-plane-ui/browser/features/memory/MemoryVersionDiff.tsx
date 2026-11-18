@@ -52,8 +52,12 @@ export function MemoryVersionDiffTitle({
 }
 
 function languageFor(path: string): 'markdown' | 'json' | 'text' {
-  if (path.endsWith('.md')) return 'markdown'
-  if (path.endsWith('.json') || path.endsWith('.jsonl')) return 'json'
+  if (path.endsWith('.md')) {
+    return 'markdown'
+  }
+  if (path.endsWith('.json') || path.endsWith('.jsonl')) {
+    return 'json'
+  }
   return 'text'
 }
 
@@ -63,9 +67,13 @@ function changedFiles(
 ): Map<string, ChangeKind> {
   const result = new Map<string, ChangeKind>()
   for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (!Object.hasOwn(before, path)) result.set(path, 'added')
-    else if (!Object.hasOwn(after, path)) result.set(path, 'deleted')
-    else if (before[path] !== after[path]) result.set(path, 'modified')
+    if (!Object.hasOwn(before, path)) {
+      result.set(path, 'added')
+    } else if (!Object.hasOwn(after, path)) {
+      result.set(path, 'deleted')
+    } else if (before[path] !== after[path]) {
+      result.set(path, 'modified')
+    }
   }
   return result
 }
@@ -107,7 +115,9 @@ export function MemoryVersionDiffContent({
       })
     ])
       .then(([previousBody, currentBody]) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted) {
+          return
+        }
         setBefore(previousBody.files)
         setAfter(currentBody.files)
         const changes = changedFiles(previousBody.files, currentBody.files)
@@ -116,7 +126,9 @@ export function MemoryVersionDiffContent({
         )
       })
       .catch((failure: unknown) => {
-        if (!controller.signal.aborted && !isAbortError(failure)) setError(failure)
+        if (!controller.signal.aborted && !isAbortError(failure)) {
+          setError(failure)
+        }
       })
     return (): void => controller.abort()
   }, [predecessorVersion, version, t])
@@ -150,24 +162,27 @@ export function MemoryVersionDiffContent({
       : t('versionReference', { version: String(predecessorVersion) })
   const versionLabel = t('versionReference', { version: String(version) })
 
-  if (error !== undefined)
+  if (error !== undefined) {
     return (
       <div className="memory-diff-state">
         <Alert color="red">{t('memoryDiffLoadFailed')}</Alert>
       </div>
     )
-  if (Object.keys(after).length === 0)
+  }
+  if (Object.keys(after).length === 0) {
     return (
       <div className="memory-diff-state">
         <Text>{t('loading')}</Text>
       </div>
     )
-  if (changes.size === 0)
+  }
+  if (changes.size === 0) {
     return (
       <div className="memory-diff-state">
         <Alert color="gray">{t('memoryDiffEmpty')}</Alert>
       </div>
     )
+  }
 
   return (
     <FileWorkspace

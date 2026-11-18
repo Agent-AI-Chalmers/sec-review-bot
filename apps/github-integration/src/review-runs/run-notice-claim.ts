@@ -49,12 +49,16 @@ export async function startRunNoticeClaimHeartbeat(
     }
   }
   const renewSerially = async (): Promise<void> => {
-    if (lost) throw new RunNoticeClaimLostError(noticeId)
+    if (lost) {
+      throw new RunNoticeClaimLostError(noticeId)
+    }
     active ??= renew().finally(() => {
       active = null
     })
     await active
-    if (lost) throw new RunNoticeClaimLostError(noticeId)
+    if (lost) {
+      throw new RunNoticeClaimLostError(noticeId)
+    }
   }
 
   await renewSerially()
@@ -70,7 +74,9 @@ export async function startRunNoticeClaimHeartbeat(
         stopped = true
         clearInterval(timer)
       }
-      if (active !== null) await active.catch(() => undefined)
+      if (active !== null) {
+        await active.catch(() => undefined)
+      }
       return !lost
     }
   }

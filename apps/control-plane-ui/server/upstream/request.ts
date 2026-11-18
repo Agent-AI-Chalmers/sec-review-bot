@@ -28,7 +28,9 @@ async function readBoundedUpstreamBody(response: Response, maximumBytes: number)
     await response.body?.cancel()
     throw new UpstreamResponseTooLargeError()
   }
-  if (response.body === null) return Buffer.alloc(0)
+  if (response.body === null) {
+    return Buffer.alloc(0)
+  }
 
   const reader = response.body.getReader()
   const chunks: Buffer[] = []
@@ -39,8 +41,12 @@ async function readBoundedUpstreamBody(response: Response, maximumBytes: number)
         done: boolean
         value?: unknown
       }
-      if (done) break
-      if (!(value instanceof Uint8Array)) throw new TypeError('Expected response body bytes')
+      if (done) {
+        break
+      }
+      if (!(value instanceof Uint8Array)) {
+        throw new TypeError('Expected response body bytes')
+      }
       size += value.byteLength
       if (size > maximumBytes) {
         await reader.cancel()
@@ -88,11 +94,17 @@ export async function requestUpstream(
   timeout.unref()
   const abortFromCaller = (): void => controller.abort()
   options.signal?.addEventListener('abort', abortFromCaller, { once: true })
-  if (options.signal?.aborted) controller.abort()
+  if (options.signal?.aborted) {
+    controller.abort()
+  }
 
   const failureKind = (): UpstreamFailureKind | undefined => {
-    if (timedOut) return 'timeout'
-    if (options.signal?.aborted) return undefined
+    if (timedOut) {
+      return 'timeout'
+    }
+    if (options.signal?.aborted) {
+      return undefined
+    }
     return 'unavailable'
   }
 
@@ -105,16 +117,23 @@ export async function requestUpstream(
       const body = await readBoundedUpstreamBody(response, options.maximumBytes)
       return { status: response.status, body }
     } catch (error) {
-      if (error instanceof UpstreamResponseTooLargeError)
+      if (error instanceof UpstreamResponseTooLargeError) {
         throw new UpstreamRequestError('too_large', { cause: error })
+      }
       const kind = failureKind()
-      if (kind !== undefined) throw new UpstreamRequestError(kind, { cause: error })
+      if (kind !== undefined) {
+        throw new UpstreamRequestError(kind, { cause: error })
+      }
       throw error
     }
   } catch (error) {
-    if (error instanceof UpstreamRequestError) throw error
+    if (error instanceof UpstreamRequestError) {
+      throw error
+    }
     const kind = failureKind()
-    if (kind !== undefined) throw new UpstreamRequestError(kind, { cause: error })
+    if (kind !== undefined) {
+      throw new UpstreamRequestError(kind, { cause: error })
+    }
     throw error
   } finally {
     clearTimeout(timeout)

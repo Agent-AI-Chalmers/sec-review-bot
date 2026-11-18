@@ -16,7 +16,9 @@ import { asErrorWithResponse } from '../../utils/error-utils.js'
  */
 export function isBranchAlreadyExists(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
-  if (errorInfo.status !== 422) return false
+  if (errorInfo.status !== 422) {
+    return false
+  }
   const message = String(errorInfo.response?.data?.message ?? '').toLowerCase()
   return message.includes('already exists')
 }

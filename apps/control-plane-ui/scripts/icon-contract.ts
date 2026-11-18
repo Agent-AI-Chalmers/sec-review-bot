@@ -12,7 +12,9 @@ function lineOf(source: ts.SourceFile, node: ts.Node) {
 
 function usesIconScale(attribute: ts.JsxAttribute): boolean {
   const initializer = attribute.initializer
-  if (!initializer || !ts.isJsxExpression(initializer)) return false
+  if (!initializer || !ts.isJsxExpression(initializer)) {
+    return false
+  }
   const expression = initializer.expression
   return (
     expression !== undefined &&

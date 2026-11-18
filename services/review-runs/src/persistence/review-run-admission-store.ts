@@ -40,7 +40,9 @@ export class ReviewRunAdmissionStore {
           [this.connectorId, run.ingress_kind, run.ingress_key]
         )
         const row = existing.rows[0]
-        if (row === undefined) return await this.insertWith(client, run)
+        if (row === undefined) {
+          return await this.insertWith(client, run)
+        }
         return {
           record: rowToRecord(row),
           created: false,
@@ -48,7 +50,9 @@ export class ReviewRunAdmissionStore {
         }
       })
     } catch (error: unknown) {
-      if (!this.isIngressIdentityConflict(error)) throw error
+      if (!this.isIngressIdentityConflict(error)) {
+        throw error
+      }
       // The concurrent winner becomes visible only after the failed transaction rolls back.
       const existing = await this.pool.query<ReviewRunRow>(
         `${RUN_SELECT}
@@ -138,7 +142,9 @@ export class ReviewRunAdmissionStore {
       toStatus: 'pending'
     })
     const record = await this.getWith(client, run.run_id)
-    if (record === null) throw new Error(`Execution run was not persisted: ${run.run_id}`)
+    if (record === null) {
+      throw new Error(`Execution run was not persisted: ${run.run_id}`)
+    }
     return { record, created: true, preparation_token: preparationToken }
   }
 

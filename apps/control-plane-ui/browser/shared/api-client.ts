@@ -28,7 +28,9 @@ export function isAbortError(error: unknown): boolean {
  * the original failure in state and call this during render instead of throwing from a rejected
  * promise, which would become an unhandled rejection. */
 export function throwIfUnauthorized(error: unknown): void {
-  if (isUnauthorizedApiError(error)) throw error
+  if (isUnauthorizedApiError(error)) {
+    throw error
+  }
 }
 
 export async function errorCode(response: Response): Promise<string | undefined> {
@@ -79,7 +81,9 @@ export async function request(path: string, options: ApiRequest = {}): Promise<R
     ...(headers === undefined ? {} : { headers }),
     ...(hasBody ? { body: JSON.stringify(options.body) } : {})
   })
-  if (!response.ok) throw new ApiError(response.status, await errorCode(response))
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
   return response
 }
 
@@ -95,7 +99,9 @@ export async function apiPost<T>(path: string, body: object): Promise<T> {
     // Mutation bodies carry an operation_id. A single transport retry reuses the exact bytes,
     // allowing the Catalog's idempotency boundary to resolve an accepted request whose response
     // was lost. An HTTP failure is an answer, so it is not retried.
-    if (error instanceof ApiError) throw error
+    if (error instanceof ApiError) {
+      throw error
+    }
     return api<T>(path, { method: 'POST', body })
   }
 }

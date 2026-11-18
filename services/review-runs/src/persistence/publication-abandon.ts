@@ -79,7 +79,9 @@ export async function abandonInFlightPublications(
   connectorId: string,
   runIds: readonly string[]
 ): Promise<Map<string, PublicationStatus>> {
-  if (runIds.length === 0) return new Map()
+  if (runIds.length === 0) {
+    return new Map()
+  }
   await client.query(
     `UPDATE input_bundle_candidates SET status='abandoned', updated_at=clock_timestamp()
      WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status IN ('reserved','present')`,

@@ -98,9 +98,13 @@ const MAIL_DOMAIN = /^[a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63})*\.[a-z]{2,}$/
  * makes that look like the app is broken. The caller logs these mentions so an unmatched command
  * is diagnosable instead of invisible, while the parser itself stays a pure function. */
 export function unmatchedMentions(body: unknown): string[] {
-  if (typeof body !== 'string' || body.trim() === '') return []
+  if (typeof body !== 'string' || body.trim() === '') {
+    return []
+  }
   const normalizedBody = stripMarkdownQuotedLines(body).trim().toLowerCase()
-  if (normalizedBody === '') return []
+  if (normalizedBody === '') {
+    return []
+  }
   const candidates = buildMentionCandidates()
   const mentions: string[] = []
   for (const match of normalizedBody.matchAll(MENTION_PATTERN)) {
@@ -110,8 +114,12 @@ export function unmatchedMentions(body: unknown): string[] {
     // what distinguishes `name_@example.com` from the markdown-wrapped `__@bot__` and from a
     // word ending in `_` followed by a mention.
     const gluedToWord = start > 0 && /[a-z0-9_]/.test(normalizedBody[start - 1] ?? '')
-    if (gluedToWord && MAIL_DOMAIN.test(login)) continue
-    if (login !== '' && !candidates.includes(login)) mentions.push(login)
+    if (gluedToWord && MAIL_DOMAIN.test(login)) {
+      continue
+    }
+    if (login !== '' && !candidates.includes(login)) {
+      mentions.push(login)
+    }
   }
   return mentions
 }

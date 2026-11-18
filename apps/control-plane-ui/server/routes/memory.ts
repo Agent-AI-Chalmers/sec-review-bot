@@ -10,26 +10,39 @@ import { createMemoryArtifactRoutes } from './memory-artifacts.js'
 function memoryCatalogPath(bffUrl: string): string | null {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
   const path = url.pathname
-  if (path === '/api/memory/tree/automation') return `/v1/memory-tree/automation${url.search}`
-  if (path === '/api/memory/tree') return `/v1/memory-tree${url.search}`
-  if (path === '/api/memory/versions' || /^\/api\/memory\/versions\/[1-9][0-9]*$/.test(path))
+  if (path === '/api/memory/tree/automation') {
+    return `/v1/memory-tree/automation${url.search}`
+  }
+  if (path === '/api/memory/tree') {
+    return `/v1/memory-tree${url.search}`
+  }
+  if (path === '/api/memory/versions' || /^\/api\/memory\/versions\/[1-9][0-9]*$/.test(path)) {
     return `/v1/memory-tree${path.slice('/api/memory'.length)}${url.search}`
+  }
   const allowed =
     path === '/api/memory/overview' ||
     path === '/api/memory/extractions' ||
     path === '/api/memory/observations' ||
     /^\/api\/memory\/extractions\/[A-Za-z0-9._:-]+$/.test(path)
-  if (!allowed) return null
+  if (!allowed) {
+    return null
+  }
   return `/v1${path.slice('/api/memory'.length)}${url.search}`
 }
 
 function redactArtifactUris(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redactArtifactUris)
-  if (typeof value !== 'object' || value === null) return value
+  if (Array.isArray(value)) {
+    return value.map(redactArtifactUris)
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value
+  }
   const source = value as Record<string, unknown>
   const result: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(source)) {
-    if (key === 'uri' && typeof item === 'string' && item.startsWith('s3://')) continue
+    if (key === 'uri' && typeof item === 'string' && item.startsWith('s3://')) {
+      continue
+    }
     result[key] = redactArtifactUris(item)
   }
   return result
@@ -79,11 +92,19 @@ export function createMemoryRoutes({
   }
 
   const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
-    if (await writes.handle(request, response)) return true
-    if (await artifacts.handle(request, response)) return true
-    if (request.method !== 'GET') return false
+    if (await writes.handle(request, response)) {
+      return true
+    }
+    if (await artifacts.handle(request, response)) {
+      return true
+    }
+    if (request.method !== 'GET') {
+      return false
+    }
     const path = memoryCatalogPath(request.url ?? '')
-    if (path === null) return false
+    if (path === null) {
+      return false
+    }
     await readMemoryPage(response, path)
     return true
   }

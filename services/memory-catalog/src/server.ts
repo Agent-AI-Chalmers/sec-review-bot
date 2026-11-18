@@ -23,13 +23,17 @@ import { registerResponseValidation } from './response-validation.js'
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
-  if (!value) throw new Error(`${name} is required.`)
+  if (!value) {
+    throw new Error(`${name} is required.`)
+  }
   return value
 }
 
 function bearerTokenMatches(header: string | undefined, expected: string): boolean {
   const prefix = 'Bearer '
-  if (!header?.startsWith(prefix)) return false
+  if (!header?.startsWith(prefix)) {
+    return false
+  }
   const actual = Buffer.from(header.slice(prefix.length))
   const wanted = Buffer.from(expected)
   return actual.length === wanted.length && timingSafeEqual(actual, wanted)
@@ -58,13 +62,16 @@ function invalidBody(message: string): Error {
 
 function validateExtraction(input: RequestBody<'registerExtraction'>): void {
   const ids = input.observations.map((item) => item.observation_id)
-  if (new Set(ids).size !== ids.length)
+  if (new Set(ids).size !== ids.length) {
     throw invalidBody('Observation IDs must be unique within an extraction.')
+  }
 }
 
 // OpenAPI cannot relate decision ids to the consumed observation ids.
 function validateMaintenanceReport(source: RequestBody<'createMemoryTreeVersion'>['source']): void {
-  if (source.kind === 'manual') return
+  if (source.kind === 'manual') {
+    return
+  }
   const decided = source.maintenance_report.observation_decisions.map(
     (decision) => decision.observation_id
   )
@@ -73,21 +80,26 @@ function validateMaintenanceReport(source: RequestBody<'createMemoryTreeVersion'
     decided.length !== expected.length ||
     new Set(decided).size !== decided.length ||
     !expected.every((id) => decided.includes(id))
-  )
+  ) {
     throw invalidBody(
       'maintenance_report must contain exactly one decision per consumed observation id.'
     )
-  for (const decision of source.maintenance_report.observation_decisions)
-    if (decision.action !== 'skipped' && decision.topics.length === 0)
+  }
+  for (const decision of source.maintenance_report.observation_decisions) {
+    if (decision.action !== 'skipped' && decision.topics.length === 0) {
       throw invalidBody(
         `maintenance_report decision ${decision.observation_id} must name edited topics.`
       )
+    }
+  }
 }
 
 function specPath(): string {
   const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
-  if (existsSync(built)) return built
+  if (existsSync(built)) {
+    return built
+  }
   return path.resolve(moduleDirectory, '../../../contracts/memory-catalog-api/v1/openapi.yaml')
 }
 
@@ -97,8 +109,9 @@ function errorStatusCode(error: unknown): number {
     error instanceof MemoryTreeAutomationConflictError ||
     error instanceof AutomationPausedError ||
     error instanceof MemoryTreeVersionConflictError
-  )
+  ) {
     return 409
+  }
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -129,7 +142,9 @@ export async function registerMemoryCatalogRoutes(
       : bearerTokenMatches(request.headers.authorization, operatorToken)
         ? 'operator'
         : undefined
-    if (role === undefined || !allowedRoles.includes(role)) throw unauthorized()
+    if (role === undefined || !allowedRoles.includes(role)) {
+      throw unauthorized()
+    }
     authenticatedRoles.set(request, role)
   }
   const authenticatedVersionInput = (
@@ -141,8 +156,9 @@ export async function registerMemoryCatalogRoutes(
     if (
       (requiresWorker && authenticatedRoles.get(request) !== 'worker') ||
       (input.source.kind === 'manual' && authenticatedRoles.get(request) !== 'operator')
-    )
+    ) {
       throw unauthorized()
+    }
     validateMaintenanceReport(input.source)
     return input.source.kind === 'manual'
       ? { ...input, source: { ...input.source, actor: operatorActor } }
@@ -181,8 +197,9 @@ export async function registerMemoryCatalogRoutes(
           ((kind === 'learning' || kind === 'reorganization') &&
             authenticatedRoles.get(request) !== 'worker') ||
           (kind === 'manual' && authenticatedRoles.get(request) !== 'operator')
-        )
+        ) {
           throw unauthorized()
+        }
         return {
           publications: await store.listVersionPublications(kind, owner_id)
         }
@@ -196,7 +213,9 @@ export async function registerMemoryCatalogRoutes(
       getExtraction: async (request: FastifyRequest, reply: FastifyReply) => {
         const extractionId = (request.params as PathParameters<'getExtraction'>).extraction_id
         const record = await store.queries.getExtraction(extractionId)
-        if (record) return record
+        if (record) {
+          return record
+        }
         return await reply.status(404).send({
           error: `Memory extraction not found: ${extractionId}`,
           code: 'NOT_FOUND'
@@ -230,7 +249,9 @@ export async function registerMemoryCatalogRoutes(
           ...(request.body as RequestBody<'pauseMemoryTreeAutomation'>),
           actor: operatorActor
         } satisfies AuthenticatedMemoryTreeAutomationOperation)
-        if (result.created) void reply.status(201)
+        if (result.created) {
+          void reply.status(201)
+        }
         return result
       },
       resumeMemoryTreeAutomation: async (request: FastifyRequest, reply: FastifyReply) => {
@@ -238,7 +259,9 @@ export async function registerMemoryCatalogRoutes(
           ...(request.body as RequestBody<'resumeMemoryTreeAutomation'>),
           actor: operatorActor
         } satisfies AuthenticatedMemoryTreeAutomationOperation)
-        if (result.created) void reply.status(201)
+        if (result.created) {
+          void reply.status(201)
+        }
         return result
       },
       getLearningInput: async (request: FastifyRequest) => {
@@ -258,14 +281,18 @@ export async function registerMemoryCatalogRoutes(
           ...(request.body as RequestBody<'restoreMemoryTree'>),
           actor: operatorActor
         } satisfies AuthenticatedMemoryTreeRestoreOperation)
-        if (result.created) void reply.status(201)
+        if (result.created) {
+          void reply.status(201)
+        }
         return result
       },
       getMemoryTree: async () => await store.queries.getMemoryTree(),
       getMemoryTreeVersion: async (request: FastifyRequest, reply: FastifyReply) => {
         const version = Number((request.params as PathParameters<'getMemoryTreeVersion'>).version)
         const record = await store.queries.getMemoryTreeVersion(version)
-        if (record) return record
+        if (record) {
+          return record
+        }
         return await reply.status(404).send({
           error: `Memory tree version not found: ${version}`,
           code: 'NOT_FOUND'
@@ -297,8 +324,9 @@ export async function createApp(options: {
   workerToken: string
   operatorToken: string
 }): Promise<FastifyInstance> {
-  if (options.workerToken === options.operatorToken)
+  if (options.workerToken === options.operatorToken) {
     throw new Error('Worker and operator tokens must be distinct.')
+  }
   const app = Fastify({
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } }
   })

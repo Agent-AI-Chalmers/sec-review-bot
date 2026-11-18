@@ -34,13 +34,19 @@ export function useRefresh(load: () => Promise<void>, enabled = true): RefreshSt
     void refresh()
   }, [refresh, load])
   React.useEffect(() => {
-    if (!autoRefresh || !enabled) return
+    if (!autoRefresh || !enabled) {
+      return
+    }
     const check = (): void => {
-      if (document.visibilityState === 'visible') void refresh()
+      if (document.visibilityState === 'visible') {
+        void refresh()
+      }
     }
     const timer = window.setInterval(check, refreshInterval)
     const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') void refresh()
+      if (document.visibilityState === 'visible') {
+        void refresh()
+      }
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return (): void => {

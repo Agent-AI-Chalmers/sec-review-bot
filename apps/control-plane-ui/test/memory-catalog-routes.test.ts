@@ -79,8 +79,9 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
       '/api/memory/overview?range=90d',
       '/api/memory/versions?limit=50',
       '/api/memory/versions/2'
-    ])
+    ]) {
       expect((await fetch(`${base}${path}`, { headers: { cookie } })).status).toBe(200)
+    }
     expect(paths).toStrictEqual([
       '/v1/memory-tree',
       '/v1/overview?range=90d',
@@ -100,7 +101,9 @@ test('memory edit creates a version while restore only moves the pointer', async
   const catalog = createServer((request, response) => {
     void (async () => {
       const chunks: Buffer[] = []
-      for await (const chunk of request as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
       requests.push({
         path: request.url ?? '',
         body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
@@ -319,7 +322,9 @@ async function memoryWriteFixture(
   const catalog = createServer((request, response) => {
     void (async () => {
       const chunks: Buffer[] = []
-      for await (const chunk of request as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
       writes.push({
         path: request.url ?? '',
         body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
@@ -355,7 +360,9 @@ async function memoryWriteFixture(
             putMemoryArtifact: async (): Promise<void> => {
               expect(writes.at(-1)?.path).toBe('/v1/memory-tree/versions/publications/reserve')
               uploads += 1
-              if (upload === 'fails') throw new Error('storage unavailable')
+              if (upload === 'fails') {
+                throw new Error('storage unavailable')
+              }
             }
           }
         })
@@ -432,7 +439,9 @@ test('memory writes reject missing, coerced, fractional, negative, and unsafe co
     ['restore', 'restored_version']
   ] as const) {
     const invalid = [undefined, null, '1', true, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]
-    if (action === 'restore') invalid.push(0)
+    if (action === 'restore') {
+      invalid.push(0)
+    }
     for (const value of invalid) {
       const response = await fixture.post(
         action,
@@ -565,6 +574,8 @@ for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
     expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
     expect(fixture.uploads()).toBe(failedPhase === 'reserve' ? 0 : 1)
     expect(fixture.writes.map(({ path }) => path)).toStrictEqual(paths.slice(0, failedIndex + 1))
-    for (const { body } of fixture.writes) expect(body).toStrictEqual(fixture.writes[0]?.body)
+    for (const { body } of fixture.writes) {
+      expect(body).toStrictEqual(fixture.writes[0]?.body)
+    }
   })
 }

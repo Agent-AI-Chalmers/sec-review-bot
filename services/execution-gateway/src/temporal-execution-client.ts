@@ -35,7 +35,9 @@ function fingerprint(request: ExecutionWorkflowInput): string {
 }
 
 function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalValue)
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue)
+  }
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(
       Object.entries(value)
@@ -47,7 +49,9 @@ function canonicalValue(value: unknown): unknown {
 }
 
 function statusName(status: { name?: string } | string | undefined): string {
-  if (typeof status === 'string') return status
+  if (typeof status === 'string') {
+    return status
+  }
   return status?.name ?? 'UNKNOWN'
 }
 
@@ -89,7 +93,9 @@ export class TemporalExecutionClient {
         }
       })
     } catch (error) {
-      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+        throw error
+      }
       const existing = await this.get(request.run_id)
       const description = await this.client.workflow.getHandle(request.run_id).describe()
       if (description.memo?.request_fingerprint === requestFingerprint && existing) {
@@ -112,7 +118,9 @@ export class TemporalExecutionClient {
     try {
       description = await handle.describe()
     } catch (error) {
-      if (error instanceof WorkflowNotFoundError) return undefined
+      if (error instanceof WorkflowNotFoundError) {
+        return undefined
+      }
       throw error
     }
     const temporalStatus = statusName(description.status)
@@ -240,8 +248,9 @@ export function parseExecutionArchiveArtifact(
   value: unknown,
   runId: string
 ): ArtifactStorageProjection {
-  if (!isRecord(value) || value.status !== 'available')
+  if (!isRecord(value) || value.status !== 'available') {
     throw new Error('Execution response is missing artifact_storage.')
+  }
   const artifact = value.artifact
   if (
     !isRecord(artifact) ||
@@ -252,8 +261,9 @@ export function parseExecutionArchiveArtifact(
     !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
     !Number.isSafeInteger(artifact.size_bytes) ||
     (artifact.size_bytes as number) < 0
-  )
+  ) {
     throw new Error('Execution response has malformed artifact metadata.')
+  }
   const uri = new URL(artifact.uri)
   if (
     uri.protocol !== 's3:' ||
@@ -264,8 +274,9 @@ export function parseExecutionArchiveArtifact(
     uri.port !== '' ||
     uri.search !== '' ||
     uri.hash !== ''
-  )
+  ) {
     throw new Error('Execution response has an invalid execution archive URI.')
+  }
   return {
     status: 'available',
     artifact: {

@@ -52,7 +52,9 @@ export function usePagedResource<Filter, Cursor, Page>(
     pageNumber: query.trail.length + 1,
     openNext: (cursor) => open({ ...query, trail: [...query.trail, cursor] }),
     openPrevious: async (): Promise<void> => {
-      if (query.trail.length > 0) await open({ ...query, trail: query.trail.slice(0, -1) })
+      if (query.trail.length > 0) {
+        await open({ ...query, trail: query.trail.slice(0, -1) })
+      }
     },
     openFirst: (changes = {}) => open({ ...query, ...changes, trail: [] })
   }

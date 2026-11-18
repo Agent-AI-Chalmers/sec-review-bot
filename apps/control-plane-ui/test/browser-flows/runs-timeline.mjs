@@ -66,7 +66,9 @@ export async function runRunsTimelineFlow({ name, page, base, waitUntil }) {
 
   const rail = await page.evaluate(() => {
     const item = document.querySelector('.run-progress-timeline .mantine-Timeline-item')
-    if (item === null) return null
+    if (item === null) {
+      return null
+    }
     const before = getComputedStyle(item, '::before')
     const bullet = item.querySelector('.mantine-Timeline-itemBullet')
     return {

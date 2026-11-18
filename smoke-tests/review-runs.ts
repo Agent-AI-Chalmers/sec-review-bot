@@ -153,7 +153,9 @@ export async function verifyRecovery(runId: string): Promise<void> {
       token: readToken
     })
     const { run } = (await response.json()) as ObservedRun
-    if (run.execution.status === 'failed') break
+    if (run.execution.status === 'failed') {
+      break
+    }
     assert.ok(Date.now() < deadline, `Execution did not become failed: ${run.execution.status}`)
     await setTimeout(250)
   }

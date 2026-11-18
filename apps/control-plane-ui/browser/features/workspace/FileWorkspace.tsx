@@ -29,7 +29,9 @@ const MarkdownPreview = React.lazy(async () => ({
 }))
 
 function validFilePath(path: string): boolean {
-  if (!path || path.startsWith('/') || path.endsWith('/')) return false
+  if (!path || path.startsWith('/') || path.endsWith('/')) {
+    return false
+  }
   const parts = path.split('/')
   return parts.every((part) => part !== '' && part !== '.' && part !== '..' && !part.includes('\\'))
 }
@@ -39,7 +41,9 @@ function linkedFile(
   selectedFile: string,
   href: string | undefined
 ): string | undefined {
-  if (!href || /^(?:[a-z]+:|#)/i.test(href)) return undefined
+  if (!href || /^(?:[a-z]+:|#)/i.test(href)) {
+    return undefined
+  }
   const withoutQuery = decodeURIComponent(href).split(/[?#]/, 1)[0] ?? ''
   const candidate = withoutQuery.replace(/^\.\//, '').replace(/^\//, '')
   const directory = selectedFile.includes('/')
@@ -48,9 +52,14 @@ function linkedFile(
   const parts = `${directory}${candidate}`.split('/')
   const normalized: string[] = []
   for (const part of parts) {
-    if (!part || part === '.') continue
-    if (part === '..') normalized.pop()
-    else normalized.push(part)
+    if (!part || part === '.') {
+      continue
+    }
+    if (part === '..') {
+      normalized.pop()
+    } else {
+      normalized.push(part)
+    }
   }
   const target = normalized.join('/')
   return Object.hasOwn(files, target) ? target : undefined
@@ -98,10 +107,15 @@ export function FileWorkspace({
   const unpreviewable = unpreviewableFiles[selectedFile]
 
   React.useEffect(() => {
-    if (!selectedFile) return
-    if (unpreviewable) return
-    if (!isMarkdown && !isJson && !isJsonLines && mode === 'preview')
+    if (!selectedFile) {
+      return
+    }
+    if (unpreviewable) {
+      return
+    }
+    if (!isMarkdown && !isJson && !isJsonLines && mode === 'preview') {
       setMode(editable ? 'edit' : 'source')
+    }
   }, [editable, isJson, isJsonLines, isMarkdown, mode, selectedFile, unpreviewable])
 
   const openOperation = (next: 'new' | 'rename'): void => {
@@ -110,7 +124,9 @@ export function FileWorkspace({
     setPathError('')
   }
   const applyOperation = (): void => {
-    if (!editable || !onFilesChange || !operation) return
+    if (!editable || !onFilesChange || !operation) {
+      return
+    }
     const nextPath = pathInput.trim()
     if (operation === 'rename' && nextPath === selectedFile) {
       setOperation(undefined)
@@ -121,8 +137,9 @@ export function FileWorkspace({
       return
     }
     const nextFiles = { ...files }
-    if (operation === 'new') nextFiles[nextPath] = ''
-    else {
+    if (operation === 'new') {
+      nextFiles[nextPath] = ''
+    } else {
       nextFiles[nextPath] = nextFiles[selectedFile] ?? ''
       delete nextFiles[selectedFile]
     }
@@ -132,7 +149,9 @@ export function FileWorkspace({
     setOperation(undefined)
   }
   const deleteSelected = (): void => {
-    if (!onFilesChange || Object.keys(files).length <= 1) return
+    if (!onFilesChange || Object.keys(files).length <= 1) {
+      return
+    }
     const nextFiles = { ...files }
     delete nextFiles[selectedFile]
     const nextSelection = Object.keys(nextFiles).sort()[0] ?? ''
@@ -257,7 +276,9 @@ export function FileWorkspace({
                   source={files[selectedFile] ?? ''}
                   onOpenLink={(href) => {
                     const target = linkedFile(files, selectedFile, href)
-                    if (target === undefined) return false
+                    if (target === undefined) {
+                      return false
+                    }
                     onSelectFile(target)
                     return true
                   }}
@@ -296,7 +317,9 @@ export function FileWorkspace({
           value={pathInput}
           onChange={(event) => setPathInput(event.currentTarget.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') applyOperation()
+            if (event.key === 'Enter') {
+              applyOperation()
+            }
           }}
         />
         {pathError && (

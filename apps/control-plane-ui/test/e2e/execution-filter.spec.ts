@@ -31,8 +31,9 @@ test('execution filter keeps long selected labels and selected options visible',
         'font-optical-sizing',
         'letter-spacing',
         'text-transform'
-      ])
+      ]) {
         text.style.setProperty(property, style.getPropertyValue(property))
+      }
       document.body.append(text)
       const textWidth = text.getBoundingClientRect().width
       text.remove()

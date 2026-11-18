@@ -47,7 +47,9 @@ function TransitionReason({ code }: { code: string }): React.JSX.Element {
       {code}
     </Text>
   )
-  if (explanation === null) return label
+  if (explanation === null) {
+    return label
+  }
   return (
     <Tooltip
       label={explanation}
@@ -82,7 +84,9 @@ export function RunTransitions({
   const now = useNow()
   const machines = STATE_MACHINES_BY_LANGUAGE[language]
   const machine = machines.find((candidate) => candidate.axis === axis) ?? machines[0]
-  if (machine === undefined) return null
+  if (machine === undefined) {
+    return null
+  }
   const transitionEvents = actualTransitions(events)
   const totalPages = Math.max(1, Math.ceil(transitionEvents.length / TRANSITIONS_PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)

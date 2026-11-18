@@ -22,13 +22,14 @@ export function catalogArtifactReference(
   value: unknown,
   kind: 'tree' | 'trajectory'
 ): PublishedArtifact {
-  if (kind === 'tree')
+  if (kind === 'tree') {
     return publishedArtifact(value, {
       bucket: ARTIFACT_BUCKET,
       mediaType: MEMORY_TREE_MEDIA_TYPE,
       maximumSize: MAX_MEMORY_TREE_ARTIFACT_BYTES,
       acceptsKey: (key, digest) => key === memoryTreeObjectKey(digest)
     })
+  }
   return publishedArtifact(value, {
     bucket: ARTIFACT_BUCKET,
     mediaType: TRAJECTORY_MEDIA_TYPE,

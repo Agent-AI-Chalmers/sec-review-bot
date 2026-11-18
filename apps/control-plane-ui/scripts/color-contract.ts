@@ -188,7 +188,9 @@ export function validateColorContract(
   for (let index = 1; index < parsedBrandColors.length; index += 1) {
     const previous = parsedBrandColors[index - 1]
     const current = parsedBrandColors[index]
-    if (!previous || !current) continue
+    if (!previous || !current) {
+      continue
+    }
 
     const previousLightness = previous.to('oklch').coords[0]
     const currentLightness = current.to('oklch').coords[0]

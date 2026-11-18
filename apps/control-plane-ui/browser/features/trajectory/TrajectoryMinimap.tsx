@@ -22,7 +22,9 @@ function scrollParent(element: HTMLElement): HTMLElement | undefined {
   let ancestor = element.parentElement
   while (ancestor) {
     const style = getComputedStyle(ancestor)
-    if (/(auto|scroll)/.test(style.overflowY)) return ancestor
+    if (/(auto|scroll)/.test(style.overflowY)) {
+      return ancestor
+    }
     ancestor = ancestor.parentElement
   }
   return undefined
@@ -76,7 +78,9 @@ export function TrajectoryMinimap({
   // modal rail never shows its 50vh fallback for a frame.
   React.useLayoutEffect(() => {
     const timeline = timelineRef.current
-    if (!timeline) return
+    if (!timeline) {
+      return
+    }
     const scroller = scrollParent(timeline)
     const scrollTarget = scroller ?? window
     let layoutFrame = 0
@@ -84,9 +88,13 @@ export function TrajectoryMinimap({
     let measured: MinimapSegment[] = []
 
     const updateCurrent = (): void => {
-      if (measured.length === 0) return
+      if (measured.length === 0) {
+        return
+      }
       const timelineRect = timeline.getBoundingClientRect()
-      if (timelineRect.height <= 0) return
+      if (timelineRect.height <= 0) {
+        return
+      }
       const viewportTop = scroller ? scroller.getBoundingClientRect().top : 0
       const viewportHeight = scroller ? scroller.clientHeight : window.innerHeight
       const center = (viewportTop - timelineRect.top + viewportHeight / 2) / timelineRect.height
@@ -104,14 +112,18 @@ export function TrajectoryMinimap({
       layoutFrame = 0
       updateTop()
       const timelineRect = timeline.getBoundingClientRect()
-      if (timelineRect.height <= 0) return
+      if (timelineRect.height <= 0) {
+        return
+      }
       const byKey = new Map(messages.map((message) => [messageKey(message), message]))
       const next: MinimapSegment[] = []
       for (const node of timeline.querySelectorAll<HTMLElement>(
         ':scope > [data-trajectory-message-key]'
       )) {
         const message = byKey.get(node.dataset.trajectoryMessageKey ?? '')
-        if (!message) continue
+        if (!message) {
+          continue
+        }
         const rect = node.getBoundingClientRect()
         next.push({
           message,
@@ -148,7 +160,7 @@ export function TrajectoryMinimap({
   }, [messages, timelineRef])
 
   const ticks = minimapTicks(segments.length)
-  if (segments.length === 0)
+  if (segments.length === 0) {
     return (
       <nav
         className={`trajectory-minimap trajectory-minimap-${placement}`}
@@ -159,6 +171,7 @@ export function TrajectoryMinimap({
         }}
       />
     )
+  }
 
   const active = Math.min(current, segments.length - 1)
   const dense = segments.length > MAX_MINIMAP_MARKS
@@ -174,7 +187,9 @@ export function TrajectoryMinimap({
     : undefined
 
   const indexAt = (clientY: number, rect: DOMRect): number => {
-    if (ticks.gap === 0) return 0
+    if (ticks.gap === 0) {
+      return 0
+    }
     return Math.max(
       0,
       Math.min(segments.length - 1, Math.round((clientY - rect.top - ticks.start) / ticks.gap))
@@ -183,7 +198,9 @@ export function TrajectoryMinimap({
 
   const navigate = (index: number): void => {
     const message = segments[index]?.message
-    if (!message) return
+    if (!message) {
+      return
+    }
     // The rail is a direct ordering control: jump instantly and let the scroll
     // listener derive the current message. A smooth scroll would keep firing
     // scroll events while a second key press still uses the old index.
@@ -222,13 +239,20 @@ export function TrajectoryMinimap({
         onKeyDown={(event) => {
           const last = segments.length - 1
           let next: number | undefined
-          if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = Math.max(0, active - 1)
-          else if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+          if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            next = Math.max(0, active - 1)
+          } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
             next = Math.min(last, active + 1)
-          else if (event.key === 'Home') next = 0
-          else if (event.key === 'End') next = last
-          else if (event.key === 'Enter' || event.key === ' ') next = active
-          if (next === undefined) return
+          } else if (event.key === 'Home') {
+            next = 0
+          } else if (event.key === 'End') {
+            next = last
+          } else if (event.key === 'Enter' || event.key === ' ') {
+            next = active
+          }
+          if (next === undefined) {
+            return
+          }
           event.preventDefault()
           setHovered(next)
           navigate(next)

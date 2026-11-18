@@ -79,7 +79,9 @@ function encodeCursor(cursor: CatalogCursor) {
 }
 
 function decodeCursor(value: string | undefined): CatalogCursor | undefined {
-  if (value === undefined) return undefined
+  if (value === undefined) {
+    return undefined
+  }
   try {
     const decoded: unknown = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
     if (
@@ -267,7 +269,9 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
                min(created_at) as oldest_pending_created_at
         from observations where consumed_version is null`)
     const row = result.rows[0]
-    if (row === undefined) throw new Error('Observation backlog query returned no row.')
+    if (row === undefined) {
+      throw new Error('Observation backlog query returned no row.')
+    }
     return {
       pending_count: Number(row.pending_count),
       oldest_pending_created_at: row.oldest_pending_created_at?.toISOString() ?? null
@@ -397,7 +401,9 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
            order by extracted_unit_count desc, source_workflow`)
     ])
     const totals = totalsResult.rows[0]
-    if (totals === undefined) throw new Error('Catalog overview totals query returned no row.')
+    if (totals === undefined) {
+      throw new Error('Catalog overview totals query returned no row.')
+    }
     return {
       totals: {
         completed_extraction_count: Number(totals.completed_extraction_count),
@@ -432,7 +438,9 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
     }>(`select state, version, changed_by, changed_at
         from memory_tree_automation where singleton=true`)
     const row = result.rows[0]
-    if (row === undefined) throw new Error('Memory-tree automation row is missing.')
+    if (row === undefined) {
+      throw new Error('Memory-tree automation row is missing.')
+    }
     return {
       state: row.state,
       version: Number(row.version),
@@ -451,7 +459,9 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
           on version.version=state.active_version
         where state.singleton=true`)
     const row = result.rows[0]
-    if (row === undefined) throw new Error('Memory tree state row is missing.')
+    if (row === undefined) {
+      throw new Error('Memory tree state row is missing.')
+    }
     return {
       version: Number(row.version),
       memory_tree_reference: row.memory_tree_reference
@@ -561,6 +571,8 @@ function projectVersion(row: VersionRow): MemoryTreeVersion {
 }
 
 function requireValue<T>(value: T | null, field: string): T {
-  if (value === null) throw new Error(`Memory version is missing source field: ${field}.`)
+  if (value === null) {
+    throw new Error(`Memory version is missing source field: ${field}.`)
+  }
   return value
 }

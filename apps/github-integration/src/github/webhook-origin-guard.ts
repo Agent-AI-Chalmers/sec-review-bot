@@ -29,7 +29,9 @@ export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
   // `app.ts` refuses to start without `/app` metadata — but a script or test that calls the
   // guard on its own will see bot events silently skipped rather than processed.
   const expectedLogin = currentAppBotLogin()
-  if (expectedLogin === null) return true
+  if (expectedLogin === null) {
+    return true
+  }
   return sender_login === expectedLogin
 }
 

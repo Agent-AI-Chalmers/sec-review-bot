@@ -38,11 +38,14 @@ function parseMemoryWriteCommand(
     !isRecord(value) ||
     typeof value.operation_id !== 'string' ||
     !/^[A-Za-z0-9._:-]+$/.test(value.operation_id)
-  )
+  ) {
     return { error: 'invalid_request' }
+  }
   const operation_id = value.operation_id
   if (action === 'pause' || action === 'resume') {
-    if (!isIntegerAtLeast(value.expected_version, 0)) return { error: 'invalid_request' }
+    if (!isIntegerAtLeast(value.expected_version, 0)) {
+      return { error: 'invalid_request' }
+    }
     return {
       action,
       operation_id,
@@ -53,8 +56,9 @@ function parseMemoryWriteCommand(
     if (
       !isIntegerAtLeast(value.expected_active_version, 1) ||
       !isIntegerAtLeast(value.restored_version, 1)
-    )
+    ) {
       return { error: 'invalid_request' }
+    }
     return {
       action,
       operation_id,
@@ -62,12 +66,17 @@ function parseMemoryWriteCommand(
       restored_version: value.restored_version
     }
   }
-  if (action !== 'edit' || !isIntegerAtLeast(value.expected_active_version, 0))
+  if (action !== 'edit' || !isIntegerAtLeast(value.expected_active_version, 0)) {
     return { error: 'invalid_request' }
-  if (!isRecord(value.files)) return { error: 'invalid_memory_files' }
+  }
+  if (!isRecord(value.files)) {
+    return { error: 'invalid_memory_files' }
+  }
   const files = new Map<string, string>()
   for (const [name, content] of Object.entries(value.files)) {
-    if (typeof content !== 'string') return { error: 'invalid_memory_files' }
+    if (typeof content !== 'string') {
+      return { error: 'invalid_memory_files' }
+    }
     files.set(name, content)
   }
   return {
@@ -150,7 +159,9 @@ export function createMemoryWriteRoutes({
     response: ServerResponse,
     action: string
   ): Promise<void> => {
-    if (!requireSameOrigin(request, response)) return
+    if (!requireSameOrigin(request, response)) {
+      return
+    }
     if (catalog === undefined) {
       sendJson(response, 503, { error: 'memory_catalog_unavailable' })
       return
@@ -206,11 +217,15 @@ export function createMemoryWriteRoutes({
   }
 
   const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
-    if (request.method !== 'POST') return false
+    if (request.method !== 'POST') {
+      return false
+    }
     const match = /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
       request.url ?? ''
     )
-    if (match === null) return false
+    if (match === null) {
+      return false
+    }
     await writeMemory(request, response, match[1] ?? match[2])
     return true
   }

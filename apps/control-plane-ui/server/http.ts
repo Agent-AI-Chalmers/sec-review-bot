@@ -27,7 +27,9 @@ export async function readBoundedRequestBody(
   for await (const chunk of request as AsyncIterable<Buffer>) {
     const bytes = Buffer.from(chunk)
     size += bytes.length
-    if (size > maximumBytes) throw new RequestBodyTooLargeError()
+    if (size > maximumBytes) {
+      throw new RequestBodyTooLargeError()
+    }
     chunks.push(bytes)
   }
   return Buffer.concat(chunks)

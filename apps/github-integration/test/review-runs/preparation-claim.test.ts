@@ -67,7 +67,9 @@ test('a transport failure during renewal blocks further work but does not claim 
   const heartbeat = await startPreparationClaimHeartbeat(
     {
       renewPreparationClaim: async () => {
-        if (!reachable) throw new Error('connect ECONNREFUSED')
+        if (!reachable) {
+          throw new Error('connect ECONNREFUSED')
+        }
         return true
       },
       preparationHeartbeatIntervalMs: () => 60_000

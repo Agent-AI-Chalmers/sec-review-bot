@@ -5,8 +5,12 @@ import { expect } from '@playwright/test'
 async function waitForCondition(predicate, message) {
   const deadline = Date.now() + 5_000
   for (;;) {
-    if (await predicate()) return
-    if (Date.now() > deadline) throw new Error(message)
+    if (await predicate()) {
+      return
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message)
+    }
     await delay(50)
   }
 }
@@ -35,7 +39,9 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     const racePage = await context.newPage()
     let aCancelled = false
     racePage.on('requestfailed', (request) => {
-      if (request.url().endsWith('/memory/versions/1/trajectory/content')) aCancelled = true
+      if (request.url().endsWith('/memory/versions/1/trajectory/content')) {
+        aCancelled = true
+      }
     })
     await racePage.route('**/api/memory/versions/1/trajectory/content', async (route) => {
       aRequested.resolve()
@@ -103,7 +109,9 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     const centeredTrajectoryError = await trajectoryFailurePage.evaluate(() => {
       const state = document.querySelector('.content-load-state')
       const alert = state?.querySelector('[role="alert"]')
-      if (!state || !alert) return false
+      if (!state || !alert) {
+        return false
+      }
       const stateRect = state.getBoundingClientRect()
       const alertRect = alert.getBoundingClientRect()
       return (
@@ -294,7 +302,9 @@ export async function runMemoryChineseFlow({ page, base, name }) {
             const container = document.querySelector('.memory-incorporation')
             const label = container?.querySelector('span')
             const link = container?.querySelector('button')
-            if (!container || !label || !link) return false
+            if (!container || !label || !link) {
+              return false
+            }
             return (
               Number.parseFloat(getComputedStyle(container).columnGap) > 0 &&
               getComputedStyle(label).fontSize === getComputedStyle(link).fontSize
@@ -336,7 +346,9 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
     const endpoint = memoryEndpoints.find(
       (candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`)
     )
-    if (endpoint !== undefined) memoryRequestCounts[endpoint] += 1
+    if (endpoint !== undefined) {
+      memoryRequestCounts[endpoint] += 1
+    }
   }
   page.on('request', countMemoryRequest)
   await page.getByRole('link', { name: 'Memory' }).click()
@@ -378,12 +390,13 @@ export async function runMemoryOverviewFlow({ page, name, waitUntil }) {
       initialMemoryRequestCounts['/api/memory/overview'] + 3,
     `${name} returning to 30 days must request only a new overview`
   )
-  for (const endpoint of memoryEndpoints.slice(0, -1))
+  for (const endpoint of memoryEndpoints.slice(0, -1)) {
     assert.strictEqual(
       memoryRequestCounts[endpoint],
       initialMemoryRequestCounts[endpoint],
       `${name} overview range changes must not request ${endpoint}`
     )
+  }
   page.off('request', countMemoryRequest)
 }
 
@@ -394,7 +407,9 @@ export async function runMemoryVersionFlow({ page, name, viewport, screenshotPat
   const versionGraphLayout = await page.evaluate(() => {
     const box = (version) => {
       const node = document.querySelector(`.version-graph-node[data-version-node="${version}"]`)
-      if (node === null) return null
+      if (node === null) {
+        return null
+      }
       const bounds = node.getBoundingClientRect()
       return { x: bounds.x, y: bounds.y }
     }
@@ -413,7 +428,9 @@ export async function runMemoryVersionFlow({ page, name, viewport, screenshotPat
     const graphCentering = await page.evaluate(() => {
       const viewport = document.querySelector('.version-graph-scroll')
       const graph = document.querySelector('.version-graph')
-      if (!viewport || !graph) return null
+      if (!viewport || !graph) {
+        return null
+      }
       const viewportBox = viewport.getBoundingClientRect()
       const graphBox = graph.getBoundingClientRect()
       return {
@@ -432,12 +449,13 @@ export async function runMemoryVersionFlow({ page, name, viewport, screenshotPat
     1,
     `${name} version graph must mark exactly one active version`
   )
-  if (name === 'desktop')
+  if (name === 'desktop') {
     assert.strictEqual(
       await page.locator('.version-graph-node[data-current]').getAttribute('data-version-node'),
       '59',
       `${name} initial graph must distinguish the active version from the newest version`
     )
+  }
   await page.getByText('List', { exact: true }).click()
   await page
     .locator('tr[aria-current="true"]')
@@ -462,7 +480,9 @@ export async function runMemoryVersionFlow({ page, name, viewport, screenshotPat
     const versionColumnLayout = await page.evaluate(() => {
       const version = document.querySelector('.memory-version-cell')
       const predecessor = document.querySelector('.memory-predecessor-cell')
-      if (version === null || predecessor === null) return null
+      if (version === null || predecessor === null) {
+        return null
+      }
       return {
         versionWidth: version.getBoundingClientRect().width,
         predecessorWidth: predecessor.getBoundingClientRect().width,
@@ -637,7 +657,9 @@ export async function runMemoryTrajectoryFlow({ page, name, viewport, waitUntil 
     const timeline = dialog.querySelector('.trajectory-timeline')
     const minimap = dialog.querySelector('.trajectory-minimap')
     const body = dialog.querySelector('.mantine-Modal-body')
-    if (layout === null || timeline === null || body === null) return null
+    if (layout === null || timeline === null || body === null) {
+      return null
+    }
     return {
       layoutWidth: layout.getBoundingClientRect().width,
       timelineWidth: timeline.getBoundingClientRect().width,
@@ -666,11 +688,16 @@ export async function runMemoryTrajectoryFlow({ page, name, viewport, waitUntil 
     () =>
       maintenanceDialog.evaluate((dialog) => {
         const minimap = dialog.querySelector('.trajectory-minimap')
-        if (minimap === null) return true
+        if (minimap === null) {
+          return true
+        }
         let scroller = minimap.parentElement
-        while (scroller !== null && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+        while (scroller !== null && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
           scroller = scroller.parentElement
-        if (scroller === null) return false
+        }
+        if (scroller === null) {
+          return false
+        }
         const rail = minimap.getBoundingClientRect()
         const port = scroller.getBoundingClientRect()
         return Math.abs(rail.top + rail.height / 2 - (port.top + port.height / 2)) < 8

@@ -32,7 +32,9 @@ verifyContractSchemasLoadable()
 const app = createGitHubApp()
 
 const { data } = await app.octokit.request('GET /app')
-if (data === null) throw new Error('GitHub App metadata is missing')
+if (data === null) {
+  throw new Error('GitHub App metadata is missing')
+}
 setGitHubAppMetadata({
   id: data.id,
   slug: data.slug,

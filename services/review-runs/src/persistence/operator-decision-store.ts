@@ -40,10 +40,11 @@ export class OperatorDecisionStore {
    *
    * `reason` is required and recorded on every event, so an abandonment always names why. */
   async abandonBlockedPreparation(runId: string, reason: string): Promise<ReviewRunRecord> {
-    if (reason.trim() === '')
+    if (reason.trim() === '') {
       throw Object.assign(new Error('An abandonment reason is required.'), {
         statusCode: 400
       })
+    }
     return await transaction(this.pool, async (client) => {
       // Claim the decision: only one caller may abandon a given disconnected row, and its state
       // doubles as the "still needs a decision" flag.
@@ -54,10 +55,11 @@ export class OperatorDecisionStore {
          FOR UPDATE`,
         [runId, this.connectorId]
       )
-      if (blocked.rowCount !== 1)
+      if (blocked.rowCount !== 1) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected preparation.`), {
           statusCode: 409
         })
+      }
 
       // The decision is recorded under its own name; the contradiction that parked the row
       // (`disconnect_reason`) was already recorded when it was parked.
@@ -76,16 +78,18 @@ export class OperatorDecisionStore {
         [runId, this.connectorId, reason, abandonCode]
       )
       if (failed.rowCount !== 1)
-        // The row was selected `FOR UPDATE` above, so nothing else can change it while this
-        // transaction runs: reaching here means the stored row disagrees with itself, never a
-        // lost race. That is a caller-visible fact about the run rather than a server fault, so
-        // it answers 409 like every other "this run is not in a state this operation may act on".
+      // The row was selected `FOR UPDATE` above, so nothing else can change it while this
+      // transaction runs: reaching here means the stored row disagrees with itself, never a
+      // lost race. That is a caller-visible fact about the run rather than a server fault, so
+      // it answers 409 like every other "this run is not in a state this operation may act on".
+      {
         throw Object.assign(
           new Error(
             `Preparation ${runId} is disconnected but its state changed; nothing was written.`
           ),
           { statusCode: 409 }
         )
+      }
       const preparationEventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -153,7 +157,9 @@ export class OperatorDecisionStore {
         })
       }
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during abandonment.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during abandonment.`)
+      }
       return record
     })
   }
@@ -175,16 +181,19 @@ export class OperatorDecisionStore {
    */
   async resumeDisconnectedRun(runId: string): Promise<ReviewRunRecord> {
     const run = await findRunRecord(this.pool, this.connectorId, runId)
-    if (run === null)
+    if (run === null) {
       throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
         statusCode: 404
       })
+    }
     // Preparation is checked first because it can park only by contradicting execution, so a
     // disconnected preparation tells us something about the other axes too: if execution also
     // moved on, resuming execution would leave the preparation stalled with no preparer able to
     // take it. Checking execution first would report such a run as resumable.
     if (run.preparation.status === 'disconnected') {
-      if (run.execution.status === 'pending') return await this.resumeDisconnectedPreparation(runId)
+      if (run.execution.status === 'pending') {
+        return await this.resumeDisconnectedPreparation(runId)
+      }
       throw Object.assign(
         new Error(
           `Review run ${runId} cannot be resumed: its preparation is disconnected and execution already moved past pending.`
@@ -192,10 +201,12 @@ export class OperatorDecisionStore {
         { statusCode: 409 }
       )
     }
-    if (run.execution.status === 'disconnected')
+    if (run.execution.status === 'disconnected') {
       return await this.resumeDisconnectedExecution(runId)
-    if (run.publication.status === 'disconnected')
+    }
+    if (run.publication.status === 'disconnected') {
       return await this.resumeDisconnectedPublication(runId)
+    }
     throw Object.assign(new Error(`Review run ${runId} has no resumable disconnected axis.`), {
       statusCode: 409
     })
@@ -209,12 +220,15 @@ export class OperatorDecisionStore {
    * already succeeded keep their status, so the run resumes where it stopped. */
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
     return await transaction(this.pool, async (client) => {
-      if (!(await this.publications.resumeDisconnectedOn(client, runId)))
+      if (!(await this.publications.resumeDisconnectedOn(client, runId))) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected publication.`), {
           statusCode: 409
         })
+      }
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during resumption.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during resumption.`)
+      }
       return record
     })
   }
@@ -224,21 +238,26 @@ export class OperatorDecisionStore {
    * operation concludes an axis whose remote outcome remains unknown. Neither decision records
    * that the task never ran. */
   async giveUpDisconnectedRun(runId: string, reason: string): Promise<ReviewRunRecord> {
-    if (reason.trim() === '')
+    if (reason.trim() === '') {
       throw Object.assign(new Error('A reason is required.'), {
         statusCode: 400
       })
+    }
     const run = await findRunRecord(this.pool, this.connectorId, runId)
-    if (run === null)
+    if (run === null) {
       throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
         statusCode: 404
       })
-    if (run.preparation.status === 'disconnected')
+    }
+    if (run.preparation.status === 'disconnected') {
       return await this.giveUpDisconnectedPreparation(runId, reason)
-    if (run.execution.status === 'disconnected')
+    }
+    if (run.execution.status === 'disconnected') {
       return await this.giveUpDisconnectedExecution(runId, reason)
-    if (run.publication.status === 'disconnected')
+    }
+    if (run.publication.status === 'disconnected') {
       return await this.giveUpDisconnectedPublication(runId, reason)
+    }
     throw Object.assign(new Error(`Review run ${runId} has no disconnected axis to give up.`), {
       statusCode: 409
     })
@@ -265,10 +284,11 @@ export class OperatorDecisionStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId, reason]
       )
-      if (gaveUp.rowCount !== 1)
+      if (gaveUp.rowCount !== 1) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected preparation.`), {
           statusCode: 409
         })
+      }
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -297,7 +317,9 @@ export class OperatorDecisionStore {
         })
       }
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during the decision.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during the decision.`)
+      }
       return record
     })
   }
@@ -323,10 +345,11 @@ export class OperatorDecisionStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId, reason]
       )
-      if (gaveUp.rowCount !== 1)
+      if (gaveUp.rowCount !== 1) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected execution.`), {
           statusCode: 409
         })
+      }
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -355,7 +378,9 @@ export class OperatorDecisionStore {
         })
       }
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during the decision.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during the decision.`)
+      }
       return record
     })
   }
@@ -382,10 +407,11 @@ export class OperatorDecisionStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId, reason]
       )
-      if (gaveUp.rowCount !== 1)
+      if (gaveUp.rowCount !== 1) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected publication.`), {
           statusCode: 409
         })
+      }
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -403,7 +429,9 @@ export class OperatorDecisionStore {
         reasonCode: 'PUBLICATION_GIVEN_UP_BY_OPERATOR'
       })
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during the decision.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during the decision.`)
+      }
       return record
     })
   }
@@ -414,12 +442,15 @@ export class OperatorDecisionStore {
    * run whose replays never resolved stays stuck with no owner and no writer. */
   async resumeDisconnectedExecution(runId: string): Promise<ReviewRunRecord> {
     return await transaction(this.pool, async (client) => {
-      if (!(await this.executions.resumeDisconnectedSubmissionRecoveryOn(client, runId)))
+      if (!(await this.executions.resumeDisconnectedSubmissionRecoveryOn(client, runId))) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected execution.`), {
           statusCode: 409
         })
+      }
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during resumption.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during resumption.`)
+      }
       return record
     })
   }
@@ -448,10 +479,11 @@ export class OperatorDecisionStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId]
       )
-      if (resumed.rowCount !== 1)
+      if (resumed.rowCount !== 1) {
         throw Object.assign(new Error(`Review run ${runId} is not a disconnected preparation.`), {
           statusCode: 409
         })
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -466,7 +498,9 @@ export class OperatorDecisionStore {
         axis: 'preparation'
       })
       const record = await findRunRecord(client, this.connectorId, runId)
-      if (record === null) throw new Error(`Review run ${runId} disappeared during resumption.`)
+      if (record === null) {
+        throw new Error(`Review run ${runId} disappeared during resumption.`)
+      }
       return record
     })
   }

@@ -182,7 +182,9 @@ export class ReviewRunStore {
             : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
         ]
       )
-      if (run.rowCount !== 1) return false
+      if (run.rowCount !== 1) {
+        return false
+      }
       // A terminal execution failure ends the run, so the requester is told about it. The notice is
       // keyed by the run rather than by preparation: this failure is not a preparation failure,
       // and leaving it unannounced meant a run could stop partway with no reply ever posted.

@@ -15,7 +15,9 @@ class FakeExecutionRunClient {
   startError: Error | undefined
 
   start(request: ExecutionWorkflowInput): Promise<ExecutionRecord> {
-    if (this.startError) return Promise.reject(this.startError)
+    if (this.startError) {
+      return Promise.reject(this.startError)
+    }
     if (this.conflict) {
       throw new ExecutionRunConflictError(request.run_id, request.workflow, 'issue-review')
     }

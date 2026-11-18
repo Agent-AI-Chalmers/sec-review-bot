@@ -20,8 +20,12 @@ function timestamp(): string {
 }
 
 function formatScalar(value: unknown): string {
-  if (value == null) return 'null'
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value == null) {
+    return 'null'
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
 
   const text =
     typeof value === 'string'
@@ -55,7 +59,9 @@ function formatValue(value: unknown): string {
     return `[${value.map((item) => formatScalar(item)).join(',')}]`
   }
 
-  if (value instanceof Error) return JSON.stringify(describeError(value))
+  if (value instanceof Error) {
+    return JSON.stringify(describeError(value))
+  }
 
   if (value && typeof value === 'object') {
     return JSON.stringify(value)

@@ -30,8 +30,12 @@ const EXPECTED_HEADERS = [
 async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    if (await predicate()) return
-    if (Date.now() > deadline) throw new Error(message)
+    if (await predicate()) {
+      return
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message)
+    }
     await delay(intervalMs)
   }
 }
@@ -45,8 +49,12 @@ async function waitUntilValue(
   const deadline = Date.now() + timeoutMs
   for (;;) {
     const value = await produce()
-    if (predicate(value)) return value
-    if (Date.now() > deadline) throw new Error(message)
+    if (predicate(value)) {
+      return value
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message)
+    }
     await delay(intervalMs)
   }
 }
@@ -60,7 +68,9 @@ async function runFilesError(page, baseURL) {
 }
 
 async function skipEmptyExternalRuns(page, fixtureRuntime) {
-  if (fixtureRuntime.server !== undefined) return
+  if (fixtureRuntime.server !== undefined) {
+    return
+  }
   test.skip(
     (await page.locator('tbody tr').count()) === 0,
     'The external deployment currently has no runs to inspect.'

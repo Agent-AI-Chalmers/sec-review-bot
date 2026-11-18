@@ -100,6 +100,7 @@ test('viewer rejects duplicate identities, unordered records, and inconsistent c
       { seq: 2, event: 'model_calls_end', status: 'failed' },
       { ...message, seq: 3 }
     ]
-  ])
+  ]) {
     expect(() => parseViewerInput(encode(records))).toThrow()
+  }
 })

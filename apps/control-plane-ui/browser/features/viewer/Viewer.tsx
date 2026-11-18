@@ -23,7 +23,9 @@ import { ICON_SIZE } from '../../shared/design.js'
 /** Read trajectory JSONL. */
 export function parseViewerInput(input: string): TrajectoryEvent[] {
   const events = readTrajectoryJsonl(input)
-  if (!events.length) throw new Error('empty_input')
+  if (!events.length) {
+    throw new Error('empty_input')
+  }
   return events
 }
 
@@ -60,16 +62,22 @@ export function Viewer(): React.JSX.Element {
     }
   }
   const upload = async (file: File | null): Promise<void> => {
-    if (!file) return
+    if (!file) {
+      return
+    }
     const attempt = ++uploadGeneration.current
     try {
       const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      if (attempt !== uploadGeneration.current) return
+      if (attempt !== uploadGeneration.current) {
+        return
+      }
       setFilename(file.name)
       setInput(content)
       render(content)
     } catch {
-      if (attempt !== uploadGeneration.current) return
+      if (attempt !== uploadGeneration.current) {
+        return
+      }
       setEvents([])
       setError(t('viewerParseFailed'))
       setInputOpened(true)

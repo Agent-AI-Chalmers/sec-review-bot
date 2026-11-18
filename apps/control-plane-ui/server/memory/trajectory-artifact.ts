@@ -14,11 +14,13 @@ export function readTrajectoryArtifact(bytes: Buffer): TrajectoryEvent[] {
   })
   const text = new TextDecoder('utf-8', { fatal: true }).decode(content)
   for (const line of text.split('\n')) {
-    if (Buffer.byteLength(line, 'utf8') > MAX_TRAJECTORY_LINE_BYTES)
+    if (Buffer.byteLength(line, 'utf8') > MAX_TRAJECTORY_LINE_BYTES) {
       throw new Error('invalid_trajectory_artifact')
+    }
   }
   const events = readTrajectoryJsonl(text)
-  if (events.filter((event) => event.event === 'message').length > MAX_TRAJECTORY_MESSAGES)
+  if (events.filter((event) => event.event === 'message').length > MAX_TRAJECTORY_MESSAGES) {
     throw new Error('invalid_trajectory_artifact')
+  }
   return events
 }

@@ -32,8 +32,9 @@ test.each(['new', 'rename'] as const)(
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     expect(onFilesChange).not.toHaveBeenCalled()
-    if (operation === 'new')
+    if (operation === 'new') {
       await waitFor(() => expect(within(dialog).getByRole('alert')).toBeVisible())
+    }
   }
 )
 

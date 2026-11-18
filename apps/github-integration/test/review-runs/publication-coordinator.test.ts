@@ -45,9 +45,12 @@ const REPOSITORY_CONTEXT = {
 function fakeInstallationOctokit() {
   const { octokit } = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (method === 'GET') return githubJson([])
-    if (pathname.endsWith('/issues'))
+    if (method === 'GET') {
+      return githubJson([])
+    }
+    if (pathname.endsWith('/issues')) {
       return githubJson({ number: 11, html_url: 'https://example.test/i/11' })
+    }
     return githubJson({})
   })
   return octokit
@@ -218,7 +221,9 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
   const store = {
     renewPublicationClaim: async () => {
       renewals += 1
-      if (renewals === 1) return true
+      if (renewals === 1) {
+        return true
+      }
       observeHeartbeat?.()
       return await new Promise<boolean>((resolve) => {
         resolveHeartbeat = resolve
@@ -521,10 +526,14 @@ test('a refused conclusion is logged as left for the operator when a step is par
       completePublication: async () => false,
       failPublication: async () => false,
       initializePublicationSteps: async () => {
-        if (publishThrows) throw new Error('GitHub answered 502 Bad Gateway')
+        if (publishThrows) {
+          throw new Error('GitHub answered 502 Bad Gateway')
+        }
       },
       listPublicationSteps: async () => {
-        if (stepStatus === 'unreadable') throw new Error('Review Runs unreachable')
+        if (stepStatus === 'unreadable') {
+          throw new Error('Review Runs unreachable')
+        }
         return [
           {
             step_key: 'repository:delivery:gone',

@@ -12,7 +12,9 @@ export function HighlightText({
   query: string
 }): React.JSX.Element {
   const needle = query.trim()
-  if (!needle) return <>{value}</>
+  if (!needle) {
+    return <>{value}</>
+  }
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const parts = value.split(new RegExp(`(${escaped})`, 'gi'))
   return (
@@ -25,13 +27,17 @@ export function HighlightText({
 }
 
 function highlightNode(node: React.ReactNode, query: string): React.ReactNode {
-  if (typeof node === 'string') return <HighlightText value={node} query={query} />
-  if (Array.isArray(node))
+  if (typeof node === 'string') {
+    return <HighlightText value={node} query={query} />
+  }
+  if (Array.isArray(node)) {
     return node.map((item: React.ReactNode, index) => (
       <React.Fragment key={index}>{highlightNode(item, query)}</React.Fragment>
     ))
-  if (React.isValidElement<{ children?: React.ReactNode }>(node))
+  }
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
     return React.cloneElement(node, undefined, highlightNode(node.props.children, query))
+  }
   return node
 }
 

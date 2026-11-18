@@ -88,7 +88,9 @@ export function normalizeArtifactStorage(
   storage: ExecutionArtifactStorage | null,
   context = 'artifact_storage'
 ): ArtifactStorage {
-  if (storage === null) return null
+  if (storage === null) {
+    return null
+  }
   if (storage.status === 'available') {
     const artifact = storage.artifact
     if (artifact == null) {

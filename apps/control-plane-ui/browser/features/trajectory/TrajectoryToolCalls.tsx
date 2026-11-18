@@ -12,7 +12,9 @@ import { ToolArguments } from './ToolArguments.js'
 function ToolCall({ call, query }: { call: ToolCallView; query: string }): React.JSX.Element {
   const t = useMessages()
   const jump = (): void => {
-    if (!call.resultMessageId) return
+    if (!call.resultMessageId) {
+      return
+    }
     scrollToTrajectoryElement(`trajectory-${call.resultMessageId}`)
   }
   return (
@@ -73,7 +75,9 @@ export function TrajectoryToolCalls({
   const [opened, setOpened] = React.useState(true)
   const previousForce = React.useRef(force)
   React.useEffect(() => {
-    if (force === previousForce.current) return
+    if (force === previousForce.current) {
+      return
+    }
     previousForce.current = force
     setOpened(force > 0)
   }, [force])

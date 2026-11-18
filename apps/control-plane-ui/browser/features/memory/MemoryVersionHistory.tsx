@@ -65,8 +65,9 @@ export function MemoryVersionHistory({
   const error = isGraph ? graphError : listError
 
   // An empty later page is not an empty history, so only page one shows the empty state.
-  if (!loading && versions.length === 0 && !error && pagination.page === 1)
+  if (!loading && versions.length === 0 && !error && pagination.page === 1) {
     return <EmptyState message={t('noVersions')} />
+  }
 
   return (
     <>

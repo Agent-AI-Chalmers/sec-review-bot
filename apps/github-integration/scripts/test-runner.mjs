@@ -43,5 +43,8 @@ try {
 } finally {
   await rm(configRoot, { recursive: true, force: true })
 }
-if (result.signal) process.kill(process.pid, result.signal)
-else process.exitCode = result.code ?? 1
+if (result.signal) {
+  process.kill(process.pid, result.signal)
+} else {
+  process.exitCode = result.code ?? 1
+}

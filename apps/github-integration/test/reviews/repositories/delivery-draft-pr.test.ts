@@ -107,7 +107,9 @@ function createOctokitMock({
       return githubJson({ sha: 'commit-sha' })
     }
     if (pathname.endsWith('/git/refs')) {
-      if (createRefMessage !== undefined) return githubJson({ message: createRefMessage }, 422)
+      if (createRefMessage !== undefined) {
+        return githubJson({ message: createRefMessage }, 422)
+      }
       calls.refs.push({
         ref: `refs/${String(payload.ref)}`,
         sha: String(payload.sha)
@@ -135,7 +137,9 @@ function createOctokitMock({
           : { tree: { sha: 'base-tree-sha' } }
       )
     }
-    if (pathname.endsWith('/pulls') && method === 'GET') return githubJson(createdPullRequests)
+    if (pathname.endsWith('/pulls') && method === 'GET') {
+      return githubJson(createdPullRequests)
+    }
     if (pathname.endsWith('/pulls') && method === 'POST') {
       if (lostPullResponse) {
         createdPullRequests.push({
@@ -249,7 +253,9 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
       },
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-claim-loss')
+        if (ownershipChecks === 2) {
+          throw new PublicationClaimLostError('run-claim-loss')
+        }
       }
     })
   ).rejects.toThrow(PublicationClaimLostError)

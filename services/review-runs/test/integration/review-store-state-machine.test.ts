@@ -18,8 +18,9 @@ import { assertPublicationAxesFollowSteps } from './publication-invariants.js'
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
-  if (!connectionString)
+  if (!connectionString) {
     throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  }
   return connectionString
 }
 
@@ -46,7 +47,9 @@ async function createStore(
   options: { connectorId?: string; claimTimeoutMs?: number } = {}
 ): Promise<ReviewRunStore> {
   const owner = options.connectorId ?? connectorId()
-  if (!connectorIds.includes(owner)) connectorIds.push(owner)
+  if (!connectorIds.includes(owner)) {
+    connectorIds.push(owner)
+  }
   const store = new ReviewRunStore({
     connectionString: requireTestDatabase(),
     connectorId: owner,
@@ -832,7 +835,9 @@ test('ReviewRunStore records one immutable schema version across concurrent init
     expect(versions.map((item) => [item.version, item.name])).toStrictEqual([
       [1, 'initial_coordination_schema']
     ])
-    for (const version of versions) expect(version.checksum).toMatch(/^[a-f0-9]{64}$/)
+    for (const version of versions) {
+      expect(version.checksum).toMatch(/^[a-f0-9]{64}$/)
+    }
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -1396,8 +1401,9 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.publicationClaims.claim(runId)
       expect.assert(token)
-      if (attempt === 0)
+      if (attempt === 0) {
         await store.publications.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+      }
       await store.publications.requirePublicationStepClaim(runId, token, 'issue:summary-comment')
       expect(
         await store.publications.failPublicationStep(runId, token, 'issue:summary-comment', {
@@ -1461,8 +1467,9 @@ test('a reconciliation that finds the side effect completes an exhausted step', 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.publicationClaims.claim(runId)
       expect.assert(token)
-      if (attempt === 0)
+      if (attempt === 0) {
         await store.publications.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+      }
       await store.publications.requirePublicationStepClaim(runId, token, 'issue:summary-comment')
       await store.publications.failPublicationStep(runId, token, 'issue:summary-comment', {
         message: 'response lost after posting'
@@ -3422,7 +3429,9 @@ test('giving up on a disconnected publication fails rather than skipping', async
           status: string
         }
       ).status
-      if (status === 'disconnected') break
+      if (status === 'disconnected') {
+        break
+      }
       await claim()
     }
     expect((await store.queries.getRun(runId))?.publication.status).toBe('disconnected')
@@ -3688,11 +3697,14 @@ test('a second step parking later does not move the publication parked_at', asyn
         const current = (await store.publications.listPublicationSteps(runId)).find(
           (item) => item.step_key === step
         )?.status
-        if (current === 'disconnected') return
-        if (current === 'pending' || current === 'failed')
+        if (current === 'disconnected') {
+          return
+        }
+        if (current === 'pending' || current === 'failed') {
           await store.publications
             .requirePublicationStepClaim(runId, token, step)
             .catch(() => undefined)
+        }
         await store.publications.failPublicationStep(
           runId,
           token,
@@ -3742,11 +3754,14 @@ async function parkStep(
     const status = (await store.publications.listPublicationSteps(runId)).find(
       (item) => item.step_key === step
     )?.status
-    if (status === 'disconnected') return
-    if (status === 'pending' || status === 'failed')
+    if (status === 'disconnected') {
+      return
+    }
+    if (status === 'pending' || status === 'failed') {
       await store.publications
         .requirePublicationStepClaim(runId, token, step)
         .catch(() => undefined)
+    }
     await store.publications.failPublicationStep(
       runId,
       token,
@@ -3785,7 +3800,9 @@ test('a reconciliation that keeps failing across passes parks the step instead o
     let passes = 0
     for (; passes < 10; passes += 1) {
       const status = (await store.publications.listPublicationSteps(runId))[0]?.status
-      if (status === 'disconnected') break
+      if (status === 'disconnected') {
+        break
+      }
       // One connector pass: the claim is refused as exhausted, the lookup fails, the failure is
       // recorded as a retryable reconciliation failure, and the publication is retried.
       await expect(
@@ -4376,7 +4393,9 @@ test('a step claim is refused once another path has concluded the publication', 
       'pending'
     )
   } finally {
-    if (holding) await blocker.query('ROLLBACK')
+    if (holding) {
+      await blocker.query('ROLLBACK')
+    }
     await claim?.catch(() => undefined)
     blocker.release()
     await pool.end()
@@ -4813,10 +4832,11 @@ for (const selector of ['claim', 'claimNext'] as const) {
         await expect(
           store.publications.requirePublicationStepClaim(runId, token, 'unresolved')
         ).rejects.toSatisfy(() => true)
-        if (fromStatus === 'pending')
+        if (fromStatus === 'pending') {
           expect(
             await store.publications.fail(runId, token, { message: 'retry' }, { retry: true })
           ).toBe(true)
+        }
         const unresolved = (await store.publications.listPublicationSteps(runId)).find(
           (s) => s.step_key === 'unresolved'
         )
@@ -4949,7 +4969,9 @@ test('a waiting publication claim reads step uncertainty committed by the lock h
     expect(event?.to_status).toBe('uncertain')
     expect(event?.reason_code).toBe('PUBLICATION_LEASE_EXPIRED')
   } finally {
-    if (holding) await holder.query('ROLLBACK')
+    if (holding) {
+      await holder.query('ROLLBACK')
+    }
     await pending?.catch(() => undefined)
     holder.release()
     await observer.end()
@@ -5033,8 +5055,9 @@ test('publication ownership constraints reject missing, partial and unexpected l
                WHERE run_id=$1`,
               [runId, status, hasToken ? randomUUID() : null, hasLease ? new Date() : null]
             )
-            if (hasToken === owned && hasLease === owned) await update
-            else
+            if (hasToken === owned && hasLease === owned) {
+              await update
+            } else {
               await expect(update).rejects.toSatisfy(
                 (error: unknown) =>
                   error instanceof Error &&
@@ -5043,6 +5066,7 @@ test('publication ownership constraints reject missing, partial and unexpected l
                   'constraint' in error &&
                   error.constraint === 'publications_ownership_check'
               )
+            }
           } finally {
             await client.query('ROLLBACK')
             client.release()

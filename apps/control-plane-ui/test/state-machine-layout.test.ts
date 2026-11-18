@@ -27,11 +27,12 @@ test('every drawn state has its own cell, and no cell names an undeclared state'
 test('every listed return edge is a transition the contract declares', () => {
   for (const machine of STATE_MACHINES) {
     const declared = new Set(machine.transitions.map((edge) => `${edge.from}->${edge.to}`))
-    for (const edge of RETURN_EDGES[machine.axis])
+    for (const edge of RETURN_EDGES[machine.axis]) {
       expect.assert(
         declared.has(edge),
         `${machine.axis} lists ${edge} as a return edge, but the contract does not declare it`
       )
+    }
   }
 })
 
@@ -53,9 +54,13 @@ test('no edge passes through a state it does not connect', () => {
   for (const machine of STATE_MACHINES) {
     const { nodes, edges } = diagramGeometry(machine)
     for (const edge of edges) {
-      if (edge.kind === 'self') continue
+      if (edge.kind === 'self') {
+        continue
+      }
       for (const node of nodes) {
-        if (node.state === edge.from || node.state === edge.to) continue
+        if (node.state === edge.from || node.state === edge.to) {
+          continue
+        }
         const hit = edge.samples.find(
           (point) =>
             Math.abs(point.x - node.center.x) < NODE_W / 2 &&
@@ -77,17 +82,20 @@ test('the view box contains every node and edge', () => {
       y >= viewBox.y &&
       x <= viewBox.x + viewBox.width &&
       y <= viewBox.y + viewBox.height
-    for (const node of nodes)
+    for (const node of nodes) {
       expect.assert(
         inside(node.center.x - NODE_W / 2, node.center.y - NODE_H / 2) &&
           inside(node.center.x + NODE_W / 2, node.center.y + NODE_H / 2),
         `${machine.axis}.${node.state} is clipped`
       )
-    for (const edge of edges)
-      for (const point of edge.samples)
+    }
+    for (const edge of edges) {
+      for (const point of edge.samples) {
         expect.assert(
           inside(point.x, point.y),
           `${machine.axis} ${edge.from}->${edge.to} is clipped`
         )
+      }
+    }
   }
 })

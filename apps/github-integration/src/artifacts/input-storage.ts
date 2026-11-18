@@ -69,7 +69,9 @@ async function existingObjectMatches(
       const listed = await client.send(
         new ListObjectsV2Command({ Bucket: bucket, Prefix: key, MaxKeys: 1 })
       )
-      if (!listed.Contents?.some((item) => item.Key === key)) return undefined
+      if (!listed.Contents?.some((item) => item.Key === key)) {
+        return undefined
+      }
     }
     throw error
   }
@@ -87,8 +89,9 @@ export function publishedInputBundleReference(
   runId: string
 ): InputBundleArtifactRef {
   if (artifact_store === 'file') {
-    if (!/^[A-Za-z0-9_-]+$/.test(runId) || !/^sha256:[0-9a-f]{64}$/.test(reference.digest))
+    if (!/^[A-Za-z0-9_-]+$/.test(runId) || !/^sha256:[0-9a-f]{64}$/.test(reference.digest)) {
       throw new Error('Invalid input bundle publication identity.')
+    }
     return {
       ...reference,
       uri: pathToFileURL(
@@ -106,7 +109,9 @@ export async function publishInputBundle(
 ): Promise<InputBundleArtifactRef> {
   if (artifact_store === 'file') {
     const published = publishedInputBundleReference(reference, runId)
-    if (await inputBundleExists(published)) return published
+    if (await inputBundleExists(published)) {
+      return published
+    }
     const source = fileURLToPath(reference.uri)
     const destination = fileURLToPath(published.uri)
     await fs.mkdir(path.dirname(destination), { recursive: true })
@@ -119,8 +124,9 @@ export async function publishInputBundle(
           ...reference,
           uri: pathToFileURL(staged).href
         }))
-      )
+      ) {
         throw new Error('Local input bundle publication source is missing.')
+      }
       // Link only the complete verified copy. Unlike rename, link cannot replace
       // a concurrent winner. Attempts remove only their own temporary directory.
       try {
@@ -133,11 +139,13 @@ export async function publishInputBundle(
             'code' in error &&
             error.code === 'EEXIST'
           )
-        )
+        ) {
           throw error
+        }
       }
-      if (!(await inputBundleExists(published)))
+      if (!(await inputBundleExists(published))) {
         throw new Error('Published local input bundle is missing.')
+      }
       return published
     } finally {
       await fs.rm(temporary, { recursive: true, force: true })
@@ -200,23 +208,33 @@ export async function inputBundleExists(reference: InputBundleArtifactRef): Prom
       const { size } = await fs.stat(source)
       const digest = createHash('sha256')
       await pipeline(createReadStream(source), digest)
-      if (size !== reference.size_bytes || `sha256:${digest.digest('hex')}` !== reference.digest)
+      if (size !== reference.size_bytes || `sha256:${digest.digest('hex')}` !== reference.digest) {
         throw new Error('Local input bundle differs from its immutable intent.')
+      }
       return true
     } catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         return false
+      }
       throw error
     }
   }
-  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket)
+  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket) {
     throw new Error('Input bundle uses an unconfigured store.')
+  }
   const matches = await existingObjectMatches(
     configuredClient(),
     uri.hostname,
     uri.pathname.slice(1),
     reference
   )
-  if (matches === false) throw new Error('Input bundle object differs from its immutable intent.')
+  if (matches === false) {
+    throw new Error('Input bundle object differs from its immutable intent.')
+  }
   return matches === true
 }

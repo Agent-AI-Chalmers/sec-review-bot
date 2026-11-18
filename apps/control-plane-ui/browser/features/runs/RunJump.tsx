@@ -36,7 +36,9 @@ export function RunJump(): React.JSX.Element {
           onSubmit={(event) => {
             event.preventDefault()
             const requestedRunId = value.trim()
-            if (!requestedRunId) return
+            if (!requestedRunId) {
+              return
+            }
             setOpened(false)
             setValue('')
             void navigate(`/runs/${encodeURIComponent(requestedRunId)}`)

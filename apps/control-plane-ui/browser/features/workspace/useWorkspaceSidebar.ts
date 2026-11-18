@@ -34,7 +34,9 @@ export function useWorkspaceSidebar(): WorkspaceSidebar {
     )
     currentSidebarWidth.current = next
     setSidebarWidth(next)
-    if (persist) localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next))
+    if (persist) {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next))
+    }
   }
   return {
     workspaceRef,
@@ -46,7 +48,9 @@ export function useWorkspaceSidebar(): WorkspaceSidebar {
       tabIndex: 0,
       onDoubleClick: () => updateSidebarWidth(DEFAULT_SIDEBAR_WIDTH, true),
       onKeyDown: (event): void => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+          return
+        }
         event.preventDefault()
         updateSidebarWidth(sidebarWidth + (event.key === 'ArrowLeft' ? -16 : 16), true)
       },
@@ -55,11 +59,14 @@ export function useWorkspaceSidebar(): WorkspaceSidebar {
         event.currentTarget.setPointerCapture(event.pointerId)
       },
       onPointerMove: (event): void => {
-        if (dragStart.current)
+        if (dragStart.current) {
           updateSidebarWidth(dragStart.current.width + event.clientX - dragStart.current.pointerX)
+        }
       },
       onPointerUp: (event): void => {
-        if (!dragStart.current) return
+        if (!dragStart.current) {
+          return
+        }
         dragStart.current = null
         event.currentTarget.releasePointerCapture(event.pointerId)
         localStorage.setItem(SIDEBAR_WIDTH_KEY, String(currentSidebarWidth.current))

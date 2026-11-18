@@ -96,7 +96,9 @@ async function derivePublicationStatus(
     [runId, connectorId, OWNED_PUBLICATION_STATUSES]
   )
   const changed = result.rows[0]
-  if (changed === undefined) return
+  if (changed === undefined) {
+    return
+  }
   // The axis moved because of what a step did, and the audit log records every other transition
   // for the same reason: an axis state that changed with no event would make the timeline lie.
   const eventId = await appendEvent(client, {
@@ -180,7 +182,9 @@ export class PublicationStore {
       [runId, this.connectorId]
     )
     const row = result.rows[0]
-    if (row === undefined) return false
+    if (row === undefined) {
+      return false
+    }
     // Refresh both budgets for disconnected steps; leave successful steps untouched.
     // Each operator resume is audited and grants another recovery cycle without a lifetime cap.
     const resumedSteps = await client.query<{ step_key: string }>(
@@ -199,12 +203,13 @@ export class PublicationStore {
       toStatus: 'pending',
       reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
     })
-    for (const step of resumedSteps.rows.toSorted((a, b) => a.step_key.localeCompare(b.step_key)))
+    for (const step of resumedSteps.rows.toSorted((a, b) => a.step_key.localeCompare(b.step_key))) {
       await this.appendStepEvent(client, runId, step.step_key, {
         fromStatus: 'disconnected',
         toStatus: 'pending',
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
       })
+    }
     await supersedeRunAttentionNotices(client, {
       runId,
       connectorId: this.connectorId,
@@ -233,7 +238,9 @@ export class PublicationStore {
         [runId, this.connectorId, token, CONCLUDABLE_PUBLICATION_STATUSES]
       )
       const completed = result.rows[0]
-      if (completed === undefined) return false
+      if (completed === undefined) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -285,7 +292,9 @@ export class PublicationStore {
         ]
       )
       const failed = result.rows[0]
-      if (failed === undefined) return false
+      if (failed === undefined) {
+        return false
+      }
       // A terminal publication failure ends the run, and this is the only place it is concluded,
       // so the requester is told about it here.
       const publicationEventId = await appendEvent(client, {
@@ -315,11 +324,12 @@ export class PublicationStore {
     stepKeys: string[]
   ): Promise<void> {
     const uniqueKeys = [...new Set(stepKeys)].sort()
-    if (uniqueKeys.length !== stepKeys.length)
+    if (uniqueKeys.length !== stepKeys.length) {
       throw new DeterministicReviewRunError(
         `Publication ${runId} contains duplicate step keys.`,
         PUBLICATION_STEP_ERROR_CODES.set_duplicate
       )
+    }
     const owned = await this.withOwnedPublication(runId, token, false, async (client) => {
       const existing = await client.query<{ step_key: string }>(
         `
@@ -361,8 +371,9 @@ export class PublicationStore {
       }
       return true
     })
-    if (!owned)
+    if (!owned) {
       throw new Error(`Publication claim was lost before steps were initialized: ${runId}`)
+    }
   }
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
     return await this.listPublicationStepsWith(this.pool, runId)
@@ -434,7 +445,9 @@ export class PublicationStore {
          FOR UPDATE`,
         [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
       )
-      if (owner.rowCount !== 1) return notOwned
+      if (owner.rowCount !== 1) {
+        return notOwned
+      }
       return await write(client)
     })
   }
@@ -480,7 +493,9 @@ export class PublicationStore {
         [runId, this.connectorId, token, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
       )
       const claimed = result.rows[0]
-      if (claimed === undefined) return false
+      if (claimed === undefined) {
+        return false
+      }
       await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: claimed.from_status,
         toStatus: 'running'
@@ -489,7 +504,9 @@ export class PublicationStore {
     })
   }
   async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
-    if (await this.claimPublicationStep(runId, token, stepKey)) return
+    if (await this.claimPublicationStep(runId, token, stepKey)) {
+      return
+    }
 
     // A token that no longer owns the publication gets `not_claimable` below: there is nothing
     // left for it to reconcile.
@@ -513,11 +530,12 @@ export class PublicationStore {
           [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
         )
         // `current` was read under the publication lock, so it is the status this UPDATE left.
-        if (moved.rowCount === 1)
+        if (moved.rowCount === 1) {
           await this.appendStepEvent(client, runId, stepKey, {
             fromStatus: current.status,
             toStatus: 'uncertain'
           })
+        }
       }
       await derivePublicationStatus(client, this.connectorId, runId)
       return needsReconciliation
@@ -590,7 +608,9 @@ export class PublicationStore {
           `,
             stepParams
           )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: 'uncertain',
         toStatus: outcome.found ? 'succeeded' : 'terminal_failed'
@@ -619,7 +639,9 @@ export class PublicationStore {
       `,
         [runId, this.connectorId, stepKey, remote.id ?? null, remote.url ?? null]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: 'running',
         toStatus: 'succeeded'
@@ -651,7 +673,9 @@ export class PublicationStore {
           [runId, this.connectorId, stepKey]
         )
         const stored = current.rows[0]?.unresolved_recovery_count
-        if (stored !== undefined && stored > expected) return true
+        if (stored !== undefined && stored > expected) {
+          return true
+        }
       }
       // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
       // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step, $7-$9 the
@@ -698,7 +722,9 @@ export class PublicationStore {
         ]
       )
       const moved = result.rows[0]
-      if (moved === undefined) return false
+      if (moved === undefined) {
+        return false
+      }
       await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: moved.from_status,
         toStatus: moved.to_status,

@@ -34,7 +34,9 @@ const validators = new Map<string, ValidateFunction>()
 
 function validate(schemaName: string, value: unknown): boolean {
   const cached = validators.get(schemaName)
-  if (cached !== undefined) return cached(value)
+  if (cached !== undefined) {
+    return cached(value)
+  }
   const schema = JSON.parse(
     readFileSync(path.join(root, CONTRACT_VERSION_DIR, schemaName), 'utf8')
   ) as AnySchemaObject
@@ -112,7 +114,9 @@ function tokenUsages(value: unknown): Array<Record<string, number | null>> {
       node.forEach(walk)
       return
     }
-    if (typeof node !== 'object' || node === null) return
+    if (typeof node !== 'object' || node === null) {
+      return
+    }
     const record = node as Record<string, unknown>
     const usage = record.token_usage
     if (typeof usage === 'object' && usage !== null) {
@@ -129,7 +133,9 @@ test('token usage keeps the documented subset invariants', () => {
   // contract text and the fixtures pin it. A fixture that broke it would teach consumers to
   // add fields that must not be added.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    if (schemaName !== 'observed-run.schema.json') continue
+    if (schemaName !== 'observed-run.schema.json') {
+      continue
+    }
     for (const usage of tokenUsages(fixture(name))) {
       const input = usage.input_tokens
       const cacheRead = usage.cache_read_input_tokens
@@ -172,7 +178,9 @@ test('each invalid fixture differs from its valid counterpart only where it inte
   for (const [valid, prefix] of pairs) {
     const expected = paths(fixture(valid)).sort()
     for (const name of Object.keys(manifest.invalid_schema_fixtures)) {
-      if (!name.startsWith(prefix)) continue
+      if (!name.startsWith(prefix)) {
+        continue
+      }
       // Only a fixture whose name says a field is missing may omit valid paths. Every other one
       // has to carry the complete valid shape and differ by value (or by one stray field), so a
       // required field added to the contract forces all of them to be updated instead of quietly

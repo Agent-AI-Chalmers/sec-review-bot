@@ -23,8 +23,9 @@ async function memoryTreeArchive(
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>)
+    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
       chunks.push(Buffer.from(chunk))
+    }
   })()
   for (const item of entries) {
     const body =
@@ -45,8 +46,11 @@ async function memoryTreeArchive(
         gid: 0
       }
       const done = (error?: Error | null): void => (error ? reject(error) : resolve())
-      if (body === undefined) pack.entry(header, done)
-      else pack.entry(header, body, done)
+      if (body === undefined) {
+        pack.entry(header, done)
+      } else {
+        pack.entry(header, body, done)
+      }
     })
   }
   pack.finalize()
@@ -87,8 +91,9 @@ test('TypeScript memory tree builder rejects content outside the contract', asyn
 
 test('TypeScript memory tree entry limit includes parent directories', async () => {
   const content = new Map<string, string>([['MEMORY.md', '# Index\n']])
-  for (let index = 0; index < 4999; index += 1)
+  for (let index = 0; index < 4999; index += 1) {
     content.set(`topics/group-${index}/topic.md`, '# Topic\n')
+  }
 
   await expect(buildMemoryTreeArtifact(content)).rejects.toThrow(/entry count limit/)
 })

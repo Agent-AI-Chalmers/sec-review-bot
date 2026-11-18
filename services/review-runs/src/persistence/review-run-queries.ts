@@ -42,8 +42,12 @@ export function encodeRunListCursor(cursor: RunListCursor): string {
 export function decodeRunListCursor(cursor: string): RunListCursor | null {
   const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
   const [createdAt, runId, extra] = decoded.split('|')
-  if (!createdAt || !runId || extra !== undefined) return null
-  if (Number.isNaN(Date.parse(createdAt))) return null
+  if (!createdAt || !runId || extra !== undefined) {
+    return null
+  }
+  if (Number.isNaN(Date.parse(createdAt))) {
+    return null
+  }
   return { created_at_cursor: createdAt, run_id: runId }
 }
 
@@ -170,7 +174,9 @@ export class ReviewRunQueries {
       [runId, this.connectorId]
     )
     const row = result.rows[0]
-    if (row === undefined) return null
+    if (row === undefined) {
+      return null
+    }
     // Single-run reads cannot return a `dropped` side channel, so report corruption and preserve
     // the established nullable lookup contract.
     try {
@@ -184,7 +190,9 @@ export class ReviewRunQueries {
   async getExecutionStatistics(
     runIds: readonly string[]
   ): Promise<Map<string, ExecutionStatisticsSummary>> {
-    if (runIds.length === 0) return new Map()
+    if (runIds.length === 0) {
+      return new Map()
+    }
     const result = await this.pool.query<{
       run_id: string
       statistics: ExecutionStatisticsSummary
@@ -252,26 +260,36 @@ export class ReviewRunQueries {
       values.push(value)
       return `$${values.length}`
     }
-    if (options.workflow !== undefined) clauses.push(`r.workflow=${add(options.workflow)}`)
-    if (options.source_platform !== undefined)
+    if (options.workflow !== undefined) {
+      clauses.push(`r.workflow=${add(options.workflow)}`)
+    }
+    if (options.source_platform !== undefined) {
       clauses.push(`r.source_platform=${add(options.source_platform)}`)
+    }
     // Missing LEFT JOINed axes are corruption and must remain visible to projection even when a
     // status filter is present.
     if (options.execution_status !== undefined) {
       const status = add(options.execution_status)
       clauses.push(`(e.status=${status} OR e.run_id IS NULL)`)
     }
-    if (options.publication_status !== undefined)
+    if (options.publication_status !== undefined) {
       clauses.push(`p.status=${add(options.publication_status)}`)
+    }
     if (options.preparation_status !== undefined) {
       const status = add(options.preparation_status)
       clauses.push(`(pr.status=${status} OR pr.run_id IS NULL)`)
     }
-    if (options.from !== undefined) clauses.push(`r.created_at>=${add(options.from)}`)
-    if (options.to !== undefined) clauses.push(`r.created_at<${add(options.to)}`)
+    if (options.from !== undefined) {
+      clauses.push(`r.created_at>=${add(options.from)}`)
+    }
+    if (options.to !== undefined) {
+      clauses.push(`r.created_at<${add(options.to)}`)
+    }
     if (options.cursor !== undefined) {
       const cursor = decodeRunListCursor(options.cursor)
-      if (cursor === null) throw new Error('Invalid run list cursor.')
+      if (cursor === null) {
+        throw new Error('Invalid run list cursor.')
+      }
       clauses.push(
         `(r.created_at, r.run_id)<(${add(cursor.created_at_cursor)}, ${add(cursor.run_id)})`
       )

@@ -25,8 +25,9 @@ export async function publishAndSubmitInputBundle(
   input: Record<string, unknown>
 ): Promise<void> {
   const local = input.input_bundle as InputBundleArtifactRef
-  if (!local || typeof local.uri !== 'string')
+  if (!local || typeof local.uri !== 'string') {
     throw new Error('Prepared input is missing its input bundle.')
+  }
   const reference = publishedInputBundleReference(local, runId)
   const publishedInput = { ...input, input_bundle: reference }
   assertWorkflowInputFits(publishedInput, 'prepared review')
@@ -49,15 +50,17 @@ export async function recoverInputBundlePublication(
   const candidates = await store.listInputBundleCandidates(runId, token)
   for (const candidate of candidates) {
     if (!(await inputBundleExists(candidate.reference))) {
-      if (candidate.status === 'selected')
+      if (candidate.status === 'selected') {
         throw new Error('Selected input bundle is unavailable; cannot replace its input.')
+      }
       // Abandonment cannot cancel an in-flight PUT. Do not delete the
       // object here: an old uploader may still finish, and publication intents can share it.
       await store.settleInputBundleCandidate(runId, token, candidate.digest, 'abandoned')
       continue
     }
-    if (candidate.status !== 'selected')
+    if (candidate.status !== 'selected') {
       await store.settleInputBundleCandidate(runId, token, candidate.digest, 'present')
+    }
     // Publish context is checked against its workflow by the existing client boundary.
     await store.submitPreparedRun(
       runId,

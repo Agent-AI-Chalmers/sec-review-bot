@@ -54,7 +54,9 @@ function cellCenter(col: number, row: number): Point {
 function boundaryPoint(center: Point, toward: Point, gap: number): Point {
   const dx = toward.x - center.x
   const dy = toward.y - center.y
-  if (dx === 0 && dy === 0) return center
+  if (dx === 0 && dy === 0) {
+    return center
+  }
   const scale = Math.min(
     dx === 0 ? Infinity : (NODE_W / 2 + gap) / Math.abs(dx),
     dy === 0 ? Infinity : (NODE_H / 2 + gap) / Math.abs(dy)
@@ -146,7 +148,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const centers = new Map<string, Point>()
   for (const state of machine.states) {
     const cell = layout[state]
-    if (cell === undefined) throw new Error(`${machine.axis}.${state} has no diagram cell`)
+    if (cell === undefined) {
+      throw new Error(`${machine.axis}.${state} has no diagram cell`)
+    }
     centers.set(state, cellCenter(cell.col, cell.row))
   }
   const nodes = machine.states.map((state) => ({
@@ -162,7 +166,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const edges: DiagramEdge[] = []
   for (const [key, transitions] of groups) {
     const [first] = transitions
-    if (first === undefined) continue
+    if (first === undefined) {
+      continue
+    }
     const { from, to } = first
     const fromCenter = centers.get(from) as Point
     const toCenter = centers.get(to) as Point
@@ -187,12 +193,15 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
     let chosen = curve(fromCenter, toCenter, start)
     if (blocked(chosen.samples)) {
       const candidates: number[] = []
-      for (let bend = Math.max(start, 24); bend <= 120; bend += 16)
+      for (let bend = Math.max(start, 24); bend <= 120; bend += 16) {
         candidates.push(bend, ...(twin ? [] : [-bend]))
+      }
       for (const bend of candidates) {
         const attempt = curve(fromCenter, toCenter, bend)
         chosen = attempt
-        if (!blocked(attempt.samples)) break
+        if (!blocked(attempt.samples)) {
+          break
+        }
       }
     }
     edges.push({ from, to, transitions, kind, ...chosen })
@@ -205,11 +214,12 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
     xs.push(node.center.x - NODE_W / 2, node.center.x + NODE_W / 2)
     ys.push(node.center.y - NODE_H / 2, node.center.y + NODE_H / 2)
   }
-  for (const edge of edges)
+  for (const edge of edges) {
     for (const point of edge.samples) {
       xs.push(point.x)
       ys.push(point.y)
     }
+  }
   const minX = Math.min(...xs) - PAD
   const minY = Math.min(...ys) - PAD
   return {

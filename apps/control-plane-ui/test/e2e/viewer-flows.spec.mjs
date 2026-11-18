@@ -17,7 +17,9 @@ test('runtime recordings show natural flat order with subagent and summary label
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
   for (const name of ['subagents', 'summarization']) {
     const edit = page.getByRole('button', { name: 'Edit input' })
-    if (await edit.isVisible()) await edit.click()
+    if (await edit.isVisible()) {
+      await edit.click()
+    }
     const raw = trajectoryCorpus(`${name}.jsonl`)
     await page.getByLabel('Paste trajectory JSONL').fill(raw)
     await page.getByRole('button', { name: 'Render', exact: true }).click()

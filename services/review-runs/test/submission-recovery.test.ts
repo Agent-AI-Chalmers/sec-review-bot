@@ -316,7 +316,9 @@ for (const outcome of ['accepted', 'unknown', 'rejected', 'input_missing'] as co
       run(outcome === 'input_missing' ? null : { api_version: 'v1' }),
       {
         async submit() {
-          if (outcome === 'unknown' || outcome === 'rejected') throw new Error('remote outcome')
+          if (outcome === 'unknown' || outcome === 'rejected') {
+            throw new Error('remote outcome')
+          }
         },
         classifyError: (error) => ({
           uncertain: outcome === 'unknown',

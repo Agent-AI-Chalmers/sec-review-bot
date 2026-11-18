@@ -9,8 +9,9 @@ import type { IssueReviewInput } from '../../src/execution-api-types-generated.j
 import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
 
 const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS
-if (temporalAddress === undefined)
+if (temporalAddress === undefined) {
   throw new Error('TEST_TEMPORAL_ADDRESS is required for integration tests.')
+}
 
 async function issueReviewInput(): Promise<IssueReviewInput> {
   return JSON.parse(

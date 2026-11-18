@@ -91,7 +91,9 @@ export class RunNoticeStore {
         [this.connectorId, this.claimTimeoutMs]
       )
       const work = candidate.rows[0]
-      if (work === undefined) return null
+      if (work === undefined) {
+        return null
+      }
       const token = crypto.randomUUID()
       // Recheck the claimable state under the row lock before issuing a fresh fencing token.
       const claimedNotice = await client.query<{
@@ -105,8 +107,9 @@ export class RunNoticeStore {
          RETURNING status`,
         [work.notice_id, token, this.connectorId, work.status, this.claimTimeoutMs]
       )
-      if (claimedNotice.rowCount !== 1)
+      if (claimedNotice.rowCount !== 1) {
         throw new Error(`Run notice ${work.notice_id} could not be claimed.`)
+      }
       return { ...work, claim_token: token }
     })
   }

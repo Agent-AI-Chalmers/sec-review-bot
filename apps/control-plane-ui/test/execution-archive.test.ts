@@ -19,8 +19,9 @@ async function bundle(
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>)
+    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
       chunks.push(Buffer.from(chunk))
+    }
   })()
   for (const item of entries) {
     const body =
@@ -39,8 +40,11 @@ async function bundle(
         gid: 0
       }
       const done = (error?: Error | null): void => (error ? reject(error) : resolve())
-      if (body === undefined) pack.entry(header, done)
-      else pack.entry(header, body, done)
+      if (body === undefined) {
+        pack.entry(header, done)
+      } else {
+        pack.entry(header, body, done)
+      }
     })
   }
   pack.finalize()
@@ -146,8 +150,11 @@ test('execution archive reader matches the shared profile corpus', async () => {
 
   for (const item of manifest.corpus) {
     const read = readExecutionArchive(await readFile(path.join(corpus, item.file)), item.runId)
-    if (item.expected === 'valid') await read
-    else await expect(read, item.file).rejects.toThrow(/invalid_execution_archive/)
+    if (item.expected === 'valid') {
+      await read
+    } else {
+      await expect(read, item.file).rejects.toThrow(/invalid_execution_archive/)
+    }
   }
 })
 

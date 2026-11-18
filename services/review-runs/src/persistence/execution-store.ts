@@ -57,7 +57,9 @@ export class ExecutionStore {
       `,
         [runId, this.connectorId]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -73,7 +75,9 @@ export class ExecutionStore {
     runId: string,
     storage: ExecutionArtifactStorage | undefined
   ): Promise<void> {
-    if (storage === undefined) return
+    if (storage === undefined) {
+      return
+    }
     await this.pool.query(
       `
       UPDATE executions
@@ -117,7 +121,9 @@ export class ExecutionStore {
             : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
         ]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -153,7 +159,9 @@ export class ExecutionStore {
       `,
         [runId, token, this.connectorId, this.claimTimeoutMs, maxUnresolvedRecoveries]
       )
-      if (result.rows[0] === undefined) return null
+      if (result.rows[0] === undefined) {
+        return null
+      }
       // The state stays `uncertain`; taking the claim is not a transition, so record it as a
       // self-event to keep the operator timeline showing when a replay started.
       await appendEvent(client, {
@@ -192,7 +200,9 @@ export class ExecutionStore {
          RETURNING run_id`,
         [runId, this.connectorId]
       )
-      if (result.rows[0] === undefined) return false
+      if (result.rows[0] === undefined) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -232,7 +242,9 @@ export class ExecutionStore {
       `,
         [runId, this.connectorId, maxUnresolvedRecoveries, this.claimTimeoutMs]
       )
-      if (result.rows[0] === undefined) return false
+      if (result.rows[0] === undefined) {
+        return false
+      }
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

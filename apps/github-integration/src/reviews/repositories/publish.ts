@@ -198,7 +198,9 @@ export async function publishDeliveryDraftPrs({
       const persisted = persistedSteps.get(stepKey)
       // A deterministic rejection is already final for this delivery. Later
       // publication retries still need to reach the summary and other deliveries.
-      if (persisted?.status === 'terminal_failed') continue
+      if (persisted?.status === 'terminal_failed') {
+        continue
+      }
       const result =
         persisted?.status === 'succeeded' &&
         persisted.remote_object_id &&
@@ -225,7 +227,9 @@ export async function publishDeliveryDraftPrs({
               assert_publication_claim
             })
       if ('outcome' in result) {
-        if (result.recording === 'not_owned') throw new PublicationClaimLostError(run_id)
+        if (result.recording === 'not_owned') {
+          throw new PublicationClaimLostError(run_id)
+        }
         reconciliationFailure = result
         throw result.error
       }
@@ -249,7 +253,9 @@ export async function publishDeliveryDraftPrs({
         reused: draftPullRequest.reused
       })
     } catch (error) {
-      if (isPublicationClaimLostError(error)) throw error
+      if (isPublicationClaimLostError(error)) {
+        throw error
+      }
       const errorMessage = asErrorMessage(error)
       const failure = classifyPublicationFailure(error)
       // A failed reconciliation lookup was already recorded on its step by settleExhaustedStep.
@@ -286,12 +292,16 @@ export async function publishDeliveryDraftPrs({
           `Failed to publish repository delivery ${String(delivery?.delivery_id ?? '(unknown)')}: ${errorMessage}`,
           { cause: error }
         )
-        if (reconciliationFailure?.recording !== 'accepted') throw publicationFailure
+        if (reconciliationFailure?.recording !== 'accepted') {
+          throw publicationFailure
+        }
         deferredReconciliationFailure ??= publicationFailure
       }
     }
   }
-  if (deferredReconciliationFailure !== null) throw deferredReconciliationFailure
+  if (deferredReconciliationFailure !== null) {
+    throw deferredReconciliationFailure
+  }
 
   return published_delivery_entries
 }
@@ -364,14 +374,16 @@ async function claimOrReconcileSummaryIssue({
     })
   })
   const issueNumber = Number(step.remote.id)
-  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1)
+  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1) {
     throw new Error('Repository summary issue step is succeeded without a recorded issue number.')
-  if (step.reconciled)
+  }
+  if (step.reconciled) {
     logInfo('repository_summary_issue_reconciled', {
       event_type,
       repo: repo.repo_full_name,
       issue_number: issueNumber
     })
+  }
   return issueNumber
 }
 
@@ -419,7 +431,9 @@ async function publishOrReconcileDeliveryDraftPr({
   try {
     await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
   } catch (error) {
-    if (!isPublicationStepExhausted(error)) throw error
+    if (!isPublicationStepExhausted(error)) {
+      throw error
+    }
     const settled = await settleExhaustedStep({
       store,
       runId: run_id,
@@ -434,8 +448,12 @@ async function publishOrReconcileDeliveryDraftPr({
         return existing === null ? null : { id: existing.number, url: existing.html_url }
       }
     })
-    if (settled.outcome === 'lookup_failed') return settled
-    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded') throw error
+    if (settled.outcome === 'lookup_failed') {
+      return settled
+    }
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded') {
+      throw error
+    }
     logInfo('delivery_draft_pr_reconciled', {
       delivery_id: delivery.delivery_id,
       draft_pr_number: Number(settled.remote.id),
@@ -581,7 +599,9 @@ async function publishRepositoryReviewResult({
       return { id: comment.id, url: comment.html_url }
     }
   })
-  if (commentStep.alreadySucceeded) return
+  if (commentStep.alreadySucceeded) {
+    return
+  }
   logInfo('repository_summary_comment_publish_completed', {
     comment_id: commentStep.remote.id,
     comment_url: commentStep.remote.url,

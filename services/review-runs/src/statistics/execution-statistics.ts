@@ -112,7 +112,9 @@ function stringValue(value: unknown): string | null {
 }
 
 function positiveInteger(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    return null
+  }
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
@@ -124,7 +126,9 @@ interface ParsedTokenUsage {
 
 function tokenUsage(observation: LangfuseObservation): ParsedTokenUsage | null {
   const details = observation.usageDetails
-  if (details === undefined) return null
+  if (details === undefined) {
+    return null
+  }
   const ordinaryInput = tokenValue(details.input)
   const ordinaryOutput = tokenValue(details.output)
   const total = tokenValue(details.total)
@@ -138,8 +142,9 @@ function tokenUsage(observation: LangfuseObservation): ParsedTokenUsage | null {
     cacheRead === null &&
     cacheCreation === null &&
     reasoning === null
-  )
+  ) {
     return null
+  }
 
   // Langfuse usage details are mutually exclusive billing buckets. The Review Runs
   // boundary exposes OpenTelemetry-style inclusive input/output totals instead.
@@ -239,11 +244,15 @@ export function aggregateExecutionStatistics(
     if (parsed !== null) {
       usageReportedCallCount += 1
       group.usageReportedCallCount += 1
-      if (parsed.sourceTotalMismatch) sourceTotalMismatchCount += 1
+      if (parsed.sourceTotalMismatch) {
+        sourceTotalMismatchCount += 1
+      }
       const usage = parsed.usage
       for (const field of TOKEN_FIELDS) {
         const value = usage[field]
-        if (value === null) continue
+        if (value === null) {
+          continue
+        }
         sums[field] += value
         reported[field] += 1
         group.sums[field] += value

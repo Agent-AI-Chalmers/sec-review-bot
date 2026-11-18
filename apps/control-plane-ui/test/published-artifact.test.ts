@@ -84,11 +84,12 @@ test('malformed fields are invalid rather than unavailable', () => {
     { ...bundleArtifact, size_bytes: -1 },
     { ...bundleArtifact, size_bytes: 1.5 },
     { ...bundleArtifact, uri: 42 }
-  ])
+  ]) {
     expect(
       publishedExecutionArchive(runBody(broken), 'run-1', BUCKET),
       JSON.stringify(broken)
     ).toStrictEqual({ kind: 'invalid' })
+  }
 })
 
 test('an object over the serving budget is reported as too large', () => {
@@ -138,7 +139,7 @@ test('a trajectory reference stays inside its published prefix', () => {
 })
 
 test('a non-object reference is invalid', () => {
-  for (const value of [null, undefined, 'artifact', 7, []])
+  for (const value of [null, undefined, 'artifact', 7, []]) {
     expect(
       publishedArtifact(value, {
         bucket: BUCKET,
@@ -147,4 +148,5 @@ test('a non-object reference is invalid', () => {
         acceptsKey: () => true
       })
     ).toStrictEqual({ kind: 'invalid' })
+  }
 })

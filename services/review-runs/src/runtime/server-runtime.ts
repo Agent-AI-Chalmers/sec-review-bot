@@ -38,7 +38,9 @@ function executionStatusFromBatch(
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
-  if (!value) throw new Error(`${name} is required.`)
+  if (!value) {
+    throw new Error(`${name} is required.`)
+  }
   return value
 }
 
@@ -53,11 +55,14 @@ function langfuseConfiguration(): {
     secretKey: process.env.LANGFUSE_SECRET_KEY?.trim() || undefined
   }
   const configured = Object.values(values).filter((value): value is string => value !== undefined)
-  if (configured.length === 0) return null
-  if (configured.length !== 3)
+  if (configured.length === 0) {
+    return null
+  }
+  if (configured.length !== 3) {
     throw new Error(
       'LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY must be configured together.'
     )
+  }
   return values as { baseUrl: string; publicKey: string; secretKey: string }
 }
 
@@ -173,7 +178,9 @@ export async function startReviewRunsServer(): Promise<{
           initialDelayMs: integerEnv('EXECUTION_STATISTICS_INITIAL_DELAY_MS', 30_000, 0),
           settlementWindowMs: integerEnv('EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS', 10 * 60_000)
         })
-  if (statisticsStore !== null) resources.defer(() => statisticsStore.close())
+  if (statisticsStore !== null) {
+    resources.defer(() => statisticsStore.close())
+  }
   const statisticsCoordinator =
     statisticsStore === null || langfuseConfig === null
       ? null
@@ -216,7 +223,9 @@ export async function startReviewRunsServer(): Promise<{
           }
         })
 
-  if (statisticsCoordinator !== null) resources.defer(() => statisticsCoordinator.stop())
+  if (statisticsCoordinator !== null) {
+    resources.defer(() => statisticsCoordinator.stop())
+  }
 
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
   resources.defer(() => app.close())

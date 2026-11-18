@@ -58,7 +58,9 @@ for (const failure of ['metadata', 'storage'] as const) {
         withVerifiedArtifactFile(
           {
             getObject: async () => {
-              if (failure === 'storage') throw new Error('storage unavailable')
+              if (failure === 'storage') {
+                throw new Error('storage unavailable')
+              }
               return { body: Readable.from(['wrong']), contentLength: 5 }
             }
           },

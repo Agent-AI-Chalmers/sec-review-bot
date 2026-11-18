@@ -24,7 +24,9 @@ export function RunArtifact({
   // the other statuses never do. Narrowing on the status is what the type system can check, so a
   // missing artifact can no longer be silently rendered as an empty panel.
   if (storage.status !== 'available') {
-    if (!storage.message && !storage.error_code) return null
+    if (!storage.message && !storage.error_code) {
+      return null
+    }
     return (
       <div className="artifact-state">
         {storage.message && <Text size="sm">{storage.message}</Text>}

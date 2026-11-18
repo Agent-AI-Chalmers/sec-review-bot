@@ -9,8 +9,9 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
   return {
     admitRun: async (request) => {
       const body = request.body
-      if (body.preparation_input === undefined || body.preparation_input_version === undefined)
+      if (body.preparation_input === undefined || body.preparation_input_version === undefined) {
         throw new Error('Preparation input is required for run admission.')
+      }
       return await store.admissions.admit({
         ...body,
         preparation_input: body.preparation_input,
@@ -163,14 +164,18 @@ export function buildCoordinationRouteHandlers(store: ReviewRunStore) {
     getInternalRun: async (request, reply) => {
       const { runId } = request.params
       const run = await store.queries.getRun(runId)
-      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      if (run === null) {
+        return reply.code(404).send({ error: 'run_not_found' })
+      }
       return reply.send(run)
     },
 
     listInternalPublicationSteps: async (request, reply) => {
       const { runId } = request.params
       const run = await store.queries.getRun(runId)
-      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      if (run === null) {
+        return reply.code(404).send({ error: 'run_not_found' })
+      }
       return reply.send(await store.publications.listPublicationSteps(run.run_id))
     },
 

@@ -44,7 +44,9 @@ export function supportedWorkflows(): ExecutionWorkflow[] {
 }
 
 export function isExecutionError(value: unknown): value is ExecutionError {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
   const error = value as Record<string, unknown>
   return (
     typeof error.category === 'string' &&
@@ -63,12 +65,15 @@ export function validateExecutionInput<Workflow extends ExecutionWorkflow>(
   workflow: Workflow,
   input: unknown
 ): asserts input is WorkflowInputByName[Workflow] {
-  if (!Object.hasOwn(schemaByWorkflow, workflow))
+  if (!Object.hasOwn(schemaByWorkflow, workflow)) {
     throw new Error(`Unsupported workflow: ${workflow}`)
+  }
   const schemaName = schemaByWorkflow[workflow]
   schemas ??= loadSchemas()
   const validator = schemas.getSchema(schemaName)
-  if (!validator) throw new Error(`Missing execution input schema: ${schemaName}`)
+  if (!validator) {
+    throw new Error(`Missing execution input schema: ${schemaName}`)
+  }
   if (!validator(input)) {
     const first = validator.errors?.[0]
     const location = first?.instancePath ? ` at ${first.instancePath}` : ''
@@ -82,10 +87,14 @@ export function validateExecutionResult(workflow: string, result: unknown): void
   const schemaName = Object.hasOwn(resultSchemaByWorkflow, workflow)
     ? resultSchemaByWorkflow[workflow]
     : undefined
-  if (!schemaName) throw new Error(`Unsupported workflow: ${workflow}`)
+  if (!schemaName) {
+    throw new Error(`Unsupported workflow: ${workflow}`)
+  }
   schemas ??= loadSchemas()
   const validator = schemas.getSchema(schemaName)
-  if (!validator) throw new Error(`Missing execution result schema: ${schemaName}`)
+  if (!validator) {
+    throw new Error(`Missing execution result schema: ${schemaName}`)
+  }
   if (!validator(result)) {
     const first = validator.errors?.[0]
     const location = first?.instancePath ? ` at ${first.instancePath}` : ''

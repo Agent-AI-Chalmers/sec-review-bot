@@ -72,7 +72,8 @@
     "use-isnan": "error",
     "valid-typeof": "error",
     "no-undef": "error",
-    "no-useless-assignment": "error"
+    "no-useless-assignment": "error",
+    "curly": ["error", "all"]
   },
   "overrides": [
     {

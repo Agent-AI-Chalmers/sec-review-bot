@@ -31,15 +31,22 @@ async function setup(t: TestContext) {
     REVIEW_RUNS_READ_TOKEN: 'read',
     REVIEW_RUNS_PORT: String(address.port)
   }
-  for (const name of ['LANGFUSE_BASE_URL', 'LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY'])
+  for (const name of ['LANGFUSE_BASE_URL', 'LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY']) {
     environment[name] = undefined
+  }
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
-    if (value === undefined) delete process.env[name]
-    else process.env[name] = value
+    if (value === undefined) {
+      delete process.env[name]
+    } else {
+      process.env[name] = value
+    }
     t.onTestFinished(() => {
-      if (previous === undefined) delete process.env[name]
-      else process.env[name] = previous
+      if (previous === undefined) {
+        delete process.env[name]
+      } else {
+        process.env[name] = previous
+      }
     })
   }
   let opens = 0

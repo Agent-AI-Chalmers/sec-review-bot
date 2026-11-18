@@ -321,7 +321,9 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
   let bodyClosed = false
   const body = new Readable({
     read(): void {
-      if (sentChunk) return
+      if (sentChunk) {
+        return
+      }
       sentChunk = true
       this.push('x')
     }

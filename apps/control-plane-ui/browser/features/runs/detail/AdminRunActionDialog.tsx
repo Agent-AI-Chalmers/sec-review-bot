@@ -50,7 +50,9 @@ export function AdminRunActionDialog({
   // Reset whenever the dialog opens for a different run, so a token typed for one decision is
   // never silently reused for the next.
   React.useEffect(() => {
-    if (!opened) return
+    if (!opened) {
+      return
+    }
     setReason('')
     setAdminToken('')
     setFailure(null)

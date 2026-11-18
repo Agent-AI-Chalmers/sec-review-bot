@@ -61,8 +61,9 @@ export class SubmissionTransitionStore {
           JSON.stringify(context)
         ]
       )
-      if (candidate.rowCount !== 1)
+      if (candidate.rowCount !== 1) {
         throw new Error('Prepared input has no matching published candidate.')
+      }
       const execution = await client.query(
         `UPDATE executions SET input=$3::jsonb, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='pending'
@@ -74,8 +75,9 @@ export class SubmissionTransitionStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='pending'`,
         [runId, this.connectorId, JSON.stringify(context)]
       )
-      if (execution.rowCount !== 1 || publication.rowCount !== 1)
+      if (execution.rowCount !== 1 || publication.rowCount !== 1) {
         throw new Error('Run cannot save prepared submission outside pending.')
+      }
       await client.query(
         `UPDATE input_bundle_candidates SET status='abandoned', updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status IN ('reserved','present')`,
@@ -87,10 +89,11 @@ export class SubmissionTransitionStore {
   async markQueued(runId: string, token: string, context: JsonObject): Promise<void> {
     await transaction(this.pool, async (client) => {
       const workflow = await this.findWorkflow(client, runId)
-      if (workflow === null)
+      if (workflow === null) {
         throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
           statusCode: 404
         })
+      }
       // Execution may have accepted the saved request just as the lease elapsed. Finish
       // recording that acknowledgement only if no expiry/takeover has replaced this owner.
       await client.query(`SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE`, [runId])
@@ -119,8 +122,9 @@ export class SubmissionTransitionStore {
            )`,
         [runId, token, this.connectorId]
       )
-      if (publication.rowCount !== 1 || execution.rowCount !== 1)
+      if (publication.rowCount !== 1 || execution.rowCount !== 1) {
         throw new Error(`Review run ${runId} cannot transition from pending to queued.`)
+      }
       const preparation = await client.query(
         `UPDATE preparations
          SET status='submitted', claim_token=NULL, claimed_at=NULL,
@@ -129,10 +133,11 @@ export class SubmissionTransitionStore {
            AND claim_token=$3`,
         [runId, this.connectorId, token]
       )
-      if (preparation.rowCount !== 1)
+      if (preparation.rowCount !== 1) {
         throw new Error(
           `Preparation ${runId} lost its claim before the queued transition completed.`
         )
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -167,7 +172,9 @@ export class SubmissionTransitionStore {
            )`,
         [runId, this.connectorId, token]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -195,7 +202,9 @@ export class SubmissionTransitionStore {
            AND status='uncertain' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       const publicationFrom = await abandonInFlightPublication(client, this.connectorId, runId)
       const executionEventId = await appendEvent(client, {
         runId,

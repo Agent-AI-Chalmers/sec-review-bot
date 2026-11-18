@@ -37,7 +37,9 @@ const FALLBACK_THEME_TRANSITION_MS = 150
 function readThemeTransitionMs(root: HTMLElement): number {
   const raw = getComputedStyle(root).getPropertyValue('--theme-transition').trim()
   const match = /^([\d.]+)(ms|s)$/.exec(raw)
-  if (match === null) return FALLBACK_THEME_TRANSITION_MS
+  if (match === null) {
+    return FALLBACK_THEME_TRANSITION_MS
+  }
   const value = Number(match[1])
   return match[2] === 's' ? value * 1000 : value
 }

@@ -110,7 +110,9 @@ function fakeApp(): App {
   return fakeGitHubApp({
     respond: ({ url }) => {
       const match = /^\/repos\/([^/]+)\/([^/]+)\/installation$/.exec(new URL(url).pathname)
-      if (!match) return githubJson({ message: 'Not Found' }, 404)
+      if (!match) {
+        return githubJson({ message: 'Not Found' }, 404)
+      }
       return githubJson({ id: 123 })
     }
   }).app
@@ -122,7 +124,9 @@ function octokitWithRefs(): Octokit {
     if (pathname.includes('/branches/')) {
       const branch = decodeURIComponent(pathname.split('/branches/')[1] ?? '')
       // Only `main` is a branch; anything else is a real 404 from GitHub.
-      if (branch !== 'main') return githubJson({ message: 'Not Found' }, 404)
+      if (branch !== 'main') {
+        return githubJson({ message: 'Not Found' }, 404)
+      }
       return githubJson({
         commit: { sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }
       })

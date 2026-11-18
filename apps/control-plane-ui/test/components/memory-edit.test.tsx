@@ -52,7 +52,9 @@ test.each([
         treeReads++
         return { version: currentVersion }
       }
-      if (path === '/memory/tree/automation') return { state: 'paused', version: 1 }
+      if (path === '/memory/tree/automation') {
+        return { state: 'paused', version: 1 }
+      }
       if (path.endsWith('/content')) {
         const version = currentVersion
         if (delayedLoad && version === baseVersion) {

@@ -294,7 +294,9 @@ function executionStatisticsFor(
  * step per delivery plus two summaries.
  */
 function stepKeysFor(workflow: Workflow, index: number): string[] {
-  if (workflow === 'pull-request-review') return ['pull-request:review']
+  if (workflow === 'pull-request-review') {
+    return ['pull-request:review']
+  }
   if (workflow === 'issue-review') {
     return index % 3 === 0 ? ['issue:draft-pr', 'issue:summary-comment'] : ['issue:summary-comment']
   }
@@ -315,14 +317,18 @@ function repositoryDeliveryIdsFor(index: number): string[] {
 const REMOTE_ROOT = 'https://github.com/octo/example'
 
 function remoteUrlFor(stepKey: string, index: number): string {
-  if (stepKey.startsWith('issue:draft-pr')) return `${REMOTE_ROOT}/pull/${200 + index}`
+  if (stepKey.startsWith('issue:draft-pr')) {
+    return `${REMOTE_ROOT}/pull/${200 + index}`
+  }
   if (stepKey === 'issue:summary-comment') {
     return `${REMOTE_ROOT}/issues/${100 + index}#issuecomment-${900 + index}`
   }
   if (stepKey === 'pull-request:review') {
     return `${REMOTE_ROOT}/pull/42#pullrequestreview-${1000 + index}`
   }
-  if (stepKey.startsWith('repository:delivery')) return `${REMOTE_ROOT}/pull/${300 + index}`
+  if (stepKey.startsWith('repository:delivery')) {
+    return `${REMOTE_ROOT}/pull/${300 + index}`
+  }
   return `${REMOTE_ROOT}/issues/${50 + index}#issuecomment-${800 + index}`
 }
 
@@ -350,8 +356,12 @@ function sourceFor(index: number): {
   platform: FixtureSourcePlatform
   connectorId: string
 } {
-  if (index % 17 === 0) return { platform: 'unknown', connectorId: 'legacy-webhook:default' }
-  if (index % 5 === 0) return { platform: 'gitlab', connectorId: 'gitlab-integration:default' }
+  if (index % 17 === 0) {
+    return { platform: 'unknown', connectorId: 'legacy-webhook:default' }
+  }
+  if (index % 5 === 0) {
+    return { platform: 'gitlab', connectorId: 'gitlab-integration:default' }
+  }
   return { platform: 'github', connectorId: 'github-integration:default' }
 }
 
@@ -369,7 +379,9 @@ function digest(index: number, position: number): string {
 }
 
 function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifact | null {
-  if (kind === null) return null
+  if (kind === null) {
+    return null
+  }
   if (kind === 'available') {
     return {
       status: 'available',
@@ -477,7 +489,7 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
     // A started publication was claimed first; its steps run between the claim and the
     // conclusion, so the axis brackets them on the timeline.
     events.push(push('publication', 'pending', 'publishing', run.publication.started_at))
-    if (run.publication.status !== 'publishing')
+    if (run.publication.status !== 'publishing') {
       events.push(
         push(
           'publication',
@@ -487,6 +499,7 @@ export function eventsFor(run: FixtureRun): RunEvent[] {
           run.publication.status === 'failed' ? run.failure_code : null
         )
       )
+    }
   } else if (run.publication.status === 'skipped') {
     events.push(
       push('publication', 'pending', 'skipped', run.publication.finished_at ?? run.created_at)
@@ -516,7 +529,9 @@ interface StepTransition {
  * more than one attempt shows those attempts failing and being retried before its last state, so
  * the timeline explains its `attempt_count` instead of leaving it to the reader to infer. */
 function stepEventsFor(run: FixtureRun, steps: readonly FixtureStep[]): StepTransition[] {
-  if (run.publication.started_at === null) return []
+  if (run.publication.started_at === null) {
+    return []
+  }
   const start = Date.parse(run.publication.started_at)
   // Every step is created when the claim initializes the step set, like an axis at admission.
   const transitions: StepTransition[] = steps.map((step) => ({
@@ -541,7 +556,9 @@ function stepEventsFor(run: FixtureRun, steps: readonly FixtureStep[]): StepTran
         reason
       })
     }
-    if (step.status === 'pending') continue
+    if (step.status === 'pending') {
+      continue
+    }
     // Every attempt but the last failed and was retried.
     for (let attempt = 1; attempt < step.attempt_count; attempt += 1) {
       add(attempt === 1 ? 'pending' : 'failed', 'running')
@@ -614,7 +631,9 @@ function preparationFor(scenario: Scenario, createdAt: number): FixtureRun['prep
  */
 function stepsFor(scenario: Scenario, workflow: Workflow, index: number): FixtureStep[] {
   const step = scenario.step
-  if (step === null) return []
+  if (step === null) {
+    return []
+  }
   const keys = stepKeysFor(workflow, index)
   const lastPosition = keys.length - 1
   return keys.map((step_key, position) => {
@@ -642,7 +661,9 @@ function stepsFor(scenario: Scenario, workflow: Workflow, index: number): Fixtur
  * reported only when the execution is terminal.
  */
 function noticeCommentUrl(status: NoticeStage): string | null {
-  if (status !== 'delivered') return null
+  if (status !== 'delivered') {
+    return null
+  }
   // A fixed, obviously-example URL: the fixtures are not tied to a real issue, and a plausible
   // link would invite someone to click it expecting a real comment.
   return 'https://github.com/example/example/issues/1#issuecomment-1'
@@ -893,14 +914,20 @@ const blockedIndexes = new Set<number>()
 export const parkedIndexes = new Set<number>()
 for (let position = 0; position < BLOCKED_RUN_COUNT; position += 1) {
   const scenarioIndex = BLOCKED_SCENARIO_INDEXES[position]
-  if (scenarioIndex === undefined) break
+  if (scenarioIndex === undefined) {
+    break
+  }
   const index = runs.findIndex((_, runIndex) => runIndex % SCENARIOS.length === scenarioIndex)
-  if (index < 0) break
+  if (index < 0) {
+    break
+  }
   const run = runs[index]
   blockedIndexes.add(index)
   run.preparation.status = 'disconnected'
   // A run in this state has necessarily been claimed at least once, so the phase has a start.
-  if (run.preparation.started_at === null) run.preparation.started_at = run.created_at
+  if (run.preparation.started_at === null) {
+    run.preparation.started_at = run.created_at
+  }
   run.preparation.finished_at = null
   run.preparation.failure_code = null
   run.notices = []
@@ -987,7 +1014,9 @@ if (publicationParkedIndex >= 0) {
   )
 }
 
-for (const run of runs) validateRun(run, stepsByRun.get(run.run_id) ?? [])
+for (const run of runs) {
+  validateRun(run, stepsByRun.get(run.run_id) ?? [])
+}
 if (new Set(runs.map((run) => run.run_id)).size !== runs.length) {
   throw new Error('dev fixtures must not reuse a run id.')
 }
@@ -998,8 +1027,12 @@ interface Cursor {
 }
 
 export function decodeCursor(value: string | null): Cursor | null {
-  if (value === null) return null
+  if (value === null) {
+    return null
+  }
   const [createdAt, runId, extra] = Buffer.from(value, 'base64url').toString('utf8').split('|')
-  if (createdAt === undefined || runId === undefined || extra !== undefined) return null
+  if (createdAt === undefined || runId === undefined || extra !== undefined) {
+    return null
+  }
   return { createdAt, runId }
 }

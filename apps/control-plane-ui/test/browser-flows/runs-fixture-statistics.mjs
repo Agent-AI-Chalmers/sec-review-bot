@@ -8,7 +8,9 @@ async function clickAndWaitForExpansion({ control, expanded, waitUntil, message 
   await control.scrollIntoViewIfNeeded()
   await waitUntil(async () => {
     const box = await control.boundingBox()
-    if (box === null) return false
+    if (box === null) {
+      return false
+    }
     const stable =
       previousBox !== null &&
       Math.abs(box.x - previousBox.x) < 0.5 &&

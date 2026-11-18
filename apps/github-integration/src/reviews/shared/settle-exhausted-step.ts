@@ -132,7 +132,9 @@ export async function settleExhaustedStep({
   // Nothing was written: another owner moved the step or the publication, so this caller no
   // longer owns it. The caller rethrows the exhaustion error and records nothing of its own; the
   // claim's lease decides who acts next.
-  if (!settled) return { outcome: 'not_owned' }
+  if (!settled) {
+    return { outcome: 'not_owned' }
+  }
   // Both remaining branches wrote to the step; only the recorded state and the remote reference
   // differ between them.
   return found === null

@@ -20,7 +20,9 @@ test('memory-tree automation mutates only this test fixture server', async ({
   try {
     await expect(control).not.toBeChecked()
   } finally {
-    if (!(await control.isChecked())) await control.click()
+    if (!(await control.isChecked())) {
+      await control.click()
+    }
   }
   await expect(control).toBeChecked()
 })

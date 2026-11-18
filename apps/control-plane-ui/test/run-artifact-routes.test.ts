@@ -481,7 +481,9 @@ test('BFF lets a progressing artifact preview outlive the metadata timeout', asy
   let started = false
   const body = new Readable({
     read(): void {
-      if (started) return
+      if (started) {
+        return
+      }
       started = true
       this.push(bundle.subarray(0, 1))
       setTimeout(() => {

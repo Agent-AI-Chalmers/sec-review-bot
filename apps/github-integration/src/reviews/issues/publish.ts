@@ -188,26 +188,28 @@ async function publishIssueReviewResult({
     // A step that was already claimed once may have created the pull request before its
     // publisher died, so this run is a retry rather than a first attempt. Recording the fact
     // keeps the log honest about why it may be recovering.
-    if (draftPrStep.previousAttempts > 1 && !draftPrStep.alreadySucceeded)
+    if (draftPrStep.previousAttempts > 1 && !draftPrStep.alreadySucceeded) {
       logInfo('draft_pr_creation_retry', {
         event_type,
         issue: issue.issue_number,
         repo: issue.repo_full_name,
         previous_attempts: draftPrStep.previousAttempts
       })
+    }
     if (draftPrStep.remote.id !== undefined && draftPrStep.remote.id !== null) {
       draftPullRequest = {
         number: Number(draftPrStep.remote.id),
         html_url: draftPrStep.remote.url ?? ''
       }
     }
-    if (draftPrStep.reconciled && draftPullRequest !== null)
+    if (draftPrStep.reconciled && draftPullRequest !== null) {
       logInfo('draft_pr_creation_reconciled', {
         event_type,
         issue: issue.issue_number,
         repo: issue.repo_full_name,
         draft_pr_number: draftPullRequest.number
       })
+    }
     if (draftPullRequest) {
       logInfo('draft_pr_creation_completed', {
         draft_pr_number: draftPullRequest.number,
@@ -267,7 +269,9 @@ async function publishIssueReviewResult({
     }
   })
   // The comment already existed: nothing left to publish for this step.
-  if (commentStep.alreadySucceeded) return
+  if (commentStep.alreadySucceeded) {
+    return
+  }
 
   logInfo('issue_comment_publish_completed', {
     comment_id: commentStep.remote.id,

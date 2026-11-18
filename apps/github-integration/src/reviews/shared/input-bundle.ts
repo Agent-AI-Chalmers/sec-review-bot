@@ -198,9 +198,13 @@ async function readRepositoryFileAtSha({
         throw new Error(`Git tree is truncated while reading ${path} at ${sha}.`)
       }
       const entry = tree.data.tree.find((item) => item.path === component)
-      if (entry === undefined) return null
+      if (entry === undefined) {
+        return null
+      }
       if (index < components.length - 1) {
-        if (entry.type !== 'tree' || entry.mode !== '040000') return null
+        if (entry.type !== 'tree' || entry.mode !== '040000') {
+          return null
+        }
         tree_sha = entry.sha
       } else if (entry.type !== 'blob' || (entry.mode !== '100644' && entry.mode !== '100755')) {
         return null

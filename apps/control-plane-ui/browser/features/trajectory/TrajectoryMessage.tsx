@@ -28,7 +28,9 @@ export function TrajectoryMessage({
       .filter(Boolean)
       .join(' · ') || undefined
   const jumpToCall = (): void => {
-    if (!message.requestAnchorId) return
+    if (!message.requestAnchorId) {
+      return
+    }
     scrollToTrajectoryElement(message.requestAnchorId)
   }
   return (

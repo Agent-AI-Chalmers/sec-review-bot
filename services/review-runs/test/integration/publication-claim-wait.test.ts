@@ -7,8 +7,9 @@ import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
-  if (!connectionString)
+  if (!connectionString) {
     throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  }
   return connectionString
 }
 

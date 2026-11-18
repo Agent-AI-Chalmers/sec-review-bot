@@ -87,12 +87,13 @@ for (const crash of ['reserved', 'published', 'confirmed', 'committed'] as const
     }
     const store: InputBundlePublicationStore = {
       async reserveInputBundleCandidate(runId, _token, intent) {
-        if (candidate)
+        if (candidate) {
           expect(intent).toStrictEqual({
             reference: candidate.reference,
             input: candidate.input,
             publish_context: candidate.publish_context
           })
+        }
         candidate = {
           run_id: runId,
           digest: intent.reference.digest,
@@ -107,9 +108,13 @@ for (const crash of ['reserved', 'published', 'confirmed', 'committed'] as const
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
         expect.assert(candidate)
-        if (status === 'present') crashOnce('published')
+        if (status === 'present') {
+          crashOnce('published')
+        }
         candidate.status = status
-        if (status === 'present') crashOnce('confirmed')
+        if (status === 'present') {
+          crashOnce('confirmed')
+        }
         return candidate
       },
       async submitPreparedRun(_run, _token, savedContext, input) {
@@ -135,7 +140,9 @@ for (const crash of ['reserved', 'published', 'confirmed', 'committed'] as const
       await publishAndSubmitInputBundle(store, run, 'takeover', context, {
         input_bundle: rebuilt
       })
-    } else expect(recovered).toBe(true)
+    } else {
+      expect(recovered).toBe(true)
+    }
     expect(candidate?.status).toBe('selected')
     expect(await inputBundleExists(candidate!.reference)).toBe(true)
   })

@@ -33,7 +33,9 @@ function paxRecord(value: string): Buffer {
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
     const record = Buffer.from(`${length} ${payload}`)
-    if (record.length === length) return record
+    if (record.length === length) {
+      return record
+    }
     length = record.length
   }
 }
@@ -41,7 +43,9 @@ function paxRecord(value: string): Buffer {
 type EntrySpec = [name: string, type: string, body?: Buffer]
 
 function entry(name: string, type: string, body: Buffer = Buffer.alloc(0)): Buffer[] {
-  if (Buffer.byteLength(name) <= 100) return [rawEntry(name, type, body)]
+  if (Buffer.byteLength(name) <= 100) {
+    return [rawEntry(name, type, body)]
+  }
   const marker = crypto.createHash('sha256').update(name).digest('hex').slice(0, 24)
   return [
     rawEntry(`PaxHeaders/${marker}`, 'x', paxRecord(name)),

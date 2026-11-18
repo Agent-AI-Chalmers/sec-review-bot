@@ -23,7 +23,9 @@ export function CodeEditor({
   onChangeRef.current = onChange
 
   React.useEffect(() => {
-    if (!hostRef.current) return
+    if (!hostRef.current) {
+      return
+    }
     const languageExtension: Extension[] =
       language === 'markdown' ? [markdown()] : language === 'json' ? [json()] : []
     const view = new EditorView({
@@ -37,7 +39,9 @@ export function CodeEditor({
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !readOnly) onChangeRef.current(update.state.doc.toString())
+          if (update.docChanged && !readOnly) {
+            onChangeRef.current(update.state.doc.toString())
+          }
         })
       ]
     })
@@ -50,7 +54,9 @@ export function CodeEditor({
 
   React.useEffect(() => {
     const view = viewRef.current
-    if (!view || view.state.doc.toString() === value) return
+    if (!view || view.state.doc.toString() === value) {
+      return
+    }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: value }
     })

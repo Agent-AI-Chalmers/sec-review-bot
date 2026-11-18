@@ -54,7 +54,7 @@ function buildHarness() {
   const store = {
     initializePublicationSteps: async (_runId: string, _token: string, keys: string[]) => {
       initializedSteps.push(keys)
-      for (const key of keys)
+      for (const key of keys) {
         steps.set(key, {
           step_key: key,
           status: 'pending',
@@ -66,6 +66,7 @@ function buildHarness() {
           failure_code: null,
           failure_message: null
         })
+      }
     },
     listPublicationSteps: async () => Array.from(steps.values()),
     requirePublicationStepClaim: async () => {},
@@ -81,7 +82,9 @@ function buildHarness() {
     if (pathname.includes('/branches/')) {
       return githubJson({ commit: { sha: 'resolved-default-sha' } })
     }
-    if (pathname.endsWith('/pulls') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/pulls') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/pulls') && method === 'POST') {
       createdPullRequests.push(body)
       return githubJson({
@@ -89,16 +92,28 @@ function buildHarness() {
         number: 1
       })
     }
-    if (pathname.includes('/comments') && method === 'GET') return githubJson([])
+    if (pathname.includes('/comments') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.includes('/comments') && method === 'POST') {
       createdComments.push(body)
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
-    if (pathname.includes('/git/blobs')) return githubJson({ sha: 'blob-sha' })
-    if (pathname.includes('/git/commits/')) return githubJson({ tree: { sha: 'base-tree-sha' } })
-    if (pathname.includes('/git/trees')) return githubJson({ sha: 'tree-sha' })
-    if (pathname.includes('/git/commits')) return githubJson({ sha: 'commit-sha' })
-    if (pathname.includes('/git/refs')) return githubJson({})
+    if (pathname.includes('/git/blobs')) {
+      return githubJson({ sha: 'blob-sha' })
+    }
+    if (pathname.includes('/git/commits/')) {
+      return githubJson({ tree: { sha: 'base-tree-sha' } })
+    }
+    if (pathname.includes('/git/trees')) {
+      return githubJson({ sha: 'tree-sha' })
+    }
+    if (pathname.includes('/git/commits')) {
+      return githubJson({ sha: 'commit-sha' })
+    }
+    if (pathname.includes('/git/refs')) {
+      return githubJson({})
+    }
     return githubJson({ default_branch: 'main' })
   })
 

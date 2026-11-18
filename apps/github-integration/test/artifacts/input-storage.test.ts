@@ -85,10 +85,11 @@ test('a concurrent identical conditional write is recovered after a 412', async 
   const input = await reference()
   let heads = 0
   s3.on(HeadObjectCommand).callsFake(() => {
-    if (heads++ === 0)
+    if (heads++ === 0) {
       throw Object.assign(new Error('missing'), {
         $metadata: { httpStatusCode: 404 }
       })
+    }
     return {
       ContentLength: input.size_bytes,
       Metadata: {

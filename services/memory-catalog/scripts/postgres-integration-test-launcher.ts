@@ -15,7 +15,9 @@ const repositoryDirectory = path.resolve(catalogDirectory, '../..')
 const suppliedDatabaseUrl = process.env.TEST_DATABASE_URL
 
 async function configuredPostgresImage(): Promise<string> {
-  if (process.env.TEST_POSTGRES_IMAGE !== undefined) return process.env.TEST_POSTGRES_IMAGE
+  if (process.env.TEST_POSTGRES_IMAGE !== undefined) {
+    return process.env.TEST_POSTGRES_IMAGE
+  }
 
   // Compose owns the deployed PostgreSQL version. The ephemeral test database
   // deliberately uses that same image rather than maintaining a second tag.
@@ -23,8 +25,9 @@ async function configuredPostgresImage(): Promise<string> {
     services?: { postgres?: { image?: unknown } }
   }
   const image = compose.services?.postgres?.image
-  if (typeof image !== 'string' || image.trim() === '')
+  if (typeof image !== 'string' || image.trim() === '') {
     throw new Error('compose.yaml must define services.postgres.image.')
+  }
   return image
 }
 
@@ -37,7 +40,9 @@ function run(command: string, args: string[], environment = process.env): Promis
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
-      if (code === 0) return resolve()
+      if (code === 0) {
+        return resolve()
+      }
       reject(
         new Error(
           `${command} ${args.join(' ')} exited with ${
@@ -62,7 +67,9 @@ function capture(command: string, args: string[]): Promise<string> {
     })
     child.once('error', reject)
     child.once('exit', (code) => {
-      if (code === 0) return resolve(output.trim())
+      if (code === 0) {
+        return resolve(output.trim())
+      }
       reject(new Error(`${command} ${args.join(' ')} exited with code ${code}.`))
     })
   })
@@ -127,12 +134,14 @@ async function main(): Promise<void> {
     await waitForPostgres(containerName)
     const address = await capture('docker', ['port', containerName, '5432/tcp'])
     const hostPort = address.replace(/^.*:/, '')
-    if (!/^\d+$/.test(hostPort))
+    if (!/^\d+$/.test(hostPort)) {
       throw new Error(`Docker returned an invalid PostgreSQL address: ${address}`)
+    }
     await runTests(`postgresql://postgres:${password}@127.0.0.1:${hostPort}/postgres`)
   } finally {
-    if (containerStarted)
+    if (containerStarted) {
       await run('docker', ['rm', '--force', containerName]).catch(() => undefined)
+    }
   }
 }
 

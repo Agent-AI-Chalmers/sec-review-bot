@@ -14,8 +14,9 @@ import { PostgresMemoryCatalogStore } from '../../src/catalog-store.js'
 import type { Actor } from '../../src/contract-types-generated.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
-if (databaseUrl === undefined)
+if (databaseUrl === undefined) {
   throw new Error('TEST_DATABASE_URL is required for integration tests.')
+}
 
 const actor: Actor = { kind: 'user', id: 'reviewer@example.com' }
 
@@ -93,9 +94,12 @@ async function waitUntilBlocked(pid: number, count: number): Promise<void> {
          select count(*) as blocked from waiter`,
         [pid]
       )
-      if (Number(blocked.rows[0]?.blocked) >= count) return
-      if (Date.now() > deadline)
+      if (Number(blocked.rows[0]?.blocked) >= count) {
+        return
+      }
+      if (Date.now() > deadline) {
         throw new Error(`fewer than ${count} attempts blocked behind the lock`)
+      }
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
   } finally {

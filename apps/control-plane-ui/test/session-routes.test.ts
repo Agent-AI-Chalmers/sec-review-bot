@@ -54,8 +54,9 @@ test('BFF bounds browser sessions by evicting the oldest login', async () => {
     const third = await loginCookie(base)
 
     expect((await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status).toBe(401)
-    for (const cookie of [second, third])
+    for (const cookie of [second, third]) {
       expect((await fetch(`${base}/api/runs`, { headers: { cookie } })).status).toBe(200)
+    }
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),

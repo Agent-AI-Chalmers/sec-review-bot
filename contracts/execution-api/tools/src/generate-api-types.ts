@@ -106,14 +106,20 @@ function commonDefName(ref: unknown, where: string): string {
  * compile-time projection intentionally keeps one stable transport shape for producers.
  */
 function projectSchema(value: unknown, common: JsonSchema): unknown {
-  if (Array.isArray(value)) return value.map((item) => projectSchema(item, common))
-  if (typeof value !== 'object' || value === null) return value
+  if (Array.isArray(value)) {
+    return value.map((item) => projectSchema(item, common))
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value
+  }
 
   const node = value as JsonSchema
   if (node.$ref !== undefined) {
     const defName = commonDefName(node.$ref, 'schema projection')
     const named = NAMED_COMMON_DEFS.get(defName)
-    if (named !== undefined) return { tsType: named }
+    if (named !== undefined) {
+      return { tsType: named }
+    }
     const target = defsOf(common)[defName]
     if (target === undefined) {
       throw new Error(`common.schema.json has no $defs.${defName}`)
@@ -180,7 +186,9 @@ function renderLimits(): string {
       node.forEach((item) => visit(item, path))
       return
     }
-    if (typeof node !== 'object' || node === null) return
+    if (typeof node !== 'object' || node === null) {
+      return
+    }
     const record = node as Record<string, unknown>
     for (const [key, value] of Object.entries(record)) {
       const next = [...path, key]
@@ -248,7 +256,9 @@ function limitName(path: string[]): string | null {
     return null
   }
   const parts = path.filter((part) => !STRUCTURAL_KEYS.has(part))
-  if (parts.length === 0) return null
+  if (parts.length === 0) {
+    return null
+  }
   return `MAX_${parts
     .join('_')
     .replace(/([a-z])([A-Z])/g, '$1_$2')

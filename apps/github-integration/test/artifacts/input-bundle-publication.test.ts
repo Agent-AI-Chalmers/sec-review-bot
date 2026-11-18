@@ -66,10 +66,11 @@ for (const crash of [
     s3.reset()
     s3.on(ListObjectsV2Command).resolves({ Contents: [] })
     s3.on(HeadObjectCommand).callsFake(() => {
-      if (!uploaded)
+      if (!uploaded) {
         throw Object.assign(new Error('missing'), {
           $metadata: { httpStatusCode: 404 }
         })
+      }
       return {
         ContentLength: bytes.length,
         Metadata: {
@@ -80,7 +81,9 @@ for (const crash of [
     })
     s3.on(PutObjectCommand).callsFake(() => {
       uploaded = true
-      if (crash === 'upload-response') failOnce()
+      if (crash === 'upload-response') {
+        failOnce()
+      }
       return {}
     })
     const store: InputBundlePublicationStore = {
@@ -91,7 +94,9 @@ for (const crash of [
           ...structuredClone(intent),
           status: 'reserved'
         }
-        if (crash === 'before-upload') failOnce()
+        if (crash === 'before-upload') {
+          failOnce()
+        }
         return candidate
       },
       async listInputBundleCandidates() {
@@ -99,17 +104,25 @@ for (const crash of [
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
         expect.assert(candidate)
-        if (crash === 'after-upload') failOnce()
+        if (crash === 'after-upload') {
+          failOnce()
+        }
         candidate.status = status
-        if (crash === 'after-confirm') failOnce()
+        if (crash === 'after-confirm') {
+          failOnce()
+        }
         return candidate
       },
       async submitPreparedRun(_run, _token, savedContext, input) {
-        if (crash === 'before-commit') failOnce()
+        if (crash === 'before-commit') {
+          failOnce()
+        }
         expect.assert(candidate)
         candidate.status = 'selected'
         authoritative = structuredClone({ context: savedContext, input })
-        if (crash === 'after-commit') failOnce()
+        if (crash === 'after-commit') {
+          failOnce()
+        }
       }
     }
     try {

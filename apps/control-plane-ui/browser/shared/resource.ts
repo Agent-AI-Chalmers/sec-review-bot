@@ -59,10 +59,14 @@ export function useResource<T>(load: (signal: AbortSignal) => Promise<T>): Resou
     setState((previous) => ({ ...previous, loading: true }))
     try {
       const data = await loadRef.current(next.signal)
-      if (attempt !== generation.current) return
+      if (attempt !== generation.current) {
+        return
+      }
       setState({ data, error: undefined, loading: false })
     } catch (error) {
-      if (attempt !== generation.current || isAbortError(error)) return
+      if (attempt !== generation.current || isAbortError(error)) {
+        return
+      }
       setState((previous) => ({ ...previous, error, loading: false }))
     }
   }, [])

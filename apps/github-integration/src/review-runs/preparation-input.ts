@@ -49,8 +49,9 @@ export function parseRepositoryPreparationInput(value: unknown): {
 }
 
 function requireString(value: unknown, label: string): string {
-  if (typeof value !== 'string')
+  if (typeof value !== 'string') {
     throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.`)
+  }
   return value
 }
 
@@ -63,7 +64,11 @@ function requireChoice<const T extends string>(
   choices: readonly T[],
   label: string
 ): T {
-  for (const choice of choices) if (value === choice) return choice
+  for (const choice of choices) {
+    if (value === choice) {
+      return choice
+    }
+  }
   throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.`)
 }
 
@@ -100,13 +105,16 @@ export function parsePullRequestPreparationInput(value: unknown): PullRequestPre
     test_changes: requireTestChanges(input.test_changes)
   }
   // Existing checkpoints carry both fields. Their captured snapshot is authoritative.
-  if (input.pr !== undefined) return { ...common, pr: requirePersistedPullRequest(input.pr) }
+  if (input.pr !== undefined) {
+    return { ...common, pr: requirePersistedPullRequest(input.pr) }
+  }
   const reference = requireRecord(input.pr_reference, 'pr_reference')
   const pr_number = requireNumberField(reference, 'pr_number', 'pr_reference')
-  if (!Number.isInteger(pr_number) || pr_number <= 0)
+  if (!Number.isInteger(pr_number) || pr_number <= 0) {
     throw new InvalidPreparationInputError(
       'Preparation input has an invalid pr_reference.pr_number.'
     )
+  }
   return {
     ...common,
     pr_reference: {
@@ -118,14 +126,16 @@ export function parsePullRequestPreparationInput(value: unknown): PullRequestPre
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (!isRecord(value))
+  if (!isRecord(value)) {
     throw new InvalidPreparationInputError(`Preparation input is missing ${label}.`)
+  }
   return value
 }
 
 function requireText(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.trim() === '')
+  if (typeof value !== 'string' || value.trim() === '') {
     throw new InvalidPreparationInputError(`Preparation input is missing ${label}.`)
+  }
   return value
 }
 
@@ -135,8 +145,9 @@ function requireStringField(record: Record<string, unknown>, field: string, labe
 
 function requireNumberField(record: Record<string, unknown>, field: string, label: string): number {
   const value = record[field]
-  if (typeof value !== 'number' || !Number.isFinite(value))
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new InvalidPreparationInputError(`Preparation input is missing ${label}.${field}`)
+  }
   return value
 }
 
@@ -146,8 +157,9 @@ function requireBooleanField(
   label: string
 ): boolean {
   const value = record[field]
-  if (typeof value !== 'boolean')
+  if (typeof value !== 'boolean') {
     throw new InvalidPreparationInputError(`Preparation input is missing ${label}.${field}`)
+  }
   return value
 }
 
@@ -158,11 +170,13 @@ function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
   const sender_login = optionalLogin(record.sender_login, `${label}.sender_login`)
   const issue_author = optionalLogin(record.issue_author, `${label}.issue_author`)
   const issue_body = record.issue_body
-  if (issue_body !== null && typeof issue_body !== 'string')
+  if (issue_body !== null && typeof issue_body !== 'string') {
     throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.issue_body`)
+  }
   const labels = record.labels
-  if (!Array.isArray(labels) || !labels.every((item): item is string => typeof item === 'string'))
+  if (!Array.isArray(labels) || !labels.every((item): item is string => typeof item === 'string')) {
     throw new InvalidPreparationInputError(`Preparation input is missing ${label}.labels`)
+  }
   return {
     action: requireString(record['action'], `${label}.action`),
     repo_name: requireStringField(record, 'repo_name', label),
@@ -231,8 +245,9 @@ function optionalStringOrNull(
   label: string
 ): string | null {
   const value = record[field]
-  if (value !== null && typeof value !== 'string')
+  if (value !== null && typeof value !== 'string') {
     throw new InvalidPreparationInputError(`Preparation input has an invalid ${label}.${field}`)
+  }
   return value
 }
 

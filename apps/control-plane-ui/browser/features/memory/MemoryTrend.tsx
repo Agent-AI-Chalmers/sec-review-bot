@@ -10,7 +10,9 @@ export function MemoryTrend({ overview }: { overview: CatalogOverview }): React.
   const height = 220
   React.useLayoutEffect(() => {
     const element = scrollRef.current
-    if (!element) return
+    if (!element) {
+      return
+    }
     const measure = (): void => {
       const next = Math.max(320, Math.round(element.getBoundingClientRect().width))
       setWidth((current) => (current === next ? current : next))

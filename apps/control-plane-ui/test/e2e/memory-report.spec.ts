@@ -133,7 +133,9 @@ test('refreshing a historical graph preserves the reader scroll position', async
     name: 'Auto refresh',
     exact: true
   })
-  if (await autoRefresh.isChecked()) await autoRefresh.uncheck()
+  if (await autoRefresh.isChecked()) {
+    await autoRefresh.uncheck()
+  }
   await page.getByRole('tab', { name: 'Observations' }).click()
   await page.getByRole('combobox', { name: 'Rows per page', exact: true }).click()
   await page.getByRole('option', { name: '100', exact: true }).click()

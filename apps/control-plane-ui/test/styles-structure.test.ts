@@ -31,8 +31,11 @@ function matchingBrace(source: string, openingBrace: number): number {
     const next = source[index + 1]
 
     if (quote) {
-      if (character === '\\') index += 1
-      else if (character === quote) quote = ''
+      if (character === '\\') {
+        index += 1
+      } else if (character === quote) {
+        quote = ''
+      }
       continue
     }
     if (character === '"' || character === "'") {
@@ -45,9 +48,15 @@ function matchingBrace(source: string, openingBrace: number): number {
       index = commentEnd + 1
       continue
     }
-    if (character === '{') depth += 1
-    if (character === '}') depth -= 1
-    if (depth === 0) return index
+    if (character === '{') {
+      depth += 1
+    }
+    if (character === '}') {
+      depth -= 1
+    }
+    if (depth === 0) {
+      return index
+    }
   }
 
   throw new Error('CSS rule must have a closing brace')
@@ -63,16 +72,24 @@ function splitSelectors(prelude: string): string[] {
   for (let index = 0; index < prelude.length; index += 1) {
     const character = prelude[index]
     if (quote) {
-      if (character === '\\') index += 1
-      else if (character === quote) quote = ''
+      if (character === '\\') {
+        index += 1
+      } else if (character === quote) {
+        quote = ''
+      }
       continue
     }
-    if (character === '"' || character === "'") quote = character
-    else if (character === '(') parentheses += 1
-    else if (character === ')') parentheses -= 1
-    else if (character === '[') brackets += 1
-    else if (character === ']') brackets -= 1
-    else if (character === ',' && parentheses === 0 && brackets === 0) {
+    if (character === '"' || character === "'") {
+      quote = character
+    } else if (character === '(') {
+      parentheses += 1
+    } else if (character === ')') {
+      parentheses -= 1
+    } else if (character === '[') {
+      brackets += 1
+    } else if (character === ']') {
+      brackets -= 1
+    } else if (character === ',' && parentheses === 0 && brackets === 0) {
       selectors.push(prelude.slice(start, index).trim())
       start = index + 1
     }
@@ -89,7 +106,9 @@ function classSelectors(source: string): string[] {
 
   while (cursor < source.length) {
     const openingBrace = source.indexOf('{', cursor)
-    if (openingBrace === -1) break
+    if (openingBrace === -1) {
+      break
+    }
     const statementEnd = source.indexOf(';', cursor)
     if (statementEnd !== -1 && statementEnd < openingBrace) {
       cursor = statementEnd + 1
@@ -103,8 +122,9 @@ function classSelectors(source: string): string[] {
     const closingBrace = matchingBrace(source, openingBrace)
     const body = source.slice(openingBrace + 1, closingBrace)
 
-    if (nestedRule.test(prelude)) selectors.push(...classSelectors(body))
-    else if (!prelude.startsWith('@')) {
+    if (nestedRule.test(prelude)) {
+      selectors.push(...classSelectors(body))
+    } else if (!prelude.startsWith('@')) {
       selectors.push(
         ...splitSelectors(prelude)
           .filter((selector) => selector.startsWith('.'))

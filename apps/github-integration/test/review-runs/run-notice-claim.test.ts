@@ -47,7 +47,9 @@ test('an unconfirmed run notice renewal revokes permission to write', async () =
   const heartbeat = await startRunNoticeClaimHeartbeat(
     {
       renewRunNoticeClaim: async () => {
-        if (!reachable) throw new Error('Review Runs unavailable')
+        if (!reachable) {
+          throw new Error('Review Runs unavailable')
+        }
         return true
       },
       runNoticeHeartbeatIntervalMs: async () => 60_000

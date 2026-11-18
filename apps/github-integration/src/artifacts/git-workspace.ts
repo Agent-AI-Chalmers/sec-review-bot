@@ -280,8 +280,12 @@ function secReviewInputRefName(
   ref_count: number,
   window_base_sha: string | undefined
 ): string {
-  if (index === ref_count - 1) return 'head'
-  if (window_base_sha !== undefined && ref === window_base_sha) return 'base'
+  if (index === ref_count - 1) {
+    return 'head'
+  }
+  if (window_base_sha !== undefined && ref === window_base_sha) {
+    return 'base'
+  }
   return `pinned-${index}`
 }
 
@@ -523,7 +527,9 @@ function parseNameStatusZ(output: string): {
   let index = 0
   while (index + 1 < fields.length) {
     const raw_status = fields[index] ?? ''
-    if (raw_status === '') break
+    if (raw_status === '') {
+      break
+    }
     index += 1
     const code = raw_status.charAt(0)
     const status = GIT_STATUS_NAMES[code]
@@ -536,12 +542,16 @@ function parseNameStatusZ(output: string): {
       const previous_path = fields[index] ?? ''
       const path = fields[index + 1] ?? ''
       index += 2
-      if (path !== '') entries.push({ path, status, previous_path })
+      if (path !== '') {
+        entries.push({ path, status, previous_path })
+      }
       continue
     }
     const path = fields[index] ?? ''
     index += 1
-    if (path !== '') entries.push({ path, status, previous_path: null })
+    if (path !== '') {
+      entries.push({ path, status, previous_path: null })
+    }
   }
   return entries
 }
@@ -570,7 +580,9 @@ function parseNumstatZ(output: string): Map<string, { additions: number; deletio
   while (index < fields.length) {
     const record = fields[index] ?? ''
     index += 1
-    if (record === '') continue
+    if (record === '') {
+      continue
+    }
 
     // Split at the first two tabs only: `-z` disables quoting, so it also stops escaping tabs
     // inside the path itself. Splitting on every tab would truncate a path like `file\tname.txt`
@@ -593,7 +605,9 @@ function parseNumstatZ(output: string): Map<string, { additions: number; deletio
     const renamed_from = fields[index] ?? ''
     const renamed_to = fields[index + 1] ?? ''
     index += 2
-    if (renamed_from === '' && renamed_to === '') continue
+    if (renamed_from === '' && renamed_to === '') {
+      continue
+    }
     counts.set(renamed_to, counts_for_file)
   }
   return counts
@@ -723,7 +737,9 @@ export async function exportWorkspaceWindow({
   const patch_by_path = new Map<string, string>()
   ordered_paths.forEach((file_path, index) => {
     const section = sections[index]
-    if (section !== undefined) patch_by_path.set(file_path, section)
+    if (section !== undefined) {
+      patch_by_path.set(file_path, section)
+    }
   })
 
   return {
@@ -753,18 +769,24 @@ export async function exportWorkspaceWindow({
  * none.
  */
 function splitDiffIntoSections(diff: string): string[] {
-  if (diff === '') return []
+  if (diff === '') {
+    return []
+  }
   const sections: string[] = []
   let current: string[] = []
   for (const line of diff.split('\n')) {
     if (line.startsWith('diff --git ')) {
-      if (current.length > 0) sections.push(current.join('\n'))
+      if (current.length > 0) {
+        sections.push(current.join('\n'))
+      }
       current = [line]
       continue
     }
     current.push(line)
   }
-  if (current.length > 0) sections.push(current.join('\n'))
+  if (current.length > 0) {
+    sections.push(current.join('\n'))
+  }
   return sections
 }
 

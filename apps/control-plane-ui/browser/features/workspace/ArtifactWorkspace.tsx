@@ -71,13 +71,15 @@ export function ArtifactWorkspace({
   // Opening on the artifact's own entry point is the difference between a workspace the
   // reader can use and one that opens on whichever file happens to sort first.
   React.useEffect(() => {
-    if (names.length === 0) return
+    if (names.length === 0) {
+      return
+    }
     setSelectedFile(names.includes(source.preferredFile) ? source.preferredFile : (names[0] ?? ''))
   }, [names, source.preferredFile])
 
   throwIfUnauthorized(artifact.error)
 
-  if (artifact.error !== undefined)
+  if (artifact.error !== undefined) {
     return (
       <div className="content-load-state">
         <ResourceLoadError
@@ -105,8 +107,11 @@ export function ArtifactWorkspace({
         />
       </div>
     )
+  }
 
-  if (!selectedFile) return <LoadingState message={t('loading')} />
+  if (!selectedFile) {
+    return <LoadingState message={t('loading')} />
+  }
 
   return (
     <FileWorkspace

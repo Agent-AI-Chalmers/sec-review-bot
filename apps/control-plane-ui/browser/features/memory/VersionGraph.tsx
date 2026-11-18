@@ -34,13 +34,16 @@ function layoutVersions(versions: VersionGraphItem[]): {
   const items = new Map(versions.map((item) => [item.version, item]))
   const children = new Map<number, VersionGraphItem[]>()
   for (const item of versions) {
-    if (item.predecessor_version === null || !items.has(item.predecessor_version)) continue
+    if (item.predecessor_version === null || !items.has(item.predecessor_version)) {
+      continue
+    }
     const siblings = children.get(item.predecessor_version) ?? []
     siblings.push(item)
     children.set(item.predecessor_version, siblings)
   }
-  for (const siblings of children.values())
+  for (const siblings of children.values()) {
     siblings.sort((left, right) => left.version - right.version)
+  }
 
   const roots = versions
     .filter((item) => item.predecessor_version === null || !items.has(item.predecessor_version))
@@ -49,7 +52,9 @@ function layoutVersions(versions: VersionGraphItem[]): {
   const visited = new Set<number>()
   let nextLeaf = 0
   const place = (item: VersionGraphItem): number => {
-    if (visited.has(item.version)) return xByVersion.get(item.version) ?? nextLeaf++
+    if (visited.has(item.version)) {
+      return xByVersion.get(item.version) ?? nextLeaf++
+    }
     visited.add(item.version)
     const descendants = children.get(item.version) ?? []
     const x =
@@ -126,7 +131,9 @@ export function VersionGraph({
     scrollTop: number
   } | null>(null)
   React.useEffect(() => {
-    if (activeVersion !== undefined) setSelectedVersion(activeVersion)
+    if (activeVersion !== undefined) {
+      setSelectedVersion(activeVersion)
+    }
   }, [activeVersion])
   const layout = React.useMemo(() => layoutVersions(versions), [versions])
   const nodes = new Map(layout.nodes.map((item) => [item.version, item]))
@@ -147,12 +154,18 @@ export function VersionGraph({
     navigationTarget === undefined ? 'latest' : `version:${navigationTarget}`
   React.useLayoutEffect(() => {
     const viewport = scrollRef.current
-    if (!viewport || layout.nodes.length === 0) return
+    if (!viewport || layout.nodes.length === 0) {
+      return
+    }
     // Refreshes replace the rows, but only an explicit navigation changes the
     // requested position. Preserve the reader's pan/scroll through data updates.
-    if (positioned.current === requestedPosition) return
+    if (positioned.current === requestedPosition) {
+      return
+    }
     const target = layout.nodes.find((item) => item.version === navigationTarget)
-    if (navigationTarget !== undefined && !target) return
+    if (navigationTarget !== undefined && !target) {
+      return
+    }
     positioned.current = requestedPosition
     const current = target ?? layout.nodes.find((item) => item.version === activeVersion)
     viewport.scrollLeft = Math.max(
@@ -212,8 +225,9 @@ export function VersionGraph({
               event.pointerType !== 'mouse' ||
               event.button !== 0 ||
               (event.target as HTMLElement).closest('.version-graph-node')
-            )
+            ) {
               return
+            }
             panStart.current = {
               pointerX: event.clientX,
               pointerY: event.clientY,
@@ -224,14 +238,18 @@ export function VersionGraph({
             event.currentTarget.setPointerCapture(event.pointerId)
           }}
           onPointerMove={(event) => {
-            if (!panStart.current) return
+            if (!panStart.current) {
+              return
+            }
             event.currentTarget.scrollLeft =
               panStart.current.scrollLeft + panStart.current.pointerX - event.clientX
             event.currentTarget.scrollTop =
               panStart.current.scrollTop + panStart.current.pointerY - event.clientY
           }}
           onPointerUp={(event) => {
-            if (!panStart.current) return
+            if (!panStart.current) {
+              return
+            }
             panStart.current = null
             setPanning(false)
             event.currentTarget.releasePointerCapture(event.pointerId)
@@ -245,9 +263,13 @@ export function VersionGraph({
               aria-hidden="true"
             >
               {layout.nodes.map((item) => {
-                if (item.predecessor_version === null) return null
+                if (item.predecessor_version === null) {
+                  return null
+                }
                 const predecessor = nodes.get(item.predecessor_version)
-                if (!predecessor) return null
+                if (!predecessor) {
+                  return null
+                }
                 const startX = item.x + NODE_WIDTH / 2
                 const startY = item.y + NODE_HEIGHT
                 const endX = predecessor.x + NODE_WIDTH / 2
@@ -293,8 +315,9 @@ export function VersionGraph({
                   }
                 }}
                 onAnimationEnd={(event) => {
-                  if (event.currentTarget === event.target && item.version === highlightedVersion)
+                  if (event.currentTarget === event.target && item.version === highlightedVersion) {
                     onHighlightEnd()
+                  }
                 }}
               >
                 <strong>{t('versionReference', { version: String(item.version) })}</strong>

@@ -40,7 +40,9 @@ test('a body that grows past the budget mid-stream is refused', async () => {
     pull(controller) {
       sent += 1
       controller.enqueue(new Uint8Array(3))
-      if (sent >= 3) controller.close()
+      if (sent >= 3) {
+        controller.close()
+      }
     }
   })
   // No content-length: the declared-length check cannot help here.

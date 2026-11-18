@@ -31,7 +31,9 @@ const CLAIM_ONLY_FIELDS = new Set(['workflow_result', 'claim_token'])
 
 function schemaOf(name: string): Schema {
   const schema = spec.components?.schemas?.[name]
-  if (schema?.properties === undefined) throw new Error(`${name} has no properties`)
+  if (schema?.properties === undefined) {
+    throw new Error(`${name} has no properties`)
+  }
   return schema
 }
 

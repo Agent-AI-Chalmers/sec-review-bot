@@ -86,7 +86,9 @@ test('every file the manifest names exists', () => {
 /** Does any glob in `patterns` cover `filePath`? Supports `**` and `*`; exact strings match. */
 function globCovers(patterns: string[], filePath: string): boolean {
   return patterns.some((pattern) => {
-    if (pattern === filePath) return true
+    if (pattern === filePath) {
+      return true
+    }
     const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
     const regex = new RegExp(
       '^' +

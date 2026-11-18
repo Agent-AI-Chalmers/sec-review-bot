@@ -31,12 +31,14 @@ async function executeClaimedPreparation({
   store: PreparationCoordinatorStore
   work: NonNullable<Awaited<ReturnType<PreparationCoordinatorStore['claimNextPreparation']>>>
 }): Promise<void> {
-  if (work.input_version !== 'v1')
+  if (work.input_version !== 'v1') {
     throw new InvalidPreparationInputError(
       `Unsupported preparation input version ${work.input_version}.`
     )
-  if (!isRecord(work.input))
+  }
+  if (!isRecord(work.input)) {
     throw new InvalidPreparationInputError('Preparation input is missing object.')
+  }
   const input = work.input
   const kind = input.kind
   const claimed_preparation = {
@@ -160,7 +162,9 @@ export function startPreparationCoordinator({
   let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = (async () => {
       while (!stopped && (await prepareReviewRunsOnce({ app, store }))) {
         // Drain currently available preparations before returning to the poll interval.

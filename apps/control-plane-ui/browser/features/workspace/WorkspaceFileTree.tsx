@@ -26,7 +26,9 @@ function buildFileTree(paths: string[]): FileTreeNode[] {
         child = { name: part, children: [] }
         parent.children.push(child)
       }
-      if (index === parts.length - 1) child.path = path
+      if (index === parts.length - 1) {
+        child.path = path
+      }
       parent = child
     })
   }

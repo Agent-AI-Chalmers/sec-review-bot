@@ -271,9 +271,12 @@ export async function dispatchRepositoryReview({
   const run_id = claimed_preparation?.run_id ?? admission?.run_id
   const preparationToken = claimed_preparation?.token ?? admission?.preparation_token
   const preparationAttempt = claimed_preparation?.attempt_count ?? 1
-  if (run_id === undefined) throw new Error('Preparation admission did not return a run id.')
-  if (!preparationToken)
+  if (run_id === undefined) {
+    throw new Error('Preparation admission did not return a run id.')
+  }
+  if (!preparationToken) {
     throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  }
   const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
 
   let octokit: Octokit

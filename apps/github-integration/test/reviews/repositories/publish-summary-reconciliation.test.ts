@@ -55,7 +55,9 @@ function buildHarness({
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
       // Only the step under test is out of attempts; everything before it is ready.
-      if (stepKey === exhaustedStep) throw exhaustedError()
+      if (stepKey === exhaustedStep) {
+        throw exhaustedError()
+      }
     },
     completePublicationStep: async () => true,
     settleExhaustedPublicationStep: async (

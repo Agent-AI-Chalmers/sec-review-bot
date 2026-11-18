@@ -85,7 +85,9 @@ export function RunFilters({
     ['to', t('filterTo')]
   ]) {
     const value = search.get(name)
-    if (value) activeFilters.push(`${label}: ${value}`)
+    if (value) {
+      activeFilters.push(`${label}: ${value}`)
+    }
   }
   return (
     <Box className="operations-bar" mb="lg">

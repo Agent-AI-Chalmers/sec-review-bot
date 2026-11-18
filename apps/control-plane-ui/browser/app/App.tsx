@@ -114,8 +114,12 @@ class ErrorBoundary extends React.Component<
     )
   }
   render(): React.ReactNode {
-    if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
-    if (this.state.error) return <ErrorFallback error={this.state.error} />
+    if (this.state.error instanceof ApiError && this.state.error.status === 401) {
+      return <Login />
+    }
+    if (this.state.error) {
+      return <ErrorFallback error={this.state.error} />
+    }
     return this.props.children
   }
 }
@@ -163,7 +167,9 @@ export function App(): React.JSX.Element {
   const viewerActive = useMatch('/viewer') !== null
   const [viewerVisited, setViewerVisited] = React.useState(viewerActive)
   React.useEffect(() => {
-    if (viewerActive) setViewerVisited(true)
+    if (viewerActive) {
+      setViewerVisited(true)
+    }
   }, [viewerActive])
   const [unauthorized, setUnauthorized] = React.useState(false)
   const activeSection = location.pathname.startsWith('/memory')

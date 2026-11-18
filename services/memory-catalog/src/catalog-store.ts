@@ -129,8 +129,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         [...identity, intent]
       )
       const row = result.rows[0]!
-      if (!row.identical)
+      if (!row.identical) {
         throw new ExtractionConflictError('Extraction publication intent changed.')
+      }
       return { intent: row.intent, status: row.status }
     })
   }
@@ -143,8 +144,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
        where extraction_id=$1 and digest=$2 and intent=$3::jsonb returning intent,status`,
       [intent.registration.extraction_id, intent.registration.trajectory_reference.digest, intent]
     )
-    if (!result.rows[0])
+    if (!result.rows[0]) {
       throw new ExtractionConflictError('Matching extraction publication reservation is required.')
+    }
     return result.rows[0]
   }
 
@@ -178,8 +180,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         [...identity, intent]
       )
       const row = result.rows[0]!
-      if (!row.identical)
+      if (!row.identical) {
         throw new MemoryTreeVersionConflictError('Version publication intent changed.')
+      }
       return projectVersionPublication(row)
     })
   }
@@ -196,10 +199,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
        returning intent,status`,
       [...versionPublicationIdentity(intent), intent]
     )
-    if (!result.rows[0])
+    if (!result.rows[0]) {
       throw new MemoryTreeVersionConflictError(
         'Matching version publication reservation is required.'
       )
+    }
     return projectVersionPublication(result.rows[0])
   }
 
@@ -242,15 +246,17 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         where extraction_id=$1 and status='selected' and intent->'registration'<>$2::jsonb`,
         [input.extraction_id, input]
       )
-      if (selected.rows[0])
+      if (selected.rows[0]) {
         throw new ExtractionConflictError('A different extraction publication is already selected.')
+      }
       const publication = await client.query<{ digest: string }>(
         `select digest from extraction_publications where extraction_id=$1
          and intent->'registration'=$2::jsonb and status in ('present','selected') for update`,
         [input.extraction_id, input]
       )
-      if (!publication.rows[0])
+      if (!publication.rows[0]) {
         throw new ExtractionConflictError('A confirmed extraction publication is required.')
+      }
       await client.query(
         `update extraction_publications set status='selected'
         where extraction_id=$1 and digest=$2`,
@@ -278,10 +284,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
              values ($1,$2,$3) on conflict (observation_id) do nothing`,
             [observation.observation_id, input.extraction_id, observation.body_markdown]
           )
-          if (insertedObservation.rowCount !== 1)
+          if (insertedObservation.rowCount !== 1) {
             throw new ExtractionConflictError(
               `Observation ID is already occupied: ${observation.observation_id}`
             )
+          }
         }
         return true
       }
@@ -346,10 +353,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       )
       const existing = replay.rows[0]
       if (existing !== undefined) {
-        if (!existing.identical)
+        if (!existing.identical) {
           throw new MemoryTreeAutomationConflictError(
             'Automation operation id already exists with different content.'
           )
+        }
         return {
           created: false,
           automation: {
@@ -362,16 +370,20 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
 
       const row = current.rows[0]
-      if (row === undefined) throw new Error('Memory-tree automation row is missing.')
-      if (Number(row.version) !== input.expected_version)
+      if (row === undefined) {
+        throw new Error('Memory-tree automation row is missing.')
+      }
+      if (Number(row.version) !== input.expected_version) {
         throw new MemoryTreeAutomationConflictError(
           `Memory-tree automation version no longer matches ${input.expected_version}.`
         )
+      }
       const expectedState = targetState === 'paused' ? 'enabled' : 'paused'
-      if (row.state !== expectedState)
+      if (row.state !== expectedState) {
         throw new MemoryTreeAutomationConflictError(
           `Memory-tree automation cannot transition from ${row.state} to ${targetState}.`
         )
+      }
       const changed = await client.query<{
         state: 'enabled' | 'paused'
         version: string
@@ -386,7 +398,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         [targetState, input.actor]
       )
       const control = changed.rows[0]
-      if (control === undefined) throw new Error('Memory-tree automation update returned no row.')
+      if (control === undefined) {
+        throw new Error('Memory-tree automation update returned no row.')
+      }
       await client.query(
         `insert into memory_tree_automation_operations (
            operation_id, target_state, expected_version, actor, changed_at
@@ -417,7 +431,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
          order by created_at, observation_id limit $1`,
         [limit]
       )
-      if (observations.rowCount === 0) return null
+      if (observations.rowCount === 0) {
+        return null
+      }
       const active = await client.query<{
         version: string
         memory_tree_reference: ArtifactReference | null
@@ -427,7 +443,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             on version.version=state.active_version
           where state.singleton=true`)
       const row = active.rows[0]
-      if (row === undefined) throw new Error('Memory tree state row is missing.')
+      if (row === undefined) {
+        throw new Error('Memory tree state row is missing.')
+      }
       return {
         expected_active_version: Number(row.version),
         active_memory_tree_reference: row.memory_tree_reference,
@@ -450,26 +468,29 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         where operation_id=$1 and status='selected' and intent<>$2::jsonb`,
         [source.operation_id, input]
       )
-      if (selected.rows[0])
+      if (selected.rows[0]) {
         throw new MemoryTreeVersionConflictError(
           'A different version publication is already selected.'
         )
+      }
       const candidate = await client.query<{
         status: VersionPublication['status']
       }>(
         'select status from memory_version_publications where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb',
         [...versionPublicationIdentity(input), input]
       )
-      if (candidate.rows[0]?.status === 'abandoned')
+      if (candidate.rows[0]?.status === 'abandoned') {
         throw new PublicationAbandonedError('Version publication has been abandoned.')
+      }
       const publication = await client.query(
         `select 1 from memory_version_publications where source_kind=$1 and operation_id=$2
          and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
          and status in ('present','selected') for update`,
         [...versionPublicationIdentity(input), input]
       )
-      if (!publication.rows[0])
+      if (!publication.rows[0]) {
         throw new MemoryTreeVersionConflictError('A confirmed version publication is required.')
+      }
       let existing: { version: string; identical: boolean } | undefined
       if (source.kind === 'learning') {
         const replay = await client.query<{
@@ -621,12 +642,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           source.kind === 'manual' ? source.actor : null
         ]
       )
-      if (source.kind === 'learning')
+      if (source.kind === 'learning') {
         await client.query(
           `update observations set consumed_version=$1
            where observation_id=any($2) and consumed_version is null`,
           [nextVersion, source.observation_ids]
         )
+      }
       await client.query(
         `update memory_tree_state
          set active_version=$1
@@ -640,8 +662,9 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
     })
     // Raise after committing abandonment so a lost response cannot revive this candidate.
-    if (result === null)
+    if (result === null) {
       throw new AutomationPausedError('Automatic memory-tree version commits are paused.')
+    }
     return result
   }
 
@@ -672,10 +695,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       )
       const existing = replay.rows[0]
       if (existing !== undefined) {
-        if (!existing.identical)
+        if (!existing.identical) {
           throw new MemoryTreeVersionConflictError(
             'Restore operation id already exists with different content.'
           )
+        }
         return {
           created: false,
           active_version: Number(existing.restored_version),
@@ -683,18 +707,20 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         }
       }
 
-      if (Number(active.rows[0]?.version) !== input.expected_active_version)
+      if (Number(active.rows[0]?.version) !== input.expected_active_version) {
         throw new MemoryTreeVersionConflictError(
           `Active version no longer matches expected active version ${input.expected_active_version}.`
         )
+      }
 
       const target = await client.query(`select 1 from memory_tree_versions where version=$1`, [
         input.restored_version
       ])
-      if (target.rowCount === 0)
+      if (target.rowCount === 0) {
         throw new MemoryTreeVersionConflictError(
           `Restored version does not exist: ${input.restored_version}.`
         )
+      }
 
       await client.query(
         `insert into memory_tree_restore_operations (

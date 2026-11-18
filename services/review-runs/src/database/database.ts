@@ -40,7 +40,9 @@ export class Database {
   }
 
   async initialize(): Promise<void> {
-    if (this.#initialized) return
+    if (this.#initialized) {
+      return
+    }
     await applySchemaVersions(this.#pool)
     this.#initialized = true
   }
@@ -51,8 +53,9 @@ export class Database {
    * initialization fails here rather than against a half-migrated database.
    */
   pool(): Pool {
-    if (!this.#initialized)
+    if (!this.#initialized) {
       throw new Error('Review Runs database is not initialized; await initialize() before use.')
+    }
     return this.#pool
   }
 

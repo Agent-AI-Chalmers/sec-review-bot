@@ -14,8 +14,12 @@ import { openAuthenticatedRuns, test } from './fixtures.ts'
 async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    if (await predicate()) return
-    if (Date.now() > deadline) throw new Error(message)
+    if (await predicate()) {
+      return
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message)
+    }
     await delay(intervalMs)
   }
 }

@@ -19,8 +19,12 @@ function createOctokitWithContent(contentByPath: Content_by_path = {}): {
     const path = decodeURIComponent(new URL(url).pathname.split('/contents/')[1] ?? '')
     const source = contentByPath[path]
     // A missing entry is a real 404, which is what GitHub answers for an absent file.
-    if (source === undefined) return githubJson({ message: 'Not Found' }, 404)
-    if (source instanceof Error) return githubJson({ message: source.message }, 500)
+    if (source === undefined) {
+      return githubJson({ message: 'Not Found' }, 404)
+    }
+    if (source instanceof Error) {
+      return githubJson({ message: source.message }, 500)
+    }
     return githubFile(source, path)
   })
 }

@@ -36,10 +36,14 @@ async function collectEntry(
   for await (const chunk of stream) {
     const bytes = Buffer.from(chunk)
     size += bytes.length
-    if (size > expectedSize) throw new Error('invalid_execution_archive')
+    if (size > expectedSize) {
+      throw new Error('invalid_execution_archive')
+    }
     chunks.push(bytes)
   }
-  if (size !== expectedSize) throw new Error('invalid_execution_archive')
+  if (size !== expectedSize) {
+    throw new Error('invalid_execution_archive')
+  }
   return Buffer.concat(chunks)
 }
 
@@ -52,14 +56,16 @@ export async function readExecutionArchive(
   bytes: Buffer,
   expectedRunId: string
 ): Promise<ExecutionArchiveView> {
-  if (bytes.length > MAX_EXECUTION_ARCHIVE_VIEW_BYTES)
+  if (bytes.length > MAX_EXECUTION_ARCHIVE_VIEW_BYTES) {
     throw new Error('execution_archive_too_large')
+  }
   let tarBytes: Buffer
   try {
     tarBytes = decompressRestrictedPaxArchive(bytes, MAX_EXTRACTED_BYTES + MAX_ENTRIES * 2048)
   } catch (error) {
-    if (error instanceof Error && error.message === 'invalid_tar_zstd_envelope')
+    if (error instanceof Error && error.message === 'invalid_tar_zstd_envelope') {
       throw new Error('invalid_execution_archive', { cause: error })
+    }
     throw error
   }
   const extract = tar.extract()
@@ -72,12 +78,16 @@ export async function readExecutionArchive(
     extract.on('entry', (header, stream, next) => {
       void (async (): Promise<void> => {
         entryCount += 1
-        if (entryCount > MAX_ENTRIES || !safePath(header.name))
+        if (entryCount > MAX_ENTRIES || !safePath(header.name)) {
           throw new Error('invalid_execution_archive')
-        if (header.type !== 'file' && header.type !== 'directory')
+        }
+        if (header.type !== 'file' && header.type !== 'directory') {
           throw new Error('invalid_execution_archive')
+        }
         const name = header.name.replace(/\/$/, '')
-        if (seenPaths.has(name)) throw new Error('invalid_execution_archive')
+        if (seenPaths.has(name)) {
+          throw new Error('invalid_execution_archive')
+        }
         seenPaths.add(name)
         if (header.type === 'directory') {
           stream.resume()
@@ -87,7 +97,9 @@ export async function readExecutionArchive(
           })
         } else {
           extractedBytes += header.size
-          if (extractedBytes > MAX_EXTRACTED_BYTES) throw new Error('execution_archive_too_large')
+          if (extractedBytes > MAX_EXTRACTED_BYTES) {
+            throw new Error('execution_archive_too_large')
+          }
           entries.set(
             name,
             await collectEntry(stream as unknown as AsyncIterable<Uint8Array>, header.size)
@@ -108,8 +120,9 @@ export async function readExecutionArchive(
     !manifestBytes ||
     !resultBytes ||
     ![...entries.keys()].some((name) => name.startsWith('artifact-tree/'))
-  )
+  ) {
     throw new Error('invalid_execution_archive')
+  }
   let manifestText: string
   let resultText: string
   try {
@@ -125,20 +138,23 @@ export async function readExecutionArchive(
   } catch {
     throw new Error('invalid_execution_archive')
   }
-  if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest))
+  if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest)) {
     throw new Error('invalid_execution_archive')
+  }
   const record = manifest as Record<string, unknown>
   if (
     record.version !== 1 ||
     record.run_id !== expectedRunId ||
     record.result !== 'result.json' ||
     !Array.isArray(record.review_units)
-  )
+  ) {
     throw new Error('invalid_execution_archive')
+  }
   const unitIds = new Set<string>()
   for (const unit of record.review_units) {
-    if (typeof unit !== 'object' || unit === null || Array.isArray(unit))
+    if (typeof unit !== 'object' || unit === null || Array.isArray(unit)) {
       throw new Error('invalid_execution_archive')
+    }
     const reviewUnit = unit as Record<string, unknown>
     if (
       typeof reviewUnit.id !== 'string' ||
@@ -146,8 +162,9 @@ export async function readExecutionArchive(
       unitIds.has(reviewUnit.id) ||
       !Array.isArray(reviewUnit.trajectories) ||
       reviewUnit.trajectories.length === 0
-    )
+    ) {
       throw new Error('invalid_execution_archive')
+    }
     unitIds.add(reviewUnit.id)
     for (const trajectory of reviewUnit.trajectories) {
       if (
@@ -156,8 +173,9 @@ export async function readExecutionArchive(
         !trajectory.startsWith('artifact-tree/') ||
         !trajectory.endsWith('.jsonl') ||
         !entries.has(trajectory)
-      )
+      ) {
         throw new Error('invalid_execution_archive')
+      }
     }
   }
 

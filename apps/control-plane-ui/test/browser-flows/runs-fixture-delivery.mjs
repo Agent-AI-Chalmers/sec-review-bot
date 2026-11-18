@@ -16,7 +16,9 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
     const runId = decodeURIComponent(new URL(page.url()).pathname).split('/').pop()
     const served = await page.evaluate(async (id) => {
       const response = await fetch(`/api/runs/${encodeURIComponent(id)}`)
-      if (!response.ok) return { status: response.status }
+      if (!response.ok) {
+        return { status: response.status }
+      }
       const { run } = await response.json()
       return {
         status: response.status,
@@ -35,7 +37,9 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
   // Compare centres rather than tops because the artifact facts use different font sizes.
   const artifact = await page.evaluate(() => {
     const row = document.querySelector('.artifact-row')
-    if (row === null) return { found: false }
+    if (row === null) {
+      return { found: false }
+    }
     const action = row.querySelector('.artifact-actions')
     const facts = [...row.querySelectorAll('.artifact-facts > *')].map((element) =>
       element.getBoundingClientRect()
@@ -190,7 +194,9 @@ export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, wa
   )
   const single = await page.evaluate(() => {
     const item = document.querySelector('.delivery-item')
-    if (item === null) return { found: false }
+    if (item === null) {
+      return { found: false }
+    }
     const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
     const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
     return {

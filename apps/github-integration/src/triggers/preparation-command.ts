@@ -110,19 +110,26 @@ export async function runPreparationCommand<P>({
       status: admitted.status,
       replayed: !admitted.created
     })
-    if (!admitted.created) return { run_id: admitted.run_id }
+    if (!admitted.created) {
+      return { run_id: admitted.run_id }
+    }
   }
 
   const run_id = claimed_preparation?.run_id ?? admitted?.run_id
   const preparationToken = claimed_preparation?.token ?? admitted?.preparation_token
   const preparationAttempt = claimed_preparation?.attempt_count ?? 1
-  if (run_id === undefined) throw new Error('Preparation admission did not return a run id.')
-  if (!preparationToken)
+  if (run_id === undefined) {
+    throw new Error('Preparation admission did not return a run id.')
+  }
+  if (!preparationToken) {
     throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  }
   const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
 
   try {
-    if (await recoverInputBundlePublication(store, run_id, preparationToken)) return { run_id }
+    if (await recoverInputBundlePublication(store, run_id, preparationToken)) {
+      return { run_id }
+    }
     const prepared = await prepare_review({
       run_id,
       checkpoint: async (preparation_input) => {

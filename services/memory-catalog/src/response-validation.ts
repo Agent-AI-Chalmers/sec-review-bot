@@ -13,7 +13,9 @@ export function registerResponseValidation(app: FastifyInstance): void {
   })
   addFormats.default(ajv)
   app.addHook('onRoute', (route) => {
-    if (!route.schema?.response) return
+    if (!route.schema?.response) {
+      return
+    }
     const validators = new Map(
       Object.entries(route.schema.response).map(([status, schema]) => [
         status,
