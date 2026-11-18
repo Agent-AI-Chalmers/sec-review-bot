@@ -12,6 +12,7 @@
 # Comments are free-form; the validator reads only the area keys and their globs.
 
 automation-config:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -31,6 +32,7 @@ automation-config:
 
 ops:
   # Deployment scripts, Compose topology, and deployment smoke tooling.
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - 'pnpm-lock.yaml'
@@ -44,6 +46,11 @@ ops:
   - '.github/workflows/ci.yml'
 
 contract-tools:
+  # Generated projections use the destination package's formatter configuration.
+  - '.oxfmtrc.json'
+  - 'apps/*/.oxfmtrc.json'
+  - 'services/*/.oxfmtrc.json'
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -74,6 +81,7 @@ contract-tools:
   - '.github/workflows/ci.yml'
 
 review-runs:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -87,6 +95,7 @@ review-runs:
   - '.github/workflows/ci.yml'
 
 execution-gateway:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -99,6 +108,7 @@ execution-gateway:
   - '.github/workflows/ci.yml'
 
 memory-catalog:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -111,6 +121,7 @@ memory-catalog:
   - '.github/workflows/ci.yml'
 
 github-integration:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -125,6 +136,7 @@ github-integration:
   - '.github/workflows/ci.yml'
 
 control-plane-ui:
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - '.dockerignore'
@@ -166,14 +178,14 @@ documentation:
   - 'scripts/**'
   - 'compose.yaml'
   - 'smoke-tests/**'
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'
   - 'pnpm-lock.yaml'
   - '.editorconfig'
   - '.gitignore'
   - '.markdownlint-cli2.jsonc'
-  - '.prettierrc.json'
-  - '.prettierignore'
+  - '.oxfmtrc.json'
   - '.autocorrectrc'
   - 'lefthook.yml'
 
@@ -189,6 +201,7 @@ smoke:
   - 'services/memory-catalog/**'
   - 'apps/control-plane-ui/**'
   - 'contracts/**'
+  - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-lock.yaml'
   - 'pnpm-workspace.yaml'

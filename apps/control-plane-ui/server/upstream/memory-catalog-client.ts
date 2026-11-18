@@ -4,10 +4,7 @@ export type MemoryArtifactCollection = 'versions' | 'extractions'
 
 export interface MemoryCatalogClient {
   read(path: string): Promise<UpstreamResult>
-  getArtifactRecord(
-    collection: MemoryArtifactCollection,
-    identity: string
-  ): Promise<UpstreamResult>
+  getArtifactRecord(collection: MemoryArtifactCollection, identity: string): Promise<UpstreamResult>
   write(path: string, body: unknown): Promise<UpstreamResult>
 }
 

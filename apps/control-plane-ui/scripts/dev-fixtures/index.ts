@@ -7,7 +7,10 @@ export function devFixtures(): Plugin {
   return {
     name: 'control-plane-ui-dev-fixtures',
     configureServer(server): void {
-      server.middlewares.use(createFixtureRouter())
+      const handle = createFixtureRouter()
+      server.middlewares.use((request, response, next) => {
+        void handle(request, response, next).catch(next)
+      })
     }
   }
 }

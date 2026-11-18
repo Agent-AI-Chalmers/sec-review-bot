@@ -6,7 +6,7 @@ import { logError } from '../../utils/logger.js'
 export type NodeHttpMiddleware = (
   request: IncomingMessage,
   response: ServerResponse
-) => void
+) => void | Promise<void>
 
 export type RepositoryReviewDispatchHandler = (args: {
   app: App
@@ -33,18 +33,11 @@ function writeJson(
   response.end(JSON.stringify(value))
 }
 
-function requestUrlFromNodeRequest(
-  request: IncomingMessage,
-  port: number
-): URL | null {
-  const requestPath =
-    typeof request.url === 'string' && request.url.length > 0
-      ? request.url
-      : '/'
+function requestUrlFromNodeRequest(request: IncomingMessage, port: number): URL | null {
+  const requestPath = typeof request.url === 'string' && request.url.length > 0 ? request.url : '/'
   // Some probes/proxies send an empty Host header; treat that as missing and use a safe local fallback.
   const requestHost =
-    typeof request.headers.host === 'string' &&
-    request.headers.host.trim().length > 0
+    typeof request.headers.host === 'string' && request.headers.host.trim().length > 0
       ? request.headers.host.trim()
       : `localhost:${port}`
 
@@ -106,11 +99,13 @@ async function handleAppHttpRequest(
   }
 
   function enforceWebhookBodyLimit(chunk: Buffer | string): void {
-    if (rejected) return
-    receivedBytes += Buffer.isBuffer(chunk)
-      ? chunk.byteLength
-      : Buffer.byteLength(chunk)
-    if (receivedBytes <= webhook_max_body_bytes) return
+    if (rejected) {
+      return
+    }
+    receivedBytes += Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(chunk)
+    if (receivedBytes <= webhook_max_body_bytes) {
+      return
+    }
     rejected = true
     cleanup()
     if (!response.headersSent && !response.writableEnded) {
@@ -125,7 +120,7 @@ async function handleAppHttpRequest(
   request.once('end', cleanup)
   request.once('error', cleanup)
 
-  webhook_middleware(request, response)
+  await webhook_middleware(request, response)
 }
 
 export function createAppHttpHandler({
@@ -135,10 +130,7 @@ export function createAppHttpHandler({
   repository_review_dispatch_handler,
   webhook_max_body_bytes = 1_048_576,
   webhook_middleware
-}: AppHttpHandlerOptions): (
-  request: IncomingMessage,
-  response: ServerResponse
-) => Promise<void> {
+}: AppHttpHandlerOptions): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   const options = {
     app,
     port,

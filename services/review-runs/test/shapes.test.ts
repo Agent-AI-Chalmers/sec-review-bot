@@ -11,9 +11,7 @@ test('an available artifact storage record keeps its artifact reference', () => 
     size_bytes: 42
   }
 
-  expect(
-    normalizeArtifactStorage({ status: 'available', artifact })
-  ).toStrictEqual({
+  expect(normalizeArtifactStorage({ status: 'available', artifact })).toStrictEqual({
     status: 'available',
     artifact
   })
@@ -33,18 +31,14 @@ test('normalizeArtifactStorage rejects an available record with no artifact', ()
     expect(
       () => normalizeArtifactStorage(storage, 'run r-1'),
       `${JSON.stringify(storage)} must be rejected`
-    ).toThrow(
-      /run r-1 is an available artifact storage record without its artifact reference/
-    )
+    ).toThrow(/run r-1 is an available artifact storage record without its artifact reference/)
   }
 })
 
 test('the normalization context names the offending record', () => {
   // The message has to identify *which* record is corrupt, or the resulting 500 is
   // undiagnosable. `rowToRecord` passes the run id, so assert the label shows up.
-  expect(() =>
-    normalizeArtifactStorage({ status: 'available' }, 'run 8c1f')
-  ).toThrow(/run 8c1f/)
+  expect(() => normalizeArtifactStorage({ status: 'available' }, 'run 8c1f')).toThrow(/run 8c1f/)
   expect(
     () => normalizeArtifactStorage({ status: 'available' }),
     'the default context is still a usable label'

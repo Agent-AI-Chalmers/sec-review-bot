@@ -15,10 +15,10 @@
     "test": "rm -rf dist && node scripts/test-runner.mjs unit",
     "test:integration": "node scripts/test-runner.mjs integration",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm run test:types",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "test:types": "vitest run --project types"
   },
   "dependencies": {
@@ -31,17 +31,14 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
     "aws-sdk-client-mock": "^4.1.0",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
     "nodemon": "^3.1.14",
-    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "5.1.0"
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007"
   }
 }

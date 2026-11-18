@@ -43,9 +43,7 @@ export function createRunsHandler(): (
   // set that produced them. Deriving from state is what lets all three axes appear in the
   // queue: a run parked on execution or publication is as invisible to an operator as one
   // parked on preparation if the list is built from a preparation-only source.
-  const parkedAxis = (
-    run: FixtureRun
-  ): 'preparation' | 'execution' | 'publication' | null =>
+  const parkedAxis = (run: FixtureRun): 'preparation' | 'execution' | 'publication' | null =>
     run.preparation.status === 'disconnected'
       ? 'preparation'
       : run.execution.status === 'disconnected'
@@ -59,15 +57,16 @@ export function createRunsHandler(): (
       // merely happens to be `disconnected` (the lifecycle scenarios, repeated across the
       // page) is not an operator backlog: listing all of them turned four sample states into
       // thirteen queue entries. The parked ones are what an operator is actually shown.
-      if (!parkedIndexes.has(index)) return []
-      const axis = parkedAxis(run)
-      if (axis === null) return []
-      if (
-        abandoned.has(run.run_id) ||
-        resumed.has(run.run_id) ||
-        gaveUp.has(run.run_id)
-      )
+      if (!parkedIndexes.has(index)) {
         return []
+      }
+      const axis = parkedAxis(run)
+      if (axis === null) {
+        return []
+      }
+      if (abandoned.has(run.run_id) || resumed.has(run.run_id) || gaveUp.has(run.run_id)) {
+        return []
+      }
       return [
         {
           run_id: run.run_id,
@@ -82,11 +81,12 @@ export function createRunsHandler(): (
         }
       ]
     })
-  const blockedRunIds = (): string[] =>
-    blockedRuns().map((block) => block.run_id)
+  const blockedRunIds = (): string[] => blockedRuns().map((block) => block.run_id)
   return async (request, response): Promise<void> => {
     const requestUrl = request.url
-    if (requestUrl === undefined) return
+    if (requestUrl === undefined) {
+      return
+    }
     if (requestUrl.startsWith('/api/runs?')) {
       const url = new URL(requestUrl, 'http://fixture.local')
       const unknown = [...url.searchParams.keys()].filter(
@@ -134,14 +134,11 @@ export function createRunsHandler(): (
       const workflow = url.searchParams.get('workflow')
       const filtered = runs.filter(
         (run) =>
-          (executionStatus === null ||
-            run.execution.status === executionStatus) &&
-          (publicationStatus === null ||
-            run.publication.status === publicationStatus) &&
+          (executionStatus === null || run.execution.status === executionStatus) &&
+          (publicationStatus === null || run.publication.status === publicationStatus) &&
           // Fixtures always carry a preparation summary (see `validateRun`), matching the
           // store, which never returns a run without one.
-          (preparationStatus === null ||
-            run.preparation?.status === preparationStatus) &&
+          (preparationStatus === null || run.preparation?.status === preparationStatus) &&
           (sourcePlatform === null || run.source_platform === sourcePlatform) &&
           (from === null || run.created_at >= from) &&
           (to === null || run.created_at < to) &&
@@ -168,14 +165,11 @@ export function createRunsHandler(): (
       const nextCursor =
         last === undefined || page.length < limit
           ? null
-          : Buffer.from(`${last.created_at}|${last.run_id}`).toString(
-              'base64url'
-            )
+          : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
       response.end(JSON.stringify({ runs: page, next_cursor: nextCursor }))
       return
     }
-    const runArtifactContentMatch =
-      /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(requestUrl)
+    const runArtifactContentMatch = /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(requestUrl)
     if (request.method === 'GET' && runArtifactContentMatch !== null) {
       const runId = decodeURIComponent(runArtifactContentMatch[1] ?? '')
       if (runId === ARTIFACT_LOAD_ERROR_RUN_ID) {
@@ -194,10 +188,7 @@ export function createRunsHandler(): (
           ...artifactContent,
           files: {
             ...artifactContent.files,
-            'manifest.json': artifactContent.files['manifest.json'].replace(
-              '__RUN_ID__',
-              runId
-            )
+            'manifest.json': artifactContent.files['manifest.json'].replace('__RUN_ID__', runId)
           }
         } satisfies RunArtifactContentResponse)
       )
@@ -205,19 +196,13 @@ export function createRunsHandler(): (
     }
     // Before the run-detail match below, which would otherwise read this fixed segment as a
     // run id. Mirrors `GET /v1/runs/parked`.
-    const abandonMatch = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/.exec(
-      requestUrl
-    )
+    const abandonMatch = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/.exec(requestUrl)
     // Mirrors `POST /v1/admin/runs/{runId}/resume`: the same eligibility (a run in the
     // queue), the same credential, and the same transition to `uncertain`.
-    const resumeMatch = /^\/api\/admin\/runs\/([^/?]+)\/resume$/.exec(
-      requestUrl
-    )
+    const resumeMatch = /^\/api\/admin\/runs\/([^/?]+)\/resume$/.exec(requestUrl)
     // Mirrors `POST /v1/admin/runs/{runId}/give-up`: a required reason, the same credential,
     // and the disconnected axis concluded as the failure that names the operator.
-    const giveUpMatch = /^\/api\/admin\/runs\/([^/?]+)\/give-up$/.exec(
-      requestUrl
-    )
+    const giveUpMatch = /^\/api\/admin\/runs\/([^/?]+)\/give-up$/.exec(requestUrl)
     if (request.method === 'POST' && giveUpMatch !== null) {
       if (request.headers['x-review-runs-admin-token'] === undefined) {
         response.statusCode = 401
@@ -226,13 +211,12 @@ export function createRunsHandler(): (
       }
       const runId = decodeURIComponent(giveUpMatch[1] ?? '')
       const chunks: Buffer[] = []
-      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
       const body = ((): Record<string, unknown> => {
         try {
-          return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
-            string,
-            unknown
-          >
+          return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
         } catch {
           return {}
         }
@@ -279,10 +263,7 @@ export function createRunsHandler(): (
         run.publication.finished_at = now
         run.failure_code = reasonCode
       }
-      if (
-        run.publication.status === 'pending' ||
-        run.publication.status === 'publishing'
-      ) {
+      if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
         run.publication.status = 'skipped'
         run.publication.finished_at = now
       }
@@ -307,11 +288,7 @@ export function createRunsHandler(): (
         return
       }
       const runId = decodeURIComponent(resumeMatch[1] ?? '')
-      if (
-        !blockedRunIds().includes(runId) ||
-        abandoned.has(runId) ||
-        resumed.has(runId)
-      ) {
+      if (!blockedRunIds().includes(runId) || abandoned.has(runId) || resumed.has(runId)) {
         response.statusCode = 409
         response.end(JSON.stringify({ error: 'not_disconnected' }))
         return
@@ -373,10 +350,7 @@ export function createRunsHandler(): (
       run.preparation.finished_at = now
       run.preparation.status = 'failed'
       run.preparation.disconnect_reason = null
-      if (
-        run.publication.status === 'pending' ||
-        run.publication.status === 'publishing'
-      ) {
+      if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
         run.publication.status = 'skipped'
         run.publication.finished_at = now
       }
@@ -396,9 +370,7 @@ export function createRunsHandler(): (
       )
       return
     }
-    const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(
-      requestUrl
-    )
+    const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(requestUrl)
     if (stepsMatch) {
       const runId = decodeURIComponent(stepsMatch[1] ?? '')
       response.end(

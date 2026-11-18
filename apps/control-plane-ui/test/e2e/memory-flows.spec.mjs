@@ -11,15 +11,15 @@ import {
 } from '../browser-flows/memory.mjs'
 import { openAuthenticatedRuns, test } from './fixtures.ts'
 
-async function waitUntil(
-  predicate,
-  message,
-  { timeoutMs = 5_000, intervalMs = 50 } = {}
-) {
+async function waitUntil(predicate, message, { timeoutMs = 5_000, intervalMs = 50 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    if (await predicate()) return
-    if (Date.now() > deadline) throw new Error(message)
+    if (await predicate()) {
+      return
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message)
+    }
     await delay(intervalMs)
   }
 }
@@ -45,9 +45,7 @@ test.describe('local memory fixtures', () => {
       fixtureRuntime.server === undefined,
       'These checks require isolated local memory fixtures.'
     )
-    await page.addInitScript(() =>
-      localStorage.setItem('ui-auto-refresh', 'false')
-    )
+    await page.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
     await openAuthenticatedRuns(page)
   })
 
@@ -62,9 +60,7 @@ test.describe('local memory fixtures', () => {
     })
   })
 
-  test('memory overview ranges reload only the overview', async ({
-    page
-  }, testInfo) => {
+  test('memory overview ranges reload only the overview', async ({ page }, testInfo) => {
     await runMemoryOverviewFlow({
       page,
       name: testInfo.project.name,
@@ -95,9 +91,7 @@ test.describe('local memory fixtures', () => {
     })
   })
 
-  test('memory trajectories and observation navigation', async ({
-    page
-  }, testInfo) => {
+  test('memory trajectories and observation navigation', async ({ page }, testInfo) => {
     await runMemoryTrajectoryFlow({
       page,
       name: testInfo.project.name,
@@ -106,9 +100,7 @@ test.describe('local memory fixtures', () => {
     })
   })
 
-  test('memory restore and edit retry preserve version identity', async ({
-    page
-  }, testInfo) => {
+  test('memory restore and edit retry preserve version identity', async ({ page }, testInfo) => {
     await runMemoryEditFlow({
       page,
       name: testInfo.project.name,

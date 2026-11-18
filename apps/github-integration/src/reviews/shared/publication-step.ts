@@ -80,22 +80,23 @@ export async function runPublicationStep({
   find: () => Promise<ReconciledRemote | null>
   effect: () => Promise<ReconciledRemote | null>
 }): Promise<PublicationStepRun> {
-  const step = (await store.listPublicationSteps(runId)).find(
-    (item) => item.step_key === stepKey
-  )
+  const step = (await store.listPublicationSteps(runId)).find((item) => item.step_key === stepKey)
   const previousAttempts = step?.attempt_count ?? 0
-  if (step?.status === 'succeeded')
+  if (step?.status === 'succeeded') {
     return {
       remote: recordedRemote(step),
       alreadySucceeded: true,
       reconciled: false,
       previousAttempts
     }
+  }
 
   try {
     await store.requirePublicationStepClaim(runId, token, stepKey)
   } catch (error) {
-    if (!isPublicationStepExhausted(error)) throw error
+    if (!isPublicationStepExhausted(error)) {
+      throw error
+    }
     // No attempts left. The publisher that started this step may already have performed it, so
     // concluding it as failed without looking would report a published effect as missing.
     const settled = await settleExhaustedStep({
@@ -106,12 +107,14 @@ export async function runPublicationStep({
       find
     })
     if (settled.outcome === 'lookup_failed') {
-      if (settled.recording === 'not_owned')
+      if (settled.recording === 'not_owned') {
         throw new PublicationClaimLostError(runId)
+      }
       throw settled.error
     }
-    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded') {
       throw error
+    }
     return {
       remote: settled.remote,
       alreadySucceeded: true,
@@ -123,8 +126,9 @@ export async function runPublicationStep({
   try {
     await assertClaim()
     const remote = (await effect()) ?? {}
-    if (!(await store.completePublicationStep(runId, token, stepKey, remote)))
+    if (!(await store.completePublicationStep(runId, token, stepKey, remote))) {
       throw new PublicationClaimLostError(runId)
+    }
     return {
       remote,
       alreadySucceeded: false,
@@ -132,7 +136,9 @@ export async function runPublicationStep({
       previousAttempts
     }
   } catch (error) {
-    if (isPublicationClaimLostError(error)) throw error
+    if (isPublicationClaimLostError(error)) {
+      throw error
+    }
     const failure = classifyPublicationFailure(error)
     await store.failPublicationStep(
       runId,

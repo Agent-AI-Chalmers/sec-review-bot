@@ -72,10 +72,7 @@ test('Langfuse observations are read by session without one request per root', a
 
   expect(requested).toHaveLength(2)
   expect(
-    requested.map((url) => [
-      url.searchParams.get('sessionId'),
-      url.searchParams.get('type')
-    ])
+    requested.map((url) => [url.searchParams.get('sessionId'), url.searchParams.get('type')])
   ).toStrictEqual([
     ['run-1', null],
     ['run-1', 'GENERATION']
@@ -195,9 +192,7 @@ test('provider SDK generations fail reconciliation instead of being silently exc
       fromStartTime: '2026-01-01T00:00:00.000Z',
       toStartTime: '2026-01-01T00:10:00.000Z'
     })
-  ).rejects.toThrow(
-    /generation-provider-sdk has unexpected instrumentation scope/
-  )
+  ).rejects.toThrow(/generation-provider-sdk has unexpected instrumentation scope/)
 })
 
 test('rate limits preserve Retry-After for the coordinator', async (t) => {
@@ -221,7 +216,6 @@ test('rate limits preserve Retry-After for the coordinator', async (t) => {
       toStartTime: '2026-01-01T00:10:00.000Z'
     })
   ).rejects.toSatisfy(
-    (error: unknown) =>
-      error instanceof LangfuseRateLimitError && error.retryAfterMs === 7_000
+    (error: unknown) => error instanceof LangfuseRateLimitError && error.retryAfterMs === 7_000
   )
 })

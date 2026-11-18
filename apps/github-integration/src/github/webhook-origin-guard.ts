@@ -29,18 +29,16 @@ export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
   // `app.ts` refuses to start without `/app` metadata — but a script or test that calls the
   // guard on its own will see bot events silently skipped rather than processed.
   const expectedLogin = currentAppBotLogin()
-  if (expectedLogin === null) return true
+  if (expectedLogin === null) {
+    return true
+  }
   return sender_login === expectedLogin
 }
 
-export function logSkippedSelfOriginatedEvent(
-  eventName: string,
-  payload: unknown
-): void {
+export function logSkippedSelfOriginatedEvent(eventName: string, payload: unknown): void {
   const appMetadata = getGitHubAppMetadata()
   const sender = asRecord(asRecord(payload).sender)
-  const sender_login =
-    typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
+  const sender_login = typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
   const knownBotLogin = appMetadata.bot_login ?? '(unknown-app-bot-login)'
 
   logInfo('workflow_skipped', {

@@ -35,7 +35,9 @@ python -m scripts.checks.translated_doc_headings
 
 Markdown 格式由 markdownlint 检查，配置在仓库根目录的 `.markdownlint-cli2.jsonc`。在仓库根目录运行 `pnpm run lint:md`。
 
-工作区包以外的仓库级文件由根目录的 `.prettierrc.json` 格式化。在仓库根目录运行 `pnpm run format:root:check`。
+<!-- doc-default: root-formatting; source=.oxfmtrc.json -->
+
+工作区包以外的仓库级文件由根目录的 `.oxfmtrc.json` 格式化。在仓库根目录运行 `pnpm run format:root:check`。
 
 中文文档的中英文间距和标点由 AutoCorrect 检查，配置在仓库根目录的 `.autocorrectrc`。在仓库根目录运行 `pnpm run lint:zh`。
 

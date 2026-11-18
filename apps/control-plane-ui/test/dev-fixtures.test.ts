@@ -1,12 +1,19 @@
 import { expect, test } from 'vitest'
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse
-} from 'node:http'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 
 import { devFixtures } from '../scripts/dev-fixtures/index.js'
+import type {
+  Run,
+  ListRunsResponseBodyByStatus,
+  RunEvent
+} from '../browser/features/runs/api-types.generated.js'
+import type {
+  ExtractionList,
+  ObservationList,
+  CatalogOverview,
+  MemoryTreeVersionList
+} from '../browser/features/memory/api-types.generated.js'
 
 /**
  * The fixture plugin registers one connect-style middleware. Capturing it lets a real
@@ -22,20 +29,12 @@ function captureMiddleware(): (
   const configureServer = plugin.configureServer
   expect.assert(typeof configureServer === 'function')
   let middleware:
-    | ((
-        request: IncomingMessage,
-        response: ServerResponse,
-        next: () => void
-      ) => void)
+    | ((request: IncomingMessage, response: ServerResponse, next: () => void) => void)
     | undefined
   const fakeServer = {
     middlewares: {
       use(
-        handler: (
-          request: IncomingMessage,
-          response: ServerResponse,
-          next: () => void
-        ) => void
+        handler: (request: IncomingMessage, response: ServerResponse, next: () => void) => void
       ): void {
         middleware = handler
       }
@@ -43,9 +42,7 @@ function captureMiddleware(): (
   }
   // `devFixtures` never reads `this`, so invoking the hook with the fake server alone is
   // faithful; the cast only satisfies Vite's `this: MinimalPluginContext` signature.
-  const runConfigureServer = configureServer as (
-    server: typeof fakeServer
-  ) => void
+  const runConfigureServer = configureServer as (server: typeof fakeServer) => void
   runConfigureServer(fakeServer)
   expect.assert(middleware !== undefined)
   return middleware
@@ -82,13 +79,10 @@ test('dev fixtures only describe reachable run states', async () => {
 })
 
 test('dev fixtures distinguish a statistics snapshot from no snapshot', async () => {
-  const { runs, stepsByRun } =
-    await import('../scripts/dev-fixtures/runs/generate.js')
+  const { runs, stepsByRun } = await import('../scripts/dev-fixtures/runs/generate.js')
   const completed = runs.filter((run) => run.execution.status === 'succeeded')
   const active = runs.find((run) => run.execution.status === 'running')
-  const agentsFor = (
-    workflow: (typeof completed)[number]['workflow']
-  ): string[] => {
+  const agentsFor = (workflow: (typeof completed)[number]['workflow']): string[] => {
     const run = completed.find((candidate) => candidate.workflow === workflow)
     expect.assert(run !== undefined)
     const statistics = run.execution_statistics
@@ -115,9 +109,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
     'repository-delivery-planner',
     'patch-synthesizer'
   ])
-  const repositoryRun = completed.find(
-    (run) => run.workflow === 'repository-review'
-  )
+  const repositoryRun = completed.find((run) => run.workflow === 'repository-review')
   expect.assert(repositoryRun !== undefined)
   const patchDeliveryIds = repositoryRun.execution_statistics?.groups
     .filter((group) => group.agent_name === 'patch-synthesizer')
@@ -131,10 +123,7 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
   for (const run of completed) {
     const statistics = run.execution_statistics
     expect.assert(statistics !== null)
-    const usages = [
-      statistics.token_usage,
-      ...statistics.groups.map((group) => group.token_usage)
-    ]
+    const usages = [statistics.token_usage, ...statistics.groups.map((group) => group.token_usage)]
     for (const usage of usages) {
       if (
         usage.input_tokens !== null &&
@@ -146,19 +135,13 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
           'fixture total_tokens must equal inclusive input_tokens + output_tokens'
         ).toBe(usage.input_tokens + usage.output_tokens)
       }
-      if (
-        usage.input_tokens !== null &&
-        usage.cache_read_input_tokens !== null
-      ) {
+      if (usage.input_tokens !== null && usage.cache_read_input_tokens !== null) {
         expect.assert(
           usage.cache_read_input_tokens <= usage.input_tokens,
           'fixture cache_read_input_tokens must be a subset of input_tokens'
         )
       }
-      if (
-        usage.input_tokens !== null &&
-        usage.cache_creation_input_tokens !== null
-      ) {
+      if (usage.input_tokens !== null && usage.cache_creation_input_tokens !== null) {
         expect.assert(
           usage.cache_creation_input_tokens <= usage.input_tokens,
           'fixture cache_creation_input_tokens must be a subset of input_tokens'
@@ -176,18 +159,13 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
     const workflowRuns = completed.filter((run) => run.workflow === workflow)
     expect.assert(
       workflowRuns.some((run) =>
-        run.execution_statistics?.groups.some(
-          (group) => group.agent_phase === 'feedback'
-        )
+        run.execution_statistics?.groups.some((group) => group.agent_phase === 'feedback')
       ),
       `${workflow} fixtures must include a feedback loop`
     )
     expect.assert(
       workflowRuns.some(
-        (run) =>
-          !run.execution_statistics?.groups.some(
-            (group) => group.agent_phase === 'feedback'
-          )
+        (run) => !run.execution_statistics?.groups.some((group) => group.agent_phase === 'feedback')
       ),
       `${workflow} fixtures must include a run without feedback`
     )
@@ -236,9 +214,9 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
 test('dev fixtures answer the give-up decision the queue offers', async () => {
   const fixture = await startFixtureServer()
   try {
-    const parked = (await (
-      await fetch(`${fixture.base}/api/runs/parked`)
-    ).json()) as { blocks: { run_id: string }[] }
+    const parked = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+      blocks: { run_id: string }[]
+    }
     const runId = parked.blocks[0]?.run_id
     expect.assert(runId !== undefined)
     const endpoint = `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/give-up`
@@ -278,9 +256,9 @@ test('dev fixtures answer the give-up decision the queue offers', async () => {
     expect(record.run.notices[0]?.kind).toBe('failure')
     expect(record.run.notices[0]?.reason_code ?? '').toMatch(/BY_OPERATOR$/)
 
-    const after = (await (
-      await fetch(`${fixture.base}/api/runs/parked`)
-    ).json()) as { blocks: { run_id: string }[] }
+    const after = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+      blocks: { run_id: string }[]
+    }
     expect(after.blocks.some((block) => block.run_id === runId)).toBe(false)
   } finally {
     await fixture.close()
@@ -293,24 +271,19 @@ test('mutating one fixture server does not change another server’s run state',
   resources.defer(first.close)
   const second = await startFixtureServer()
   resources.defer(second.close)
-  const parked = (await (
-    await fetch(`${first.base}/api/runs/parked`)
-  ).json()) as { blocks: { run_id: string; axis: string }[] }
-  const runId = parked.blocks.find(
-    (block) => block.axis === 'preparation'
-  )?.run_id
+  const parked = (await (await fetch(`${first.base}/api/runs/parked`)).json()) as {
+    blocks: { run_id: string; axis: string }[]
+  }
+  const runId = parked.blocks.find((block) => block.axis === 'preparation')?.run_id
   expect.assert(runId)
-  const response = await fetch(
-    `${first.base}/api/admin/runs/${encodeURIComponent(runId)}/resume`,
-    {
-      method: 'POST',
-      headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
-    }
-  )
+  const response = await fetch(`${first.base}/api/admin/runs/${encodeURIComponent(runId)}/resume`, {
+    method: 'POST',
+    headers: { 'x-review-runs-admin-token': 'fixture-admin-token' }
+  })
   expect(response.status).toBe(200)
-  const remaining = (await (
-    await fetch(`${second.base}/api/runs/parked`)
-  ).json()) as { blocks: { run_id: string; axis: string }[] }
+  const remaining = (await (await fetch(`${second.base}/api/runs/parked`)).json()) as {
+    blocks: { run_id: string; axis: string }[]
+  }
   expect(remaining.blocks).toContainEqual(
     expect.objectContaining({ run_id: runId, axis: 'preparation' })
   )
@@ -332,10 +305,7 @@ test('dev fixtures serve memory actions as downloads', async () => {
   const fixture = await startFixtureServer()
   try {
     for (const [path, filename] of [
-      [
-        '/api/memory/versions/2/artifact',
-        'attachment; filename="memory-tree.v1.tar.zst"'
-      ],
+      ['/api/memory/versions/2/artifact', 'attachment; filename="memory-tree.v1.tar.zst"'],
       [
         '/api/memory/versions/2/trajectory',
         'attachment; filename="memory-trajectory.v1.jsonl.zst"'
@@ -347,9 +317,7 @@ test('dev fixtures serve memory actions as downloads', async () => {
     ] as const) {
       const response = await fetch(`${fixture.base}${path}`)
       expect(response.status).toBe(200)
-      expect(response.headers.get('content-type')).toBe(
-        'application/octet-stream'
-      )
+      expect(response.headers.get('content-type')).toBe('application/octet-stream')
       expect(response.headers.get('content-disposition')).toBe(filename)
       expect.assert((await response.arrayBuffer()).byteLength > 0)
     }
@@ -363,25 +331,15 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
   try {
     for (const [path, status, error] of [
       ['/api/memory/versions/404/content', 422, 'invalid_memory_tree_artifact'],
-      [
-        '/api/memory/versions/404/trajectory/content',
-        503,
-        'memory_catalog_unavailable'
-      ],
-      [
-        '/api/runs/fixture-artifact-load-error/artifact/content',
-        503,
-        'review_runs_unavailable'
-      ]
+      ['/api/memory/versions/404/trajectory/content', 503, 'memory_catalog_unavailable'],
+      ['/api/runs/fixture-artifact-load-error/artifact/content', 503, 'review_runs_unavailable']
     ] as const) {
       const response = await fetch(`${fixture.base}${path}`)
       expect(response.status).toBe(status)
       expect(await response.json()).toStrictEqual({ error })
     }
 
-    const download = await fetch(
-      `${fixture.base}/api/memory/versions/404/artifact`
-    )
+    const download = await fetch(`${fixture.base}/api/memory/versions/404/artifact`)
     expect(download.status).toBe(200)
     expect(download.headers.get('content-disposition')).toBe(
       'attachment; filename="memory-tree.v1.tar.zst"'
@@ -399,38 +357,22 @@ test('dev fixtures page the run list in the order their cursor describes', async
   // paging affordance then silently disappears wherever the fixture is the only server.
   const fixture = await startFixtureServer()
   try {
-    const first = await (
-      await fetch(`${fixture.base}/api/runs?limit=50`)
-    ).json()
-    const stamps = first.runs.map(
-      (run: { created_at: string }) => run.created_at
+    const first = await ((await fetch(`${fixture.base}/api/runs?limit=50`)).json() as Promise<
+      ListRunsResponseBodyByStatus['200']
+    >)
+    const stamps = first.runs.map((run: { created_at: string }) => run.created_at)
+    expect(stamps, 'the list is newest-first, which is what the cursor walks').toStrictEqual(
+      [...stamps].sort().reverse()
     )
-    expect(
-      stamps,
-      'the list is newest-first, which is what the cursor walks'
-    ).toStrictEqual([...stamps].sort().reverse())
-    expect.assert(
-      first.next_cursor,
-      'sixty-two fixtures must not fit one page of fifty'
-    )
+    expect.assert(first.next_cursor, 'sixty-two fixtures must not fit one page of fifty')
 
-    const second = await (
-      await fetch(
-        `${fixture.base}/api/runs?limit=50&cursor=${first.next_cursor}`
-      )
-    ).json()
-    const firstIds = new Set(
-      first.runs.map((run: { run_id: string }) => run.run_id)
-    )
-    expect.assert(
-      second.runs.length > 0,
-      'the cursor must return a second page'
-    )
+    const second = await ((
+      await fetch(`${fixture.base}/api/runs?limit=50&cursor=${first.next_cursor}`)
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
+    const firstIds = new Set(first.runs.map((run: { run_id: string }) => run.run_id))
+    expect.assert(second.runs.length > 0, 'the cursor must return a second page')
     for (const run of second.runs as { run_id: string }[]) {
-      expect.assert(
-        !firstIds.has(run.run_id),
-        `${run.run_id} appears on both pages`
-      )
+      expect.assert(!firstIds.has(run.run_id), `${run.run_id} appears on both pages`)
     }
   } finally {
     await fixture.close()
@@ -449,16 +391,13 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
   // filters for, so a one-column wait cannot pass early again.
   const fixture = await startFixtureServer()
   try {
-    const unfiltered = await (
-      await fetch(`${fixture.base}/api/runs?limit=1`)
-    ).json()
+    const unfiltered = await ((await fetch(`${fixture.base}/api/runs?limit=1`)).json() as Promise<
+      ListRunsResponseBodyByStatus['200']
+    >)
     const newest = unfiltered.runs[0]
     expect.assert(newest, 'the fixtures must serve at least one run')
     expect.assert(
-      !(
-        newest.workflow === 'repository-review' &&
-        newest.publication.status === 'published'
-      ),
+      !(newest.workflow === 'repository-review' && newest.publication.status === 'published'),
       'the newest run must not already look like the published repository filter'
     )
   } finally {
@@ -469,19 +408,19 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
 test('run fixtures filter by source platform', async () => {
   const fixture = await startFixtureServer()
   try {
-    const github = await (
+    const github = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=github&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(github.runs[0]?.source_platform).toBe('github')
 
-    const gitlab = await (
+    const gitlab = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=gitlab&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(gitlab.runs[0]?.source_platform).toBe('gitlab')
 
-    const unknown = await (
+    const unknown = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=unknown&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(unknown.runs[0]?.source_platform).toBe('unknown')
   } finally {
     await fixture.close()
@@ -493,16 +432,16 @@ test('memory fixtures form one coherent provenance graph', async () => {
   try {
     const [extractions, observations, overview, versions] = await Promise.all([
       fetch(`${fixture.base}/api/memory/extractions?limit=100`).then(
-        (response) => response.json()
+        (response) => response.json() as Promise<ExtractionList>
       ),
       fetch(`${fixture.base}/api/memory/observations?limit=100`).then(
-        (response) => response.json()
+        (response) => response.json() as Promise<ObservationList>
       ),
-      fetch(`${fixture.base}/api/memory/overview?range=30d`).then((response) =>
-        response.json()
+      fetch(`${fixture.base}/api/memory/overview?range=30d`).then(
+        (response) => response.json() as Promise<CatalogOverview>
       ),
-      fetch(`${fixture.base}/api/memory/versions?limit=100`).then((response) =>
-        response.json()
+      fetch(`${fixture.base}/api/memory/versions?limit=100`).then(
+        (response) => response.json() as Promise<MemoryTreeVersionList>
       )
     ])
 
@@ -523,19 +462,13 @@ test('memory fixtures form one coherent provenance graph', async () => {
     expect(extractions.extractions).toHaveLength(48)
     expect(observations.next_cursor).toBe(null)
     expect(observations.observations).toHaveLength(46)
-    expect(overview.totals.completed_extraction_count).toBe(
-      extractions.extractions.length
-    )
-    expect(overview.totals.observation_count).toBe(
-      observations.observations.length
-    )
+    expect(overview.totals.completed_extraction_count).toBe(extractions.extractions.length)
+    expect(overview.totals.observation_count).toBe(observations.observations.length)
     expect(
-      overview.totals.pending_observation_count +
-        overview.totals.consumed_observation_count
+      overview.totals.pending_observation_count + overview.totals.consumed_observation_count
     ).toBe(observations.observations.length)
     expect(
-      overview.totals.units_with_observation_count +
-        overview.totals.units_without_observation_count
+      overview.totals.units_with_observation_count + overview.totals.units_without_observation_count
     ).toBe(overview.totals.extracted_unit_count)
     expect(
       overview.workflows.reduce(
@@ -546,26 +479,17 @@ test('memory fixtures form one coherent provenance graph', async () => {
     ).toBe(overview.totals.extracted_unit_count)
 
     const siblings = observations.observations.filter(
-      (item: { extraction_id: string }) =>
-        item.extraction_id === 'fixture-extraction-2'
+      (item: { extraction_id: string }) => item.extraction_id === 'fixture-extraction-2'
     )
     expect(siblings).toHaveLength(2)
     expect(
-      new Set(
-        siblings.map((item: { observation_id: string }) => item.observation_id)
-      ).size
+      new Set(siblings.map((item: { observation_id: string }) => item.observation_id)).size
     ).toBe(2)
     expect.assert(
-      siblings.some(
-        (item: { consumed_version: number | null }) =>
-          item.consumed_version === null
-      )
+      siblings.some((item: { consumed_version: number | null }) => item.consumed_version === null)
     )
     expect.assert(
-      siblings.some(
-        (item: { consumed_version: number | null }) =>
-          item.consumed_version === 2
-      )
+      siblings.some((item: { consumed_version: number | null }) => item.consumed_version === 2)
     )
     expect.assert(
       observations.observations.every(
@@ -587,16 +511,15 @@ test('memory fixtures form one coherent provenance graph', async () => {
       expect(extraction.source_run_id).toBe(observation.source_run_id)
       expect(extraction.source_unit_id).toBe(observation.source_unit_id)
       expect(
-        extraction.observations.find(
-          (item) => item.observation_id === observation.observation_id
-        )?.body_markdown
+        extraction.observations.find((item) => item.observation_id === observation.observation_id)
+          ?.body_markdown
       ).toBe(observation.body_markdown)
 
       const runResponse = await fetch(
         `${fixture.base}/api/runs/${encodeURIComponent(observation.source_run_id)}`
       )
       expect(runResponse.status).toBe(200)
-      const { run } = await runResponse.json()
+      const { run } = await (runResponse.json() as Promise<{ run: Run }>)
       expect(run.source_platform).toBe('github')
       expect(run.execution.status).toBe('succeeded')
       expect(run.publication.status).toBe('published')
@@ -604,17 +527,11 @@ test('memory fixtures form one coherent provenance graph', async () => {
 
       if (observation.consumed_version !== null) {
         const version = versions.versions.find(
-          (candidate: { version: number }) =>
-            candidate.version === observation.consumed_version
+          (candidate: { version: number }) => candidate.version === observation.consumed_version
         )
-        expect.assert(
-          version,
-          'a consumed observation must name an existing version'
-        )
-        expect(version.source.kind).toBe('learning')
-        expect(version.source.observation_ids).toContain(
-          observation.observation_id
-        )
+        expect.assert(version, 'a consumed observation must name an existing version')
+        expect.assert(version.source.kind === 'learning')
+        expect(version.source.observation_ids).toContain(observation.observation_id)
       }
     }
 
@@ -639,8 +556,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
         ).toStrictEqual(version.source.observation_ids.toSorted())
         for (const observationId of version.source.observation_ids) {
           const observation = observations.observations.find(
-            (candidate: { observation_id: string }) =>
-              candidate.observation_id === observationId
+            (candidate: { observation_id: string }) => candidate.observation_id === observationId
           )
           expect.assert(
             observation,
@@ -660,17 +576,13 @@ test('memory fixtures form one coherent provenance graph', async () => {
 test('fixture event responses preserve the contract reason for a failed transition', async () => {
   const { runs } = await import('../scripts/dev-fixtures/runs/generate.js')
   const run = runs.find(
-    (value) =>
-      value.preparation.status === 'failed' &&
-      value.preparation.failure_code !== null
+    (value) => value.preparation.status === 'failed' && value.preparation.failure_code !== null
   )!
   const fixture = await startFixtureServer()
   try {
-    const response = await fetch(
-      `${fixture.base}/api/runs/${run.run_id}/events`
-    )
+    const response = await fetch(`${fixture.base}/api/runs/${run.run_id}/events`)
     expect(response.status).toBe(200)
-    const body = await response.json()
+    const body = await (response.json() as Promise<{ events: RunEvent[] }>)
     const transition = body.events.find(
       (event: { axis: string; to_status: string }) =>
         event.axis === 'preparation' && event.to_status === 'failed'
@@ -686,8 +598,7 @@ test('fixture events show a step that failed and was retried inside a publicatio
   // Step events are what tell a publication's own history apart from its steps': without one
   // run whose step failed and recovered, every step event in the fixtures would be a clean
   // success and the console would never show the difference locally.
-  const { runs, stepsByRun } =
-    await import('../scripts/dev-fixtures/runs/generate.js')
+  const { runs, stepsByRun } = await import('../scripts/dev-fixtures/runs/generate.js')
   const run = runs.find((value) =>
     (stepsByRun.get(value.run_id) ?? []).some(
       (step) => step.status === 'succeeded' && step.attempt_count > 1
@@ -697,9 +608,7 @@ test('fixture events show a step that failed and was retried inside a publicatio
   expect(run.publication.status).toBe('published')
   const fixture = await startFixtureServer()
   try {
-    const response = await fetch(
-      `${fixture.base}/api/runs/${run.run_id}/events`
-    )
+    const response = await fetch(`${fixture.base}/api/runs/${run.run_id}/events`)
     const { events } = (await response.json()) as {
       events: Array<{
         axis: string
@@ -712,38 +621,23 @@ test('fixture events show a step that failed and was retried inside a publicatio
     const publication = events.filter(
       (event) => event.axis === 'publication' && event.step_key === null
     )
-    const steps = events.filter(
-      (event) => event.step_key !== null && event.from_status !== null
-    )
+    const steps = events.filter((event) => event.step_key !== null && event.from_status !== null)
     const retried = steps.filter((event) =>
-      steps.some(
-        (other) =>
-          other.step_key === event.step_key && other.to_status === 'failed'
-      )
+      steps.some((other) => other.step_key === event.step_key && other.to_status === 'failed')
     )
-    expect(
-      retried.map((event) => `${event.from_status}->${event.to_status}`)
-    ).toStrictEqual([
+    expect(retried.map((event) => `${event.from_status}->${event.to_status}`)).toStrictEqual([
       'pending->running',
       'running->failed',
       'failed->running',
       'running->succeeded'
     ])
     // The publication brackets its steps: it starts before the first and concludes after the last.
-    const started = publication.find(
-      (event) => event.to_status === 'publishing'
-    )
-    const concluded = publication.find(
-      (event) => event.to_status === 'published'
-    )
+    const started = publication.find((event) => event.to_status === 'publishing')
+    const concluded = publication.find((event) => event.to_status === 'published')
     expect.assert(started && concluded)
     for (const step of steps) {
-      expect.assert(
-        Date.parse(step.occurred_at) > Date.parse(started.occurred_at)
-      )
-      expect.assert(
-        Date.parse(step.occurred_at) < Date.parse(concluded.occurred_at)
-      )
+      expect.assert(Date.parse(step.occurred_at) > Date.parse(started.occurred_at))
+      expect.assert(Date.parse(step.occurred_at) < Date.parse(concluded.occurred_at))
     }
   } finally {
     await fixture.close()
@@ -753,12 +647,10 @@ test('fixture events show a step that failed and was retried inside a publicatio
 test('abandoning a contradictory preparation uses the current production reason', async () => {
   const fixture = await startFixtureServer()
   try {
-    const parked = (await (
-      await fetch(`${fixture.base}/api/runs/parked`)
-    ).json()) as { blocks: { run_id: string; axis: string }[] }
-    const runId = parked.blocks.find(
-      (block) => block.axis === 'preparation'
-    )?.run_id
+    const parked = (await (await fetch(`${fixture.base}/api/runs/parked`)).json()) as {
+      blocks: { run_id: string; axis: string }[]
+    }
+    const runId = parked.blocks.find((block) => block.axis === 'preparation')?.run_id
     expect.assert(runId)
     const response = await fetch(
       `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/abandon`,
@@ -781,12 +673,8 @@ test('abandoning a contradictory preparation uses the current production reason'
       }
     }
     expect(run.preparation.status).toBe('failed')
-    expect(run.preparation.failure_code).toBe(
-      'PREPARATION_ABANDONED_BY_OPERATOR'
-    )
-    expect(run.notices[0]?.reason_code).toBe(
-      'PREPARATION_ABANDONED_BY_OPERATOR'
-    )
+    expect(run.preparation.failure_code).toBe('PREPARATION_ABANDONED_BY_OPERATOR')
+    expect(run.notices[0]?.reason_code).toBe('PREPARATION_ABANDONED_BY_OPERATOR')
   } finally {
     await fixture.close()
   }

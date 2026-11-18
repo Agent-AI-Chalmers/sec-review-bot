@@ -63,13 +63,12 @@ for (const fixture of corpusManifest.corpus) {
     expect(fixture.mediaType).toBe(MEDIA_TYPE)
     expect.assert(fixture.description.length > 0)
     expect.assert(fixture.entryCount > 0)
-    if (fixture.entries !== undefined)
+    if (fixture.entries !== undefined) {
       expect(fixture.entries).toHaveLength(fixture.entryCount)
+    }
     expect(fixture.size).toBe(archive.length)
     expect(fixture.sha256).toBe(digest)
-    expect(fixture.objectKey).toBe(
-      `memory/trees/${digest}/memory-tree.v1.tar.zst`
-    )
+    expect(fixture.objectKey).toBe(`memory/trees/${digest}/memory-tree.v1.tar.zst`)
     expect(result.valid).toBe(fixture.expected === 'valid')
     expect(result.code).toBe(fixture.expectedCode)
   })

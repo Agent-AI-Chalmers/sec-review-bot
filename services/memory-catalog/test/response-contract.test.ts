@@ -15,14 +15,11 @@ import {
   contractFixtureNames
 } from './contract-fixtures.js'
 
-const document = parse(
-  readFileSync(path.join(CATALOG_CONTRACT_ROOT, 'openapi.yaml'), 'utf8')
-) as { components: { schemas: Record<string, object> } }
+const document = parse(readFileSync(path.join(CATALOG_CONTRACT_ROOT, 'openapi.yaml'), 'utf8')) as {
+  components: { schemas: Record<string, object> }
+}
 const defs = JSON.parse(
-  JSON.stringify(document.components.schemas).replaceAll(
-    '#/components/schemas/',
-    '#/$defs/'
-  )
+  JSON.stringify(document.components.schemas).replaceAll('#/components/schemas/', '#/$defs/')
 ) as Record<string, object>
 const manifest = contractFixtureManifest()
 
@@ -33,12 +30,12 @@ test('shared fixtures cover every schema and all files exactly once', () => {
   ]
   expect(new Set(names).size).toBe(names.length)
   expect(names.sort()).toStrictEqual(contractFixtureNames())
-  expect(
-    [...new Set(Object.values(manifest.schema_fixtures))].sort()
-  ).toStrictEqual(Object.keys(defs).sort())
-  expect(
-    [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort()
-  ).toStrictEqual(Object.keys(defs).sort())
+  expect([...new Set(Object.values(manifest.schema_fixtures))].sort()).toStrictEqual(
+    Object.keys(defs).sort()
+  )
+  expect([...new Set(Object.values(manifest.invalid_schema_fixtures))].sort()).toStrictEqual(
+    Object.keys(defs).sort()
+  )
 })
 
 test('response object validation accepts and rejects the shared schema cases', async () => {
@@ -72,7 +69,9 @@ test('response object validation accepts and rejects the shared schema cases', a
         value = contractFixture(name)
         const response = await app.inject(`/fixture/${schema}`)
         expect(response.statusCode, name).toBe(valid ? 200 : 500)
-        if (valid) expect(response.json(), name).toStrictEqual({ value })
+        if (valid) {
+          expect(response.json(), name).toStrictEqual({ value })
+        }
       }
     }
   } finally {
@@ -106,23 +105,29 @@ test('actual catalog routes reject malformed query results before emitting succe
         [manifest.invalid_schema_fixtures, false]
       ] as const) {
         for (const [name, caseSchema] of Object.entries(cases)) {
-          if (caseSchema !== schema) continue
+          if (caseSchema !== schema) {
+            continue
+          }
           value = contractFixture(name)
           // Catalog handlers produce response objects; pre-serialized payloads are outside
           // this hook's scope. Nested values remain covered by the shared schema cases.
-          if (value === null || typeof value !== 'object') continue
+          if (value === null || typeof value !== 'object') {
+            continue
+          }
           const response = await app.inject({
             method: 'GET',
             url: url!,
             headers: { authorization: 'Bearer worker' }
           })
           expect(response.statusCode, name).toBe(valid ? 200 : 500)
-          if (valid) expect(response.json(), name).toStrictEqual(value)
-          else
+          if (valid) {
+            expect(response.json(), name).toStrictEqual(value)
+          } else {
             expect(response.json(), name).toStrictEqual({
               error: 'Internal server error',
               code: 'INTERNAL_ERROR'
             })
+          }
         }
       }
     }
@@ -140,15 +145,11 @@ test('actual write routes reject shared malformed requests before reaching the s
     },
     changeMemoryTreeAutomation: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-automation-operation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-automation-operation-result.json'))
     },
     restoreMemoryTree: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-restore-operation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-restore-operation-result.json'))
     },
     abandonVersionPublications: () => {
       calls++
@@ -156,15 +157,11 @@ test('actual write routes reject shared malformed requests before reaching the s
     },
     reserveExtractionPublication: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-extraction-publication.json')
-      )
+      return Promise.resolve(contractFixture('valid-extraction-publication.json'))
     },
     createMemoryTreeVersion: () => {
       calls++
-      return Promise.resolve(
-        contractFixture('valid-memory-tree-version-creation-result.json')
-      )
+      return Promise.resolve(contractFixture('valid-memory-tree-version-creation-result.json'))
     },
     reserveVersionPublication: () => {
       calls++
@@ -178,28 +175,12 @@ test('actual write routes reject shared malformed requests before reaching the s
   })
   const routes = [
     ['ExtractionRegistration', '/v1/extractions', 'worker'],
-    [
-      'MemoryTreeAutomationOperation',
-      '/v1/memory-tree/automation/pause',
-      'operator'
-    ],
+    ['MemoryTreeAutomationOperation', '/v1/memory-tree/automation/pause', 'operator'],
     ['MemoryTreeRestoreOperation', '/v1/memory-tree/restore', 'operator'],
-    [
-      'AutomaticVersionPublicationOwner',
-      '/v1/memory-tree/versions/publications/abandon',
-      'worker'
-    ],
-    [
-      'ExtractionPublicationIntent',
-      '/v1/extractions/publications/reserve',
-      'worker'
-    ],
+    ['AutomaticVersionPublicationOwner', '/v1/memory-tree/versions/publications/abandon', 'worker'],
+    ['ExtractionPublicationIntent', '/v1/extractions/publications/reserve', 'worker'],
     ['MemoryTreeVersionCreation', '/v1/memory-tree/versions', 'worker'],
-    [
-      'MemoryTreeVersionCreation',
-      '/v1/memory-tree/versions/publications/reserve',
-      'worker'
-    ]
+    ['MemoryTreeVersionCreation', '/v1/memory-tree/versions/publications/reserve', 'worker']
   ] as const
   try {
     for (const [schema, url, token] of routes) {
@@ -208,7 +189,9 @@ test('actual write routes reject shared malformed requests before reaching the s
         [manifest.invalid_schema_fixtures, false]
       ] as const) {
         for (const [name, caseSchema] of Object.entries(cases)) {
-          if (caseSchema !== schema) continue
+          if (caseSchema !== schema) {
+            continue
+          }
           const payload = contractFixture(name)
           const source = (payload as { source?: { kind?: string } }).source
           const role = source?.kind === 'manual' ? 'operator' : token

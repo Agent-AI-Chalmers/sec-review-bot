@@ -36,7 +36,9 @@ export function ExplainedCode({
       {code}
     </Text>
   )
-  if (explanation === null) return label
+  if (explanation === null) {
+    return label
+  }
   return (
     <Tooltip
       label={explanation}

@@ -35,13 +35,7 @@ export type PreparationSummary = {
    * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Execution API provider, which is only submitted to once preparation reaches `submitted`.
    * @type string
    */
-  status:
-    | 'pending'
-    | 'preparing'
-    | 'uncertain'
-    | 'disconnected'
-    | 'submitted'
-    | 'failed'
+  status: 'pending' | 'preparing' | 'uncertain' | 'disconnected' | 'submitted' | 'failed'
   /**
    * @minimum 0
    * @type integer
@@ -574,14 +568,12 @@ export type ExecutionStatisticsGroup = {
 
 export type ExecutionStatisticsSummary = {
   reconciliation_status: 'pending' | 'reconciling' | 'settled' | 'unavailable'
-  ingestion_status:
-    ('settled' | 'partial_window' | 'no_observations' | 'unavailable') | null
+  ingestion_status: ('settled' | 'partial_window' | 'no_observations' | 'unavailable') | null
   /**
    * @description Coverage for calls returned by Langfuse. It is not proof that every real model call was uploaded.
    * @type string
    */
-  usage_coverage:
-    ('complete_for_observed_calls' | 'partial' | 'unavailable') | null
+  usage_coverage: ('complete_for_observed_calls' | 'partial' | 'unavailable') | null
   /**
    * @minimum 0
    * @type integer
@@ -932,8 +924,7 @@ export type ListRunPublicationStepsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListRunPublicationStepsResponseBody =
-  ListRunPublicationStepsResponseBodyByStatus['200']
+export type ListRunPublicationStepsResponseBody = ListRunPublicationStepsResponseBodyByStatus['200']
 
 export type ListRunEventsPath = {
   /**
@@ -1008,8 +999,7 @@ export type SubmitPreparedRunResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type SubmitPreparedRunResponseBody =
-  SubmitPreparedRunResponseBodyByStatus['200']
+export type SubmitPreparedRunResponseBody = SubmitPreparedRunResponseBodyByStatus['200']
 
 export type RenewPreparationClaimPath = {
   /**
@@ -1044,8 +1034,7 @@ export type RenewPreparationClaimResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewPreparationClaimResponseBody =
-  RenewPreparationClaimResponseBodyByStatus['200']
+export type RenewPreparationClaimResponseBody = RenewPreparationClaimResponseBodyByStatus['200']
 
 export type ClaimNextPreparationOptions = {
   body?: never
@@ -1061,8 +1050,7 @@ export type ClaimNextPreparationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextPreparationResponseBody =
-  ClaimNextPreparationResponseBodyByStatus['200']
+export type ClaimNextPreparationResponseBody = ClaimNextPreparationResponseBodyByStatus['200']
 
 export type CheckpointPreparationInputPath = {
   /**
@@ -1157,8 +1145,7 @@ export type FailPreparationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPreparationResponseBody =
-  FailPreparationResponseBodyByStatus['200']
+export type FailPreparationResponseBody = FailPreparationResponseBodyByStatus['200']
 
 export type ClaimNextRunNoticeOptions = {
   body?: never
@@ -1174,8 +1161,7 @@ export type ClaimNextRunNoticeResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextRunNoticeResponseBody =
-  ClaimNextRunNoticeResponseBodyByStatus['200']
+export type ClaimNextRunNoticeResponseBody = ClaimNextRunNoticeResponseBodyByStatus['200']
 
 export type RenewRunNoticeClaimPath = {
   /**
@@ -1209,8 +1195,7 @@ export type RenewRunNoticeClaimResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewRunNoticeClaimResponseBody =
-  RenewRunNoticeClaimResponseBodyByStatus['200']
+export type RenewRunNoticeClaimResponseBody = RenewRunNoticeClaimResponseBodyByStatus['200']
 
 export type CompleteRunNoticePath = {
   /**
@@ -1261,8 +1246,7 @@ export type CompleteRunNoticeResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompleteRunNoticeResponseBody =
-  CompleteRunNoticeResponseBodyByStatus['200']
+export type CompleteRunNoticeResponseBody = CompleteRunNoticeResponseBodyByStatus['200']
 
 export type ClaimNextPublicationBody = {
   /**
@@ -1288,8 +1272,7 @@ export type ClaimNextPublicationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextPublicationResponseBody =
-  ClaimNextPublicationResponseBodyByStatus['200']
+export type ClaimNextPublicationResponseBody = ClaimNextPublicationResponseBodyByStatus['200']
 
 export type RenewPublicationClaimPath = {
   /**
@@ -1324,8 +1307,7 @@ export type RenewPublicationClaimResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewPublicationClaimResponseBody =
-  RenewPublicationClaimResponseBodyByStatus['200']
+export type RenewPublicationClaimResponseBody = RenewPublicationClaimResponseBodyByStatus['200']
 
 export type InitializePublicationStepsPath = {
   /**
@@ -1455,8 +1437,7 @@ export type CompletePublicationStepResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompletePublicationStepResponseBody =
-  CompletePublicationStepResponseBodyByStatus['200']
+export type CompletePublicationStepResponseBody = CompletePublicationStepResponseBodyByStatus['200']
 
 export type SettleExhaustedPublicationStepPath = {
   /**
@@ -1563,8 +1544,7 @@ export type FailPublicationStepResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPublicationStepResponseBody =
-  FailPublicationStepResponseBodyByStatus['200']
+export type FailPublicationStepResponseBody = FailPublicationStepResponseBodyByStatus['200']
 
 export type CompletePublicationPath = {
   /**
@@ -1599,8 +1579,7 @@ export type CompletePublicationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompletePublicationResponseBody =
-  CompletePublicationResponseBodyByStatus['200']
+export type CompletePublicationResponseBody = CompletePublicationResponseBodyByStatus['200']
 
 export type FailPublicationPath = {
   /**
@@ -1640,8 +1619,7 @@ export type FailPublicationResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPublicationResponseBody =
-  FailPublicationResponseBodyByStatus['200']
+export type FailPublicationResponseBody = FailPublicationResponseBodyByStatus['200']
 
 export type GetInternalRunPath = {
   /**
@@ -1668,8 +1646,7 @@ export type GetInternalRunResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetInternalRunResponseBody =
-  GetInternalRunResponseBodyByStatus['200']
+export type GetInternalRunResponseBody = GetInternalRunResponseBodyByStatus['200']
 
 export type ListInternalPublicationStepsPath = {
   /**
@@ -1715,8 +1692,7 @@ export type ListParkedRunsResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListParkedRunsResponseBody =
-  ListParkedRunsResponseBodyByStatus['200']
+export type ListParkedRunsResponseBody = ListParkedRunsResponseBodyByStatus['200']
 
 export type AbandonBlockedPreparationPath = {
   /**
@@ -1793,8 +1769,7 @@ export type GiveUpDisconnectedRunResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GiveUpDisconnectedRunResponseBody =
-  GiveUpDisconnectedRunResponseBodyByStatus['200']
+export type GiveUpDisconnectedRunResponseBody = GiveUpDisconnectedRunResponseBodyByStatus['200']
 
 export type ResumeDisconnectedRunPath = {
   /**
@@ -1821,8 +1796,7 @@ export type ResumeDisconnectedRunResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ResumeDisconnectedRunResponseBody =
-  ResumeDisconnectedRunResponseBodyByStatus['200']
+export type ResumeDisconnectedRunResponseBody = ResumeDisconnectedRunResponseBodyByStatus['200']
 
 export type GetPreparationHeartbeatIntervalOptions = {
   body?: never
@@ -2003,43 +1977,19 @@ export const operationRoutes = {
   listRuns: { path: '/v1/runs', method: 'get' },
   admitRun: { path: '/v1/runs', method: 'post' },
   getRun: { path: '/v1/runs/{runId}', method: 'get' },
-  listRunPublicationSteps: {
-    path: '/v1/runs/{runId}/publication-steps',
-    method: 'get'
-  },
+  listRunPublicationSteps: { path: '/v1/runs/{runId}/publication-steps', method: 'get' },
   listRunEvents: { path: '/v1/runs/{runId}/events', method: 'get' },
   submitPreparedRun: { path: '/v1/runs/{runId}/submission', method: 'post' },
-  renewPreparationClaim: {
-    path: '/v1/runs/{runId}/preparation/claim',
-    method: 'post'
-  },
+  renewPreparationClaim: { path: '/v1/runs/{runId}/preparation/claim', method: 'post' },
   claimNextPreparation: { path: '/v1/preparation/claims/next', method: 'post' },
-  checkpointPreparationInput: {
-    path: '/v1/runs/{runId}/preparation/checkpoint',
-    method: 'post'
-  },
-  failPreparation: {
-    path: '/v1/runs/{runId}/preparation/failure',
-    method: 'post'
-  },
+  checkpointPreparationInput: { path: '/v1/runs/{runId}/preparation/checkpoint', method: 'post' },
+  failPreparation: { path: '/v1/runs/{runId}/preparation/failure', method: 'post' },
   claimNextRunNotice: { path: '/v1/run-notices/claims/next', method: 'post' },
-  renewRunNoticeClaim: {
-    path: '/v1/run-notices/{noticeId}/claim',
-    method: 'post'
-  },
-  completeRunNotice: {
-    path: '/v1/run-notices/{noticeId}/complete',
-    method: 'post'
-  },
+  renewRunNoticeClaim: { path: '/v1/run-notices/{noticeId}/claim', method: 'post' },
+  completeRunNotice: { path: '/v1/run-notices/{noticeId}/complete', method: 'post' },
   claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },
-  renewPublicationClaim: {
-    path: '/v1/runs/{runId}/publication/claim',
-    method: 'post'
-  },
-  initializePublicationSteps: {
-    path: '/v1/runs/{runId}/publication/steps',
-    method: 'post'
-  },
+  renewPublicationClaim: { path: '/v1/runs/{runId}/publication/claim', method: 'post' },
+  initializePublicationSteps: { path: '/v1/runs/{runId}/publication/steps', method: 'post' },
   requirePublicationStepClaim: {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/claim',
     method: 'post'
@@ -2056,32 +2006,17 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/fail',
     method: 'post'
   },
-  completePublication: {
-    path: '/v1/runs/{runId}/publication/complete',
-    method: 'post'
-  },
-  failPublication: {
-    path: '/v1/runs/{runId}/publication/fail',
-    method: 'post'
-  },
+  completePublication: { path: '/v1/runs/{runId}/publication/complete', method: 'post' },
+  failPublication: { path: '/v1/runs/{runId}/publication/fail', method: 'post' },
   getInternalRun: { path: '/v1/internal/runs/{runId}', method: 'get' },
   listInternalPublicationSteps: {
     path: '/v1/internal/runs/{runId}/publication/steps',
     method: 'get'
   },
   listParkedRuns: { path: '/v1/runs/parked', method: 'get' },
-  abandonBlockedPreparation: {
-    path: '/v1/admin/runs/{runId}/abandon',
-    method: 'post'
-  },
-  giveUpDisconnectedRun: {
-    path: '/v1/admin/runs/{runId}/give-up',
-    method: 'post'
-  },
-  resumeDisconnectedRun: {
-    path: '/v1/admin/runs/{runId}/resume',
-    method: 'post'
-  },
+  abandonBlockedPreparation: { path: '/v1/admin/runs/{runId}/abandon', method: 'post' },
+  giveUpDisconnectedRun: { path: '/v1/admin/runs/{runId}/give-up', method: 'post' },
+  resumeDisconnectedRun: { path: '/v1/admin/runs/{runId}/resume', method: 'post' },
   getPreparationHeartbeatInterval: {
     path: '/v1/config/preparation-heartbeat-interval',
     method: 'get'
@@ -2094,10 +2029,7 @@ export const operationRoutes = {
     path: '/v1/config/run-notice-heartbeat-interval',
     method: 'get'
   },
-  reserveInputBundleCandidate: {
-    path: '/v1/runs/{runId}/input-bundle-candidates',
-    method: 'post'
-  },
+  reserveInputBundleCandidate: { path: '/v1/runs/{runId}/input-bundle-candidates', method: 'post' },
   listInputBundleCandidates: {
     path: '/v1/runs/{runId}/input-bundle-candidates/reconcile',
     method: 'post'

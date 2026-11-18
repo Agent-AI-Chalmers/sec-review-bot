@@ -10,31 +10,6 @@
 // is impossible, because the default transport throws a message naming the offending test.
 import { Octokit } from 'octokit'
 
-type OctokitOptions = NonNullable<ConstructorParameters<typeof Octokit>[0]>
-type FetchOption = NonNullable<NonNullable<OctokitOptions['request']>['fetch']>
-
-/**
- * Adapt a simple `(input, init) => Response` handler to the SDK's `request.fetch` type.
- *
- * The SDK types `fetch` as the DOM `fetch`, which a test double cannot implement in full. Rather
- * than asserting through `any`/`never`, this narrows the difference in one typed place: the
- * adapter matches the full signature and delegates to the handler.
- */
-export function testFetch(
-  handler: (
-    input: string | URL | Request,
-    init?: RequestInit
-  ) => Promise<Response>
-): FetchOption {
-  return ((input: Parameters<FetchOption>[0], init?: RequestInit) =>
-    handler(
-      typeof input === 'string' || input instanceof URL
-        ? input
-        : (input as Request),
-      init
-    )) as FetchOption
-}
-
 /** A request as the fake transport sees it. */
 export interface RecordedRequest {
   method: string
@@ -74,8 +49,9 @@ export function fakeGitHub(respond: Handler): FakeGitHub {
     // without the waiting; retry behaviour itself is not what these tests assert.
     retry: { enabled: false },
     request: {
-      fetch: testFetch(async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString()
+      fetch: async (input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
         const method = (init?.method ?? 'GET').toUpperCase()
         const rawBody = init?.body
         const body =
@@ -85,7 +61,7 @@ export function fakeGitHub(respond: Handler): FakeGitHub {
         const request: RecordedRequest = { method, url, body }
         requests.push(request)
         return await respond(request)
-      })
+      }
     }
   })
   return { octokit, requests }
@@ -109,10 +85,7 @@ export function githubJson(body: unknown, status = 200): Response {
 }
 
 /** A `file` entry as `repos.getContent` returns it. */
-export function githubFile(
-  content: string,
-  path = '.sec-review/config.yml'
-): Response {
+export function githubFile(content: string, path = '.sec-review/config.yml'): Response {
   return githubJson({
     type: 'file',
     path,

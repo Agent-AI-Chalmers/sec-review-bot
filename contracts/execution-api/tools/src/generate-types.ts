@@ -8,28 +8,17 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { formatGenerated, renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { renderWorkflowInputDeclarations } from './generate-api-types.js'
-import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
 export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'services', 'review-runs')
-export const SPEC_PATH = path.resolve(
-  REPO_ROOT,
-  'contracts',
-  'execution-api',
-  'v1',
-  'openapi.yaml'
-)
-export const REVIEW_RUNS_OUTPUT_PATH = path.join(
-  REVIEW_RUNS_ROOT,
-  'src',
-  'execution-api-schema.ts'
-)
+export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'execution-api', 'v1', 'openapi.yaml')
+export const REVIEW_RUNS_OUTPUT_PATH = path.join(REVIEW_RUNS_ROOT, 'src', 'execution-api-schema.ts')
 export const GATEWAY_OUTPUT_PATH = path.join(
   REPO_ROOT,
   'services',
@@ -45,16 +34,18 @@ const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path r
 `
 
 function renderOperationOptionsById(spec: unknown): string {
-  const paths = (spec as { paths?: Record<string, Record<string, unknown>> })
-    .paths
-  if (paths === undefined) throw new Error('Execution API has no paths')
+  const paths = (spec as { paths?: Record<string, Record<string, unknown>> }).paths
+  if (paths === undefined) {
+    throw new Error('Execution API has no paths')
+  }
   const entries: string[] = []
   for (const pathItem of Object.values(paths)) {
     for (const operation of Object.values(pathItem)) {
       const operationId = (operation as { operationId?: unknown }).operationId
-      if (typeof operationId !== 'string') continue
-      const typeName =
-        operationId.charAt(0).toUpperCase() + operationId.slice(1)
+      if (typeof operationId !== 'string') {
+        continue
+      }
+      const typeName = operationId.charAt(0).toUpperCase() + operationId.slice(1)
       entries.push(`  ${operationId}: ${typeName}Options`)
     }
   }
@@ -62,9 +53,7 @@ function renderOperationOptionsById(spec: unknown): string {
 }
 
 /** The committed content of `src/execution-api-schema.ts`. */
-export async function renderExecutionApiTypes(
-  outputPath: string
-): Promise<string> {
+export async function renderExecutionApiTypes(outputPath: string): Promise<string> {
   const spec = parse(await readFile(SPEC_PATH, 'utf8')) as unknown
   const composedTypes = `
 ${await renderWorkflowInputDeclarations()}
@@ -84,13 +73,8 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
     input: WorkflowInputByName[Workflow]
   }
 `
-  const rendered =
-    HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
-  // `format` does not read the project's Prettier config from `filepath`; it has to be
-  // resolved and passed, or the output keeps the generator's own quoting and fails
-  // `format:check`.
-  const options = await prettier.resolveConfig(outputPath)
-  return await prettier.format(rendered, { ...options, filepath: outputPath })
+  const rendered = HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
+  return formatGenerated(outputPath, rendered)
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */

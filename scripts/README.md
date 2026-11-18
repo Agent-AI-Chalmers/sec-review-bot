@@ -35,7 +35,9 @@ python -m scripts.checks.translated_doc_headings
 
 Markdown style is checked by markdownlint, configured in the root `.markdownlint-cli2.jsonc`. Run `pnpm run lint:md` from the repository root.
 
-Repository-level files outside workspace packages are formatted by the root `.prettierrc.json`. Run `pnpm run format:root:check` from the repository root.
+<!-- doc-default: root-formatting; source=.oxfmtrc.json -->
+
+Repository-level files outside workspace packages are formatted by the root `.oxfmtrc.json`. Run `pnpm run format:root:check` from the repository root.
 
 Chinese documentation spacing and punctuation are checked by AutoCorrect, configured in the root `.autocorrectrc`. Run `pnpm run lint:zh` from the repository root.
 

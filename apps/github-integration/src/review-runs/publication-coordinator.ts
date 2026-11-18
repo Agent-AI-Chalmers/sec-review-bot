@@ -8,10 +8,7 @@ import { integerEnv } from '../utils/env.js'
 import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { asErrorMessage, errorCode } from '../utils/error-utils.js'
 import { classifyPublicationFailure } from './publication-failure.js'
-import {
-  isPublicationClaimLostError,
-  PublicationClaimLostError
-} from './publication-claim.js'
+import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import {
   reviewRunsClient,
   type PublicationCoordinatorStore,
@@ -30,7 +27,7 @@ interface Options {
   intervalMs?: number
 }
 
-function pollIntervalMs(): number {
+function pollIntervalMs() {
   return integerEnv('REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS', 15_000)
 }
 
@@ -49,10 +46,13 @@ async function publishWork(
     installation_octokit_for_repo: async (repo: string) =>
       await installationOctokitForRepo(app, repo)
   }
-  if (work.workflow === 'issue-review') await handleIssueReviewRun(common)
-  else if (work.workflow === 'pull-request-review')
+  if (work.workflow === 'issue-review') {
+    await handleIssueReviewRun(common)
+  } else if (work.workflow === 'pull-request-review') {
     await handlePullRequestReviewRun(common)
-  else await handleRepositoryReviewRun(common)
+  } else {
+    await handleRepositoryReviewRun(common)
+  }
 }
 
 export async function withPublicationHeartbeat(
@@ -82,12 +82,16 @@ export async function withPublicationHeartbeat(
   const renewSerially = async (): Promise<void> => {
     // Lease ownership is monotonic within one publication attempt. A later
     // successful renewal cannot make work started during an uncertain interval safe.
-    if (lost) throw new PublicationClaimLostError(work.run_id)
+    if (lost) {
+      throw new PublicationClaimLostError(work.run_id)
+    }
     active ??= renew().finally(() => {
       active = null
     })
     await active
-    if (lost) throw new PublicationClaimLostError(work.run_id)
+    if (lost) {
+      throw new PublicationClaimLostError(work.run_id)
+    }
   }
   try {
     await renewSerially()
@@ -99,9 +103,12 @@ export async function withPublicationHeartbeat(
     void renewSerially().catch(() => undefined)
   }, intervalMs)
   timer.unref?.()
+  // The timer and operation can assign active; TypeScript cannot see those callback writes.
   try {
     await operation(renewSerially)
-    if (active !== null) await active
+    if (active !== null) {
+      await (active as Promise<void>)
+    }
     try {
       await renewSerially()
     } catch {
@@ -110,7 +117,9 @@ export async function withPublicationHeartbeat(
     return !lost
   } finally {
     clearInterval(timer)
-    if (active !== null) await active
+    if (active !== null) {
+      await (active as Promise<void>)
+    }
   }
 }
 
@@ -126,7 +135,9 @@ async function incompleteStepsMessage(
     const unsettled = (await store.listPublicationSteps(runId)).filter(
       (step) => step.status !== 'succeeded'
     )
-    if (unsettled.length === 0) return generic
+    if (unsettled.length === 0) {
+      return generic
+    }
     const described = unsettled.map(
       (step) =>
         `${step.step_key} (${step.status}${step.failure_code === null ? '' : `, ${step.failure_code}`})`
@@ -153,10 +164,10 @@ export async function publishReviewRunsOnce({
   // publishable mid-interval is picked up as soon as it does, and the poll timer above
   // stays as the backstop. The wait stays comfortably inside the client's request
   // timeout.
-  const work = await store.claimNextPublication(
-    Math.min(pollIntervalMs(), 10_000)
-  )
-  if (work === null) return
+  const work = await store.claimNextPublication(Math.min(pollIntervalMs(), 10_000))
+  if (work === null) {
+    return
+  }
   try {
     const ownsClaim = await withPublicationHeartbeat(
       store,
@@ -180,13 +191,15 @@ export async function publishReviewRunsOnce({
         },
         { retry: false }
       )
-      if (!committed) await logRefusedConclusion(store, work)
-      else
+      if (!committed) {
+        await logRefusedConclusion(store, work)
+      } else {
         logError('review_publication_failed', {
           run_id: work.run_id,
           workflow: work.workflow,
           retry: false
         })
+      }
       return
     }
     logInfo('review_publication_completed', {
@@ -221,7 +234,9 @@ export async function publishReviewRunsOnce({
       workflow: work.workflow,
       retry: classification.retry
     })
-    if (!committed) await logRefusedConclusion(store, work)
+    if (!committed) {
+      await logRefusedConclusion(store, work)
+    }
   }
 }
 
@@ -268,7 +283,9 @@ export function startPublicationCoordinator({
   let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = publishReviewRunsOnce({ app, store })
       .catch((error) => {
         logError('review_publication_loop_failed', {

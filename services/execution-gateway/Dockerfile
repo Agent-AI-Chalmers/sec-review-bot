@@ -17,7 +17,7 @@ RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
 
 WORKDIR /repo/services/execution-gateway
 
-COPY tsconfig.json tsconfig.build.json eslint.config.js .prettierrc.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 COPY --from=contracts execution-api /repo/contracts/execution-api
 COPY --from=contracts execution-workflow /repo/contracts/execution-workflow

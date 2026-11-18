@@ -13,7 +13,7 @@ function event(overrides: Partial<RunEvent>): RunEvent {
     reason_code: null,
     occurred_at: '2026-10-28T10:00:00.000Z',
     ...overrides
-  } as RunEvent
+  }
 }
 
 const run = {

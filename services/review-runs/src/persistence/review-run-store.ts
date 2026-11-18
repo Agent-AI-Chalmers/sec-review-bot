@@ -59,11 +59,7 @@ export type {
   PreparationExpiryResult,
   PreparationWork
 } from './preparation-store.js'
-export type {
-  DroppedRunRow,
-  ParkedRun,
-  RunRowsProjection
-} from './review-run-queries.js'
+export type { DroppedRunRow, ParkedRun, RunRowsProjection } from './review-run-queries.js'
 
 export class ReviewRunStore {
   private readonly database: Database
@@ -83,8 +79,7 @@ export class ReviewRunStore {
 
   constructor({
     connectionString,
-    connectorId = process.env.CONNECTOR_ID?.trim() ||
-      'github-integration:default',
+    connectorId = process.env.CONNECTOR_ID?.trim() || 'github-integration:default',
     sourcePlatform = 'github',
     claimTimeoutMs = DEFAULT_CLAIM_TIMEOUT_MS,
     pool,
@@ -107,31 +102,15 @@ export class ReviewRunStore {
     this.connectorId = connectorId
     this.sourcePlatform = sourcePlatform
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
-    this.notices = new RunNoticeStore(
-      this.database,
-      this.connectorId,
-      this.claimTimeoutMs
-    )
-    this.preparations = new PreparationStore(
-      this.database,
-      this.connectorId,
-      this.claimTimeoutMs
-    )
-    this.publications = new PublicationStore(
-      this.database,
-      this.connectorId,
-      this.claimTimeoutMs
-    )
+    this.notices = new RunNoticeStore(this.database, this.connectorId, this.claimTimeoutMs)
+    this.preparations = new PreparationStore(this.database, this.connectorId, this.claimTimeoutMs)
+    this.publications = new PublicationStore(this.database, this.connectorId, this.claimTimeoutMs)
     this.publicationClaims = new PublicationClaimStore(
       this.database,
       this.connectorId,
       this.claimTimeoutMs
     )
-    this.executions = new ExecutionStore(
-      this.database,
-      this.connectorId,
-      this.claimTimeoutMs
-    )
+    this.executions = new ExecutionStore(this.database, this.connectorId, this.claimTimeoutMs)
     this.operatorDecisions = new OperatorDecisionStore(
       this.database,
       this.connectorId,
@@ -203,17 +182,15 @@ export class ReviewRunStore {
             : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
         ]
       )
-      if (run.rowCount !== 1) return false
+      if (run.rowCount !== 1) {
+        return false
+      }
       // A terminal execution failure ends the run, so the requester is told about it. The notice is
       // keyed by the run rather than by preparation: this failure is not a preparation failure,
       // and leaving it unannounced meant a run could stop partway with no reply ever posted.
       // A terminal Execution failure has no result to publish. Keep the publication row only as the
       // durable declaration that publication is not applicable, converging an in-flight one too.
-      const fromStatus = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
+      const fromStatus = await abandonInFlightPublication(client, this.connectorId, runId)
       const executionEventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

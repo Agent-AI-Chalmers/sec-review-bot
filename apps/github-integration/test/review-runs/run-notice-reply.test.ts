@@ -37,25 +37,30 @@ function stubOctokit(
 
     // The installation guard reads the repository first.
     if (tail === '') {
-      if (options.repoLookupFailsWith !== undefined)
-        return githubJson(
-          { message: 'Server Error' },
-          options.repoLookupFailsWith
-        )
-      if (!installed.has(`${owner}/${repo}`))
+      if (options.repoLookupFailsWith !== undefined) {
+        return githubJson({ message: 'Server Error' }, options.repoLookupFailsWith)
+      }
+      if (!installed.has(`${owner}/${repo}`)) {
         return githubJson({ message: 'Not Found' }, 404)
+      }
       return githubJson({ full_name: `${owner}/${repo}` })
     }
-    if (tail.endsWith('/issues') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/issues') && method === 'GET') {
+      return githubJson([])
+    }
     if (tail.endsWith('/issues') && method === 'POST') {
       report.created.push({ owner, repo })
       return githubJson({ number: 9 })
     }
-    if (tail.endsWith('/comments') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/comments') && method === 'GET') {
+      return githubJson([])
+    }
     if (tail.endsWith('/comments') && method === 'POST') {
       report.commented.push(Number(tail.split('/').at(-2)))
       const posted = body as { body?: unknown } | undefined
-      if (typeof posted?.body === 'string') report.bodies?.push(posted.body)
+      if (typeof posted?.body === 'string') {
+        report.bodies?.push(posted.body)
+      }
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
     return githubJson({})
@@ -68,14 +73,7 @@ test('a repository failure target must be exactly owner/repo', async () => {
   // opportunistically: `a/b/c` truncated to `a/b` would report into a different repository than
   // the one that was scanned. Anything ambiguous counts as "no target", which the caller records
   // as an undelivered notice rather than posting somewhere misleading.
-  for (const verified_repository of [
-    'a/b/c',
-    'octo',
-    '/example',
-    'octo/',
-    '',
-    '   '
-  ]) {
+  for (const verified_repository of ['a/b/c', 'octo', '/example', 'octo/', '', '   ']) {
     const report = {
       created: [] as Array<{ owner: string; repo: string }>,
       commented: [] as number[],
@@ -94,14 +92,10 @@ test('a repository failure target must be exactly owner/repo', async () => {
       kind: 'failure',
       assert_notice_claim: keepNoticeClaim
     })
-    expect(
-      result,
-      `${JSON.stringify(verified_repository)} must not resolve to a repository`
-    ).toBe(null)
-    expect(
-      report.created,
-      'no issue may be created for an invalid target'
-    ).toStrictEqual([])
+    expect(result, `${JSON.stringify(verified_repository)} must not resolve to a repository`).toBe(
+      null
+    )
+    expect(report.created, 'no issue may be created for an invalid target').toStrictEqual([])
   }
 })
 
@@ -334,9 +328,7 @@ for (const limited of [true, false]) {
             status: 403,
             headers: {
               'content-type': 'application/json',
-              ...(limited
-                ? { 'retry-after': '60', 'x-ratelimit-remaining': '0' }
-                : {})
+              ...(limited ? { 'retry-after': '60', 'x-ratelimit-remaining': '0' } : {})
             }
           }
         )
@@ -356,7 +348,9 @@ for (const limited of [true, false]) {
     ).rejects.toSatisfy((error: unknown) => {
       const classification = classifyPreparationFailure(error, 1)
       expect(classification.retry).toBe(limited)
-      if (limited) expect(classification.retryAfterMs).toBe(60_000)
+      if (limited) {
+        expect(classification.retryAfterMs).toBe(60_000)
+      }
       return true
     })
   })

@@ -1,0 +1,4 @@
+{
+  "ignorePatterns": ["dist/**", "node_modules/**", ".agent-input-bundles/**"],
+  "extends": ["../../.oxlintrc.json"]
+}

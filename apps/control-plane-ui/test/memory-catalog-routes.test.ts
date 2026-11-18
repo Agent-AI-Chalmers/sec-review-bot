@@ -6,9 +6,7 @@ import { loginCookie } from './server-support.js'
 
 test('memory writes require configured catalog access', async () => {
   const reviewRuns = createServer((_request, response) => response.end('{}'))
-  await new Promise<void>((resolve) =>
-    reviewRuns.listen(0, '127.0.0.1', resolve)
-  )
+  await new Promise<void>((resolve) => reviewRuns.listen(0, '127.0.0.1', resolve))
   const reviewAddress = reviewRuns.address()
   expect.assert(reviewAddress && typeof reviewAddress === 'object')
   const ui = createControlPlaneUiBffServer({
@@ -81,10 +79,9 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
       '/api/memory/overview?range=90d',
       '/api/memory/versions?limit=50',
       '/api/memory/versions/2'
-    ])
-      expect(
-        (await fetch(`${base}${path}`, { headers: { cookie } })).status
-      ).toBe(200)
+    ]) {
+      expect((await fetch(`${base}${path}`, { headers: { cookie } })).status).toBe(200)
+    }
     expect(paths).toStrictEqual([
       '/v1/memory-tree',
       '/v1/overview?range=90d',
@@ -101,26 +98,29 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
 
 test('memory edit creates a version while restore only moves the pointer', async () => {
   const requests: Array<{ path: string; body: Record<string, unknown> }> = []
-  const catalog = createServer(async (request, response) => {
-    const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    requests.push({
-      path: request.url ?? '',
-      body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
-        string,
-        unknown
-      >
+  const catalog = createServer((request, response) => {
+    void (async () => {
+      const chunks: Buffer[] = []
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
+      requests.push({
+        path: request.url ?? '',
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+      })
+      response.writeHead(201, { 'content-type': 'application/json' })
+      response.end('{"version":3}')
+    })().catch((error: unknown) => {
+      response.destroy(
+        error instanceof Error ? error : new Error('Test server failed', { cause: error })
+      )
     })
-    response.writeHead(201, { 'content-type': 'application/json' })
-    response.end('{"version":3}')
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
   expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const reviewRuns = createServer((_request, response) => response.end('{}'))
-  await new Promise<void>((resolve) =>
-    reviewRuns.listen(0, '127.0.0.1', resolve)
-  )
+  await new Promise<void>((resolve) => reviewRuns.listen(0, '127.0.0.1', resolve))
   const reviewAddress = reviewRuns.address()
   expect.assert(reviewAddress && typeof reviewAddress === 'object')
   let uploads = 0
@@ -163,9 +163,9 @@ test('memory edit creates a version while restore only moves the pointer', async
       '/v1/memory-tree/versions/publications/confirm',
       '/v1/memory-tree/versions'
     ])
-    expect(requests[0]!.body).toStrictEqual(requests[1]!.body)
-    expect(requests[0]!.body).toStrictEqual(requests[2]!.body)
-    const editSource = requests[0]!.body.source as Record<string, unknown>
+    expect(requests[0].body).toStrictEqual(requests[1].body)
+    expect(requests[0].body).toStrictEqual(requests[2].body)
+    const editSource = requests[0].body.source as Record<string, unknown>
     expect(editSource.actor).toBe(undefined)
     expect(editSource.operation_id).toBe('edit-1')
 
@@ -183,8 +183,8 @@ test('memory edit creates a version while restore only moves the pointer', async
       ).status
     ).toBe(201)
     expect(uploads, 'restore must not publish another object').toBe(1)
-    expect(requests[3]!.path).toBe('/v1/memory-tree/restore')
-    expect(requests[3]!.body).toStrictEqual({
+    expect(requests[3].path).toBe('/v1/memory-tree/restore')
+    expect(requests[3].body).toStrictEqual({
       operation_id: 'restore-1',
       expected_active_version: 3,
       restored_version: 1
@@ -319,28 +319,30 @@ async function memoryWriteFixture(
 }> {
   const writes: Array<{ path: string; body: unknown }> = []
   let uploads = 0
-  const catalog = createServer(async (request, response) => {
-    const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    writes.push({
-      path: request.url ?? '',
-      body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
-    })
-    const status =
-      catalogFailurePath === undefined || request.url === catalogFailurePath
-        ? catalogStatus
-        : 201
-    response.writeHead(status, { 'content-type': 'application/json' })
-    response.end(
-      JSON.stringify(
-        status === 409 ? { error: 'version_conflict' } : { created: true }
+  const catalog = createServer((request, response) => {
+    void (async () => {
+      const chunks: Buffer[] = []
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
+      writes.push({
+        path: request.url ?? '',
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+      })
+      const status =
+        catalogFailurePath === undefined || request.url === catalogFailurePath ? catalogStatus : 201
+      response.writeHead(status, { 'content-type': 'application/json' })
+      response.end(
+        JSON.stringify(status === 409 ? { error: 'version_conflict' } : { created: true })
       )
-    )
+    })().catch((error: unknown) => {
+      response.destroy(
+        error instanceof Error ? error : new Error('Test server failed', { cause: error })
+      )
+    })
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
-  t.onTestFinished(
-    () => new Promise<void>((resolve) => catalog.close(() => resolve()))
-  )
+  t.onTestFinished(() => new Promise<void>((resolve) => catalog.close(() => resolve())))
   const catalogAddress = catalog.address()
   expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
@@ -356,19 +358,17 @@ async function memoryWriteFixture(
             getObject: async (): Promise<never> =>
               expect.unreachable('writes must not read stored objects'),
             putMemoryArtifact: async (): Promise<void> => {
-              expect(writes.at(-1)?.path).toBe(
-                '/v1/memory-tree/versions/publications/reserve'
-              )
+              expect(writes.at(-1)?.path).toBe('/v1/memory-tree/versions/publications/reserve')
               uploads += 1
-              if (upload === 'fails') throw new Error('storage unavailable')
+              if (upload === 'fails') {
+                throw new Error('storage unavailable')
+              }
             }
           }
         })
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
-  t.onTestFinished(
-    () => new Promise<void>((resolve) => ui.close(() => resolve()))
-  )
+  t.onTestFinished(() => new Promise<void>((resolve) => ui.close(() => resolve())))
   const address = ui.address()
   expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
@@ -406,17 +406,7 @@ const validMemoryWrites = {
 test('memory writes reject malformed JSON and non-object JSON without side effects', async (t) => {
   const fixture = await memoryWriteFixture(t)
   for (const action of Object.keys(validMemoryWrites)) {
-    for (const body of [
-      '',
-      '{',
-      'null',
-      '[]',
-      '[{}]',
-      '"text"',
-      '42',
-      'true',
-      'false'
-    ]) {
+    for (const body of ['', '{', 'null', '[]', '[{}]', '"text"', '42', 'true', 'false']) {
       const response = await fixture.post(action, body)
       expect(response.status, `${action}: ${body}`).toBe(400)
       expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
@@ -429,25 +419,9 @@ test('memory writes reject malformed JSON and non-object JSON without side effec
 test('memory writes require valid operation IDs before any Catalog or storage mutation', async (t) => {
   const fixture = await memoryWriteFixture(t)
   for (const [action, valid] of Object.entries(validMemoryWrites)) {
-    for (const operation_id of [
-      undefined,
-      null,
-      1,
-      true,
-      [],
-      {},
-      '',
-      'has space',
-      'has/slash'
-    ]) {
-      const response = await fixture.post(
-        action,
-        JSON.stringify({ ...valid, operation_id })
-      )
-      expect(
-        response.status,
-        `${action}: ${JSON.stringify(operation_id)}`
-      ).toBe(400)
+    for (const operation_id of [undefined, null, 1, true, [], {}, '', 'has space', 'has/slash']) {
+      const response = await fixture.post(action, JSON.stringify({ ...valid, operation_id }))
+      expect(response.status, `${action}: ${JSON.stringify(operation_id)}`).toBe(400)
       expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
     }
   }
@@ -464,25 +438,16 @@ test('memory writes reject missing, coerced, fractional, negative, and unsafe co
     ['restore', 'expected_active_version'],
     ['restore', 'restored_version']
   ] as const) {
-    const invalid = [
-      undefined,
-      null,
-      '1',
-      true,
-      -1,
-      0.5,
-      Number.MAX_SAFE_INTEGER + 1
-    ]
-    if (action === 'restore') invalid.push(0)
+    const invalid = [undefined, null, '1', true, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]
+    if (action === 'restore') {
+      invalid.push(0)
+    }
     for (const value of invalid) {
       const response = await fixture.post(
         action,
         JSON.stringify({ ...validMemoryWrites[action], [field]: value })
       )
-      expect(
-        response.status,
-        `${action}.${field}: ${JSON.stringify(value)}`
-      ).toBe(400)
+      expect(response.status, `${action}.${field}: ${JSON.stringify(value)}`).toBe(400)
       expect(await response.json()).toStrictEqual({ error: 'invalid_request' })
     }
   }
@@ -544,10 +509,7 @@ test('valid control writes preserve zero versions and ignore client-supplied act
 
 test('an initial memory edit accepts version zero and reserves before uploading', async (t) => {
   const fixture = await memoryWriteFixture(t)
-  const response = await fixture.post(
-    'edit',
-    JSON.stringify(validMemoryWrites.edit)
-  )
+  const response = await fixture.post('edit', JSON.stringify(validMemoryWrites.edit))
   expect(response.status).toBe(201)
   expect(fixture.uploads()).toBe(1)
   expect(fixture.writes.map(({ path }) => path)).toStrictEqual([
@@ -556,9 +518,7 @@ test('an initial memory edit accepts version zero and reserves before uploading'
     '/v1/memory-tree/versions'
   ])
   const body = fixture.writes[0]?.body
-  expect.assert(
-    body && typeof body === 'object' && 'expected_active_version' in body
-  )
+  expect.assert(body && typeof body === 'object' && 'expected_active_version' in body)
   expect(body.expected_active_version).toBe(0)
 })
 
@@ -567,10 +527,7 @@ test('valid edits keep upload capability errors separate from malformed input', 
   const invalid = await fixture.post('edit', 'null')
   expect(invalid.status).toBe(400)
   expect(await invalid.json()).toStrictEqual({ error: 'invalid_request' })
-  const response = await fixture.post(
-    'edit',
-    JSON.stringify(validMemoryWrites.edit)
-  )
+  const response = await fixture.post('edit', JSON.stringify(validMemoryWrites.edit))
   expect(response.status).toBe(503)
   expect(await response.json()).toStrictEqual({
     error: 'memory_artifact_upload_unavailable'
@@ -580,10 +537,7 @@ test('valid edits keep upload capability errors separate from malformed input', 
 
 test('memory edits report upload failures as 502 and do not confirm or commit', async (t) => {
   const fixture = await memoryWriteFixture(t, { upload: 'fails' })
-  const response = await fixture.post(
-    'edit',
-    JSON.stringify(validMemoryWrites.edit)
-  )
+  const response = await fixture.post('edit', JSON.stringify(validMemoryWrites.edit))
   expect(response.status).toBe(502)
   expect(await response.json()).toStrictEqual({
     error: 'memory_artifact_upload_failed'
@@ -596,10 +550,7 @@ test('memory edits report upload failures as 502 and do not confirm or commit', 
 
 test('valid memory edits relay Catalog conflicts before uploading', async (t) => {
   const fixture = await memoryWriteFixture(t, { catalogStatus: 409 })
-  const response = await fixture.post(
-    'edit',
-    JSON.stringify(validMemoryWrites.edit)
-  )
+  const response = await fixture.post('edit', JSON.stringify(validMemoryWrites.edit))
   expect(response.status).toBe(409)
   expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
   expect(fixture.uploads()).toBe(0)
@@ -618,17 +569,13 @@ for (const failedPhase of ['reserve', 'confirm', 'commit'] as const) {
       catalogStatus: 409,
       catalogFailurePath: paths[failedIndex]
     })
-    const response = await fixture.post(
-      'edit',
-      JSON.stringify(validMemoryWrites.edit)
-    )
+    const response = await fixture.post('edit', JSON.stringify(validMemoryWrites.edit))
     expect(response.status).toBe(409)
     expect(await response.json()).toStrictEqual({ error: 'version_conflict' })
     expect(fixture.uploads()).toBe(failedPhase === 'reserve' ? 0 : 1)
-    expect(fixture.writes.map(({ path }) => path)).toStrictEqual(
-      paths.slice(0, failedIndex + 1)
-    )
-    for (const { body } of fixture.writes)
+    expect(fixture.writes.map(({ path }) => path)).toStrictEqual(paths.slice(0, failedIndex + 1))
+    for (const { body } of fixture.writes) {
       expect(body).toStrictEqual(fixture.writes[0]?.body)
+    }
   })
 }

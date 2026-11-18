@@ -64,25 +64,33 @@ type QueryScalarType = 'integer' | 'number' | 'boolean'
  * does not parse is left untouched and rejected by the schema, not guessed at.
  */
 function coerceQueryStrings(request: FastifyRequest): void {
-  const querystring = (
-    request.routeOptions?.schema as { querystring?: unknown } | undefined
-  )?.querystring
+  const querystring = request.routeOptions?.schema?.querystring
   const properties = (
-    querystring as
-      { properties?: Record<string, { type?: QueryScalarType }> } | undefined
+    querystring as { properties?: Record<string, { type?: QueryScalarType }> } | undefined
   )?.properties
-  if (properties === undefined) return
+  if (properties === undefined) {
+    return
+  }
   const query = request.query as Record<string, unknown> | null
-  if (query === null || typeof query !== 'object') return
+  if (query === null || typeof query !== 'object') {
+    return
+  }
   for (const [name, value] of Object.entries(query)) {
-    if (typeof value !== 'string') continue
+    if (typeof value !== 'string') {
+      continue
+    }
     const type = properties[name]?.type
     if (type === 'integer' || type === 'number') {
       const parsed = Number(value)
-      if (value.trim() !== '' && Number.isFinite(parsed)) query[name] = parsed
+      if (value.trim() !== '' && Number.isFinite(parsed)) {
+        query[name] = parsed
+      }
     } else if (type === 'boolean') {
-      if (value === 'true') query[name] = true
-      else if (value === 'false') query[name] = false
+      if (value === 'true') {
+        query[name] = true
+      } else if (value === 'false') {
+        query[name] = false
+      }
     }
   }
 }
@@ -110,17 +118,11 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
 /** Report a stored row the contract cannot represent, with the identity and fault needed to
  * find it. The reads that can hit one skip and report it rather than failing the whole read,
  * so this is the only record that the row was dropped. */
-function logDroppedRunRow(
-  connectorId: string,
-  dropped: { run_id: string; error: unknown }
-): void {
+function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error: unknown }): void {
   logEvent('review_runs_run_row_dropped', {
     connector_id: connectorId,
     run_id: dropped.run_id,
-    error:
-      dropped.error instanceof Error
-        ? dropped.error.message
-        : String(dropped.error)
+    error: dropped.error instanceof Error ? dropped.error.message : String(dropped.error)
   })
 }
 
@@ -130,11 +132,10 @@ function logDroppedRunRow(
  * byte by byte from the response-time difference. `timingSafeEqual` throws when the buffers
  * differ in length, which is why the length is compared first: the length of the expected
  * token is not the secret, and a mismatch is a plain rejection. */
-function bearerTokenMatches(
-  header: string | undefined,
-  expected: string
-): boolean {
-  if (header === undefined) return false
+function bearerTokenMatches(header: string | undefined, expected: string): boolean {
+  if (header === undefined) {
+    return false
+  }
   const provided = Buffer.from(header)
   const want = Buffer.from(`Bearer ${expected}`)
   return provided.length === want.length && timingSafeEqual(provided, want)
@@ -158,12 +159,16 @@ interface ReviewRunsRouteDeps {
  * (tsx) falls back to the repository's contracts tree. */
 function resolveSpecPath(): string {
   const built = path.resolve(import.meta.dirname, '../openapi.yaml')
-  if (existsSync(built)) return built
+  if (existsSync(built)) {
+    return built
+  }
   const fromSource = path.resolve(
     import.meta.dirname,
     '../../../../contracts/review-runs-api/v1/openapi.yaml'
   )
-  if (existsSync(fromSource)) return fromSource
+  if (existsSync(fromSource)) {
+    return fromSource
+  }
   throw new Error(
     `OpenAPI contract not found next to the module (${built}) or in the ` +
       `repository tree (${fromSource}).`
@@ -198,8 +203,7 @@ export async function registerReviewRunsRoutes(
           connector_id: store.connectorId,
           message: error instanceof Error ? error.message : String(error)
         }),
-      logDroppedRunRow: (dropped) =>
-        logDroppedRunRow(store.connectorId, dropped)
+      logDroppedRunRow: (dropped) => logDroppedRunRow(store.connectorId, dropped)
     }),
     ...buildCoordinationRouteHandlers(store),
     ...buildAdminRouteHandlers(store)
@@ -239,9 +243,7 @@ export async function registerReviewRunsRoutes(
     // Defense in depth: a Postgres datetime parse error (22007/22008) can only
     // originate from a bad `from`/`to` filter.
     if (errorCode === '22007' || errorCode === '22008') {
-      return reply
-        .code(400)
-        .send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
+      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
     }
     if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
       return reply.code(413).send({ error: 'Request body is too large.' })
@@ -262,9 +264,7 @@ export async function registerReviewRunsRoutes(
     if (errorCode === 'FST_ERR_VALIDATION') {
       const detail = error instanceof Error ? error.message : String(error)
       const context =
-        typeof error === 'object' &&
-        error !== null &&
-        'validationContext' in error
+        typeof error === 'object' && error !== null && 'validationContext' in error
           ? (error as { validationContext?: string }).validationContext
           : undefined
       const code =
@@ -284,10 +284,7 @@ export async function registerReviewRunsRoutes(
         : 500
     // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
     // must not leak into the envelope, which would also break the OpenAPI enum.
-    const code =
-      errorCode !== null && errorCodeEnum.includes(errorCode)
-        ? errorCode
-        : undefined
+    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
     // An unexpected internal fault (5xx) must not leak its message (which may carry SQLSTATE
     // or connection details); the caller only learns that the request failed. Known 4xx
     // results keep their message, since those are the caller's own input being rejected.
@@ -310,11 +307,7 @@ export async function registerReviewRunsRoutes(
       )
     }
     const message =
-      status >= 500
-        ? 'Internal error'
-        : error instanceof Error
-          ? error.message
-          : String(error)
+      status >= 500 ? 'Internal error' : error instanceof Error ? error.message : String(error)
     return reply.code(status).send({
       error: message,
       ...(code === undefined ? {} : { code })
@@ -356,6 +349,8 @@ export async function registerReviewRunsRoutes(
       // only dilute the audit signal. Wrapping here means a new operation is logged without
       // repeating the call. Only identifiers are logged, never request arguments, which may
       // carry claim credentials.
+      // openapi-glue forwards this handler to Fastify, which awaits its Promise.
+      // oxlint-disable-next-line typescript/no-misused-promises
       return async (request: FastifyRequest, reply: FastifyReply) => {
         const durable = request.method !== 'GET'
         const runId = (request.params as { runId?: string }).runId

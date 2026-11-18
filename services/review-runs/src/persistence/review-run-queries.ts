@@ -13,11 +13,7 @@ import type {
   ReviewRunRecord
 } from '../shapes.js'
 import { listEvents } from './review-run-events.js'
-import {
-  RUN_SELECT,
-  rowToRecord,
-  type ReviewRunRow
-} from './run-record-projection.js'
+import { RUN_SELECT, rowToRecord, type ReviewRunRow } from './run-record-projection.js'
 
 /** A run-list cursor: the full-precision timestamp and id of the last row of a page. */
 export interface RunListCursor {
@@ -33,9 +29,7 @@ export interface RunListCursor {
  * may depend on that shape. Callers treat it as an opaque string.
  */
 export function encodeRunListCursor(cursor: RunListCursor): string {
-  return Buffer.from(`${cursor.created_at_cursor}|${cursor.run_id}`).toString(
-    'base64url'
-  )
+  return Buffer.from(`${cursor.created_at_cursor}|${cursor.run_id}`).toString('base64url')
 }
 
 /**
@@ -48,8 +42,12 @@ export function encodeRunListCursor(cursor: RunListCursor): string {
 export function decodeRunListCursor(cursor: string): RunListCursor | null {
   const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
   const [createdAt, runId, extra] = decoded.split('|')
-  if (!createdAt || !runId || extra !== undefined) return null
-  if (Number.isNaN(Date.parse(createdAt))) return null
+  if (!createdAt || !runId || extra !== undefined) {
+    return null
+  }
+  if (Number.isNaN(Date.parse(createdAt))) {
+    return null
+  }
   return { created_at_cursor: createdAt, run_id: runId }
 }
 
@@ -126,11 +124,7 @@ const PARKED_AXES = [
 /** One axis' parked rows. `parked_at` is the latest transition into `disconnected`, falling back
  * to `updated_at` when no such event exists; generating every axis from this one
  * template keeps that rule from drifting between them. */
-function parkedAxisSelect({
-  table,
-  axis,
-  reasonSql
-}: (typeof PARKED_AXES)[number]): string {
+function parkedAxisSelect({ table, axis, reasonSql }: (typeof PARKED_AXES)[number]) {
   return `SELECT run_id, '${axis}' AS axis, ${reasonSql} AS reason,
            COALESCE((
              SELECT e.occurred_at FROM review_run_events e
@@ -180,7 +174,9 @@ export class ReviewRunQueries {
       [runId, this.connectorId]
     )
     const row = result.rows[0]
-    if (row === undefined) return null
+    if (row === undefined) {
+      return null
+    }
     // Single-run reads cannot return a `dropped` side channel, so report corruption and preserve
     // the established nullable lookup contract.
     try {
@@ -194,7 +190,9 @@ export class ReviewRunQueries {
   async getExecutionStatistics(
     runIds: readonly string[]
   ): Promise<Map<string, ExecutionStatisticsSummary>> {
-    if (runIds.length === 0) return new Map()
+    if (runIds.length === 0) {
+      return new Map()
+    }
     const result = await this.pool.query<{
       run_id: string
       statistics: ExecutionStatisticsSummary
@@ -252,44 +250,46 @@ export class ReviewRunQueries {
        WHERE r.connector_id=$1 AND s.run_id=ANY($2::text[])`,
       [this.connectorId, runIds]
     )
-    return new Map(
-      result.rows.map(({ run_id, statistics }) => [run_id, statistics])
-    )
+    return new Map(result.rows.map(({ run_id, statistics }) => [run_id, statistics]))
   }
 
-  private async listRunRows(
-    options: ListRunsOptions,
-    limit: number
-  ): Promise<ReviewRunRow[]> {
+  private async listRunRows(options: ListRunsOptions, limit: number): Promise<ReviewRunRow[]> {
     const values: unknown[] = [this.connectorId]
     const clauses = ['r.connector_id=$1']
     const add = (value: unknown): string => {
       values.push(value)
       return `$${values.length}`
     }
-    if (options.workflow !== undefined)
+    if (options.workflow !== undefined) {
       clauses.push(`r.workflow=${add(options.workflow)}`)
-    if (options.source_platform !== undefined)
+    }
+    if (options.source_platform !== undefined) {
       clauses.push(`r.source_platform=${add(options.source_platform)}`)
+    }
     // Missing LEFT JOINed axes are corruption and must remain visible to projection even when a
     // status filter is present.
     if (options.execution_status !== undefined) {
       const status = add(options.execution_status)
       clauses.push(`(e.status=${status} OR e.run_id IS NULL)`)
     }
-    if (options.publication_status !== undefined)
+    if (options.publication_status !== undefined) {
       clauses.push(`p.status=${add(options.publication_status)}`)
+    }
     if (options.preparation_status !== undefined) {
       const status = add(options.preparation_status)
       clauses.push(`(pr.status=${status} OR pr.run_id IS NULL)`)
     }
-    if (options.from !== undefined)
+    if (options.from !== undefined) {
       clauses.push(`r.created_at>=${add(options.from)}`)
-    if (options.to !== undefined)
+    }
+    if (options.to !== undefined) {
       clauses.push(`r.created_at<${add(options.to)}`)
+    }
     if (options.cursor !== undefined) {
       const cursor = decodeRunListCursor(options.cursor)
-      if (cursor === null) throw new Error('Invalid run list cursor.')
+      if (cursor === null) {
+        throw new Error('Invalid run list cursor.')
+      }
       clauses.push(
         `(r.created_at, r.run_id)<(${add(cursor.created_at_cursor)}, ${add(cursor.run_id)})`
       )
@@ -328,9 +328,7 @@ export class ReviewRunQueries {
   }
 
   async listParkedRuns(): Promise<ParkedRun[]> {
-    const result = await this.pool.query<
-      Omit<ParkedRun, 'parked_at'> & { parked_at: Date }
-    >(
+    const result = await this.pool.query<Omit<ParkedRun, 'parked_at'> & { parked_at: Date }>(
       `SELECT run_id, axis, reason, parked_at FROM (
          ${PARKED_AXES.map(parkedAxisSelect).join('\n         UNION ALL\n         ')}
        ) parked

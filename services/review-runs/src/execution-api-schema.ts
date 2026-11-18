@@ -213,8 +213,7 @@ export type GetRunStatusesResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetRunStatusesResponseBody =
-  GetRunStatusesResponseBodyByStatus['200']
+export type GetRunStatusesResponseBody = GetRunStatusesResponseBodyByStatus['200']
 
 export type GetRunPath = {
   /**
@@ -352,8 +351,7 @@ export interface RepositoryScanScope {
   paths_ignore: string[]
   incremental_changed_files: {
     path: string
-    status:
-      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+    status: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
     previous_path: string | null
   }[]
 }

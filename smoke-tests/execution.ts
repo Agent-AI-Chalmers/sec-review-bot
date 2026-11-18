@@ -18,14 +18,12 @@ function loadInput() {
   const bundle = process.env.SMOKE_INPUT_BUNDLE
   assert.ok(bundle, 'SMOKE_INPUT_BUNDLE is required')
   return {
-    ...(JSON.parse(
-      readFileSync('/smoke/issue-review-input.json', 'utf8')
-    ) as Input),
+    ...(JSON.parse(readFileSync('/smoke/issue-review-input.json', 'utf8')) as Input),
     input_bundle: JSON.parse(bundle) as Record<string, unknown>
   }
 }
 
-export async function submit() {
+export async function submit(): Promise<void> {
   const savedAdmission = process.env.SMOKE_ADMISSION
   assert.ok(savedAdmission, 'SMOKE_ADMISSION is required')
   const admission = JSON.parse(savedAdmission) as Admission
@@ -101,7 +99,7 @@ export async function submit() {
   console.log(runId)
 }
 
-export async function verifyReplay(runId: string) {
+export async function verifyReplay(runId: string): Promise<void> {
   // Read before replay so a restarted Gateway must recover the existing execution.
   const existing = (await (
     await request({
@@ -159,26 +157,20 @@ export async function verifyReplay(runId: string) {
     })
   ).json()) as Execution
   assert.equal(execution.status, 'running')
-  console.error(
-    'ok: Gateway accepted identical replay and rejected changed input'
-  )
+  console.error('ok: Gateway accepted identical replay and rejected changed input')
 }
 
 export function verifyExecutionIdentity(
   runId: string,
   beforeJson: string,
   afterJson: string
-) {
-  const before = (JSON.parse(beforeJson) as Description).workflowExecutionInfo
-    .execution
-  const after = (JSON.parse(afterJson) as Description).workflowExecutionInfo
-    .execution
+): void {
+  const before = (JSON.parse(beforeJson) as Description).workflowExecutionInfo.execution
+  const after = (JSON.parse(afterJson) as Description).workflowExecutionInfo.execution
   assert.equal(before.workflowId, runId)
   assert.equal(after.workflowId, runId)
   assert.equal(typeof before.runId, 'string')
   assert.ok(before.runId.length > 0)
   assert.equal(after.runId, before.runId)
-  console.error(
-    'ok: Replay and conflict preserved the original Temporal execution'
-  )
+  console.error('ok: Replay and conflict preserved the original Temporal execution')
 }

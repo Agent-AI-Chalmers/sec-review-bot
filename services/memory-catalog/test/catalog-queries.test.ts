@@ -2,10 +2,7 @@ import { expect, test } from 'vitest'
 
 import type { Pool } from 'pg'
 
-import {
-  InvalidCatalogCursorError,
-  PostgresMemoryCatalogQueries
-} from '../src/catalog-queries.js'
+import { InvalidCatalogCursorError, PostgresMemoryCatalogQueries } from '../src/catalog-queries.js'
 import { learningReport, reorganizationReport } from './maintenance-report.js'
 
 const artifact = {
@@ -125,12 +122,8 @@ test('extraction pagination uses a stable opaque exclusive cursor', async () => 
     hasObservation: true
   })
 
-  expect(parametersSeen).toStrictEqual([
-    [null, null, 'issue-review', null, true, 2]
-  ])
-  expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual([
-    'extraction-3'
-  ])
+  expect(parametersSeen).toStrictEqual([[null, null, 'issue-review', null, true, 2]])
+  expect(page.extractions.map((entry) => entry.extraction_id)).toStrictEqual(['extraction-3'])
   expect(typeof page.next_cursor).toBe('string')
   expect(page.next_cursor ?? '').toMatch(/^[A-Za-z0-9_-]+$/)
 })
@@ -192,7 +185,7 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
   let trendQuery: { sql: string; values: unknown[] | undefined } | undefined
   const pool = {
     query: (sql: string, values?: unknown[]) => {
-      if (sql.includes('completed_extraction_count'))
+      if (sql.includes('completed_extraction_count')) {
         return Promise.resolve({
           rows: [
             {
@@ -207,6 +200,7 @@ test('catalog overview projects completed extraction outcomes by distinct unit',
           ],
           rowCount: 1
         })
+      }
       if (sql.includes('generate_series')) {
         trendQuery = { sql, values }
         return Promise.resolve({
@@ -272,7 +266,7 @@ test('all-time catalog overview uses UTC month periods including an empty curren
   let trendQuery: { sql: string; values: unknown[] | undefined } | undefined
   const pool = {
     query: (sql: string, values?: unknown[]) => {
-      if (sql.includes('completed_extraction_count'))
+      if (sql.includes('completed_extraction_count')) {
         return Promise.resolve({
           rows: [
             {
@@ -287,6 +281,7 @@ test('all-time catalog overview uses UTC month periods including an empty curren
           ],
           rowCount: 1
         })
+      }
       if (sql.includes('generate_series')) {
         trendQuery = { sql, values }
         return Promise.resolve({

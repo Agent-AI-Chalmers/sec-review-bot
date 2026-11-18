@@ -21,13 +21,7 @@ import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error
 function publicationStepCodesFromContract(): string[] {
   const spec = parseYaml(
     readFileSync(
-      path.join(
-        REPOSITORY_ROOT,
-        'contracts',
-        'review-runs-api',
-        'v1',
-        'openapi.yaml'
-      ),
+      path.join(REPOSITORY_ROOT, 'contracts', 'review-runs-api', 'v1', 'openapi.yaml'),
       'utf8'
     )
   ) as {
@@ -37,8 +31,7 @@ function publicationStepCodesFromContract(): string[] {
       }
     }
   }
-  const values =
-    spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
+  const values = spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
   return values
     .filter((value): value is string => typeof value === 'string')
     .filter((value) => value.startsWith('PUBLICATION_STEP_'))
@@ -51,10 +44,7 @@ test('every Review Runs publication-step code is known and terminal when refused
 
   const known = new Set<string>(Object.values(EXECUTION_PUBLISH_ERROR_CODES))
   for (const code of codes) {
-    expect.assert(
-      known.has(code),
-      `${code} is missing from EXECUTION_PUBLISH_ERROR_CODES`
-    )
+    expect.assert(known.has(code), `${code} is missing from EXECUTION_PUBLISH_ERROR_CODES`)
     // Review Runs answers every one of these with a 409 (server.ts maps
     // `DeterministicReviewRunError` to 409), and a stored run re-enters the same condition on
     // every claim. A missing classification would resolve to `retry: true` and loop forever, so

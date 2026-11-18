@@ -4,11 +4,7 @@
 // through a node it does not touch, one line per state pair, a return edge never hides under its
 // forward twin) can be tested on the produced paths instead of on screenshots.
 import type { StateMachine } from '../state-machines.generated.js'
-import {
-  STATE_LAYOUT,
-  isReturnEdge,
-  selfLoopSide
-} from './state-machine-layout.js'
+import { STATE_LAYOUT, isReturnEdge, selfLoopSide } from './state-machine-layout.js'
 
 export const NODE_W = 118
 export const NODE_H = 32
@@ -58,7 +54,9 @@ function cellCenter(col: number, row: number): Point {
 function boundaryPoint(center: Point, toward: Point, gap: number): Point {
   const dx = toward.x - center.x
   const dy = toward.y - center.y
-  if (dx === 0 && dy === 0) return center
+  if (dx === 0 && dy === 0) {
+    return center
+  }
   const scale = Math.min(
     dx === 0 ? Infinity : (NODE_W / 2 + gap) / Math.abs(dx),
     dy === 0 ? Infinity : (NODE_H / 2 + gap) / Math.abs(dy)
@@ -81,24 +79,20 @@ function quadraticSamples(p0: Point, c: Point, p1: Point): Point[] {
   return points
 }
 
-function insideNode(point: Point, center: Point, margin: number): boolean {
+function insideNode(point: Point, center: Point, margin: number) {
   return (
     Math.abs(point.x - center.x) < NODE_W / 2 + margin &&
     Math.abs(point.y - center.y) < NODE_H / 2 + margin
   )
 }
 
-function round(value: number): number {
+function round(value: number) {
   return Math.round(value * 10) / 10
 }
 
 /** A curve between two different states. `bend` pushes the control point to the left of the
  * direction of travel, so an edge and its reverse bow to opposite sides and never overlap. */
-function curve(
-  from: Point,
-  to: Point,
-  bend: number
-): { d: string; samples: Point[] } {
+function curve(from: Point, to: Point, bend: number): { d: string; samples: Point[] } {
   const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
   const dx = to.x - from.x
   const dy = to.y - from.y
@@ -127,10 +121,7 @@ function curve(
 
 /** A small loop on one edge of a node, off-centre so it stays clear of edges meeting the node's
  * middle. */
-function selfLoop(
-  center: Point,
-  side: 'above' | 'below'
-): { d: string; samples: Point[] } {
+function selfLoop(center: Point, side: 'above' | 'below'): { d: string; samples: Point[] } {
   const direction = side === 'below' ? 1 : -1
   const anchorX = center.x + NODE_W / 2 - 26
   const y = center.y + (direction * NODE_H) / 2
@@ -157,8 +148,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const centers = new Map<string, Point>()
   for (const state of machine.states) {
     const cell = layout[state]
-    if (cell === undefined)
+    if (cell === undefined) {
       throw new Error(`${machine.axis}.${state} has no diagram cell`)
+    }
     centers.set(state, cellCenter(cell.col, cell.row))
   }
   const nodes = machine.states.map((state) => ({
@@ -174,7 +166,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
   const edges: DiagramEdge[] = []
   for (const [key, transitions] of groups) {
     const [first] = transitions
-    if (first === undefined) continue
+    if (first === undefined) {
+      continue
+    }
     const { from, to } = first
     const fromCenter = centers.get(from) as Point
     const toCenter = centers.get(to) as Point
@@ -189,13 +183,9 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
       continue
     }
     const kind = isReturnEdge(machine.axis, from, to) ? 'return' : 'forward'
-    const others = nodes.filter(
-      (node) => node.state !== from && node.state !== to
-    )
+    const others = nodes.filter((node) => node.state !== from && node.state !== to)
     const blocked = (samples: Point[]): boolean =>
-      samples.some((point) =>
-        others.some((node) => insideNode(point, node.center, NODE_MARGIN))
-      )
+      samples.some((point) => others.some((node) => insideNode(point, node.center, NODE_MARGIN)))
     // Straight when nothing is in the way and no reverse edge shares the chord; otherwise bend,
     // widening until the curve clears every other node.
     const twin = groups.has(`${to}->${from}`)
@@ -203,12 +193,15 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
     let chosen = curve(fromCenter, toCenter, start)
     if (blocked(chosen.samples)) {
       const candidates: number[] = []
-      for (let bend = Math.max(start, 24); bend <= 120; bend += 16)
+      for (let bend = Math.max(start, 24); bend <= 120; bend += 16) {
         candidates.push(bend, ...(twin ? [] : [-bend]))
+      }
       for (const bend of candidates) {
         const attempt = curve(fromCenter, toCenter, bend)
         chosen = attempt
-        if (!blocked(attempt.samples)) break
+        if (!blocked(attempt.samples)) {
+          break
+        }
       }
     }
     edges.push({ from, to, transitions, kind, ...chosen })
@@ -221,11 +214,12 @@ export function diagramGeometry(machine: StateMachine): DiagramGeometry {
     xs.push(node.center.x - NODE_W / 2, node.center.x + NODE_W / 2)
     ys.push(node.center.y - NODE_H / 2, node.center.y + NODE_H / 2)
   }
-  for (const edge of edges)
+  for (const edge of edges) {
     for (const point of edge.samples) {
       xs.push(point.x)
       ys.push(point.y)
     }
+  }
   const minX = Math.min(...xs) - PAD
   const minY = Math.min(...ys) - PAD
   return {

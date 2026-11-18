@@ -161,10 +161,7 @@ test('the total is derived from normalized tokens and a disagreeing source total
       reasoning_tokens: null
     })
     expect(warn).toHaveBeenCalledTimes(1)
-    const message = JSON.parse(String(warn.mock.calls[0]?.[0])) as Record<
-      string,
-      unknown
-    >
+    const message = JSON.parse(String(warn.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(message.event).toBe('execution_statistics_source_total_mismatch')
     expect(message.mismatched_calls).toBe(1)
   } finally {
@@ -202,9 +199,7 @@ test('task phases and feedback retries remain separate regardless of observation
     metadata: {
       sec_review_agent: agent,
       sec_review_agent_phase: phase,
-      ...(retry === null
-        ? {}
-        : { sec_review_feedback_retry_index: String(retry) }),
+      ...(retry === null ? {} : { sec_review_feedback_retry_index: String(retry) }),
       ls_provider: 'probe'
     },
     usageDetails: { input: 1, output: 1, total: 2 }
@@ -218,11 +213,7 @@ test('task phases and feedback retries remain separate regardless of observation
     expect(
       snapshot.groups
         .filter((group) => group.agentName === agent)
-        .map((group) => [
-          group.agentPhase,
-          group.feedbackRetryIndex,
-          group.modelCallCount
-        ])
+        .map((group) => [group.agentPhase, group.feedbackRetryIndex, group.modelCallCount])
     ).toStrictEqual([
       ['draft', null, 1],
       ['refinement', null, 1]
@@ -231,11 +222,7 @@ test('task phases and feedback retries remain separate regardless of observation
   expect(
     snapshot.groups
       .filter((group) => group.agentName === 'issue-mitigator')
-      .map((group) => [
-        group.agentPhase,
-        group.feedbackRetryIndex,
-        group.modelCallCount
-      ])
+      .map((group) => [group.agentPhase, group.feedbackRetryIndex, group.modelCallCount])
   ).toStrictEqual([
     ['initial', null, 1],
     ['feedback', 1, 1],

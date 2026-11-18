@@ -1,9 +1,7 @@
 import type { WorkflowName } from '../src/execution/execution-api-types-generated.js'
 import type { PublishContext } from '../src/review-runs/publish-context.js'
 
-export function publishContextForWorkflow(
-  workflow: WorkflowName
-): PublishContext {
+export function publishContextForWorkflow(workflow: WorkflowName): PublishContext {
   if (workflow === 'issue-review') {
     return {
       issue: {

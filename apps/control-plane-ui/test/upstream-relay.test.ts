@@ -14,15 +14,18 @@ import {
  * only part of the answer that differs.
  */
 test('upstream failure codes name the upstream that failed', () => {
-  expect(
-    upstreamFailure(new UpstreamRequestError('timeout'), 'review_runs')
-  ).toStrictEqual({ status: 504, error: 'review_runs_timeout' })
-  expect(
-    upstreamFailure(new UpstreamRequestError('timeout'), 'memory_catalog')
-  ).toStrictEqual({ status: 504, error: 'memory_catalog_timeout' })
-  expect(
-    upstreamFailure(new UpstreamRequestError('unavailable'), 'memory_catalog')
-  ).toStrictEqual({ status: 502, error: 'memory_catalog_unavailable' })
+  expect(upstreamFailure(new UpstreamRequestError('timeout'), 'review_runs')).toStrictEqual({
+    status: 504,
+    error: 'review_runs_timeout'
+  })
+  expect(upstreamFailure(new UpstreamRequestError('timeout'), 'memory_catalog')).toStrictEqual({
+    status: 504,
+    error: 'memory_catalog_timeout'
+  })
+  expect(upstreamFailure(new UpstreamRequestError('unavailable'), 'memory_catalog')).toStrictEqual({
+    status: 502,
+    error: 'memory_catalog_unavailable'
+  })
 })
 
 test('an oversized upstream body is not attributed to one upstream', () => {
@@ -89,11 +92,7 @@ test('a relayed response can be marked uncacheable', () => {
 
 test('a failure is sent as the console reads it', () => {
   const { response, written } = capture()
-  sendUpstreamFailure(
-    response,
-    'review_runs',
-    new UpstreamRequestError('timeout')
-  )
+  sendUpstreamFailure(response, 'review_runs', new UpstreamRequestError('timeout'))
   expect(written.status).toBe(504)
   expect(JSON.parse(written.body)).toStrictEqual({
     error: 'review_runs_timeout'

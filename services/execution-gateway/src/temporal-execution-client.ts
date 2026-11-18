@@ -8,18 +8,12 @@ import {
   WorkflowNotFoundError
 } from '@temporalio/client'
 
-import {
-  isExecutionError,
-  validateExecutionResult
-} from './execution-api-validation.js'
+import { isExecutionError, validateExecutionResult } from './execution-api-validation.js'
 import {
   executionWorkflowType,
   validateExecutionSubmission
 } from './execution-workflow-validation.js'
-import type {
-  ExecutionArtifactStorage,
-  ExecutionError
-} from './execution-api-types-generated.js'
+import type { ExecutionArtifactStorage, ExecutionError } from './execution-api-types-generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
@@ -41,7 +35,9 @@ function fingerprint(request: ExecutionWorkflowInput): string {
 }
 
 function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalValue)
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue)
+  }
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(
       Object.entries(value)
@@ -53,7 +49,9 @@ function canonicalValue(value: unknown): unknown {
 }
 
 function statusName(status: { name?: string } | string | undefined): string {
-  if (typeof status === 'string') return status
+  if (typeof status === 'string') {
+    return status
+  }
   return status?.name ?? 'UNKNOWN'
 }
 
@@ -75,8 +73,7 @@ export class TemporalExecutionClient {
     return new TemporalExecutionClient(
       connection,
       client,
-      process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() ||
-        'sec-review-execution'
+      process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() || 'sec-review-execution'
     )
   }
 
@@ -96,22 +93,15 @@ export class TemporalExecutionClient {
         }
       })
     } catch (error) {
-      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+        throw error
+      }
       const existing = await this.get(request.run_id)
-      const description = await this.client.workflow
-        .getHandle(request.run_id)
-        .describe()
-      if (
-        description.memo?.request_fingerprint === requestFingerprint &&
-        existing
-      ) {
+      const description = await this.client.workflow.getHandle(request.run_id).describe()
+      if (description.memo?.request_fingerprint === requestFingerprint && existing) {
         return existing
       }
-      throw new ExecutionRunConflictError(
-        request.run_id,
-        request.workflow,
-        existing?.workflow
-      )
+      throw new ExecutionRunConflictError(request.run_id, request.workflow, existing?.workflow)
     }
     return (
       (await this.get(request.run_id)) ?? {
@@ -128,14 +118,14 @@ export class TemporalExecutionClient {
     try {
       description = await handle.describe()
     } catch (error) {
-      if (error instanceof WorkflowNotFoundError) return undefined
+      if (error instanceof WorkflowNotFoundError) {
+        return undefined
+      }
       throw error
     }
     const temporalStatus = statusName(description.status)
     const workflow =
-      typeof description.memo?.workflow === 'string'
-        ? description.memo.workflow
-        : undefined
+      typeof description.memo?.workflow === 'string' ? description.memo.workflow : undefined
     if (temporalStatus === 'RUNNING') {
       return {
         run_id: runId,
@@ -151,10 +141,7 @@ export class TemporalExecutionClient {
           ...(workflow ? { workflow } : {}),
           status: 'failed',
           artifact_storage: { status: 'unavailable' },
-          error: executionError(
-            'EXECUTION_RESPONSE_INVALID',
-            'Invalid workflow response.'
-          )
+          error: executionError('EXECUTION_RESPONSE_INVALID', 'Invalid workflow response.')
         }
       }
       if (response.ok === true && 'result' in response) {
@@ -185,10 +172,7 @@ export class TemporalExecutionClient {
         }
         let artifact_storage: ArtifactStorageProjection
         try {
-          artifact_storage = parseExecutionArchiveArtifact(
-            response.artifact_storage,
-            runId
-          )
+          artifact_storage = parseExecutionArchiveArtifact(response.artifact_storage, runId)
         } catch (error) {
           return {
             run_id: runId,
@@ -197,8 +181,7 @@ export class TemporalExecutionClient {
             artifact_storage: {
               status: 'failed',
               error_code: 'ARTIFACT_REFERENCE_INVALID',
-              message:
-                'Execution returned an invalid execution archive artifact.'
+              message: 'Execution returned an invalid execution archive artifact.'
             },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
@@ -226,10 +209,7 @@ export class TemporalExecutionClient {
         artifact_storage: { status: 'unavailable' },
         error: isExecutionError(response.error)
           ? response.error
-          : executionError(
-              'EXECUTION_RESPONSE_INVALID',
-              'Invalid workflow response.'
-            )
+          : executionError('EXECUTION_RESPONSE_INVALID', 'Invalid workflow response.')
       }
     }
     return {
@@ -268,8 +248,9 @@ export function parseExecutionArchiveArtifact(
   value: unknown,
   runId: string
 ): ArtifactStorageProjection {
-  if (!isRecord(value) || value.status !== 'available')
+  if (!isRecord(value) || value.status !== 'available') {
     throw new Error('Execution response is missing artifact_storage.')
+  }
   const artifact = value.artifact
   if (
     !isRecord(artifact) ||
@@ -280,8 +261,9 @@ export function parseExecutionArchiveArtifact(
     !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
     !Number.isSafeInteger(artifact.size_bytes) ||
     (artifact.size_bytes as number) < 0
-  )
+  ) {
     throw new Error('Execution response has malformed artifact metadata.')
+  }
   const uri = new URL(artifact.uri)
   if (
     uri.protocol !== 's3:' ||
@@ -292,8 +274,9 @@ export function parseExecutionArchiveArtifact(
     uri.port !== '' ||
     uri.search !== '' ||
     uri.hash !== ''
-  )
+  ) {
     throw new Error('Execution response has an invalid execution archive URI.')
+  }
   return {
     status: 'available',
     artifact: {

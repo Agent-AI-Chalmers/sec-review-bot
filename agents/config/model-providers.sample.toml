@@ -75,7 +75,7 @@ api_base = "https://api.deepseek.com/anthropic"
 # Optional Anthropic-format reasoning controls. thinking_mode is sent as
 # thinking.type; anthropic_effort is sent as output_config.effort.
 thinking_mode = "enabled"
-thinking_budget_tokens = 12000  # required when thinking_mode is enabled
+thinking_budget_tokens = 12000 # required when thinking_mode is enabled
 anthropic_effort = "high"
 timeout_ms = 120000
 max_retries = 2

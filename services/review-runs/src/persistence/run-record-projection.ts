@@ -1,7 +1,4 @@
-import type {
-  ReviewRunWorkflow,
-  ExecutionArtifactStorage
-} from '../contracts.js'
+import type { ReviewRunWorkflow, ExecutionArtifactStorage } from '../contracts.js'
 import type { Pool, PoolClient } from 'pg'
 import {
   normalizeArtifactStorage,
@@ -45,12 +42,10 @@ export interface ReviewRunRow {
     input: JsonObject | null
     observed_at: string | null
     artifact_storage: ExecutionArtifactStorage | null
-    workflow_result: unknown | null
+    workflow_result: unknown
   }
   publication: AxisRowColumns<PublicationStatus>
-  preparation: AxisRowColumns<
-    'pending' | 'preparing' | 'submitted' | 'failed' | null
-  > & {
+  preparation: AxisRowColumns<'pending' | 'preparing' | 'submitted' | 'failed' | null> & {
     missing: boolean
     attempt_count: number | null
     disconnect_reason: string | null
@@ -141,7 +136,7 @@ export const RUN_SELECT = `
 /** Normalize a timestamp the SELECT produced. `json_build_object` serializes timestamptz as an
  * ISO string, so this only ever narrows the precision (microseconds to milliseconds) - it never
  * receives a `Date`. Values come from `clock_timestamp()`, so parsing is exact. */
-function iso(value: string): string {
+function iso(value: string) {
   return new Date(value).toISOString()
 }
 
@@ -228,10 +223,7 @@ export function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     failure_message: publicationFailure
       ? publication.failure_message
       : (execution.failure_message ?? preparation.failure_message),
-    artifact_storage: normalizeArtifactStorage(
-      execution.artifact_storage,
-      `run ${trunk.run_id}`
-    ),
+    artifact_storage: normalizeArtifactStorage(execution.artifact_storage, `run ${trunk.run_id}`),
     notices: row.notices,
     ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
     ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})

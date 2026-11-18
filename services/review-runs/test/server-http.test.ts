@@ -14,9 +14,9 @@ import Fastify from 'fastify'
 // Each import of a built artifact uses a computed specifier so `tsc` typechecks this file
 // without a prior build: a literal import is unresolvable when `dist/` is absent
 // (`TS2307`), but the URL form loads the same file at runtime and is not a static reference.
-const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
+const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = (await import(
   new URL('../dist/http/server-surface.js', import.meta.url).href
-)
+)) as typeof import('../src/http/server-surface.js')
 
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
@@ -189,9 +189,7 @@ test('an internal fault is logged with its identity but not returned to the call
   const app = await buildApp({
     queries: {
       getRun: async () => {
-        throw new Error(
-          'available artifact storage record is missing its artifact'
-        )
+        throw new Error('available artifact storage record is missing its artifact')
       }
     }
   })
@@ -244,11 +242,9 @@ test('a request body missing a required contract field is rejected before the ha
       }
     })
     expect(response.statusCode).toBe(400)
-    expect(handlerCalls, 'validation must reject before the handler runs').toBe(
-      0
-    )
+    expect(handlerCalls, 'validation must reject before the handler runs').toBe(0)
     expect(
-      (response.json() as { code?: string }).code,
+      response.json<{ code?: string }>().code,
       'a body that fails the contract is INVALID_BODY, not the query filter code'
     ).toBe('INVALID_BODY')
   } finally {
@@ -275,7 +271,7 @@ test('schema validation names which part of the request failed', async () => {
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
     expect(query.statusCode).toBe(400)
-    expect((query.json() as { code?: string }).code).toBe('INVALID_QUERY')
+    expect(query.json<{ code?: string }>().code).toBe('INVALID_QUERY')
 
     // The query is one `additionalProperties: false` object, so a parameter the contract
     // does not declare is rejected before the handler runs — not silently ignored, which is
@@ -286,11 +282,8 @@ test('schema validation names which part of the request failed', async () => {
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
     expect(unknown.statusCode).toBe(400)
-    expect((unknown.json() as { code?: string }).code).toBe('INVALID_QUERY')
-    expect(
-      listCalls,
-      'an undeclared query parameter must be rejected before the handler'
-    ).toBe(0)
+    expect(unknown.json<{ code?: string }>().code).toBe('INVALID_QUERY')
+    expect(listCalls, 'an undeclared query parameter must be rejected before the handler').toBe(0)
 
     const path = await app.inject({
       method: 'POST',
@@ -302,9 +295,7 @@ test('schema validation names which part of the request failed', async () => {
       payload: { preparation_token: 't', publish_context: {}, input: {} }
     })
     expect(path.statusCode).toBe(400)
-    expect((path.json() as { code?: string }).code).toBe(
-      'INVALID_PATH_PARAMETER'
-    )
+    expect(path.json<{ code?: string }>().code).toBe('INVALID_PATH_PARAMETER')
   } finally {
     await app.close()
   }
@@ -342,12 +333,7 @@ test('the completion route keeps the comment_url its branch requires', async () 
     })
     expect(delivered.statusCode).toBe(200)
     expect(completed).toStrictEqual([
-      [
-        'notice-http-1',
-        'notice-claim',
-        true,
-        'https://github.com/o/r/issues/1#issuecomment-9'
-      ]
+      ['notice-http-1', 'notice-claim', true, 'https://github.com/o/r/issues/1#issuecomment-9']
     ])
 
     // The other branch must reject a URL rather than silently dropping it.
@@ -364,10 +350,7 @@ test('the completion route keeps the comment_url its branch requires', async () 
         comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
       }
     })
-    expect(
-      notDelivered.statusCode,
-      'an undelivered notice must not carry a comment_url'
-    ).toBe(400)
+    expect(notDelivered.statusCode, 'an undelivered notice must not carry a comment_url').toBe(400)
   } finally {
     await app.close()
   }
@@ -514,11 +497,7 @@ test('a preparation input checkpoint is fenced by the HTTP route claim token', a
     expect(response.statusCode, response.body).toBe(200)
     expect(response.body).toBe('')
     expect(checkpoints).toStrictEqual([
-      [
-        '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-        'preparation-claim',
-        { resolved: true }
-      ]
+      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'preparation-claim', { resolved: true }]
     ])
   } finally {
     await app.close()
@@ -526,8 +505,9 @@ test('a preparation input checkpoint is fenced by the HTTP route claim token', a
 })
 
 test('a deterministic publication failure maps to 409 with its code', async () => {
-  const { DeterministicReviewRunError, PUBLICATION_STEP_ERROR_CODES } =
-    await import(new URL('../dist/errors.js', import.meta.url).href)
+  const { DeterministicReviewRunError, PUBLICATION_STEP_ERROR_CODES } = (await import(
+    new URL('../dist/errors.js', import.meta.url).href
+  )) as typeof import('../src/errors.js')
   const app = await buildApp({
     preparations: {
       renewClaim: async () => {
@@ -597,10 +577,7 @@ test('an undeclared body field is rejected, matching the contract', async () => 
       }
     })
     expect(response.statusCode).toBe(400)
-    expect(
-      handlerCalls,
-      'an undeclared field must be rejected before the handler'
-    ).toBe(0)
+    expect(handlerCalls, 'an undeclared field must be rejected before the handler').toBe(0)
   } finally {
     await app.close()
   }
@@ -640,10 +617,7 @@ test('remote_object.id is accepted only in its canonical string form', async () 
           remote_object: { id, url: 'https://example.test/1' }
         }
       })
-      expect(
-        response.statusCode,
-        `id ${JSON.stringify(id)} must validate`
-      ).toBe(200)
+      expect(response.statusCode, `id ${JSON.stringify(id)} must validate`).toBe(200)
       expect(received).toStrictEqual({ id, url: 'https://example.test/1' })
     }
   } finally {
@@ -675,19 +649,13 @@ test('a remote_object.id the contract does not declare is rejected', async () =>
         },
         payload: { token: 'token-1', remote_object: { id } }
       })
+      expect(response.statusCode, `id ${JSON.stringify(id)} must be rejected`).toBe(400)
       expect(
-        response.statusCode,
-        `id ${JSON.stringify(id)} must be rejected`
-      ).toBe(400)
-      expect(
-        (response.json() as { code?: string }).code,
+        response.json<{ code?: string }>().code,
         'a body that fails the contract is INVALID_BODY'
       ).toBe('INVALID_BODY')
     }
-    expect(
-      handlerCalls,
-      'an invalid id must be rejected before the handler'
-    ).toBe(0)
+    expect(handlerCalls, 'an invalid id must be rejected before the handler').toBe(0)
   } finally {
     await app.close()
   }
@@ -724,11 +692,8 @@ test('the query string is coerced to the declared types, and only there', async 
         url: `/v1/runs?limit=${bad}`,
         headers: { authorization: `Bearer ${READ_TOKEN}` }
       })
-      expect(
-        response.statusCode,
-        `limit=${JSON.stringify(bad)} must be rejected`
-      ).toBe(400)
-      expect((response.json() as { code?: string }).code).toBe('INVALID_QUERY')
+      expect(response.statusCode, `limit=${JSON.stringify(bad)} must be rejected`).toBe(400)
+      expect(response.json<{ code?: string }>().code).toBe('INVALID_QUERY')
     }
     expect(calls, 'a rejected query must not reach the handler').toBe(1)
   } finally {
@@ -759,7 +724,7 @@ test('run list filters reach the store as validated values with normalized dates
       from: '2026-10-01T08:00:00+08:00',
       to: '2026-10-02T08:00:00+08:00'
     }
-    for (const query of ['', `?${new URLSearchParams(filters)}`]) {
+    for (const query of ['', `?${new URLSearchParams(filters).toString()}`]) {
       const response = await app.inject({
         method: 'GET',
         url: `/v1/runs${query}`,
@@ -812,8 +777,7 @@ test('a request body over the size limit is a 413 with the declared envelope', a
   // here rather than left to a Fastify default.
   const app = await buildApp({
     admissions: {
-      admit: async () =>
-        expect.unreachable('the handler must not run for an oversized body')
+      admit: async () => expect.unreachable('the handler must not run for an oversized body')
     }
   })
   try {
@@ -887,10 +851,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
       started_at: null,
       finished_at: null,
       updated_at: '2026-01-01T00:00:00.000Z',
-      failure_code:
-        preparationStatus === 'failed'
-          ? 'PREPARATION_ABANDONED_BY_OPERATOR'
-          : null
+      failure_code: preparationStatus === 'failed' ? 'PREPARATION_ABANDONED_BY_OPERATOR' : null
     },
     execution: {
       status: 'succeeded',
@@ -936,10 +897,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
       },
       payload: body
     })
-    expect(
-      viaService.statusCode,
-      'the service token must not reach an operator decision'
-    ).toBe(401)
+    expect(viaService.statusCode, 'the service token must not reach an operator decision').toBe(401)
     const accepted = await configured.inject({
       method: 'POST',
       url: path,
@@ -950,10 +908,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
       payload: body
     })
     expect(accepted.statusCode).toBe(200)
-    expect(
-      (accepted.json() as { preparation: { status: string } }).preparation
-        .status
-    ).toBe('failed')
+    expect(accepted.json<{ preparation: { status: string } }>().preparation.status).toBe('failed')
 
     // Resuming is an operator decision too, and it goes through the same credential gate. It
     // posts no body, so the route must not require one.
@@ -988,10 +943,9 @@ test('the resume route answers 409 for a run that is not disconnected', async ()
       connectorId: 'github-integration:test',
       operatorDecisions: {
         resumeDisconnectedRun: async () => {
-          throw Object.assign(
-            new Error('Review run x has no disconnected axis to resume.'),
-            { statusCode: 409 }
-          )
+          throw Object.assign(new Error('Review run x has no disconnected axis to resume.'), {
+            statusCode: 409
+          })
         }
       }
     },

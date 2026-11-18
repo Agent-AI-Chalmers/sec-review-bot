@@ -12,8 +12,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { compile, type JSONSchema } from 'json-schema-to-typescript'
-import prettier from 'prettier'
+import { compile } from 'json-schema-to-typescript'
+import { formatGenerated } from '@sec-review-bot/contract-codegen'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
@@ -72,16 +72,12 @@ const WORKFLOW_INPUTS = [
 ] as const
 
 function readSchema(file: string): JsonSchema {
-  return JSON.parse(
-    readFileSync(path.join(SCHEMA_DIR, file), 'utf8')
-  ) as JsonSchema
+  return JSON.parse(readFileSync(path.join(SCHEMA_DIR, file), 'utf8')) as JsonSchema
 }
 
 function defsOf(document: JsonSchema): Record<string, JsonSchema> {
   const defs = document.$defs
-  return typeof defs === 'object' && defs !== null
-    ? (defs as Record<string, JsonSchema>)
-    : {}
+  return typeof defs === 'object' && defs !== null ? (defs as Record<string, JsonSchema>) : {}
 }
 
 /**
@@ -110,15 +106,20 @@ function commonDefName(ref: unknown, where: string): string {
  * compile-time projection intentionally keeps one stable transport shape for producers.
  */
 function projectSchema(value: unknown, common: JsonSchema): unknown {
-  if (Array.isArray(value))
+  if (Array.isArray(value)) {
     return value.map((item) => projectSchema(item, common))
-  if (typeof value !== 'object' || value === null) return value
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value
+  }
 
   const node = value as JsonSchema
   if (node.$ref !== undefined) {
     const defName = commonDefName(node.$ref, 'schema projection')
     const named = NAMED_COMMON_DEFS.get(defName)
-    if (named !== undefined) return { tsType: named }
+    if (named !== undefined) {
+      return { tsType: named }
+    }
     const target = defsOf(common)[defName]
     if (target === undefined) {
       throw new Error(`common.schema.json has no $defs.${defName}`)
@@ -150,7 +151,7 @@ async function compileDeclaration(
     throw new Error(`${name}: expected an object schema`)
   }
   return (
-    await compile({ ...projected, title: name } as JSONSchema, name, {
+    await compile({ ...projected, title: name }, name, {
       bannerComment: '',
       enableConstEnums: false,
       format: false,
@@ -185,7 +186,9 @@ function renderLimits(): string {
       node.forEach((item) => visit(item, path))
       return
     }
-    if (typeof node !== 'object' || node === null) return
+    if (typeof node !== 'object' || node === null) {
+      return
+    }
     const record = node as Record<string, unknown>
     for (const [key, value] of Object.entries(record)) {
       const next = [...path, key]
@@ -249,13 +252,13 @@ const STRUCTURAL_KEYS = new Set([
 ])
 
 function limitName(path: string[]): string | null {
-  if (
-    path.some((part) => part === 'allOf' || part === 'if' || part === 'then')
-  ) {
+  if (path.some((part) => part === 'allOf' || part === 'if' || part === 'then')) {
     return null
   }
   const parts = path.filter((part) => !STRUCTURAL_KEYS.has(part))
-  if (parts.length === 0) return null
+  if (parts.length === 0) {
+    return null
+  }
   return `MAX_${parts
     .join('_')
     .replace(/([a-z])([A-Z])/g, '$1_$2')
@@ -272,9 +275,7 @@ function renderWorkflowName(): string {
   const suffix = '-input.schema.json'
   const workflows = WORKFLOW_INPUTS.map(({ schema }) => {
     if (!schema.endsWith(suffix)) {
-      throw new Error(
-        `workflow input schema must end with ${suffix}: ${schema}`
-      )
+      throw new Error(`workflow input schema must end with ${suffix}: ${schema}`)
     }
     return schema.slice(0, -suffix.length)
   })
@@ -328,13 +329,7 @@ async function renderFile(): Promise<string> {
 }
 
 function gatewayVersionOutput(): string {
-  return path.join(
-    REPO_ROOT,
-    'services',
-    'execution-gateway',
-    'src',
-    'execution-api-version.ts'
-  )
+  return path.join(REPO_ROOT, 'services', 'execution-gateway', 'src', 'execution-api-version.ts')
 }
 
 function connectorVersionOutput(): string {
@@ -356,8 +351,7 @@ async function renderGatewayVersion(output: string): Promise<string> {
     `export const EXECUTION_API_VERSION = '${EXECUTION_API_VERSION}' as const`,
     ''
   ].join('\n')
-  const options = await prettier.resolveConfig(output)
-  return await prettier.format(rendered, { ...options, filepath: output })
+  return formatGenerated(output, rendered)
 }
 
 async function renderConnectorVersion(output: string): Promise<string> {
@@ -370,8 +364,7 @@ async function renderConnectorVersion(output: string): Promise<string> {
     'export type ExecutionApiVersion = typeof EXECUTION_API_VERSION',
     ''
   ].join('\n')
-  const options = await prettier.resolveConfig(output)
-  return await prettier.format(rendered, { ...options, filepath: output })
+  return formatGenerated(output, rendered)
 }
 
 function inputTypesOutput(): string {
@@ -393,11 +386,7 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     {
       output: apiTypesOutput,
       render: async () => {
-        const options = await prettier.resolveConfig(apiTypesOutput)
-        return await prettier.format(await renderFile(), {
-          ...options,
-          filepath: apiTypesOutput
-        })
+        return formatGenerated(apiTypesOutput, await renderFile())
       }
     },
     {

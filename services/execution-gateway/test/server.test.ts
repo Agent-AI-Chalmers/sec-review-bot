@@ -15,13 +15,11 @@ class FakeExecutionRunClient {
   startError: Error | undefined
 
   start(request: ExecutionWorkflowInput): Promise<ExecutionRecord> {
-    if (this.startError) return Promise.reject(this.startError)
+    if (this.startError) {
+      return Promise.reject(this.startError)
+    }
     if (this.conflict) {
-      throw new ExecutionRunConflictError(
-        request.run_id,
-        request.workflow,
-        'issue-review'
-      )
+      throw new ExecutionRunConflictError(request.run_id, request.workflow, 'issue-review')
     }
     const record: ExecutionRecord = {
       run_id: request.run_id,
@@ -40,14 +38,7 @@ class FakeExecutionRunClient {
 function fixture(name: string): Record<string, unknown> {
   return JSON.parse(
     readFileSync(
-      path.resolve(
-        '../..',
-        'contracts',
-        'execution-api',
-        'v1',
-        'fixtures',
-        name
-      ),
+      path.resolve('../..', 'contracts', 'execution-api', 'v1', 'fixtures', name),
       'utf8'
     )
   ) as Record<string, unknown>
@@ -70,9 +61,7 @@ test('invalid workflow timeout fails while creating the app', async (t) => {
     delete process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS
   })
 
-  await expect(
-    createApp({ client: new FakeExecutionRunClient() })
-  ).rejects.toThrow(
+  await expect(createApp({ client: new FakeExecutionRunClient() })).rejects.toThrow(
     /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/
   )
 })
@@ -147,8 +136,7 @@ test('requires the configured bearer token', async () => {
     error: {
       category: 'runtime',
       code: 'UNAUTHORIZED',
-      message:
-        'None of the security schemes (HTTPBearer) successfully authenticated this request.',
+      message: 'None of the security schemes (HTTPBearer) successfully authenticated this request.',
       retryable: false,
       details: {}
     }

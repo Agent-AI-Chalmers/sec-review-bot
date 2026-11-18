@@ -13,9 +13,7 @@ test('a key logs once per window and again after it elapses', () => {
   expect(allow('repo'), 'first sighting logs').toBe(true)
   expect(allow('repo'), 'within the window is suppressed').toBe(false)
   clock -= 50
-  expect(allow('repo'), 'a backwards clock must not reopen the gate').toBe(
-    false
-  )
+  expect(allow('repo'), 'a backwards clock must not reopen the gate').toBe(false)
   clock = 1_099
   expect(allow('repo'), 'still inside the window').toBe(false)
   clock = 1_100
@@ -43,9 +41,7 @@ test('the number of distinct keys is capped, so invented keys cannot grow the ta
   expect(allow('a')).toBe(true)
   expect(allow('b')).toBe(true)
   expect(allow('c'), 'a key beyond the cap is refused').toBe(false)
-  expect(allow('a'), 'existing keys are still governed by the interval').toBe(
-    false
-  )
+  expect(allow('a'), 'existing keys are still governed by the interval').toBe(false)
 })
 
 test('an elapsed interval frees a key but not the cap', () => {
@@ -62,10 +58,6 @@ test('an elapsed interval frees a key but not the cap', () => {
 })
 
 test('invalid configuration is rejected up front', () => {
-  expect(() => createLogThrottle({ minIntervalMs: -1, maxKeys: 1 })).toThrow(
-    /minIntervalMs/
-  )
-  expect(() => createLogThrottle({ minIntervalMs: 0, maxKeys: 0 })).toThrow(
-    /maxKeys/
-  )
+  expect(() => createLogThrottle({ minIntervalMs: -1, maxKeys: 1 })).toThrow(/minIntervalMs/)
+  expect(() => createLogThrottle({ minIntervalMs: 0, maxKeys: 0 })).toThrow(/maxKeys/)
 })

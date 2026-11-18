@@ -8,11 +8,7 @@ import type { Database } from '../database/database.js'
 import { transaction } from '../database/transaction.js'
 import type { PublicationStatus, PublicationWork } from '../shapes.js'
 import { appendEvent } from './review-run-events.js'
-import {
-  RUN_SELECT,
-  rowToRecord,
-  type ReviewRunRow
-} from './run-record-projection.js'
+import { RUN_SELECT, rowToRecord, type ReviewRunRow } from './run-record-projection.js'
 
 const CLAIM_WAIT_INTERVAL_MS = 250
 
@@ -40,7 +36,9 @@ export class PublicationClaimStore {
         [runId, this.connectorId]
       )
       const prior = previous.rows[0]
-      if (prior === undefined) return null
+      if (prior === undefined) {
+        return null
+      }
       const result = await client.query<{
         claim_token: string
         to_status: PublicationStatus
@@ -70,28 +68,24 @@ export class PublicationClaimStore {
         [runId, token, this.connectorId, this.claimTimeoutMs]
       )
       const claimed = result.rows[0]
-      if (claimed === undefined) return null
-      await this.appendClaimEvent(
-        client,
-        runId,
-        prior.status,
-        claimed.to_status
-      )
+      if (claimed === undefined) {
+        return null
+      }
+      await this.appendClaimEvent(client, runId, prior.status, claimed.to_status)
       return claimed.claim_token
     })
   }
 
   /** Claim the next publishable run, optionally polling until the bounded wait elapses. */
   async claimNext(waitMs = 0): Promise<PublicationWork | null> {
-    const boundedWaitMs =
-      Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
+    const boundedWaitMs = Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
     const deadline = Date.now() + boundedWaitMs
     for (;;) {
       const work = await this.claimNextOnce()
-      if (work !== null || Date.now() >= deadline) return work
-      await new Promise((resolve) =>
-        setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS)
-      )
+      if (work !== null || Date.now() >= deadline) {
+        return work
+      }
+      await new Promise((resolve) => setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS))
     }
   }
 
@@ -118,7 +112,9 @@ export class PublicationClaimStore {
         [this.connectorId, this.claimTimeoutMs]
       )
       const candidateRow = candidate.rows[0]
-      if (candidateRow === undefined) return null
+      if (candidateRow === undefined) {
+        return null
+      }
       const runId = candidateRow.run_id
       const token = crypto.randomUUID()
       // Restate every claimability condition in the UPDATE. The SELECT lock serializes current
@@ -148,33 +144,22 @@ export class PublicationClaimStore {
                AND p.claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
            )
          RETURNING p.status AS to_status`,
-        [
-          runId,
-          this.connectorId,
-          token,
-          candidateRow.status,
-          this.claimTimeoutMs
-        ]
+        [runId, this.connectorId, token, candidateRow.status, this.claimTimeoutMs]
       )
       const updated = claimed.rows[0]
-      if (updated === undefined)
-        throw new Error(
-          `Publication work changed while being claimed: ${runId}`
-        )
-      await this.appendClaimEvent(
-        client,
-        runId,
-        candidateRow.status,
-        updated.to_status
-      )
+      if (updated === undefined) {
+        throw new Error(`Publication work changed while being claimed: ${runId}`)
+      }
+      await this.appendClaimEvent(client, runId, candidateRow.status, updated.to_status)
       const result = await client.query<ReviewRunRow>(
         `${RUN_SELECT}
          WHERE r.run_id=$1 AND r.connector_id=$2`,
         [runId, this.connectorId]
       )
       const row = result.rows[0]
-      if (row === undefined || row.execution.workflow_result === null)
+      if (row === undefined || row.execution.workflow_result === null) {
         throw new Error(`Claimed publication work is incomplete: ${runId}`)
+      }
       return {
         ...rowToRecord(row),
         workflow_result: row.execution.workflow_result,

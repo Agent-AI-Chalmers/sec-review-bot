@@ -6,9 +6,7 @@ import { api, apiPost } from '../../browser/shared/api-client.js'
 import { renderComponent } from './render.js'
 
 vi.mock('../../browser/shared/api-client.js', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../browser/shared/api-client.js')
-  >()),
+  ...(await importOriginal<typeof import('../../browser/shared/api-client.js')>()),
   api: vi.fn(),
   apiPost: vi.fn()
 }))
@@ -32,9 +30,7 @@ vi.mock('../../browser/features/workspace/FileWorkspace.js', () => ({
     <textarea
       aria-label="Memory content"
       value={files['MEMORY.md']}
-      onChange={(event) =>
-        onFilesChange({ 'MEMORY.md': event.currentTarget.value })
-      }
+      onChange={(event) => onFilesChange({ 'MEMORY.md': event.currentTarget.value })}
     />
   )
 }))
@@ -56,8 +52,9 @@ test.each([
         treeReads++
         return { version: currentVersion }
       }
-      if (path === '/memory/tree/automation')
+      if (path === '/memory/tree/automation') {
         return { state: 'paused', version: 1 }
+      }
       if (path.endsWith('/content')) {
         const version = currentVersion
         if (delayedLoad && version === baseVersion) {
@@ -100,28 +97,28 @@ test.each([
     await waitFor(() => expect(treeReads).toBeGreaterThan(readsBefore))
     const commit = screen.getByRole('button', { name: 'Commit version' })
     fireEvent.click(commit)
-    await within(
-      screen.getByRole('dialog', { name: 'Edit memory files' })
-    ).findByText('The edit could not be committed.')
+    await within(screen.getByRole('dialog', { name: 'Edit memory files' })).findByText(
+      'The edit could not be committed.'
+    )
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'First edit' }
     })
-    const first = vi.mocked(apiPost).mock.calls[0]![1]
+    const first = vi.mocked(apiPost).mock.calls[0][1]
     fireEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2))
-    expect(vi.mocked(apiPost).mock.calls[1]![1]).toEqual(first)
+    expect(vi.mocked(apiPost).mock.calls[1][1]).toEqual(first)
     await waitFor(() => expect(commit).toBeEnabled())
     fireEvent.change(content, { target: { value: 'Changed edit' } })
     fireEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(3))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'Changed edit' }
     })
-    expect(vi.mocked(apiPost).mock.calls[2]![1]).not.toEqual(
+    expect(vi.mocked(apiPost).mock.calls[2][1]).not.toEqual(
       expect.objectContaining({
         operation_id: (first as { operation_id: string }).operation_id
       })
@@ -131,13 +128,9 @@ test.each([
     const discard = await screen.findByRole('dialog', {
       name: 'Discard memory changes?'
     })
-    fireEvent.click(
-      within(discard).getByRole('button', { name: 'Discard changes' })
-    )
+    fireEvent.click(within(discard).getByRole('button', { name: 'Discard changes' }))
     await waitFor(() =>
-      expect(
-        screen.queryByRole('textbox', { name: 'Memory content' })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Memory content' })).not.toBeInTheDocument()
     )
     fireEvent.click(edit)
     const reopened = await screen.findByRole('textbox', {
@@ -148,11 +141,11 @@ test.each([
     fireEvent.click(screen.getByRole('button', { name: 'Commit version' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(4))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: 3,
       files: { 'MEMORY.md': 'First edit' }
     })
-    expect(vi.mocked(apiPost).mock.calls[3]![1]).not.toEqual(
+    expect(vi.mocked(apiPost).mock.calls[3][1]).not.toEqual(
       expect.objectContaining({
         operation_id: (first as { operation_id: string }).operation_id
       })

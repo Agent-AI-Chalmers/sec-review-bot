@@ -29,7 +29,9 @@ export interface BuiltMemoryTreeArtifact {
 }
 
 function validateContentPath(name: string): void {
-  if (name === 'MEMORY.md') return
+  if (name === 'MEMORY.md') {
+    return
+  }
   if (
     !name.startsWith('topics/') ||
     !name.endsWith('.md') ||
@@ -41,8 +43,9 @@ function validateContentPath(name: string): void {
 }
 
 function validateTextFile(name: string, value: Buffer): void {
-  if (value.length > MAX_MEMORY_TREE_FILE_BYTES)
+  if (value.length > MAX_MEMORY_TREE_FILE_BYTES) {
     throw new Error(`Memory tree file exceeds the size limit: ${name}`)
+  }
   try {
     utf8.decode(value)
   } catch {
@@ -50,43 +53,31 @@ function validateTextFile(name: string, value: Buffer): void {
   }
 }
 
-function writeTarString(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: string
-): void {
+function writeTarString(target: Buffer, offset: number, length: number, value: string): void {
   const bytes = Buffer.from(value, 'utf8')
-  if (bytes.length > length)
+  if (bytes.length > length) {
     throw new Error(`Memory tree tar field is too long: ${value}`)
+  }
   bytes.copy(target, offset)
 }
 
-function writeTarOctal(
-  target: Buffer,
-  offset: number,
-  length: number,
-  value: number
-): void {
-  writeTarString(
-    target,
-    offset,
-    length,
-    `${value.toString(8).padStart(length - 1, '0')}\0`
-  )
+function writeTarOctal(target: Buffer, offset: number, length: number, value: number): void {
+  writeTarString(target, offset, length, `${value.toString(8).padStart(length - 1, '0')}\0`)
 }
 
 function splitUstarPath(name: string): { name: string; prefix: string } {
-  if (Buffer.byteLength(name, 'utf8') <= 100) return { name, prefix: '' }
+  if (Buffer.byteLength(name, 'utf8') <= 100) {
+    return { name, prefix: '' }
+  }
   for (let index = name.length - 2; index > 0; index -= 1) {
-    if (name[index] !== '/') continue
+    if (name[index] !== '/') {
+      continue
+    }
     const prefix = name.slice(0, index)
     const suffix = name.slice(index + 1)
-    if (
-      Buffer.byteLength(prefix, 'utf8') <= 155 &&
-      Buffer.byteLength(suffix, 'utf8') <= 100
-    )
+    if (Buffer.byteLength(prefix, 'utf8') <= 155 && Buffer.byteLength(suffix, 'utf8') <= 100) {
       return { name: suffix, prefix }
+    }
   }
   throw new Error(`Memory tree path does not fit POSIX ustar fields: ${name}`)
 }
@@ -96,7 +87,9 @@ function paxRecord(key: string, value: string): Buffer {
   let length = Buffer.byteLength(payload, 'utf8') + 3
   for (;;) {
     const record = Buffer.from(`${length} ${payload}`, 'utf8')
-    if (record.length === length) return record
+    if (record.length === length) {
+      return record
+    }
     length = record.length
   }
 }
@@ -108,8 +101,7 @@ function rawUstarEntry(
 ): Buffer[] {
   const header = Buffer.alloc(512)
   const split = splitUstarPath(name)
-  const directory =
-    type === 'directory' || (type === undefined && body === undefined)
+  const directory = type === 'directory' || (type === undefined && body === undefined)
   writeTarString(header, 0, 100, split.name)
   writeTarOctal(header, 100, 8, directory ? 0o755 : 0o644)
   writeTarOctal(header, 108, 8, 0)
@@ -123,7 +115,9 @@ function rawUstarEntry(
   writeTarString(header, 345, 155, split.prefix)
   const checksum = header.reduce((total, byte) => total + byte, 0)
   writeTarString(header, 148, 8, `${checksum.toString(8).padStart(6, '0')}\0 `)
-  if (body === undefined) return [header]
+  if (body === undefined) {
+    return [header]
+  }
   const padding = (512 - (body.length % 512)) % 512
   return padding === 0 ? [header, body] : [header, body, Buffer.alloc(padding)]
 }
@@ -132,13 +126,10 @@ function paxEntry(name: string, body: Buffer | undefined): Buffer[] {
   try {
     return rawUstarEntry(name, body)
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('ustar fields'))
+    if (!(error instanceof Error) || !error.message.includes('ustar fields')) {
       throw error
-    const marker = crypto
-      .createHash('sha256')
-      .update(name)
-      .digest('hex')
-      .slice(0, 24)
+    }
+    const marker = crypto.createHash('sha256').update(name).digest('hex').slice(0, 24)
     return [
       ...rawUstarEntry(`PaxHeaders/${marker}`, paxRecord('path', name), 'pax'),
       ...rawUstarEntry(`PaxPath/${marker}`, body)
@@ -148,26 +139,27 @@ function paxEntry(name: string, body: Buffer | undefined): Buffer[] {
 
 async function collect(stream: AsyncIterable<Uint8Array>): Promise<Buffer> {
   const chunks: Buffer[] = []
-  for await (const chunk of stream) chunks.push(Buffer.from(chunk))
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk))
+  }
   return Buffer.concat(chunks)
 }
 
 export function memoryTreeObjectKey(digest: string): string {
-  if (!/^sha256:[0-9a-f]{64}$/.test(digest))
+  if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
     throw new Error('Memory tree key requires a lowercase SHA-256 digest.')
+  }
   return `memory/trees/${digest.slice('sha256:'.length)}/${MEMORY_TREE_FILENAME}`
 }
 
 export async function buildMemoryTreeArtifact(
   content: ReadonlyMap<string, Buffer | string>
 ): Promise<BuiltMemoryTreeArtifact> {
-  if (!content.has('MEMORY.md'))
+  if (!content.has('MEMORY.md')) {
     throw new Error('Memory tree requires MEMORY.md.')
+  }
   const files = [...content.entries()]
-    .map(
-      ([name, value]) =>
-        [name, Buffer.isBuffer(value) ? value : Buffer.from(value)] as const
-    )
+    .map(([name, value]) => [name, Buffer.isBuffer(value) ? value : Buffer.from(value)] as const)
     .sort(([left], [right]) => compareArchivePaths(left, right))
   let extractedBytes = MANIFEST.length
   for (const [name, value] of files) {
@@ -175,8 +167,9 @@ export async function buildMemoryTreeArtifact(
     validateTextFile(name, value)
     extractedBytes += value.length
   }
-  if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES)
+  if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES) {
     throw new Error('Memory tree exceeds the extracted size limit.')
+  }
   const directories = new Set<string>(['memory/topics/'])
   for (const [name] of files) {
     const parts = name.split('/').slice(0, -1)
@@ -194,21 +187,18 @@ export async function buildMemoryTreeArtifact(
       value
     }))
   ].sort((left, right) => compareArchivePaths(left.name, right.name))
-  if (orderedEntries.length + 2 > MAX_MEMORY_TREE_ENTRIES)
+  if (orderedEntries.length + 2 > MAX_MEMORY_TREE_ENTRIES) {
     throw new Error('Memory tree exceeds the entry count limit.')
-  const tarParts = [
-    ...paxEntry('manifest.json', MANIFEST),
-    ...paxEntry('memory/', undefined)
-  ]
+  }
+  const tarParts = [...paxEntry('manifest.json', MANIFEST), ...paxEntry('memory/', undefined)]
   for (const item of orderedEntries) {
-    tarParts.push(
-      ...paxEntry(item.name, item.directory ? undefined : item.value)
-    )
+    tarParts.push(...paxEntry(item.name, item.directory ? undefined : item.value))
   }
   tarParts.push(Buffer.alloc(1024))
   const bytes = zstdCompressSync(Buffer.concat(tarParts))
-  if (bytes.length > MAX_MEMORY_TREE_ARTIFACT_BYTES)
+  if (bytes.length > MAX_MEMORY_TREE_ARTIFACT_BYTES) {
     throw new Error('Memory tree archive exceeds the size limit.')
+  }
   const digest = `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`
   return {
     bytes,
@@ -219,11 +209,10 @@ export async function buildMemoryTreeArtifact(
   }
 }
 
-export async function readMemoryTreeArtifact(
-  bytes: Buffer
-): Promise<Map<string, Buffer>> {
-  if (bytes.length > MAX_MEMORY_TREE_ARTIFACT_BYTES)
+export async function readMemoryTreeArtifact(bytes: Buffer): Promise<Map<string, Buffer>> {
+  if (bytes.length > MAX_MEMORY_TREE_ARTIFACT_BYTES) {
     throw new Error('Memory tree archive exceeds the size limit.')
+  }
   const tarBytes = decompressRestrictedPaxArchive(
     bytes,
     MAX_MEMORY_TREE_EXTRACTED_BYTES + MAX_MEMORY_TREE_ENTRIES * 2048
@@ -242,20 +231,20 @@ export async function readMemoryTreeArtifact(
     extract.on('entry', (header, stream, next) => {
       void (async (): Promise<void> => {
         count += 1
-        if (count > MAX_MEMORY_TREE_ENTRIES)
+        if (count > MAX_MEMORY_TREE_ENTRIES) {
           throw new Error('Memory tree exceeds the entry count limit.')
+        }
         const name = header.name
-        if (seenPaths.has(name))
+        if (seenPaths.has(name)) {
           throw new Error(`Memory tree contains a duplicate entry: ${name}`)
+        }
         seenPaths.add(name)
-        if (count === 1 && name !== 'manifest.json')
+        if (count === 1 && name !== 'manifest.json') {
           throw new Error('Memory tree manifest must be the first entry.')
-        if (
-          previousName &&
-          name !== 'memory/' &&
-          compareArchivePaths(name, previousName) <= 0
-        )
+        }
+        if (previousName && name !== 'memory/' && compareArchivePaths(name, previousName) <= 0) {
           throw new Error('Memory tree entries are not in canonical order.')
+        }
         previousName = name
         if (
           header.mtime?.getTime() !== 0 ||
@@ -263,39 +252,40 @@ export async function readMemoryTreeArtifact(
           header.gid !== 0 ||
           (header.uname ?? '') !== '' ||
           (header.gname ?? '') !== ''
-        )
-          throw new Error(
-            `Memory tree entry metadata is not canonical: ${name}`
-          )
+        ) {
+          throw new Error(`Memory tree entry metadata is not canonical: ${name}`)
+        }
 
-        const body = await collect(
-          stream as unknown as AsyncIterable<Uint8Array>
-        )
+        const body = await collect(stream as unknown as AsyncIterable<Uint8Array>)
         extractedBytes += body.length
-        if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES)
+        if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES) {
           throw new Error('Memory tree exceeds the extracted size limit.')
+        }
         if (name === 'manifest.json') {
-          if (
-            header.type !== 'file' ||
-            header.mode !== 0o644 ||
-            !body.equals(MANIFEST)
-          )
+          if (header.type !== 'file' || header.mode !== 0o644 || !body.equals(MANIFEST)) {
             throw new Error('Memory tree manifest is invalid.')
+          }
           sawManifest = true
         } else if (
           name === 'memory/' ||
           name === 'memory/topics/' ||
           (name.startsWith('memory/topics/') && name.endsWith('/'))
         ) {
-          if (header.type !== 'directory' || header.mode !== 0o755)
+          if (header.type !== 'directory' || header.mode !== 0o755) {
             throw new Error(`Memory tree directory is invalid: ${name}`)
-          if (name === 'memory/') sawMemoryDirectory = true
-          if (name === 'memory/topics/') sawTopicsDirectory = true
+          }
+          if (name === 'memory/') {
+            sawMemoryDirectory = true
+          }
+          if (name === 'memory/topics/') {
+            sawTopicsDirectory = true
+          }
         } else if (name.startsWith('memory/')) {
           const relative = name.slice('memory/'.length)
           validateContentPath(relative)
-          if (header.type !== 'file' || header.mode !== 0o644)
+          if (header.type !== 'file' || header.mode !== 0o644) {
             throw new Error(`Memory tree file is invalid: ${name}`)
+          }
           validateTextFile(relative, body)
           result.set(relative, body)
         } else {
@@ -309,12 +299,8 @@ export async function readMemoryTreeArtifact(
   })
   extract.end(tarBytes)
   await completed
-  if (
-    !sawManifest ||
-    !sawMemoryDirectory ||
-    !sawTopicsDirectory ||
-    !result.has('MEMORY.md')
-  )
+  if (!sawManifest || !sawMemoryDirectory || !sawTopicsDirectory || !result.has('MEMORY.md')) {
     throw new Error('Memory tree required entries are missing.')
+  }
   return result
 }

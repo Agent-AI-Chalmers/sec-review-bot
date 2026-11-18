@@ -13,10 +13,7 @@ import type {
   ReviewRunRecord,
   RunNoticeWork
 } from './review-runs-api.js'
-import {
-  parsePublishContextForWorkflow,
-  type PublishContext
-} from './publish-context.js'
+import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 import { integerEnv } from '../utils/env.js'
 
 export type {
@@ -44,8 +41,9 @@ type PathOf<Id extends OperationId> = (typeof operationRoutes)[Id]['path']
 type MethodOf<Id extends OperationId> = (typeof operationRoutes)[Id]['method']
 
 /** The `{param}` names a path template declares, as a union. */
-type PathParam<T extends string> =
-  T extends `${string}{${infer P}}${infer Rest}` ? P | PathParam<Rest> : never
+type PathParam<T extends string> = T extends `${string}{${infer P}}${infer Rest}`
+  ? P | PathParam<Rest>
+  : never
 
 /** Build a request URL from an operation's *own* contract path. The operation is the only
  * routing input: the path is looked up in the generated map rather than passed in, so a call
@@ -58,20 +56,17 @@ function contractPath<Id extends OperationId>(
   const template = operationRoutes[operation].path
   return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = (params as Record<string, string | undefined>)[name]
-    if (value === undefined)
+    if (value === undefined) {
       throw new Error(`Missing path parameter ${name} for ${operation}`)
+    }
     return encodeURIComponent(value)
   })
 }
 
 /** The HTTP method the contract serves an operation with, uppercased for `fetch`, from the
  * same generated map — so the method cannot drift from the operation either. */
-function contractMethod<Id extends OperationId>(
-  operation: Id
-): Uppercase<MethodOf<Id> & string> {
-  return operationRoutes[operation].method.toUpperCase() as Uppercase<
-    MethodOf<Id> & string
-  >
+function contractMethod<Id extends OperationId>(operation: Id): Uppercase<MethodOf<Id> & string> {
+  return operationRoutes[operation].method.toUpperCase() as Uppercase<MethodOf<Id> & string>
 }
 
 export class ReviewRunsSubmissionError extends Error {
@@ -86,13 +81,17 @@ export class ReviewRunsSubmissionError extends Error {
 
 function serviceUrl(): string {
   const value = process.env.REVIEW_RUNS_SERVICE_URL?.trim()
-  if (!value) throw new Error('REVIEW_RUNS_SERVICE_URL is required.')
+  if (!value) {
+    throw new Error('REVIEW_RUNS_SERVICE_URL is required.')
+  }
   return value.replace(/\/+$/, '')
 }
 
 function serviceToken(): string {
   const value = process.env.REVIEW_RUNS_SERVICE_TOKEN?.trim()
-  if (!value) throw new Error('REVIEW_RUNS_SERVICE_TOKEN is required.')
+  if (!value) {
+    throw new Error('REVIEW_RUNS_SERVICE_TOKEN is required.')
+  }
   return value
 }
 
@@ -121,15 +120,25 @@ async function readBoundedResponseText(response: Response): Promise<string> {
     await response.body?.cancel()
     throw new ReviewRunsResponseTooLargeError()
   }
-  if (response.body === null) return ''
+  if (response.body === null) {
+    return ''
+  }
 
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
   let size = 0
   try {
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const { done, value } = (await reader.read()) as {
+        done: boolean
+        value?: unknown
+      }
+      if (done) {
+        break
+      }
+      if (!(value instanceof Uint8Array)) {
+        throw new TypeError('Expected response body bytes')
+      }
       size += value.byteLength
       if (size > MAX_REVIEW_RUNS_RESPONSE_BYTES) {
         await reader.cancel()
@@ -153,15 +162,12 @@ async function readBoundedResponseText(response: Response): Promise<string> {
 function parseHttpErrorBody(text: string): HttpErrorBody {
   try {
     const parsed: unknown = JSON.parse(text)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       return {}
+    }
     return {
-      ...('error' in parsed && typeof parsed.error === 'string'
-        ? { error: parsed.error }
-        : {}),
-      ...('code' in parsed && typeof parsed.code === 'string'
-        ? { code: parsed.code }
-        : {})
+      ...('error' in parsed && typeof parsed.error === 'string' ? { error: parsed.error } : {}),
+      ...('code' in parsed && typeof parsed.code === 'string' ? { code: parsed.code } : {})
     }
   } catch {
     return {}
@@ -173,16 +179,15 @@ type Operation<Id extends OperationId> = OperationOptionsById[Id]
 /** The JSON request body the contract declares for an operation. A `POST` must pass exactly
  * this, so a field renamed in `openapi.yaml` fails the client's typecheck instead of being
  * accepted here and silently stripped or ignored by the service. */
-type RequestBody<Id extends OperationId> =
-  Operation<Id> extends { body: infer Body } ? Body : never
+type RequestBody<Id extends OperationId> = Operation<Id> extends { body: infer Body } ? Body : never
 
 /** The success body the contract declares for an operation, keyed by status code. */
-type SuccessBody<Id extends OperationId> =
-  unknown extends OperationResponseById[Id] ? void : OperationResponseById[Id]
+type SuccessBody<Id extends OperationId> = unknown extends OperationResponseById[Id]
+  ? void
+  : OperationResponseById[Id]
 
 class HttpReviewRunsClient {
-  readonly connectorId =
-    process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
+  readonly connectorId = process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
 
   // One HTTP request with auth, timeout, and error/status handling. `nullOn404` maps a 404
   // to `null` for reads that distinguish "absent" from "error".
@@ -224,12 +229,13 @@ class HttpReviewRunsClient {
       try {
         text = await readBoundedResponseText(response)
       } catch (error) {
-        if (!(error instanceof ReviewRunsResponseTooLargeError) || response.ok)
+        if (!(error instanceof ReviewRunsResponseTooLargeError) || response.ok) {
           throw error
-        throw Object.assign(
-          new Error(`Review Runs returned HTTP ${response.status}.`),
-          { code: null, status: response.status }
-        )
+        }
+        throw Object.assign(new Error(`Review Runs returned HTTP ${response.status}.`), {
+          code: null,
+          status: response.status
+        })
       }
       if (!response.ok) {
         const parsed = parseHttpErrorBody(text)
@@ -237,9 +243,7 @@ class HttpReviewRunsClient {
         // classification must tell apart from the same `code` carried by a request that never
         // got an answer. Dropping it here made every refusal look like a transport fault.
         throw Object.assign(
-          new Error(
-            parsed.error ?? `Review Runs returned HTTP ${response.status}.`
-          ),
+          new Error(parsed.error ?? `Review Runs returned HTTP ${response.status}.`),
           { code: parsed.code ?? null, status: response.status }
         )
       }
@@ -254,13 +258,10 @@ class HttpReviewRunsClient {
       return (text === '' ? undefined : JSON.parse(text)) as SuccessBody<Id>
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw Object.assign(
-          new Error(`Review Runs ${operation} request timed out.`),
-          {
-            code: 'REVIEW_RUNS_REQUEST_TIMEOUT',
-            cause: error
-          }
-        )
+        throw Object.assign(new Error(`Review Runs ${operation} request timed out.`), {
+          code: 'REVIEW_RUNS_REQUEST_TIMEOUT',
+          cause: error
+        })
       }
       throw error
     } finally {
@@ -268,13 +269,11 @@ class HttpReviewRunsClient {
     }
   }
 
-  private async validateContext(
-    runId: string,
-    context: PublishContext
-  ): Promise<PublishContext> {
+  private async validateContext(runId: string, context: PublishContext): Promise<PublishContext> {
     const run = await this.getRun(runId)
-    if (run === null)
+    if (run === null) {
       throw new Error(`Review Runs run does not exist: ${runId}`)
+    }
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
@@ -296,16 +295,9 @@ class HttpReviewRunsClient {
   async reserveInputBundleCandidate(
     runId: string,
     token: string,
-    intent: Omit<
-      OperationOptionsById['reserveInputBundleCandidate']['body'],
-      'token'
-    >
+    intent: Omit<OperationOptionsById['reserveInputBundleCandidate']['body'], 'token'>
   ): Promise<OperationResponseById['reserveInputBundleCandidate']> {
-    return await this.request(
-      'reserveInputBundleCandidate',
-      { runId },
-      { token, ...intent }
-    )
+    return await this.request('reserveInputBundleCandidate', { runId }, { token, ...intent })
   }
   async listInputBundleCandidates(
     runId: string,
@@ -319,11 +311,7 @@ class HttpReviewRunsClient {
     digest: string,
     status: 'present' | 'abandoned'
   ): Promise<OperationResponseById['settleInputBundleCandidate']> {
-    return await this.request(
-      'settleInputBundleCandidate',
-      { runId },
-      { token, digest, status }
-    )
+    return await this.request('settleInputBundleCandidate', { runId }, { token, digest, status })
   }
   async submitPreparedRun(
     runId: string,
@@ -344,9 +332,7 @@ class HttpReviewRunsClient {
       )
     } catch (error) {
       const code =
-        error instanceof Error &&
-        'code' in error &&
-        typeof error.code === 'string'
+        error instanceof Error && 'code' in error && typeof error.code === 'string'
           ? error.code
           : null
       throw new ReviewRunsSubmissionError(
@@ -370,16 +356,8 @@ class HttpReviewRunsClient {
     return await this.request('claimNextPreparation', {}, undefined)
   }
 
-  async checkpointPreparationInput(
-    runId: string,
-    token: string,
-    input: JsonObject
-  ): Promise<void> {
-    await this.request(
-      'checkpointPreparationInput',
-      { runId },
-      { token, input }
-    )
+  async checkpointPreparationInput(runId: string, token: string, input: JsonObject): Promise<void> {
+    await this.request('checkpointPreparationInput', { runId }, { token, input })
   }
 
   async claimNextRunNotice(): Promise<RunNoticeWork | null> {
@@ -396,11 +374,7 @@ class HttpReviewRunsClient {
     delivered: true,
     commentUrl: string
   ): Promise<boolean>
-  async completeRunNotice(
-    noticeId: string,
-    token: string,
-    delivered: false
-  ): Promise<boolean>
+  async completeRunNotice(noticeId: string, token: string, delivered: false): Promise<boolean>
   async completeRunNotice(
     noticeId: string,
     token: string,
@@ -440,14 +414,13 @@ class HttpReviewRunsClient {
         wait_ms: waitMs
       }
     )
-    if (work === null) return null
+    if (work === null) {
+      return null
+    }
     try {
       return {
         ...work,
-        publish_context: parsePublishContextForWorkflow(
-          work.workflow,
-          work.publish_context
-        )
+        publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context)
       }
     } catch (error) {
       // Validation happens after the durable claim because connector-specific context does
@@ -458,9 +431,7 @@ class HttpReviewRunsClient {
         work.claim_token,
         {
           code:
-            error instanceof Error &&
-            'code' in error &&
-            typeof error.code === 'string'
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
               ? error.code
               : 'PUBLISH_CONTEXT_INVALID',
           message: error instanceof Error ? error.message : String(error)
@@ -498,16 +469,8 @@ class HttpReviewRunsClient {
     return await this.request('listInternalPublicationSteps', { runId })
   }
 
-  async requirePublicationStepClaim(
-    runId: string,
-    token: string,
-    stepKey: string
-  ): Promise<void> {
-    await this.request(
-      'requirePublicationStepClaim',
-      { runId, stepKey },
-      { token }
-    )
+  async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
+    await this.request('requirePublicationStepClaim', { runId, stepKey }, { token })
   }
 
   async completePublicationStep(
@@ -521,9 +484,7 @@ class HttpReviewRunsClient {
     // ids arrive as numbers, so normalize here; Review Runs validates bodies without
     // coercion, so a raw number would be rejected rather than silently converted.
     const remoteObject = {
-      ...(remote.id === undefined
-        ? {}
-        : { id: remote.id === null ? null : String(remote.id) }),
+      ...(remote.id === undefined ? {} : { id: remote.id === null ? null : String(remote.id) }),
       url: remote.url ?? null
     }
     return await this.request(
@@ -560,10 +521,7 @@ class HttpReviewRunsClient {
           ? {}
           : {
               remote_object: {
-                id:
-                  remote.id === null || remote.id === undefined
-                    ? null
-                    : String(remote.id),
+                id: remote.id === null || remote.id === undefined ? null : String(remote.id),
                 url: remote.url ?? null
               }
             })
@@ -588,8 +546,7 @@ class HttpReviewRunsClient {
         ...(options.expectedUnresolvedRecoveryCount === undefined
           ? {}
           : {
-              expected_unresolved_recovery_count:
-                options.expectedUnresolvedRecoveryCount
+              expected_unresolved_recovery_count: options.expectedUnresolvedRecoveryCount
             })
       }
     )
@@ -635,9 +592,7 @@ class HttpReviewRunsClient {
         token,
         failure,
         retry: options.retry,
-        ...(options.retryAfterMs === undefined
-          ? {}
-          : { retry_after_ms: options.retryAfterMs })
+        ...(options.retryAfterMs === undefined ? {} : { retry_after_ms: options.retryAfterMs })
       }
     )
   }

@@ -14,6 +14,8 @@ test('long editor lines wrap within a narrow workspace', async () => {
     </div>
   )
   const content = screen.getByRole('textbox', { name: 'Memory content' })
+  // Browser matchers retry asynchronously; shared jest-dom declarations also expose a void signature.
+  // oxlint-disable-next-line typescript/await-thenable
   await expect.element(content).toBeVisible()
   // jsdom has no layout: actual line height and overflow need a browser.
   await expect
@@ -23,7 +25,5 @@ test('long editor lines wrap within a narrow workspace', async () => {
       return line?.getBoundingClientRect().height ?? 0
     })
     .toBeGreaterThan(40)
-  expect(content.element().scrollWidth).toBeLessThanOrEqual(
-    content.element().clientWidth + 1
-  )
+  expect(content.element().scrollWidth).toBeLessThanOrEqual(content.element().clientWidth + 1)
 })

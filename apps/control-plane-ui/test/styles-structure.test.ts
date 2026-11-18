@@ -19,9 +19,7 @@ const expectedLoadOrder = [
 const responsiveFile = 'responsive.css'
 
 function importedStyles(source: string): string[] {
-  return [...source.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"];?/g)].map(
-    ([, file]) => file
-  )
+  return [...source.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"];?/g)].map(([, file]) => file)
 }
 
 function matchingBrace(source: string, openingBrace: number): number {
@@ -33,8 +31,11 @@ function matchingBrace(source: string, openingBrace: number): number {
     const next = source[index + 1]
 
     if (quote) {
-      if (character === '\\') index += 1
-      else if (character === quote) quote = ''
+      if (character === '\\') {
+        index += 1
+      } else if (character === quote) {
+        quote = ''
+      }
       continue
     }
     if (character === '"' || character === "'") {
@@ -47,9 +48,15 @@ function matchingBrace(source: string, openingBrace: number): number {
       index = commentEnd + 1
       continue
     }
-    if (character === '{') depth += 1
-    if (character === '}') depth -= 1
-    if (depth === 0) return index
+    if (character === '{') {
+      depth += 1
+    }
+    if (character === '}') {
+      depth -= 1
+    }
+    if (depth === 0) {
+      return index
+    }
   }
 
   throw new Error('CSS rule must have a closing brace')
@@ -65,16 +72,24 @@ function splitSelectors(prelude: string): string[] {
   for (let index = 0; index < prelude.length; index += 1) {
     const character = prelude[index]
     if (quote) {
-      if (character === '\\') index += 1
-      else if (character === quote) quote = ''
+      if (character === '\\') {
+        index += 1
+      } else if (character === quote) {
+        quote = ''
+      }
       continue
     }
-    if (character === '"' || character === "'") quote = character
-    else if (character === '(') parentheses += 1
-    else if (character === ')') parentheses -= 1
-    else if (character === '[') brackets += 1
-    else if (character === ']') brackets -= 1
-    else if (character === ',' && parentheses === 0 && brackets === 0) {
+    if (character === '"' || character === "'") {
+      quote = character
+    } else if (character === '(') {
+      parentheses += 1
+    } else if (character === ')') {
+      parentheses -= 1
+    } else if (character === '[') {
+      brackets += 1
+    } else if (character === ']') {
+      brackets -= 1
+    } else if (character === ',' && parentheses === 0 && brackets === 0) {
       selectors.push(prelude.slice(start, index).trim())
       start = index + 1
     }
@@ -91,7 +106,9 @@ function classSelectors(source: string): string[] {
 
   while (cursor < source.length) {
     const openingBrace = source.indexOf('{', cursor)
-    if (openingBrace === -1) break
+    if (openingBrace === -1) {
+      break
+    }
     const statementEnd = source.indexOf(';', cursor)
     if (statementEnd !== -1 && statementEnd < openingBrace) {
       cursor = statementEnd + 1
@@ -105,8 +122,9 @@ function classSelectors(source: string): string[] {
     const closingBrace = matchingBrace(source, openingBrace)
     const body = source.slice(openingBrace + 1, closingBrace)
 
-    if (nestedRule.test(prelude)) selectors.push(...classSelectors(body))
-    else if (!prelude.startsWith('@')) {
+    if (nestedRule.test(prelude)) {
+      selectors.push(...classSelectors(body))
+    } else if (!prelude.startsWith('@')) {
       selectors.push(
         ...splitSelectors(prelude)
           .filter((selector) => selector.startsWith('.'))
@@ -122,9 +140,7 @@ function classSelectors(source: string): string[] {
 test('the stylesheet entry imports every domain file once without nested imports', async () => {
   const entry = await readFile(entryPath, 'utf8')
   const imports = importedStyles(entry)
-  const files = (await readdir(stylesDirectory))
-    .filter((file) => file.endsWith('.css'))
-    .sort()
+  const files = (await readdir(stylesDirectory)).filter((file) => file.endsWith('.css')).sort()
 
   expect(imports).toStrictEqual(expectedLoadOrder)
   expect([...imports].sort()).toStrictEqual(files)
@@ -149,28 +165,23 @@ test('domain styles do not redefine the same selector in different files', async
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     for (const selector of new Set(classSelectors(source))) {
       const existingOwner = owners.get(selector)
-      expect(
-        existingOwner,
-        `${selector} is defined in both ${existingOwner} and ${file}`
-      ).toBe(undefined)
+      expect(existingOwner, `${selector} is defined in both ${existingOwner} and ${file}`).toBe(
+        undefined
+      )
       owners.set(selector, file)
     }
   }
 })
 
 test('responsive rules are isolated in the final stylesheet', async () => {
-  const files = (await readdir(stylesDirectory)).filter((file) =>
-    file.endsWith('.css')
-  )
+  const files = (await readdir(stylesDirectory)).filter((file) => file.endsWith('.css'))
 
   for (const file of files) {
     const source = await readFile(path.join(stylesDirectory, file), 'utf8')
     if (file === responsiveFile) {
       expect(source).toMatch(/@media\b/)
     } else {
-      expect(source, `${file} must not own media queries`).not.toMatch(
-        /@media\b/
-      )
+      expect(source, `${file} must not own media queries`).not.toMatch(/@media\b/)
     }
   }
 })

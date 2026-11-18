@@ -19,8 +19,6 @@ test('splitRepoFullName rejects ambiguous or malformed repository names', () => 
     'octo-/example',
     'octo/.'
   ]) {
-    expect(() => splitRepoFullName(value)).toThrow(
-      /Invalid repository full name/
-    )
+    expect(() => splitRepoFullName(value)).toThrow(/Invalid repository full name/)
   }
 })

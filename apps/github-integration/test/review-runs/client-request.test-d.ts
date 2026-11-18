@@ -9,9 +9,9 @@ import type {
 import type { ReviewRunsClient } from '../../src/review-runs/client.js'
 
 test('publication step initialization requires the run, claim, and step keys', () => {
-  expectTypeOf<
-    Parameters<ReviewRunsClient['initializePublicationSteps']>
-  >().toEqualTypeOf<[string, string, string[]]>()
+  expectTypeOf<Parameters<ReviewRunsClient['initializePublicationSteps']>>().toEqualTypeOf<
+    [string, string, string[]]
+  >()
 })
 
 test('getRun preserves the possibility of absence', () => {
@@ -21,9 +21,7 @@ test('getRun preserves the possibility of absence', () => {
 })
 
 test('every contract operation has a route', () => {
-  expectTypeOf<keyof typeof operationRoutes>().toEqualTypeOf<
-    keyof OperationOptionsById
-  >()
+  expectTypeOf<keyof typeof operationRoutes>().toEqualTypeOf<keyof OperationOptionsById>()
 })
 
 test('the submission path remains a contract literal', () => {

@@ -3,7 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import ts from 'typescript'
+import { parseSync, type TSTypeAliasDeclaration } from 'oxc-parser'
+import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 
 import { renderOpenApiTypes } from '../src/index.js'
 
@@ -23,9 +25,7 @@ type HealthStatus = Assert<Equal<HealthResponseBodyByStatus['200'], HealthRespon
 test('response indexing preserves Kubb success selection and error-only fallback', async () => {
   // Distinct status aliases can share a body. Keep the status map and select exactly
   // Kubb's original members, rather than including every response (especially errors).
-  const directory = await mkdtemp(
-    path.join(os.tmpdir(), 'memory-response-types-')
-  )
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'memory-response-types-'))
   const response = (schema: string) => ({
     description: schema,
     content: {
@@ -85,6 +85,7 @@ test('response indexing preserves Kubb success selection and error-only fallback
               properties: { status: { type: 'string', enum: ['ok'] } }
             },
             Shared: {
+              description: '响应 🧭 Shared',
               type: 'object',
               required: ['revision'],
               properties: { revision: { type: 'integer' } }
@@ -104,59 +105,57 @@ test('response indexing preserves Kubb success selection and error-only fallback
       })
     )
     const generated = await renderOpenApiTypes(spec)
-    const file = ts.createSourceFile(
-      'types.ts',
-      generated,
-      ts.ScriptTarget.Latest,
-      true
-    )
-    expect(
-      !file.statements.some(
-        (node) =>
-          ts.isTypeAliasDeclaration(node) &&
-          /Status[0-9]+$/.test(node.name.text)
-      )
-    ).toBeTruthy()
-    const aliases = new Map(
-      file.statements
-        .filter(ts.isTypeAliasDeclaration)
-        .map((node) => [node.name.text, node.type])
-    )
+    expect(generated).toContain('响应 🧭 Shared')
+    const { program, errors } = parseSync('types.ts', generated)
+    expect(errors).toStrictEqual([])
+    const declarations = program.body
+      .map((node) => (node.type === 'ExportNamedDeclaration' ? node.declaration : node))
+      .filter((node): node is TSTypeAliasDeclaration => node?.type === 'TSTypeAliasDeclaration')
+    expect(declarations.some((node) => /Status[0-9]+$/.test(node.id.name))).toBe(false)
+    const aliases = new Map(declarations.map((node) => [node.id.name, node.typeAnnotation]))
     for (const [name, expected] of [
       ['WithSuccessResponseBody', ['200', '201', '202', '204']],
       ['WithoutSuccessResponseBody', ['400', '409']],
       ['SingleSuccessResponseBody', ['200']]
     ] as const) {
       const type = aliases.get(name)
-      expect.assert(type && ts.isIndexedAccessTypeNode(type))
-      const indices = ts.isUnionTypeNode(type.indexType)
-        ? type.indexType.types
-        : [type.indexType]
+      expect.assert(type?.type === 'TSIndexedAccessType')
+      const indices =
+        type.indexType.type === 'TSUnionType' ? type.indexType.types : [type.indexType]
       expect(
         indices.map((member) => {
           expect.assert(
-            ts.isLiteralTypeNode(member) && ts.isStringLiteral(member.literal)
+            member.type === 'TSLiteralType' &&
+              member.literal.type === 'Literal' &&
+              typeof member.literal.value === 'string'
           )
-          return member.literal.text
+          return member.literal.value
         })
       ).toStrictEqual(expected)
     }
 
     const output = path.join(directory, 'types.ts')
     await writeFile(output, generated + RESPONSE_TYPE_ASSERTIONS)
-    const program = ts.createProgram([output], {
-      strict: true,
-      noEmit: true,
-      skipLibCheck: true,
-      types: [],
-      target: ts.ScriptTarget.ESNext
-    })
-    const diagnostics = ts.getPreEmitDiagnostics(program)
-    expect(
-      diagnostics.map((diagnostic) =>
-        ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-      )
-    ).toStrictEqual([])
+    const require = createRequire(import.meta.url)
+    const compiler = path.join(
+      path.dirname(require.resolve('typescript/package.json')),
+      'bin',
+      'tsc'
+    )
+    execFileSync(
+      process.execPath,
+      [
+        compiler,
+        '--noEmit',
+        '--strict',
+        '--skipLibCheck',
+        '--target',
+        'ESNext',
+        '--ignoreConfig',
+        output
+      ],
+      { encoding: 'utf8' }
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

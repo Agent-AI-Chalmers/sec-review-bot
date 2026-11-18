@@ -6,12 +6,7 @@
       "name": "types",
       "script": "contracts/review-runs-api/tools/src/generate-types.ts",
       "command": "pnpm --dir contracts/review-runs-api/tools run generate",
-      "inputs": [
-        "contracts/review-runs-api/v1/openapi.yaml",
-        "services/review-runs/.prettierrc.json",
-        "apps/github-integration/.prettierrc.json",
-        "apps/control-plane-ui/.prettierrc.json"
-      ],
+      "inputs": ["contracts/review-runs-api/v1/openapi.yaml"],
       "outputs": [
         "services/review-runs/src/contract-types-generated.ts",
         "services/review-runs/src/error-codes-generated.ts",
@@ -21,7 +16,11 @@
       ],
       "code_inputs": [
         "contracts/codegen/src/index.ts",
-        "contracts/codegen/package.json"
+        "contracts/codegen/package.json",
+        "contracts/codegen/src/format-generated.ts",
+        "services/review-runs/.oxfmtrc.json",
+        "apps/github-integration/.oxfmtrc.json",
+        "apps/control-plane-ui/.oxfmtrc.json"
       ]
     },
     {
@@ -32,6 +31,11 @@
       "outputs": [
         "contracts/review-runs-api/v1/observed-run.schema.json",
         "contracts/review-runs-api/v1/review-run-record.schema.json"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/format-generated.ts",
+        "contracts/codegen/package.json",
+        ".oxfmtrc.json"
       ]
     },
     {
@@ -47,6 +51,13 @@
         "contracts/review-runs-api/v1/STATE_MACHINES.zh.md",
         "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts",
         "services/review-runs/src/state-machines.generated.ts"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/format-generated.ts",
+        "contracts/codegen/package.json",
+        ".oxfmtrc.json",
+        "apps/control-plane-ui/.oxfmtrc.json",
+        "services/review-runs/.oxfmtrc.json"
       ]
     }
   ]

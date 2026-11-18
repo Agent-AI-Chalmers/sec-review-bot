@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 
 const SRC = path.resolve(import.meta.dirname, '../src')
 const AXIS_STORES = [
@@ -24,26 +24,21 @@ const AXIS_STORES = [
  * this check pass no matter what was imported.
  */
 function importedModules(file: string): string[] {
-  const source = ts.createSourceFile(
-    file,
-    readFileSync(path.join(SRC, file), 'utf8'),
-    ts.ScriptTarget.Latest,
-    true
-  )
+  const { program, errors } = parseSync(file, readFileSync(path.join(SRC, file), 'utf8'))
+  expect(errors).toStrictEqual([])
   const modules: string[] = []
-  for (const statement of source.statements) {
+  for (const statement of program.body) {
     if (
-      !ts.isImportDeclaration(statement) &&
-      !ts.isExportDeclaration(statement)
-    )
+      statement.type !== 'ImportDeclaration' &&
+      statement.type !== 'ExportNamedDeclaration' &&
+      statement.type !== 'ExportAllDeclaration'
+    ) {
       continue
-    const specifier = statement.moduleSpecifier
-    if (
-      specifier &&
-      ts.isStringLiteral(specifier) &&
-      specifier.text.startsWith('.')
-    )
-      modules.push(path.basename(specifier.text).replace(/\.js$/, '.ts'))
+    }
+    const specifier = statement.source?.value
+    if (specifier?.startsWith('.')) {
+      modules.push(path.basename(specifier).replace(/\.js$/, '.ts'))
+    }
   }
   return modules
 }
@@ -52,7 +47,9 @@ test('single-axis stores do not depend on each other', () => {
   for (const store of AXIS_STORES) {
     const dependencies = importedModules(store)
     for (const other of AXIS_STORES) {
-      if (other === store) continue
+      if (other === store) {
+        continue
+      }
       const otherName = path.basename(other)
       expect(
         dependencies,
@@ -60,10 +57,9 @@ test('single-axis stores do not depend on each other', () => {
       ).not.toContain(otherName)
     }
     // `review-run-store.ts` constructs the stores, so it must not be imported back.
-    expect(
-      dependencies,
-      `${store} imports review-run-store.ts, which constructs it`
-    ).not.toContain('review-run-store.ts')
+    expect(dependencies, `${store} imports review-run-store.ts, which constructs it`).not.toContain(
+      'review-run-store.ts'
+    )
   }
 })
 
@@ -111,17 +107,14 @@ test('the read model does not depend on write stores', () => {
   expect(dependencies).toContain('review-run-events.ts')
   expect(dependencies).not.toContain('review-run-store.ts')
   for (const store of AXIS_STORES) {
-    expect(
-      dependencies,
-      `review-run-queries.ts imports write store ${store}`
-    ).not.toContain(path.basename(store))
+    expect(dependencies, `review-run-queries.ts imports write store ${store}`).not.toContain(
+      path.basename(store)
+    )
   }
 })
 
 test('submission transitions compose axes without depending on axis stores', () => {
-  const dependencies = importedModules(
-    'persistence/submission-transition-store.ts'
-  )
+  const dependencies = importedModules('persistence/submission-transition-store.ts')
   expect(dependencies).toContain('publication-abandon.ts')
   expect(dependencies).toContain('review-run-events.ts')
   expect(dependencies).toContain('run-notices.ts')
@@ -143,16 +136,13 @@ test('publication claims stay separate from single-axis publication writes', () 
 })
 
 test('run admission owns aggregate creation without importing axis stores', () => {
-  const dependencies = importedModules(
-    'persistence/review-run-admission-store.ts'
-  )
+  const dependencies = importedModules('persistence/review-run-admission-store.ts')
   expect(dependencies).toContain('run-record-projection.ts')
   expect(dependencies).toContain('review-run-events.ts')
   expect(dependencies).not.toContain('review-run-store.ts')
   for (const store of AXIS_STORES) {
-    expect(
-      dependencies,
-      `review-run-admission-store.ts imports axis store ${store}`
-    ).not.toContain(path.basename(store))
+    expect(dependencies, `review-run-admission-store.ts imports axis store ${store}`).not.toContain(
+      path.basename(store)
+    )
   }
 })

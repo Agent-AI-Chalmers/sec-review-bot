@@ -74,10 +74,7 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
       'review-runs-deterministic-publication-fault'
     ]
   ] as const) {
-    const error = Object.assign(
-      new Error('Publication step set is not usable.'),
-      { code }
-    )
+    const error = Object.assign(new Error('Publication step set is not usable.'), { code })
     expect(classifyPublicationFailure(error)).toStrictEqual({
       retry: false,
       scope: 'step',
@@ -86,9 +83,7 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
     })
   }
 
-  expect(
-    classifyPublicationFailure(new Error('Publication step set changed.'))
-  ).toStrictEqual({
+  expect(classifyPublicationFailure(new Error('Publication step set changed.'))).toStrictEqual({
     retry: true,
     scope: 'publication',
     code: null,

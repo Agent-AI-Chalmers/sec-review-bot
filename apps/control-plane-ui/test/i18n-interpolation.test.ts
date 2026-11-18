@@ -19,22 +19,14 @@ test('multiple numeric parameters render in both languages', () => {
   expect(translate('en', 'trajectoryShowing', { shown: 2, total: 10 })).toBe(
     'Showing 2 of 10 messages'
   )
-  expect(translate('zh', 'trajectoryShowing', { shown: 2, total: 10 })).toBe(
-    '显示 2 / 10 条消息'
-  )
+  expect(translate('zh', 'trajectoryShowing', { shown: 2, total: 10 })).toBe('显示 2 / 10 条消息')
 })
 
 test('both catalogs have matching keys and interpolation parameters', () => {
-  expect(Object.keys(messages.en).sort()).toStrictEqual(
-    Object.keys(messages.zh).sort()
-  )
+  expect(Object.keys(messages.en).sort()).toStrictEqual(Object.keys(messages.zh).sort())
   for (const key of Object.keys(messages.en) as (keyof typeof messages.en)[]) {
     const parameters = (text: string): string[] =>
-      [
-        ...new Set([...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]))
-      ].sort()
-    expect(parameters(messages.en[key]), key).toStrictEqual(
-      parameters(messages.zh[key])
-    )
+      [...new Set([...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]))].sort()
+    expect(parameters(messages.en[key]), key).toStrictEqual(parameters(messages.zh[key]))
   }
 })

@@ -13,10 +13,9 @@ interface RepositoryIssue {
 
 function splitRepoFullName(repo_full_name: string): RepoParts {
   const text = String(repo_full_name || '').trim()
-  const match =
-    /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(
-      text
-    )
+  const match = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(
+    text
+  )
 
   if (!match) {
     throw new Error(`Invalid repository full name: ${repo_full_name}`)
@@ -106,9 +105,13 @@ export async function findRepositorySecuritySummaryIssue(
  * the reply target therefore resolve the value through this one function, so they cannot
  * disagree about whether a notice names a repository at all. */
 export function repositoryFullName(value: unknown): string | null {
-  if (typeof value !== 'string') return null
+  if (typeof value !== 'string') {
+    return null
+  }
   const segments = value.trim().split('/')
-  if (segments.length !== 2) return null
+  if (segments.length !== 2) {
+    return null
+  }
   const [owner, repo] = segments
   return owner && repo ? `${owner}/${repo}` : null
 }

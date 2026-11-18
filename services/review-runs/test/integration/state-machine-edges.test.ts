@@ -24,12 +24,12 @@ import { Pool } from 'pg'
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 import { assertPublicationAxesFollowSteps } from './publication-invariants.js'
 
-const connectionString =
-  process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
-  if (!connectionString)
+  if (!connectionString) {
     throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  }
   return connectionString
 }
 
@@ -39,9 +39,7 @@ async function createStore(
   const store = new ReviewRunStore({
     connectionString: requireTestDatabase(),
     connectorId: options.connectorId ?? `edges:${randomUUID()}`,
-    ...(options.claimTimeoutMs === undefined
-      ? {}
-      : { claimTimeoutMs: options.claimTimeoutMs })
+    ...(options.claimTimeoutMs === undefined ? {} : { claimTimeoutMs: options.claimTimeoutMs })
   })
   await store.initialize()
   return store
@@ -58,11 +56,7 @@ async function createQueuedRun(
     publish_context: context
   })
   expect.assert(admission.preparation_token)
-  await store.submissionTransitions.markQueued(
-    runId,
-    admission.preparation_token,
-    context
-  )
+  await store.submissionTransitions.markQueued(runId, admission.preparation_token, context)
   return runId
 }
 
@@ -77,10 +71,7 @@ const AUDITED_MACHINES: ReadonlyMap<string, MachineBody> = new Map(
   ])
 )
 
-function machineName(event: {
-  axis: CoordinationAxis
-  step_key: string | null
-}): string {
+function machineName(event: { axis: CoordinationAxis; step_key: string | null }): string {
   return event.step_key === null ? event.axis : `${event.axis}.step`
 }
 
@@ -107,9 +98,12 @@ async function claimNoticeFor(
   try {
     while (Date.now() < deadline) {
       const notice = await store.notices.claimNext()
-      if (notice === null) break
-      if (notice.run_id === runId)
+      if (notice === null) {
+        break
+      }
+      if (notice.run_id === runId) {
         return { notice_id: notice.notice_id, claim_token: notice.claim_token }
+      }
       deferred.push({
         notice_id: notice.notice_id,
         run_id: notice.run_id,
@@ -187,21 +181,15 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       const runId = await newSuccessRun()
       const token = await store.publicationClaims.claim(runId)
       expect(token).not.toBe(null)
-      await store.publications.initializePublicationSteps(
-        runId,
-        token as string,
-        ['issue:summary-comment']
-      )
+      await store.publications.initializePublicationSteps(runId, token as string, [
+        'issue:summary-comment'
+      ])
       return { runId, token: token as string }
     }
 
     // preparation: preparing -> submitted, then execution pending -> queued.
     const submitted = await newPreparingRun()
-    await store.submissionTransitions.markQueued(
-      submitted.runId,
-      submitted.token,
-      {}
-    )
+    await store.submissionTransitions.markQueued(submitted.runId, submitted.token, {})
 
     // preparation: preparing -> failed, execution pending -> skipped, notice pending -> ...
     const failedPreparation = await newPreparingRun()
@@ -315,16 +303,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     expect(
-      await store.executions.disconnectExhaustedSubmissionRecovery(
-        uncertainDisconnects.runId,
-        0
-      )
+      await store.executions.disconnectExhaustedSubmissionRecovery(uncertainDisconnects.runId, 0)
     ).toBe(true)
     // execution: disconnected -> uncertain when an operator hands it back. Without this the run
     // would stay parked forever: automatic recovery only claims `uncertain`.
-    await store.operatorDecisions.resumeDisconnectedExecution(
-      uncertainDisconnects.runId
-    )
+    await store.operatorDecisions.resumeDisconnectedExecution(uncertainDisconnects.runId)
 
     // execution: disconnected -> failed when an operator stops waiting. This does not claim the
     // task never ran - the Execution may still have it - only that the outcome will not be awaited.
@@ -336,10 +319,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     expect(
-      await store.executions.disconnectExhaustedSubmissionRecovery(
-        giveUpExecution.runId,
-        0
-      )
+      await store.executions.disconnectExhaustedSubmissionRecovery(giveUpExecution.runId, 0)
     ).toBe(true)
     await store.operatorDecisions.giveUpDisconnectedRun(
       giveUpExecution.runId,
@@ -369,11 +349,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> running -> succeeded.
     const observed = await newPreparingRun()
-    await store.submissionTransitions.markQueued(
-      observed.runId,
-      observed.token,
-      {}
-    )
+    await store.submissionTransitions.markQueued(observed.runId, observed.token, {})
     await store.executions.markRunning(observed.runId)
     await store.executions.recordExecutionSuccess(
       observed.runId,
@@ -383,11 +359,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> failed without ever running, which also skips publication.
     const queuedFailed = await newPreparingRun()
-    await store.submissionTransitions.markQueued(
-      queuedFailed.runId,
-      queuedFailed.token,
-      {}
-    )
+    await store.submissionTransitions.markQueued(queuedFailed.runId, queuedFailed.token, {})
     await store.failExecution(queuedFailed.runId, {
       code: 'EXECUTION_FAILED',
       message: 'boom'
@@ -395,11 +367,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> running -> failed, which also skips publication.
     const executionFailed = await newPreparingRun()
-    await store.submissionTransitions.markQueued(
-      executionFailed.runId,
-      executionFailed.token,
-      {}
-    )
+    await store.submissionTransitions.markQueued(executionFailed.runId, executionFailed.token, {})
     await store.executions.markRunning(executionFailed.runId)
     await store.failExecution(executionFailed.runId, {
       code: 'EXECUTION_FAILED',
@@ -480,26 +448,22 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [publishUncertain.runId]
     )
-    const uncertainTakeover = await store.publicationClaims.claim(
-      publishUncertain.runId
-    )
+    const uncertainTakeover = await store.publicationClaims.claim(publishUncertain.runId)
     expect.assert(uncertainTakeover)
-    expect(
-      (await store.queries.getRun(publishUncertain.runId))?.publication.status
-    ).toBe('uncertain')
+    expect((await store.queries.getRun(publishUncertain.runId))?.publication.status).toBe(
+      'uncertain'
+    )
     await store.publications.fail(
       publishUncertain.runId,
       uncertainTakeover,
       { message: 'retry later' },
       { retry: true }
     )
-    const resumedUncertain = await store.publicationClaims.claim(
-      publishUncertain.runId
-    )
+    const resumedUncertain = await store.publicationClaims.claim(publishUncertain.runId)
     expect.assert(resumedUncertain)
-    expect(
-      (await store.queries.getRun(publishUncertain.runId))?.publication.status
-    ).toBe('uncertain')
+    expect((await store.queries.getRun(publishUncertain.runId))?.publication.status).toBe(
+      'uncertain'
+    )
 
     // publication: publishing -> disconnected when a reconciliation itself runs out of budget
     // without an answer. The step is what becomes disconnected; the axis follows it.
@@ -529,8 +493,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // cannot reach the remote system spend its own budget, after which it stops answering for
     // itself and asks a person to look.
     expect(
-      (await store.queries.getRun(publishDisconnected.runId))?.publication
-        .status,
+      (await store.queries.getRun(publishDisconnected.runId))?.publication.status,
       'an exhausted step makes the axis uncertain before its reconciliation runs'
     ).toBe('uncertain')
     for (let round = 0; round < 3; round += 1) {
@@ -543,8 +506,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     }
     expect(
-      (await store.queries.getRun(publishDisconnected.runId))?.publication
-        .status,
+      (await store.queries.getRun(publishDisconnected.runId))?.publication.status,
       'the axis has to follow its step into disconnected'
     ).toBe('disconnected')
 
@@ -718,9 +680,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
           'issue:summary-comment'
         )
       ).rejects.toSatisfy(() => true)
-      expect(
-        (await store.queries.getRun(reconciling.runId))?.publication.status
-      ).toBe('uncertain')
+      expect((await store.queries.getRun(reconciling.runId))?.publication.status).toBe('uncertain')
       await store.publications.fail(
         reconciling.runId,
         reconciling.token,
@@ -826,9 +786,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [givenUpPublication.runId]
     )
-    const publicationToken = await store.publicationClaims.claim(
-      givenUpPublication.runId
-    )
+    const publicationToken = await store.publicationClaims.claim(givenUpPublication.runId)
     await store.publications.initializePublicationSteps(
       givenUpPublication.runId,
       publicationToken as string,
@@ -848,15 +806,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
       const status = (
-        (
-          await store.publications.listPublicationSteps(
-            givenUpPublication.runId
-          )
-        )[0] as {
+        (await store.publications.listPublicationSteps(givenUpPublication.runId))[0] as {
           status: string
         }
       ).status
-      if (status === 'disconnected') break
+      if (status === 'disconnected') {
+        break
+      }
       await store.publications
         .requirePublicationStepClaim(
           givenUpPublication.runId,
@@ -884,9 +840,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [resumedPublication.runId]
     )
-    const parkedToken = await store.publicationClaims.claim(
-      resumedPublication.runId
-    )
+    const parkedToken = await store.publicationClaims.claim(resumedPublication.runId)
     await store.publications.initializePublicationSteps(
       resumedPublication.runId,
       parkedToken as string,
@@ -904,10 +858,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
       if (
-        (await store.queries.getRun(resumedPublication.runId))?.publication
-          .status === 'disconnected'
-      )
+        (await store.queries.getRun(resumedPublication.runId))?.publication.status ===
+        'disconnected'
+      ) {
         break
+      }
       await store.publications
         .requirePublicationStepClaim(
           resumedPublication.runId,
@@ -917,25 +872,19 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         .catch(() => undefined)
     }
     expect(
-      (await store.queries.getRun(resumedPublication.runId))?.publication
-        .status,
+      (await store.queries.getRun(resumedPublication.runId))?.publication.status,
       'the resume below has to start from a parked publication'
     ).toBe('disconnected')
-    await store.operatorDecisions.resumeDisconnectedRun(
-      resumedPublication.runId
+    await store.operatorDecisions.resumeDisconnectedRun(resumedPublication.runId)
+    expect((await store.queries.getRun(resumedPublication.runId))?.publication.status).toBe(
+      'pending'
     )
-    expect(
-      (await store.queries.getRun(resumedPublication.runId))?.publication.status
-    ).toBe('pending')
     expect(
       (await store.queries.getRun(blocked.runId))?.preparation?.status,
       'the abandonment below has to start from a disconnected row'
     ).toBe('disconnected')
 
-    await store.operatorDecisions.abandonBlockedPreparation(
-      blocked.runId,
-      'operator decision'
-    )
+    await store.operatorDecisions.abandonBlockedPreparation(blocked.runId, 'operator decision')
 
     // Leave live publications in all three owned states, then check each equals its steps.
     await assertPublicationAxesFollowSteps(pool, [connector])
@@ -953,7 +902,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
       for (const event of await store.queries.listEvents(runId)) {
-        if (event.from_status === null) continue
+        if (event.from_status === null) {
+          continue
+        }
         recorded.push({
           machine: machineName(event),
           edge: `${event.from_status}->${event.to_status}`,
@@ -1043,7 +994,9 @@ test('a reason the audit log writes is the reason the contract declares', async 
     const expected = declared.get(key)
     expect.assert(expected !== undefined, `${key} is not declared`)
     // An edge that accepts any reason makes the whole pair open.
-    if (expected.some((value) => value === null)) continue
+    if (expected.some((value) => value === null)) {
+      continue
+    }
     expect(
       expected,
       `${key} was recorded with ${String(reason)} but the contract declares ${expected.join(' or ')}`

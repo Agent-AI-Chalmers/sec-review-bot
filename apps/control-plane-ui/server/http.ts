@@ -3,11 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 /** JSON content type for a body this BFF writes itself. */
 export const PROXIED_CONTENT_TYPE = 'application/json; charset=utf-8'
 
-export function sendJson(
-  response: ServerResponse,
-  status: number,
-  body: object
-): void {
+export function sendJson(response: ServerResponse, status: number, body: object): void {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(JSON.stringify(body))
 }
@@ -28,10 +24,12 @@ export async function readBoundedRequestBody(
 ): Promise<Buffer> {
   const chunks: Buffer[] = []
   let size = 0
-  for await (const chunk of request) {
+  for await (const chunk of request as AsyncIterable<Buffer>) {
     const bytes = Buffer.from(chunk)
     size += bytes.length
-    if (size > maximumBytes) throw new RequestBodyTooLargeError()
+    if (size > maximumBytes) {
+      throw new RequestBodyTooLargeError()
+    }
     chunks.push(bytes)
   }
   return Buffer.concat(chunks)

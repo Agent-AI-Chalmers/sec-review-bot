@@ -1,11 +1,7 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import {
-  RequestBodyTooLargeError,
-  readBoundedRequestBody,
-  sendJson
-} from '../http.js'
+import { RequestBodyTooLargeError, readBoundedRequestBody, sendJson } from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 
 export interface SessionRoutes {
@@ -25,8 +21,9 @@ export function createSessionRoutes({
   secureCookies: boolean
   sessionTtlSeconds: number
 }): SessionRoutes {
-  if (!Number.isSafeInteger(maximumSessions) || maximumSessions < 1)
+  if (!Number.isSafeInteger(maximumSessions) || maximumSessions < 1) {
     throw new RangeError('maximumSessions must be a positive integer')
+  }
 
   // Restarting the BFF intentionally revokes every session. Only opaque expirations live here;
   // the shared access token is used for comparison and is never stored in a session record.
@@ -40,20 +37,29 @@ export function createSessionRoutes({
       ?.slice('control_plane_ui_session='.length)
 
   const prepareSlot = (now: number): void => {
-    for (const [session, expiresAt] of sessions)
-      if (expiresAt <= now) sessions.delete(session)
+    for (const [session, expiresAt] of sessions) {
+      if (expiresAt <= now) {
+        sessions.delete(session)
+      }
+    }
     while (sessions.size >= maximumSessions) {
       const oldest = sessions.keys().next().value
-      if (oldest === undefined) break
+      if (oldest === undefined) {
+        break
+      }
       sessions.delete(oldest)
     }
   }
 
   const authenticated = (request: IncomingMessage): boolean => {
     const session = sessionCookie(request)
-    if (session === undefined) return false
+    if (session === undefined) {
+      return false
+    }
     const expiresAt = sessions.get(session)
-    if (expiresAt === undefined) return false
+    if (expiresAt === undefined) {
+      return false
+    }
     if (expiresAt <= Date.now()) {
       sessions.delete(session)
       return false
@@ -61,14 +67,13 @@ export function createSessionRoutes({
     return true
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.url === '/api/session' && request.method === 'POST') {
       // Signing in is a state change too: without this, another site could force the
       // browser into a session it did not ask for.
-      if (!requireSameOrigin(request, response)) return true
+      if (!requireSameOrigin(request, response)) {
+        return true
+      }
       let raw: Buffer
       try {
         raw = await readBoundedRequestBody(request)
@@ -114,9 +119,13 @@ export function createSessionRoutes({
     }
 
     if (request.url === '/api/session' && request.method === 'DELETE') {
-      if (!requireSameOrigin(request, response)) return true
+      if (!requireSameOrigin(request, response)) {
+        return true
+      }
       const session = sessionCookie(request)
-      if (session !== undefined) sessions.delete(session)
+      if (session !== undefined) {
+        sessions.delete(session)
+      }
       response.writeHead(204, {
         'set-cookie': `control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${cookieSecurity}`
       })

@@ -16,9 +16,7 @@ test('failure reasons name only the service identified by the error code', () =>
 })
 
 test('unknown server failures remain service-neutral', () => {
-  expect(failureReason(new ApiError(502, 'artifact_read_failed'), t)).toBe(
-    'Error 502.'
-  )
+  expect(failureReason(new ApiError(502, 'artifact_read_failed'), t)).toBe('Error 502.')
   expect(failureReason(new ApiError(404, 'not_found'), t)).toBe(undefined)
   expect(failureReason(new Error('network unavailable'), t)).toBe(undefined)
 })

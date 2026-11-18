@@ -14,7 +14,7 @@ import type {
 
 export type CatalogOverview = CatalogOverviewContract
 
-function percent(part: number, total: number): string {
+function percent(part: number, total: number) {
   return total === 0 ? '0%' : `${Math.round((part / total) * 100)}%`
 }
 
@@ -31,50 +31,33 @@ export function MemoryOverview({
 }): React.JSX.Element {
   const t = useMessages()
   const totals = overview.totals
-  const yieldValue = percent(
-    totals.units_with_observation_count,
-    totals.extracted_unit_count
-  )
+  const yieldValue = percent(totals.units_with_observation_count, totals.extracted_unit_count)
 
   return (
     <div className="memory-overview">
-      <section
-        className="memory-overview-metrics"
-        aria-label={t('memoryOverview')}
-      >
+      <section className="memory-overview-metrics" aria-label={t('memoryOverview')}>
         <div className="memory-overview-metric">
           <span>{t('extractedUnits')}</span>
           <strong>{totals.extracted_unit_count.toLocaleString()}</strong>
           <small>
-            {t('completedExtractions')}:{' '}
-            {totals.completed_extraction_count.toLocaleString()}
+            {t('completedExtractions')}: {totals.completed_extraction_count.toLocaleString()}
           </small>
         </div>
         <div className="memory-overview-metric">
           <span>{t('unitsWithObservation')}</span>
-          <strong>
-            {totals.units_with_observation_count.toLocaleString()}
-          </strong>
+          <strong>{totals.units_with_observation_count.toLocaleString()}</strong>
           <small>{yieldValue}</small>
         </div>
         <div className="memory-overview-metric">
           <span className="memory-overview-label">
             {t('unitsWithoutObservation')}
             <Tooltip label={t('unitsWithoutObservationHelp')}>
-              <IconInfoCircle
-                size={ICON_SIZE.md}
-                aria-label={t('unitsWithoutObservationHelp')}
-              />
+              <IconInfoCircle size={ICON_SIZE.md} aria-label={t('unitsWithoutObservationHelp')} />
             </Tooltip>
           </span>
-          <strong>
-            {totals.units_without_observation_count.toLocaleString()}
-          </strong>
+          <strong>{totals.units_without_observation_count.toLocaleString()}</strong>
           <small>
-            {percent(
-              totals.units_without_observation_count,
-              totals.extracted_unit_count
-            )}
+            {percent(totals.units_without_observation_count, totals.extracted_unit_count)}
           </small>
         </div>
         <div className="memory-overview-metric">
@@ -103,7 +86,7 @@ export function MemoryOverview({
             <SegmentedControl
               size="xs"
               value={range}
-              onChange={(value) => onRangeChange(value as OverviewRange)}
+              onChange={(value) => onRangeChange(value)}
               data={[
                 { value: '30d', label: t('range30Days') },
                 { value: '90d', label: t('range90Days') },
@@ -125,16 +108,12 @@ export function MemoryOverview({
             <span>
               <i className="memory-overview-lifecycle-swatch pending" />
               {t('pendingObservations')}
-              <strong>
-                {totals.pending_observation_count.toLocaleString()}
-              </strong>
+              <strong>{totals.pending_observation_count.toLocaleString()}</strong>
             </span>
             <span>
               <i className="memory-overview-lifecycle-swatch consumed" />
               {t('consumedObservations')}
-              <strong>
-                {totals.consumed_observation_count.toLocaleString()}
-              </strong>
+              <strong>{totals.consumed_observation_count.toLocaleString()}</strong>
             </span>
           </div>
         </div>
@@ -162,10 +141,7 @@ export function MemoryOverview({
                   <Table.Td data-label={t('unitsWithObservation')} ta="right">
                     {item.units_with_observation_count}
                   </Table.Td>
-                  <Table.Td
-                    data-label={t('unitsWithoutObservation')}
-                    ta="right"
-                  >
+                  <Table.Td data-label={t('unitsWithoutObservation')} ta="right">
                     {item.units_without_observation_count}
                   </Table.Td>
                 </Table.Tr>

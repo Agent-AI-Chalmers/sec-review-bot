@@ -30,9 +30,7 @@ test('preview renders the body and code; source and copy retain the original tex
   expect(container.textContent).not.toContain('<instructions>')
   await user.click(screen.getByRole('radio', { name: 'Source' }))
   expect(container.querySelector('pre')?.textContent).toBe(source)
-  expect(
-    screen.queryByRole('heading', { name: 'Checks' })
-  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Checks' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Copy' }))
   expect(copy).toHaveBeenLastCalledWith(source)
   await user.click(screen.getByRole('radio', { name: 'Preview' }))

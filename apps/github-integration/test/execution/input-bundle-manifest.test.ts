@@ -6,9 +6,10 @@ import { expect, test } from 'vitest'
 import { writeInputBundleManifest } from '../../src/execution/input-bundle-manifest.js'
 
 async function readManifest(root: string): Promise<Record<string, unknown>> {
-  return JSON.parse(
-    await fs.readFile(path.join(root, 'manifest.json'), 'utf8')
-  ) as Record<string, unknown>
+  return JSON.parse(await fs.readFile(path.join(root, 'manifest.json'), 'utf8')) as Record<
+    string,
+    unknown
+  >
 }
 
 test('writes the API v1 manifest without a setup declaration field', async () => {

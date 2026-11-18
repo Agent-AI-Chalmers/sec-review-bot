@@ -1,9 +1,4 @@
-import {
-  act,
-  renderHook,
-  waitFor,
-  type RenderHookResult
-} from '@testing-library/react'
+import { act, renderHook, waitFor, type RenderHookResult } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import {

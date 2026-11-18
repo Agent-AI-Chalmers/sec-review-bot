@@ -43,7 +43,7 @@ function reviewRecord(): ReviewRecord {
       residual_risks: []
     },
     cvss: null
-  } as ReviewRecord
+  }
 }
 
 const RUN_ID = '6f1c2f9e-0000-4000-8000-000000000001'
@@ -111,24 +111,26 @@ function buildHarness({
 
   const { octokit } = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.includes('/comments') && method === 'GET')
+    if (pathname.includes('/comments') && method === 'GET') {
       return githubJson(existingComment === null ? [] : [existingComment])
+    }
     if (pathname.includes('/comments') && method === 'POST') {
       postedComments.push({ method })
       return githubJson({ id: 99, html_url: 'https://example.test/c/99' })
     }
-    if (pathname.includes('/pulls') && method === 'GET') return githubJson([])
-    if (pathname.includes('/branches/'))
+    if (pathname.includes('/pulls') && method === 'GET') {
+      return githubJson([])
+    }
+    if (pathname.includes('/branches/')) {
       return githubJson({ commit: { sha: 'resolved-default-sha' } })
+    }
     return githubJson({ default_branch: 'main' })
   })
 
   return { store, octokit, settles, postedComments }
 }
 
-async function runPublish(
-  harness: ReturnType<typeof buildHarness>
-): Promise<void> {
+async function runPublish(harness: ReturnType<typeof buildHarness>): Promise<void> {
   await handleIssueReviewRun({
     run: {
       run_id: RUN_ID,
@@ -183,8 +185,7 @@ test('an exhausted comment step with no comment on GitHub stays a failure', asyn
     return (
       error instanceof Error &&
       'code' in error &&
-      error.code ===
-        EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+      error.code === EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
     )
   })
   expect(
@@ -239,10 +240,7 @@ test('every outcome names whether the step was written, so a caller need not inf
   // The write path decides whether the step is `succeeded`, `terminal_failed`, or untouched. The
   // outcome says which, and names the recorded state in the schema's own words, so a caller never
   // has to know which branch of `settleExhaustedStep` wrote.
-  const settledWith = async (
-    accepted: boolean,
-    found: { id: number; url: string } | null
-  ) =>
+  const settledWith = async (accepted: boolean, found: { id: number; url: string } | null) =>
     await settleExhaustedStep({
       store: {
         listPublicationSteps: async () => [],
@@ -286,8 +284,7 @@ test('a reconciliation that cannot reach GitHub records the failure but settles 
   // that is what spends the step's reconciliation budget, so a remote that keeps failing parks the
   // step for an operator instead of being retried forever.
   let settled = false
-  const failures: Array<{ code: string | null | undefined; retry: unknown }> =
-    []
+  const failures: Array<{ code: string | null | undefined; retry: unknown }> = []
   const result = await settleExhaustedStep({
     store: {
       listPublicationSteps: async () => [],
@@ -333,6 +330,8 @@ test('a lookup can return a primitive error without mutation or wrapping', async
     token: 'claim',
     stepKey: 'issue:summary-comment',
     find: async () => {
+      // Deliberately test non-Error failures from an external lookup.
+      // oxlint-disable-next-line typescript/only-throw-error
       throw 'lookup exploded'
     }
   })
@@ -351,10 +350,11 @@ test('a lookup failure whose first report is lost is recorded by the retry', asy
       settleExhaustedPublicationStep: async () => true,
       failPublicationStep: async () => {
         calls += 1
-        if (calls === 1)
+        if (calls === 1) {
           throw Object.assign(new Error('Review Runs timed out'), {
             status: 504
           })
+        }
         return true
       }
     } as unknown as PublicationStepStore,
@@ -413,19 +413,14 @@ test('a lookup failure whose recording did not complete is reported again agains
     }
   })
   expect.assert(result.outcome === 'lookup_failed')
-  expect(
-    reported,
-    'retried once, against the same count both times'
-  ).toStrictEqual([1, 1])
+  expect(reported, 'retried once, against the same count both times').toStrictEqual([1, 1])
   expect(String(result.error)).toMatch(/502/)
   expect(result.recording).toBe('unknown')
   expect(result.expectedUnresolvedRecoveryCount).toBe(1)
 })
 
 test('a frozen lookup error is returned unchanged with explicit recording state', async () => {
-  const error = Object.freeze(
-    Object.assign(new Error('GitHub unavailable'), { status: 502 })
-  )
+  const error = Object.freeze(Object.assign(new Error('GitHub unavailable'), { status: 502 }))
   for (const accepted of [true, false]) {
     const result = await settleExhaustedStep({
       store: {
@@ -436,6 +431,8 @@ test('a frozen lookup error is returned unchanged with explicit recording state'
       token: 'claim',
       stepKey: 'issue:summary-comment',
       find: async () => {
+        // Preserve the original failure, including primitive values.
+        // oxlint-disable-next-line typescript/only-throw-error
         throw error
       }
     })

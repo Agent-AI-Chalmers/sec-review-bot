@@ -34,9 +34,7 @@ function makeOctokit(options: {
     // GET /repos/{owner}/{repo}            -> repository metadata
     // GET /repos/{owner}/{repo}/branches/{branch} -> branch head
     // GET /repos/{owner}/{repo}/contents/{path}   -> the config file
-    const match = /\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(
-      new URL(url).pathname
-    )
+    const match = /\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(new URL(url).pathname)
     const owner = match?.[1] ?? ''
     const repo = match?.[2] ?? ''
     const tail = match?.[3] ?? ''
@@ -46,8 +44,9 @@ function makeOctokit(options: {
       const branch = decodeURIComponent(branchMatch[1] ?? '')
       calls.branchGet.push({ owner, repo, branch })
       options.onBranchGet?.({ owner, repo, branch })
-      if (options.branchStatus !== undefined)
+      if (options.branchStatus !== undefined) {
         return githubJson({ message: 'not found' }, options.branchStatus)
+      }
       return githubJson({
         commit: { sha: options.head_sha ?? 'default-sha' }
       })
@@ -59,8 +58,9 @@ function makeOctokit(options: {
 
     calls.repoGet.push({ owner, repo })
     options.onRepoGet?.({ owner, repo })
-    if (options.getStatus !== undefined)
+    if (options.getStatus !== undefined) {
       return githubJson({ message: 'forbidden' }, options.getStatus)
+    }
     return githubJson({ default_branch: options.default_branch ?? 'main' })
   })
   return { octokit, calls, requests }
@@ -72,21 +72,16 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
     default_branch: 'trunk',
     head_sha: 'trunk-sha'
   })
-  const result: TrustedDefaultBranch = await resolveTrustedDefaultBranch(
-    octokit,
-    {
-      owner_login: 'octo',
-      repo_name: 'example'
-    }
-  )
+  const result: TrustedDefaultBranch = await resolveTrustedDefaultBranch(octokit, {
+    owner_login: 'octo',
+    repo_name: 'example'
+  })
   expect(result).toStrictEqual({
     default_branch: 'trunk',
     head_sha: 'trunk-sha'
   })
   expect(calls.repoGet).toStrictEqual([{ owner: 'octo', repo: 'example' }])
-  expect(calls.branchGet).toStrictEqual([
-    { owner: 'octo', repo: 'example', branch: 'trunk' }
-  ])
+  expect(calls.branchGet).toStrictEqual([{ owner: 'octo', repo: 'example', branch: 'trunk' }])
 })
 
 // Invariant 4: API failure -> explicit failure, no fallback.
@@ -162,9 +157,7 @@ test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not th
     repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example'
   })
-  await fetchTrustedRepositoryTriggerConfig(octokit, identity).catch(
-    () => undefined
-  )
+  await fetchTrustedRepositoryTriggerConfig(octokit, identity).catch(() => undefined)
 
   for (const call of calls.repoGet) {
     expect(call.owner).toBe('octo')

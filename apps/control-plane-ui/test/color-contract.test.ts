@@ -57,10 +57,7 @@ test('insufficient semantic contrast blocks the color contract', () => {
   )
 
   expect.assert(
-    issues.some(
-      (issue) =>
-        issue.severity === 'error' && issue.message.includes('light: --muted')
-    )
+    issues.some((issue) => issue.severity === 'error' && issue.message.includes('light: --muted'))
   )
 })
 
@@ -73,9 +70,7 @@ test('a registered color missing from both themes blocks the contract', () => {
 
   const issues = validateColorContract(themes, [])
 
-  expect(
-    issues.filter((issue) => issue.message.includes('--orphan'))
-  ).toStrictEqual([
+  expect(issues.filter((issue) => issue.message.includes('--orphan'))).toStrictEqual([
     { severity: 'error', message: 'light: missing --orphan' },
     { severity: 'error', message: 'dark: missing --orphan' }
   ])
@@ -99,28 +94,16 @@ test('every registered color participates in the theme cross-fade', () => {
 })
 
 test('brand shades must get darker while near-duplicates only warn', () => {
-  const reversed = validateColorContract(validThemes, [
-    '#ffffff',
-    '#111111',
-    '#777777'
-  ])
-  const duplicate = validateColorContract(validThemes, [
-    '#ffffff',
-    '#fefefe',
-    '#111111'
-  ])
+  const reversed = validateColorContract(validThemes, ['#ffffff', '#111111', '#777777'])
+  const duplicate = validateColorContract(validThemes, ['#ffffff', '#fefefe', '#111111'])
 
   expect.assert(
     reversed.some(
       (issue) =>
-        issue.severity === 'error' &&
-        issue.message === 'brand.2 must be darker than brand.1'
+        issue.severity === 'error' && issue.message === 'brand.2 must be darker than brand.1'
     )
   )
   expect.assert(
-    duplicate.some(
-      (issue) =>
-        issue.severity === 'warning' && issue.message.includes('ΔE2000')
-    )
+    duplicate.some((issue) => issue.severity === 'warning' && issue.message.includes('ΔE2000'))
   )
 })

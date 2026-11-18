@@ -6,15 +6,15 @@ function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
 }
 
-function asString(value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
 
-function asNumber(value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
-function asBoolean(value: unknown, fallback = false): boolean {
+function asBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
 }
 
@@ -83,9 +83,7 @@ interface LinkedIssue {
   api_url: string
 }
 
-function buildPullRequestContextFromRaw(
-  rawPayload: Record<string, unknown>
-): PullRequestContext {
+function buildPullRequestContextFromRaw(rawPayload: Record<string, unknown>): PullRequestContext {
   const repository = asRecord(rawPayload.repository)
   const repositoryOwner = asRecord(repository.owner)
   const sender = asRecord(rawPayload.sender)
@@ -96,10 +94,8 @@ function buildPullRequestContextFromRaw(
   const pullRequestHeadRepo = asRecord(pullRequestHead.repo)
   const pullRequestBaseRepo = asRecord(pullRequestBase.repo)
 
-  const head_repo_full_name =
-    asString(pullRequestHeadRepo.full_name, '').trim() || null
-  const base_repo_full_name =
-    asString(pullRequestBaseRepo.full_name, '').trim() || null
+  const head_repo_full_name = asString(pullRequestHeadRepo.full_name, '').trim() || null
+  const base_repo_full_name = asString(pullRequestBaseRepo.full_name, '').trim() || null
 
   return requirePullRequestContext({
     action: asString(rawPayload.action),
@@ -162,23 +158,17 @@ function isForkPullRequest({
 
 function requireText(value: string, label: string): void {
   if (value.trim() === '') {
-    throw new PullRequestContextExtractionError(
-      `Pull request webhook payload is missing ${label}.`
-    )
+    throw new PullRequestContextExtractionError(`Pull request webhook payload is missing ${label}.`)
   }
 }
 
 function requirePositiveInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new PullRequestContextExtractionError(
-      `Pull request webhook payload is missing ${label}.`
-    )
+    throw new PullRequestContextExtractionError(`Pull request webhook payload is missing ${label}.`)
   }
 }
 
-function requirePullRequestContext(
-  context: PullRequestContext
-): PullRequestContext {
+function requirePullRequestContext(context: PullRequestContext): PullRequestContext {
   requireText(context.repo_name, 'repository.name')
   requireText(context.repo_full_name, 'repository.full_name')
   requireText(context.owner_login, 'repository.owner.login')
@@ -191,9 +181,7 @@ function requirePullRequestContext(
   return context
 }
 
-export function extractPullRequestContext(
-  payload: unknown
-): PullRequestContext {
+export function extractPullRequestContext(payload: unknown): PullRequestContext {
   return buildPullRequestContextFromRaw(asRecord(payload))
 }
 
@@ -221,9 +209,7 @@ export async function getPullRequestContext(
         `${owner_login}/${repo_name}`,
       owner: {
         login:
-          asString(
-            asRecord(asRecord(asRecord(response.data.base).repo).owner).login
-          ) || owner_login
+          asString(asRecord(asRecord(asRecord(response.data.base).repo).owner).login) || owner_login
       }
     },
     sender: null,
@@ -308,15 +294,11 @@ function isSameRepositoryIssueSource(
   }
 ): boolean {
   const { owner_login, repo_name } = context
-  const repositoryUrl = asString(source_issue.repository_url)
-    .trim()
-    .toLowerCase()
+  const repositoryUrl = asString(source_issue.repository_url).trim().toLowerCase()
   if (!repositoryUrl) {
     return false
   }
-  return repositoryUrl.endsWith(
-    `/repos/${owner_login.toLowerCase()}/${repo_name.toLowerCase()}`
-  )
+  return repositoryUrl.endsWith(`/repos/${owner_login.toLowerCase()}/${repo_name.toLowerCase()}`)
 }
 
 async function listTimelineCrossReferencedIssueRefs(
@@ -362,11 +344,7 @@ async function listTimelineCrossReferencedIssueRefs(
       }
 
       const issue_number = asNumber(source_issue.number)
-      if (
-        !Number.isInteger(issue_number) ||
-        issue_number <= 0 ||
-        seen.has(issue_number)
-      ) {
+      if (!Number.isInteger(issue_number) || issue_number <= 0 || seen.has(issue_number)) {
         continue
       }
 
@@ -422,9 +400,7 @@ export async function fetchTimelineLinkedIssues(
 
     const user = asRecord(issue.user)
     const labels = Array.isArray(issue.labels)
-      ? issue.labels
-          .map((label) => asString(asRecord(label).name, '').trim())
-          .filter(Boolean)
+      ? issue.labels.map((label) => asString(asRecord(label).name, '').trim()).filter(Boolean)
       : []
 
     issues.push({

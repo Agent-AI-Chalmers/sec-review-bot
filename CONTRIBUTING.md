@@ -49,6 +49,20 @@ After changing a contract, complete the checks required by the [contracts guide]
 
 List the commands you ran to check the change and report the results. Also note any relevant checks you did not run.
 
+## Formatting And Lint Responsibilities
+
+<!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
+
+Use Oxfmt for formatting with a 100-column target. Preserve fixture exclusions. Generated artifacts must pass formatting without another rewrite, and repeated generation must leave the same bytes. See the [contract tooling guide](contracts/codegen/README.md) when changing generators.
+
+<!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
+
+All TypeScript packages use the shared Oxlint correctness rules and type-aware checks. Keep imports before executable statements and use braces for control-flow bodies. Handle Promise failures explicitly.
+
+Prefer inferred return types for simple internal functions and callbacks. Explicitly annotate exported functions that define a stable interface, unless their contract is already supplied by a contextual type or checked with `satisfies`.
+
+Keep blank lines around declarations for readability; adjacent type aliases and function overloads may remain grouped.
+
 ## Submit A Pull Request
 
 ### Title

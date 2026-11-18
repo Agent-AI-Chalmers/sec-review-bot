@@ -55,27 +55,24 @@ test('shared v1 contract fixtures match JSON schemas', () => {
     }
     const valid = validate(contractFixture(fixtureName))
 
-    expect(
-      valid,
-      `${fixtureName} failed ${schemaName}: ${ajv.errorsText(validate.errors)}`
-    ).toBe(true)
+    expect(valid, `${fixtureName} failed ${schemaName}: ${ajv.errorsText(validate.errors)}`).toBe(
+      true
+    )
   }
 })
 
 test('shared v1 contract fixture manifest covers fixture and schema files', () => {
   const schemaFixtures = new Map(fixtureSchemas())
   const invalidSchemaFixtures = new Map(invalidFixtureSchemas())
-  const fixtureNames = contractFixtureFiles().filter(
-    (name) => name !== 'manifest.json'
-  )
+  const fixtureNames = contractFixtureFiles().filter((name) => name !== 'manifest.json')
   const schemaNames = new Set(contractSchemaFiles())
 
-  expect(
-    [...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort()
-  ).toStrictEqual(fixtureNames)
+  expect([...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort()).toStrictEqual(
+    fixtureNames
+  )
   expect.assert(
-    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every(
-      (schemaName) => schemaNames.has(schemaName)
+    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every((schemaName) =>
+      schemaNames.has(schemaName)
     )
   )
 })
@@ -88,7 +85,7 @@ test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
   ).toStrictEqual(Object.keys(manifest.invalid_schema_fixtures).sort())
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    validate(contractFixture(fixtureName))
+    expect(validate(contractFixture(fixtureName))).toBe(false)
     const allFailing = new Set(
       (validate.errors ?? []).map((error) =>
         error.instancePath === ''
@@ -103,15 +100,10 @@ test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
     const failing = new Set(
       [...allFailing].filter(
         (candidate) =>
-          ![...allFailing].some(
-            (other) => other !== candidate && candidate.startsWith(`${other}.`)
-          )
+          ![...allFailing].some((other) => other !== candidate && candidate.startsWith(`${other}.`))
       )
     )
-    expect(
-      failing,
-      `${fixtureName} should fail only at its declared path`
-    ).toStrictEqual(
+    expect(failing, `${fixtureName} should fail only at its declared path`).toStrictEqual(
       new Set([manifest.invalid_fixture_error_paths[fixtureName]])
     )
   }
@@ -129,9 +121,7 @@ test('v1 pull request input schema requires audit objective', () => {
 
 test('v1 repository input schema requires audit objective', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = contractFixture(
-    'repository-review-input-incremental.json'
-  ) as {
+  const payload = contractFixture('repository-review-input-incremental.json') as {
     review_intent: { objective: string }
   }
   payload.review_intent.objective = 'repair'
@@ -179,9 +169,7 @@ test('v1 repository incremental schema rejects missing window fields', () => {
 
 test('v1 repository incremental schema allows empty changed file scope', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(
-    contractFixture('repository-review-input-incremental.json')
-  ) as {
+  const payload = structuredClone(contractFixture('repository-review-input-incremental.json')) as {
     scan_scope: {
       incremental_changed_files: Array<Record<string, unknown>>
     }
@@ -204,9 +192,7 @@ test('v1 review record schema rejects unsafe file change paths', () => {
     '.git/config',
     ' src/server.ts '
   ]) {
-    const payload = structuredClone(
-      contractFixture('review-record-deleted-file.json')
-    ) as {
+    const payload = structuredClone(contractFixture('review-record-deleted-file.json')) as {
       mitigation: {
         file_changes: Array<{ path: string }>
       }

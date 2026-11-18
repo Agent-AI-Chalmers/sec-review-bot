@@ -34,17 +34,17 @@ let suiteInputBundleRoot: string
 const previousInputBundleRoot = process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
 
 beforeAll(async () => {
-  suiteTempRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'prepare-input-suite-')
-  )
+  suiteTempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-input-suite-'))
   suiteInputBundleRoot = path.join(suiteTempRoot, 'input-bundles')
   process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = suiteInputBundleRoot
 })
 
 afterAll(async () => {
-  if (previousInputBundleRoot === undefined)
+  if (previousInputBundleRoot === undefined) {
     delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
-  else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousInputBundleRoot
+  } else {
+    process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousInputBundleRoot
+  }
   await fs.rm(suiteTempRoot, { recursive: true, force: true })
 })
 
@@ -63,10 +63,7 @@ async function createGitFixture(
     cwd: source
   })
   await fs.mkdir(path.join(source, 'src'), { recursive: true })
-  await fs.writeFile(
-    path.join(source, 'src', 'app.ts'),
-    'export const value = 1\n'
-  )
+  await fs.writeFile(path.join(source, 'src', 'app.ts'), 'export const value = 1\n')
   await execFileAsync('git', ['add', '.'], { cwd: source })
   await execFileAsync('git', ['commit', '-m', 'base'], { cwd: source })
   const { stdout: base } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
@@ -75,18 +72,12 @@ async function createGitFixture(
   // A second commit gives `synchronize` a previous head that is neither the
   // pull request base nor the current head, which is the shape that exposes a
   // workspace missing the window base.
-  await fs.writeFile(
-    path.join(source, 'src', 'app.ts'),
-    'export const value = 2\n'
-  )
+  await fs.writeFile(path.join(source, 'src', 'app.ts'), 'export const value = 2\n')
   await execFileAsync('git', ['commit', '-am', 'head'], { cwd: source })
   const { stdout: mid } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
   })
-  await fs.writeFile(
-    path.join(source, 'src', 'app.ts'),
-    'export const value = 3\n'
-  )
+  await fs.writeFile(path.join(source, 'src', 'app.ts'), 'export const value = 3\n')
   await execFileAsync('git', ['commit', '-am', 'pushed'], { cwd: source })
   const { stdout: head } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
@@ -105,7 +96,9 @@ async function createGitFixture(
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {
-    for (const item of value) collectKeys(item, keys)
+    for (const item of value) {
+      collectKeys(item, keys)
+    }
   } else if (typeof value === 'object' && value !== null) {
     for (const [key, item] of Object.entries(value)) {
       keys.add(key)
@@ -150,15 +143,9 @@ async function assertRunnerInputArtifact<
   expect(inputBundle['digest']).toBe(
     `sha256:${crypto.createHash('sha256').update(archive).digest('hex')}`
   )
-  const { stdout: archiveListing } = await execFileAsync('tar', [
-    '--zstd',
-    '-tf',
-    archivePath
-  ])
+  const { stdout: archiveListing } = await execFileAsync('tar', ['--zstd', '-tf', archivePath])
   expect(archiveListing).toMatch(/^manifest\.json$/m)
-  expect(archiveListing).toMatch(
-    new RegExp(`^${WORKSPACE_SNAPSHOT_TAR_NAME}$`, 'm')
-  )
+  expect(archiveListing).toMatch(new RegExp(`^${WORKSPACE_SNAPSHOT_TAR_NAME}$`, 'm'))
   expect(archiveListing).not.toMatch(/^workspace\//m)
   expect(archiveListing).not.toMatch(/review-input\.json$/m)
   expect(path.basename(path.dirname(inputBundleRoot))).toBe(runId)
@@ -171,10 +158,7 @@ async function assertRunnerInputArtifact<
   expect(JSON.parse(await fs.readFile(inputPath, 'utf8'))).toStrictEqual(input)
 }
 
-function repositoryOctokit(refs: {
-  base_sha: string
-  head_sha: string
-}): Octokit {
+function repositoryOctokit(refs: { base_sha: string; head_sha: string }): Octokit {
   return fakeGitHub(({ url }) => {
     const parsed = new URL(url)
     const pathname = parsed.pathname
@@ -216,8 +200,9 @@ function repositoryOctokit(refs: {
       const ref = decodeURIComponent(pathname.split('/commits/')[1] ?? '')
       return githubJson({ sha: ref })
     }
-    if (pathname.includes('/git/trees/'))
+    if (pathname.includes('/git/trees/')) {
       return githubJson({ tree: [], truncated: false })
+    }
     if (pathname.includes('/contents/')) {
       return githubJson({ message: 'Not Found' }, 404)
     }
@@ -234,9 +219,7 @@ test(
   'issue input preparer keeps materialized git workspace files in snapshot',
   { concurrent: false },
   async () => {
-    const tempRoot = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'issue-input-workspace-')
-    )
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'issue-input-workspace-'))
     const previousGitHubServerUrl = process.env['GITHUB_SERVER_URL']
     process.env['GITHUB_SERVER_URL'] = `file://${tempRoot}`
     try {
@@ -273,24 +256,25 @@ test(
       await execFileAsync('git', ['push', 'origin', 'main'], {
         cwd: source_repo_path
       })
-      const { stdout: head_sha_stdout } = await execFileAsync(
-        'git',
-        ['rev-parse', 'HEAD'],
-        {
-          cwd: source_repo_path
-        }
-      )
+      const { stdout: head_sha_stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+        cwd: source_repo_path
+      })
       const head_sha = head_sha_stdout.trim()
 
       const octokit = fakeGitHub(({ url }) => {
         const pathname = new URL(url).pathname
-        if (pathname.includes('/git/trees/'))
+        if (pathname.includes('/git/trees/')) {
           return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/'))
+        }
+        if (pathname.includes('/contents/')) {
           return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/'))
+        }
+        if (pathname.includes('/branches/')) {
           return githubJson({ commit: { sha: head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
 
@@ -309,8 +293,7 @@ test(
         labels: [],
         html_url: 'https://github.com/octo/demo/issues/42',
         api_url: 'https://api.github.com/repos/octo/demo/issues/42',
-        comments_url:
-          'https://api.github.com/repos/octo/demo/issues/42/comments',
+        comments_url: 'https://api.github.com/repos/octo/demo/issues/42/comments',
         is_pull_request: false
       }
 
@@ -332,10 +315,7 @@ test(
         runId: prepared.run_id
       })
       const manifest = JSON.parse(
-        await fs.readFile(
-          path.join(prepared.input_bundle_root, 'manifest.json'),
-          'utf8'
-        )
+        await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       expect(manifest).toStrictEqual({
         api_version: EXECUTION_API_VERSION,
@@ -352,10 +332,7 @@ test(
       ])
 
       expect(
-        await fs.readFile(
-          path.join(extractedSnapshot, 'workspace', 'src', 'app.ts'),
-          'utf8'
-        )
+        await fs.readFile(path.join(extractedSnapshot, 'workspace', 'src', 'app.ts'), 'utf8')
       ).toBe('export const value = 1\n')
     } finally {
       if (previousGitHubServerUrl === undefined) {
@@ -427,13 +404,18 @@ test(
             }
           })
         }
-        if (pathname.includes('/git/trees/'))
+        if (pathname.includes('/git/trees/')) {
           return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/'))
+        }
+        if (pathname.includes('/contents/')) {
           return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/'))
+        }
+        if (pathname.includes('/branches/')) {
           return githubJson({ commit: { sha: refs.head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
       const prepared = await preparePullRequestReviewInput({
@@ -468,13 +450,8 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      expect(Object.keys(agent_metadata).sort()).toStrictEqual([
-        'commit_shas',
-        'review_window'
-      ])
-      expect(
-        (agent_metadata['review_window'] as Record<string, unknown>)['kind']
-      ).toBe('full')
+      expect(Object.keys(agent_metadata).sort()).toStrictEqual(['commit_shas', 'review_window'])
+      expect((agent_metadata['review_window'] as Record<string, unknown>)['kind']).toBe('full')
 
       // The execution input carries the review subject, not the raw webhook
       // payload: no endpoint URLs, commit counts, or sender identity.
@@ -496,27 +473,23 @@ test(
       ])
 
       const manifest = JSON.parse(
-        await fs.readFile(
-          path.join(prepared.input_bundle_root, 'manifest.json'),
-          'utf8'
-        )
+        await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       expect('incremental_window' in manifest).toBe(true)
       expect(
         await fs
           .readFile(
-            path.join(
-              prepared.input_bundle_root,
-              'incremental-window',
-              'changed-files.json'
-            ),
+            path.join(prepared.input_bundle_root, 'incremental-window', 'changed-files.json'),
             'utf8'
           )
           .then(Boolean)
       ).toBe(true)
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }
@@ -555,10 +528,7 @@ test(
       expect('repo_full_name' in full.input.scan_target).toBe(false)
       expect('repository' in full.input).toBe(false)
       const fullManifest = JSON.parse(
-        await fs.readFile(
-          path.join(full.input_bundle_root, 'manifest.json'),
-          'utf8'
-        )
+        await fs.readFile(path.join(full.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       expect('incremental_window' in fullManifest).toBe(false)
 
@@ -577,12 +547,7 @@ test(
         scan_mode: 'full'
       })
       await expect(
-        fs.access(
-          path.join(
-            retriedFull.input_bundle_root,
-            'stale-from-failed-attempt.txt'
-          )
-        )
+        fs.access(path.join(retriedFull.input_bundle_root, 'stale-from-failed-attempt.txt'))
       ).rejects.toMatchObject({ code: 'ENOENT' })
 
       const incremental = await prepareRepositoryReviewInput({
@@ -605,10 +570,9 @@ test(
       })
       expect(incremental.input.scan_target.scan_mode).toBe('incremental')
       expect(incremental.input.scan_target.base_sha).toBe(refs.base_sha)
-      const changed_paths =
-        incremental.input.scan_scope.incremental_changed_files.map(
-          (file) => file.path
-        )
+      const changed_paths = incremental.input.scan_scope.incremental_changed_files.map(
+        (file) => file.path
+      )
       expect(
         changed_paths,
         `the workspace change is missing from the scan scope: ${changed_paths.join(', ')}`
@@ -618,11 +582,7 @@ test(
         'the scan scope was read from the compare response instead of the workspace'
       ).not.toContain('from-api.ts')
       const incremental_patch = await fs.readFile(
-        path.join(
-          incremental.input_bundle_root,
-          'incremental-window',
-          'incremental.patch'
-        ),
+        path.join(incremental.input_bundle_root, 'incremental-window', 'incremental.patch'),
         'utf8'
       )
       expect(incremental_patch).toMatch(/src\/app\.ts/)
@@ -633,11 +593,7 @@ test(
       // stop being written.
       const incremental_changed_files = JSON.parse(
         await fs.readFile(
-          path.join(
-            incremental.input_bundle_root,
-            'incremental-window',
-            'changed-files.json'
-          ),
+          path.join(incremental.input_bundle_root, 'incremental-window', 'changed-files.json'),
           'utf8'
         )
       ) as {
@@ -648,17 +604,10 @@ test(
       expect(incremental_changed_files.base_sha).toBe(refs.base_sha)
       expect(incremental_changed_files.head_sha).toBe(refs.head_sha)
       expect(
-        incremental_changed_files.files.map((file) => [
-          file.path,
-          file.status,
-          file.previous_path
-        ])
+        incremental_changed_files.files.map((file) => [file.path, file.status, file.previous_path])
       ).toStrictEqual([['src/app.ts', 'modified', null]])
       const incrementalManifest = JSON.parse(
-        await fs.readFile(
-          path.join(incremental.input_bundle_root, 'manifest.json'),
-          'utf8'
-        )
+        await fs.readFile(path.join(incremental.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       expect('incremental_window' in incrementalManifest).toBe(true)
 
@@ -666,11 +615,7 @@ test(
       // and be missing from the other.
       const scan_window = JSON.parse(
         await fs.readFile(
-          path.join(
-            incremental.input_bundle_root,
-            'history',
-            'scan-window.json'
-          ),
+          path.join(incremental.input_bundle_root, 'history', 'scan-window.json'),
           'utf8'
         )
       ) as Record<string, unknown>
@@ -679,8 +624,11 @@ test(
       expect(scan_window['head_sha']).toBe(refs.head_sha)
       expect(typeof scan_window['changed_file_count']).toBe('number')
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }
@@ -751,13 +699,18 @@ test(
             }
           })
         }
-        if (pathname.includes('/git/trees/'))
+        if (pathname.includes('/git/trees/')) {
           return githubJson({ tree: [], truncated: false })
-        if (pathname.includes('/contents/'))
+        }
+        if (pathname.includes('/contents/')) {
           return githubJson({ message: 'Not Found' }, 404)
-        if (pathname.includes('/branches/'))
+        }
+        if (pathname.includes('/branches/')) {
           return githubJson({ commit: { sha: refs.head_sha } })
-        if (pathname.includes('/timeline')) return githubJson([])
+        }
+        if (pathname.includes('/timeline')) {
+          return githubJson([])
+        }
         return githubJson({ default_branch: 'main' })
       }).octokit
 
@@ -782,26 +735,16 @@ test(
 
       const changed_files = JSON.parse(
         await fs.readFile(
-          path.join(
-            prepared.input_bundle_root,
-            'incremental-window',
-            'changed-files.json'
-          ),
+          path.join(prepared.input_bundle_root, 'incremental-window', 'changed-files.json'),
           'utf8'
         )
       ) as { files: Array<{ path: string }> }
       const patch = await fs.readFile(
-        path.join(
-          prepared.input_bundle_root,
-          'incremental-window',
-          'incremental.patch'
-        ),
+        path.join(prepared.input_bundle_root, 'incremental-window', 'incremental.patch'),
         'utf8'
       )
 
-      expect(changed_files.files.map((item) => item.path)).toStrictEqual([
-        'src/app.ts'
-      ])
+      expect(changed_files.files.map((item) => item.path)).toStrictEqual(['src/app.ts'])
       // The patch must be exactly the push window, not the whole pull request.
       // The fixture is base=1, mid=2, head=3, so a push window over mid..head
       // shows 2 -> 3 and a full-window patch would show 1 -> 3 instead.
@@ -814,15 +757,16 @@ test(
       // The third artifact -- the file set suggestion anchoring uses -- must agree with the
       // other two. When it came from the API's per-file list, a large run could anchor against a
       // narrower set than the patch covered, and the three would describe different changes.
-      expect(
-        prepared.files.map((item: { filename: string }) => item.filename)
-      ).toStrictEqual(changed_files.files.map((item) => item.path))
-      expect(prepared.files[0]?.patch ?? '').toMatch(
-        /^\+export const value = 3$/m
+      expect(prepared.files.map((item: { filename: string }) => item.filename)).toStrictEqual(
+        changed_files.files.map((item) => item.path)
       )
+      expect(prepared.files[0]?.patch ?? '').toMatch(/^\+export const value = 3$/m)
     } finally {
-      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
-      else process.env['GITHUB_SERVER_URL'] = previousServer
+      if (previousServer === undefined) {
+        delete process.env['GITHUB_SERVER_URL']
+      } else {
+        process.env['GITHUB_SERVER_URL'] = previousServer
+      }
       await fs.rm(tempRoot, { recursive: true, force: true })
     }
   }

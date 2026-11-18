@@ -17,8 +17,9 @@ import type {
 import { learningReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
-if (databaseUrl === undefined)
+if (databaseUrl === undefined) {
   throw new Error('TEST_DATABASE_URL is required for integration tests.')
+}
 
 function artifact(name: string, digestCharacter: string): ArtifactReference {
   return {
@@ -52,10 +53,7 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
     source_run_id: 'run-1',
     source_unit_id: 'review',
     execution_archive_digest: `sha256:${'d'.repeat(64)}`,
-    trajectory_reference: artifact(
-      'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
-      'c'
-    ),
+    trajectory_reference: artifact('trajectories/memory-extractor/trajectory.v1.jsonl.zst', 'c'),
     observations: [{ observation_id: 'extraction-1', body_markdown: 'A fact.' }]
   }
   const actor: Actor = { kind: 'user', id: 'reviewer@example.com' }
@@ -69,22 +67,13 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
 
     // Read while the observation is still pending, so the backlog has an oldest timestamp.
     const backlog = await store.queries.getObservationBacklog()
-    assertIsoTimestamp(
-      backlog.oldest_pending_created_at,
-      'backlog.oldest_pending_created_at'
-    )
+    assertIsoTimestamp(backlog.oldest_pending_created_at, 'backlog.oldest_pending_created_at')
     const stored = await store.queries.getExtraction(extraction.extraction_id)
     assertIsoTimestamp(stored?.created_at, 'extraction.created_at')
     const extractions = await store.queries.listExtractions(undefined, 10, {})
-    assertIsoTimestamp(
-      extractions.extractions[0]?.created_at,
-      'listExtractions.created_at'
-    )
+    assertIsoTimestamp(extractions.extractions[0]?.created_at, 'listExtractions.created_at')
     const observations = await store.queries.listObservations(undefined, 10, {})
-    assertIsoTimestamp(
-      observations.observations[0]?.created_at,
-      'observation.created_at'
-    )
+    assertIsoTimestamp(observations.observations[0]?.created_at, 'observation.created_at')
 
     const versionInput = {
       expected_active_version: 0,
@@ -108,10 +97,7 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
       'version.created_at'
     )
     const history = await store.queries.listMemoryTreeVersions(undefined, 10)
-    assertIsoTimestamp(
-      history.versions[0]?.created_at,
-      'listMemoryTreeVersions.created_at'
-    )
+    assertIsoTimestamp(history.versions[0]?.created_at, 'listMemoryTreeVersions.created_at')
 
     const paused = await store.changeMemoryTreeAutomation('paused', {
       operation_id: 'pause-automation',
@@ -157,10 +143,10 @@ for (const surface of ['extractions', 'observations'] as const) {
         await store.reserveExtractionPublication(publication)
         await store.confirmExtractionPublication(publication)
         await store.registerExtraction(registration)
-        await pool.query(
-          `update ${surface} set created_at=$1 where extraction_id=$2`,
-          [`2026-01-01T00:00:00.${fraction}Z`, id]
-        )
+        await pool.query(`update ${surface} set created_at=$1 where extraction_id=$2`, [
+          `2026-01-01T00:00:00.${fraction}Z`,
+          id
+        ])
       }
       const list = async (cursor: string | undefined) => {
         if (surface === 'extractions') {

@@ -10,9 +10,7 @@ const chromeCandidates = [
   '/usr/bin/google-chrome',
   '/usr/bin/google-chrome-stable'
 ].filter((candidate): candidate is string => candidate !== undefined)
-const executablePath = chromeCandidates.find((candidate) =>
-  existsSync(candidate)
-)
+const executablePath = chromeCandidates.find((candidate) => existsSync(candidate))
 const externalDeployment = process.env.CONTROL_PLANE_UI_BASE_URL !== undefined
 const fixedFixturePort = process.env.CONTROL_PLANE_UI_E2E_PORT !== undefined
 const isolatedLocalWorkers = !externalDeployment && !fixedFixturePort
@@ -30,10 +28,7 @@ export default defineConfig({
   // External deployments share data and capacity. A fixed local port also cannot
   // host more than one fixture server, so both modes run predictably in one worker.
   workers: isolatedLocalWorkers ? 3 : 1,
-  reporter: [
-    ['line'],
-    ['html', { open: 'never', outputFolder: 'playwright-report' }]
-  ],
+  reporter: [['line'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
     locale: 'en-US',
     permissions: ['clipboard-read', 'clipboard-write'],

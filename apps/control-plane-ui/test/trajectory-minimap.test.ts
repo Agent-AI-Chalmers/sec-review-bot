@@ -47,15 +47,11 @@ test('dense trajectories bucket marks without overlapping', () => {
   expect(buckets).toHaveLength(MAX_MINIMAP_MARKS)
   expect(buckets[0]?.start).toBe(0)
   expect(buckets.at(-1)?.end).toBe(count - 1)
-  for (let index = 1; index < buckets.length; index += 1)
-    expect.assert(buckets[index]!.top > buckets[index - 1]!.top)
-  const gaps = buckets
-    .slice(1)
-    .map((bucket, index) => bucket.top - buckets[index]!.top)
-  expect.assert(
-    Math.min(...gaps) > 2,
-    `bucket marks must not overlap: ${gaps.join(', ')}`
-  )
+  for (let index = 1; index < buckets.length; index += 1) {
+    expect.assert(buckets[index].top > buckets[index - 1].top)
+  }
+  const gaps = buckets.slice(1).map((bucket, index) => bucket.top - buckets[index].top)
+  expect.assert(Math.min(...gaps) > 2, `bucket marks must not overlap: ${gaps.join(', ')}`)
 })
 
 test('a sparse trajectory keeps one bucket per message', () => {

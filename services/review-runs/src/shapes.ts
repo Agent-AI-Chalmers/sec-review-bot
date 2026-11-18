@@ -33,17 +33,13 @@ export type {
   ReviewRunRecord
 }
 
-export type ExecutionStatisticsSummary = NonNullable<
-  ObservedRun['execution_statistics']
->
+export type ExecutionStatisticsSummary = NonNullable<ObservedRun['execution_statistics']>
 
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type ExecutionStatus = ReviewRunRecord['execution']['status']
 export type PublicationStatus = ReviewRunRecord['publication']['status']
 /** The redacted preparation summary's state, as both the contract and the run record use it. */
-export type PreparationStatus = NonNullable<
-  ReviewRunRecord['preparation']
->['status']
+export type PreparationStatus = NonNullable<ReviewRunRecord['preparation']>['status']
 export type JsonObject = Record<string, unknown>
 
 /** The durable record's artifact storage, narrowed from the Execution API's loose type. */
@@ -63,12 +59,7 @@ export type PublicationStepSummary = Omit<
 /** The arguments the store accepts for a new run. */
 export type CreateReviewRunArgs = Pick<
   ReviewRunRecord,
-  | 'run_id'
-  | 'workflow'
-  | 'publish_context'
-  | 'execution_input'
-  | 'ingress_kind'
-  | 'ingress_key'
+  'run_id' | 'workflow' | 'publish_context' | 'execution_input' | 'ingress_kind' | 'ingress_key'
 > & {
   preparation_input?: JsonObject
   preparation_input_version?: string
@@ -97,7 +88,9 @@ export function normalizeArtifactStorage(
   storage: ExecutionArtifactStorage | null,
   context = 'artifact_storage'
 ): ArtifactStorage {
-  if (storage === null) return null
+  if (storage === null) {
+    return null
+  }
   if (storage.status === 'available') {
     const artifact = storage.artifact
     if (artifact == null) {
@@ -108,9 +101,7 @@ export function normalizeArtifactStorage(
     }
     return {
       status: 'available',
-      artifact: artifact as NonNullable<
-        Extract<ArtifactStorage, { artifact: unknown }>
-      >['artifact']
+      artifact: artifact as NonNullable<Extract<ArtifactStorage, { artifact: unknown }>>['artifact']
     }
   }
   return {

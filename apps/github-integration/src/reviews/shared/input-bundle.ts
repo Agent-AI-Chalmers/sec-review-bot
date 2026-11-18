@@ -39,10 +39,7 @@ const execFileAsync = promisify(execFile)
  * The input travels through Temporal and is persisted, and both fail far from the cause when the
  * payload is too large, so the size is checked here, against the bound the contract declares.
  */
-export function assertWorkflowInputFits(
-  input: unknown,
-  workflow: string
-): void {
+export function assertWorkflowInputFits(input: unknown, workflow: string): void {
   const bytes = Buffer.byteLength(JSON.stringify(input), 'utf8')
   if (bytes > MAX_WORKFLOW_INPUT_BYTES) {
     throw new Error(
@@ -61,13 +58,8 @@ export async function ensureCleanDirectory(dir_path: string): Promise<void> {
   await fs.mkdir(dir_path, { recursive: true })
 }
 
-export function buildGitRemoteUrl(
-  owner_login: string,
-  repo_name: string
-): string {
-  const serverUrl = (
-    process.env.GITHUB_SERVER_URL || 'https://github.com'
-  ).replace(/\/+$/, '')
+export function buildGitRemoteUrl(owner_login: string, repo_name: string): string {
+  const serverUrl = (process.env.GITHUB_SERVER_URL || 'https://github.com').replace(/\/+$/, '')
   return `${serverUrl}/${owner_login}/${repo_name}.git`
 }
 
@@ -203,19 +195,18 @@ async function readRepositoryFileAtSha({
         tree_sha
       })
       if (tree.data.truncated) {
-        throw new Error(
-          `Git tree is truncated while reading ${path} at ${sha}.`
-        )
+        throw new Error(`Git tree is truncated while reading ${path} at ${sha}.`)
       }
       const entry = tree.data.tree.find((item) => item.path === component)
-      if (entry === undefined) return null
+      if (entry === undefined) {
+        return null
+      }
       if (index < components.length - 1) {
-        if (entry.type !== 'tree' || entry.mode !== '040000') return null
+        if (entry.type !== 'tree' || entry.mode !== '040000') {
+          return null
+        }
         tree_sha = entry.sha
-      } else if (
-        entry.type !== 'blob' ||
-        (entry.mode !== '100644' && entry.mode !== '100755')
-      ) {
+      } else if (entry.type !== 'blob' || (entry.mode !== '100644' && entry.mode !== '100755')) {
         return null
       }
     }
@@ -280,11 +271,7 @@ export async function archiveInputBundle({
     input_bundle_root,
     ...entries
   ])
-  await pipeline(
-    createReadStream(tarPath),
-    createZstdCompress(),
-    createWriteStream(archivePath)
-  )
+  await pipeline(createReadStream(tarPath), createZstdCompress(), createWriteStream(archivePath))
   await fs.rm(tarPath, { force: true })
   const digest = crypto.createHash('sha256')
   await pipeline(createReadStream(archivePath), digest)

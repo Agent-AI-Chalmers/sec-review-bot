@@ -19,10 +19,7 @@ function schema(): Record<string, unknown> & ExecutionWorkflowInputSchema {
     'v1',
     'execution-workflow-input.schema.json'
   )
-  return JSON.parse(readFileSync(schemaPath, 'utf8')) as Record<
-    string,
-    unknown
-  > &
+  return JSON.parse(readFileSync(schemaPath, 'utf8')) as Record<string, unknown> &
     ExecutionWorkflowInputSchema
 }
 

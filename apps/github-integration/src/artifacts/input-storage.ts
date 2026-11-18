@@ -21,7 +21,7 @@ import {
 } from '../config.js'
 import type { InputBundleArtifactRef } from '../execution/input.js'
 
-function inputObjectKey(runId: string, digest: string): string {
+function inputObjectKey(runId: string, digest: string) {
   return `runs/${runId}/input/${digest.replace(/^sha256:/, '')}/input-bundle.v1.tar.zst`
 }
 
@@ -42,11 +42,10 @@ function matchesReference(
     Metadata?: Record<string, string> | undefined
   },
   reference: InputBundleArtifactRef
-): boolean {
+) {
   return (
     response.ContentLength === reference.size_bytes &&
-    response.Metadata?.['sha256'] ===
-      reference.digest.replace(/^sha256:/, '') &&
+    response.Metadata?.['sha256'] === reference.digest.replace(/^sha256:/, '') &&
     response.Metadata?.['media-type'] === reference.media_type
   )
 }
@@ -58,22 +57,21 @@ async function existingObjectMatches(
   reference: InputBundleArtifactRef
 ): Promise<boolean | undefined> {
   try {
-    const response = await client.send(
-      new HeadObjectCommand({ Bucket: bucket, Key: key })
-    )
+    const response = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
     return matchesReference(response, reference)
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-            ?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
         : undefined
     if (status === 403 || status === 404) {
       // A narrowly scoped LIST can establish absence even when HEAD returns 403.
       const listed = await client.send(
         new ListObjectsV2Command({ Bucket: bucket, Prefix: key, MaxKeys: 1 })
       )
-      if (!listed.Contents?.some((item) => item.Key === key)) return undefined
+      if (!listed.Contents?.some((item) => item.Key === key)) {
+        return undefined
+      }
     }
     throw error
   }
@@ -91,18 +89,13 @@ export function publishedInputBundleReference(
   runId: string
 ): InputBundleArtifactRef {
   if (artifact_store === 'file') {
-    if (
-      !/^[A-Za-z0-9_-]+$/.test(runId) ||
-      !/^sha256:[0-9a-f]{64}$/.test(reference.digest)
-    )
+    if (!/^[A-Za-z0-9_-]+$/.test(runId) || !/^sha256:[0-9a-f]{64}$/.test(reference.digest)) {
       throw new Error('Invalid input bundle publication identity.')
+    }
     return {
       ...reference,
       uri: pathToFileURL(
-        path.join(
-          input_bundle_staging_root,
-          inputObjectKey(runId, reference.digest)
-        )
+        path.join(input_bundle_staging_root, inputObjectKey(runId, reference.digest))
       ).href
     }
   }
@@ -116,13 +109,13 @@ export async function publishInputBundle(
 ): Promise<InputBundleArtifactRef> {
   if (artifact_store === 'file') {
     const published = publishedInputBundleReference(reference, runId)
-    if (await inputBundleExists(published)) return published
+    if (await inputBundleExists(published)) {
+      return published
+    }
     const source = fileURLToPath(reference.uri)
     const destination = fileURLToPath(published.uri)
     await fs.mkdir(path.dirname(destination), { recursive: true })
-    const temporary = await fs.mkdtemp(
-      path.join(path.dirname(destination), '.publish-')
-    )
+    const temporary = await fs.mkdtemp(path.join(path.dirname(destination), '.publish-'))
     try {
       const staged = path.join(temporary, 'bundle')
       await fs.copyFile(source, staged)
@@ -131,32 +124,35 @@ export async function publishInputBundle(
           ...reference,
           uri: pathToFileURL(staged).href
         }))
-      )
+      ) {
         throw new Error('Local input bundle publication source is missing.')
+      }
       // Link only the complete verified copy. Unlike rename, link cannot replace
       // a concurrent winner. Attempts remove only their own temporary directory.
       try {
         await fs.link(staged, destination)
       } catch (error) {
-        if (!(
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'EEXIST'
-        ))
+        if (
+          !(
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'EEXIST'
+          )
+        ) {
           throw error
+        }
       }
-      if (!(await inputBundleExists(published)))
+      if (!(await inputBundleExists(published))) {
         throw new Error('Published local input bundle is missing.')
+      }
       return published
     } finally {
       await fs.rm(temporary, { recursive: true, force: true })
     }
   }
   if (!artifact_s3_bucket) {
-    throw new Error(
-      'SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.'
-    )
+    throw new Error('SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.')
   }
 
   const source = new URL(reference.uri)
@@ -165,19 +161,12 @@ export async function publishInputBundle(
   }
   const key = inputObjectKey(runId, reference.digest)
   const client = configuredClient()
-  const existing = await existingObjectMatches(
-    client,
-    artifact_s3_bucket,
-    key,
-    reference
-  )
+  const existing = await existingObjectMatches(client, artifact_s3_bucket, key, reference)
   if (existing === true) {
     return publishedInputBundleReference(reference, runId)
   }
   if (existing === false) {
-    throw new Error(
-      `Immutable input bundle object conflicts with existing content: ${key}`
-    )
+    throw new Error(`Immutable input bundle object conflicts with existing content: ${key}`)
   }
 
   try {
@@ -198,17 +187,11 @@ export async function publishInputBundle(
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-            ?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
         : undefined
     if (
       status !== 412 ||
-      (await existingObjectMatches(
-        client,
-        artifact_s3_bucket,
-        key,
-        reference
-      )) !== true
+      (await existingObjectMatches(client, artifact_s3_bucket, key, reference)) !== true
     ) {
       throw error
     }
@@ -217,9 +200,7 @@ export async function publishInputBundle(
 }
 
 /** A failed read is uncertainty, not absence. Only a definitive missing object returns false. */
-export async function inputBundleExists(
-  reference: InputBundleArtifactRef
-): Promise<boolean> {
+export async function inputBundleExists(reference: InputBundleArtifactRef): Promise<boolean> {
   const uri = new URL(reference.uri)
   if (uri.protocol === 'file:') {
     try {
@@ -227,11 +208,9 @@ export async function inputBundleExists(
       const { size } = await fs.stat(source)
       const digest = createHash('sha256')
       await pipeline(createReadStream(source), digest)
-      if (
-        size !== reference.size_bytes ||
-        `sha256:${digest.digest('hex')}` !== reference.digest
-      )
+      if (size !== reference.size_bytes || `sha256:${digest.digest('hex')}` !== reference.digest) {
         throw new Error('Local input bundle differs from its immutable intent.')
+      }
       return true
     } catch (error) {
       if (
@@ -239,20 +218,23 @@ export async function inputBundleExists(
         error !== null &&
         'code' in error &&
         error.code === 'ENOENT'
-      )
+      ) {
         return false
+      }
       throw error
     }
   }
-  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket)
+  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket) {
     throw new Error('Input bundle uses an unconfigured store.')
+  }
   const matches = await existingObjectMatches(
     configuredClient(),
     uri.hostname,
     uri.pathname.slice(1),
     reference
   )
-  if (matches === false)
+  if (matches === false) {
     throw new Error('Input bundle object differs from its immutable intent.')
+  }
   return matches === true
 }

@@ -10,10 +10,7 @@ import { dispatchRepositoryReview } from '../triggers/repository-review.js'
 import { isRecord } from '../utils/error-utils.js'
 import { integerEnv } from '../utils/env.js'
 import { logError, logInfo } from '../utils/logger.js'
-import {
-  classifyPreparationFailure,
-  InvalidPreparationInputError
-} from './preparation-failure.js'
+import { classifyPreparationFailure, InvalidPreparationInputError } from './preparation-failure.js'
 import {
   parseRepositoryPreparationInput,
   parseIssuePreparationInput,
@@ -32,18 +29,16 @@ async function executeClaimedPreparation({
 }: {
   app: App
   store: PreparationCoordinatorStore
-  work: NonNullable<
-    Awaited<ReturnType<PreparationCoordinatorStore['claimNextPreparation']>>
-  >
+  work: NonNullable<Awaited<ReturnType<PreparationCoordinatorStore['claimNextPreparation']>>>
 }): Promise<void> {
-  if (work.input_version !== 'v1')
+  if (work.input_version !== 'v1') {
     throw new InvalidPreparationInputError(
       `Unsupported preparation input version ${work.input_version}.`
     )
-  if (!isRecord(work.input))
-    throw new InvalidPreparationInputError(
-      'Preparation input is missing object.'
-    )
+  }
+  if (!isRecord(work.input)) {
+    throw new InvalidPreparationInputError('Preparation input is missing object.')
+  }
   const input = work.input
   const kind = input.kind
   const claimed_preparation = {
@@ -71,10 +66,7 @@ async function executeClaimedPreparation({
     return
   }
 
-  if (
-    kind === 'github_pull_request_review' &&
-    work.workflow === 'pull-request-review'
-  ) {
+  if (kind === 'github_pull_request_review' && work.workflow === 'pull-request-review') {
     // A persisted payload is the snapshot this run was admitted for. It is used
     // as-is rather than re-read: a fresh read has no webhook `before` commit, so a
     // `synchronize` would lose its push window and silently widen to the whole
@@ -99,10 +91,7 @@ async function executeClaimedPreparation({
     return
   }
 
-  if (
-    kind === 'github_repository_review' &&
-    work.workflow === 'repository-review'
-  ) {
+  if (kind === 'github_repository_review' && work.workflow === 'repository-review') {
     await dispatchRepositoryReview({
       app,
       ...parseRepositoryPreparationInput(input),
@@ -113,7 +102,7 @@ async function executeClaimedPreparation({
   }
 
   throw new InvalidPreparationInputError(
-    `Preparation input kind ${kind} does not match ${work.workflow}.`
+    `Preparation input kind ${typeof kind === 'string' ? kind : 'unknown'} does not match ${work.workflow}.`
   )
 }
 
@@ -132,10 +121,7 @@ export async function prepareReviewRunsOnce({
       // The workflow may already have consumed its token into a terminal or
       // submission-recovery state. Only fail the preparation if it still owns it.
       try {
-        const classification = classifyPreparationFailure(
-          error,
-          work.attempt_count
-        )
+        const classification = classifyPreparationFailure(error, work.attempt_count)
         await store.failPreparation(
           work.run_id,
           work.claim_token,
@@ -176,7 +162,9 @@ export function startPreparationCoordinator({
   let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = (async () => {
       while (!stopped && (await prepareReviewRunsOnce({ app, store }))) {
         // Drain currently available preparations before returning to the poll interval.

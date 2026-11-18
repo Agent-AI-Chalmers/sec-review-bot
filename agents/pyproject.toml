@@ -22,31 +22,20 @@ dependencies = [
   "structlog>=26.1.0",
   "temporalio>=1.36.0",
   "boto3>=1.43.120",
-  "yamlcore>=0.1.1",
+  "yamlcore>=0.1.1"
 ]
 
 [dependency-groups]
-test = [
-  "pytest>=9.2.0",
-  "pytest-asyncio>=1.4.1",
-  "pytest-timeout>=2.4.0",
-]
-lint = [
-  "black>=26.10.1",
-  "ruff>=0.17.3",
-]
+test = ["pytest>=9.2.0", "pytest-asyncio>=1.4.1", "pytest-timeout>=2.4.0"]
+lint = ["black>=26.10.1", "ruff>=0.17.3"]
 typecheck = [
   "hatchling>=1.33.0",
   "mypy>=2.4.0",
   "pyright>=1.1.414",
   "types-PyYAML>=6.0.12.20260906",
-  "types-jsonschema>=4.26.0.20261006",
+  "types-jsonschema>=4.26.0.20261006"
 ]
-dev = [
-  { include-group = "test" },
-  { include-group = "lint" },
-  { include-group = "typecheck" },
-]
+dev = [{ include-group = "test" }, { include-group = "lint" }, { include-group = "typecheck" }]
 
 [project.scripts]
 sec-review-execution-worker = "sec_review_agents.entrypoints.execution_worker.main:main"
@@ -69,7 +58,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "integration: requires a real runtime or external process beyond ordinary in-process tests",
-  "llm: invokes a real language model and is gated from normal test runs",
+  "llm: invokes a real language model and is gated from normal test runs"
 ]
 
 [tool.ruff]
@@ -81,12 +70,12 @@ line-length = 88
 [tool.ruff.lint]
 extend-select = ["I", "E402"]
 ignore = [
-  "B008",   # FastAPI dependency defaults intentionally call Body/Depends.
-  "B017",   # Temporal tests intentionally assert framework-wrapped failures.
+  "B008", # FastAPI dependency defaults intentionally call Body/Depends.
+  "B017", # Temporal tests intentionally assert framework-wrapped failures.
   "BLE001", # Boundary layers intentionally convert arbitrary failures.
   "FLY002", # Prompt/fixture blocks are clearer as joins than collapsed literals.
-  "S110",   # Best-effort cleanup/serialization paths intentionally suppress failures.
-  "TRY004", # Public validation paths intentionally keep ValueError contracts.
+  "S110", # Best-effort cleanup/serialization paths intentionally suppress failures.
+  "TRY004" # Public validation paths intentionally keep ValueError contracts.
 ]
 
 [tool.black]
@@ -114,8 +103,4 @@ packages = ["src/sec_review_agents"]
 path = "hatch_build.py"
 
 [tool.hatch.build.targets.sdist]
-include = [
-  "/hatch_build.py",
-  "/src/sec_review_agents",
-  "/README.md",
-]
+include = ["/hatch_build.py", "/src/sec_review_agents", "/README.md"]

@@ -2,10 +2,7 @@ import { EXECUTION_API_VERSION } from '../../execution/execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
-import {
-  fetchTimelineLinkedPullRequests,
-  type IssueContext
-} from '../../github/issue-service.js'
+import { fetchTimelineLinkedPullRequests, type IssueContext } from '../../github/issue-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import type { Octokit } from 'octokit'
@@ -39,10 +36,7 @@ async function materializeWorkspace(
   })
 }
 
-async function writeJsonArtifact(
-  artifact_path: string,
-  value: unknown
-): Promise<void> {
+async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
@@ -69,14 +63,8 @@ async function materializeHistoryArtifacts({
     title: issue.issue_title,
     body: issue.issue_body
   }
-  const linkedPullRequests = await fetchTimelineLinkedPullRequests(
-    octokit,
-    issue
-  )
-  await writeJsonArtifact(
-    path.join(history_path, 'issue-metadata.json'),
-    issueMetadata
-  )
+  const linkedPullRequests = await fetchTimelineLinkedPullRequests(octokit, issue)
+  await writeJsonArtifact(path.join(history_path, 'issue-metadata.json'), issueMetadata)
   await writeJsonArtifact(path.join(history_path, 'linked-context.json'), {
     relation_type: 'cross-referenced',
     source: 'timeline',

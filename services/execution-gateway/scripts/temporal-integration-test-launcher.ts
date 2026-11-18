@@ -15,25 +15,23 @@ const repositoryDirectory = path.resolve(gatewayDirectory, '../..')
 const suppliedTemporalAddress = process.env.TEST_TEMPORAL_ADDRESS
 
 async function configuredTemporalImage(): Promise<string> {
-  if (process.env.TEST_TEMPORAL_IMAGE !== undefined)
+  if (process.env.TEST_TEMPORAL_IMAGE !== undefined) {
     return process.env.TEST_TEMPORAL_IMAGE
+  }
 
   // Compose owns the deployed Temporal version. The ephemeral test service
   // deliberately uses that same image rather than maintaining a second tag.
-  const compose = parse(
-    await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8')
-  ) as { services?: { temporal?: { image?: unknown } } }
+  const compose = parse(await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8')) as {
+    services?: { temporal?: { image?: unknown } }
+  }
   const image = compose.services?.temporal?.image
-  if (typeof image !== 'string' || image.trim() === '')
+  if (typeof image !== 'string' || image.trim() === '') {
     throw new Error('compose.yaml must define services.temporal.image.')
+  }
   return image
 }
 
-function run(
-  command: string,
-  args: string[],
-  environment = process.env
-): Promise<void> {
+function run(command: string, args: string[], environment = process.env): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: gatewayDirectory,
@@ -42,7 +40,9 @@ function run(
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
-      if (code === 0) return resolve()
+      if (code === 0) {
+        return resolve()
+      }
       reject(
         new Error(
           `${command} ${args.join(' ')} exited with ${
@@ -71,10 +71,10 @@ function capture(
     })
     child.once('error', reject)
     child.once('exit', (code) => {
-      if (code === 0) return resolve(output.trim())
-      reject(
-        new Error(`${command} ${args.join(' ')} exited with code ${code}.`)
-      )
+      if (code === 0) {
+        return resolve(output.trim())
+      }
+      reject(new Error(`${command} ${args.join(' ')} exited with code ${code}.`))
     })
   })
 }
@@ -113,14 +113,7 @@ async function runTests(temporalAddress: string): Promise<void> {
   await run('pnpm', ['run', 'build'])
   await run(
     'pnpm',
-    [
-      'exec',
-      'vitest',
-      'run',
-      '--project',
-      'integration',
-      ...process.argv.slice(2)
-    ],
+    ['exec', 'vitest', 'run', '--project', 'integration', ...process.argv.slice(2)],
     { ...process.env, TEST_TEMPORAL_ADDRESS: temporalAddress }
   )
 }
@@ -153,14 +146,14 @@ async function main(): Promise<void> {
     await waitForTemporal(containerName)
     const address = await capture('docker', ['port', containerName, '7233/tcp'])
     const hostPort = address.replace(/^.*:/, '')
-    if (!/^\d+$/.test(hostPort))
+    if (!/^\d+$/.test(hostPort)) {
       throw new Error(`Docker returned an invalid Temporal address: ${address}`)
+    }
     await runTests(`127.0.0.1:${hostPort}`)
   } finally {
-    if (containerStarted)
-      await run('docker', ['rm', '--force', containerName]).catch(
-        () => undefined
-      )
+    if (containerStarted) {
+      await run('docker', ['rm', '--force', containerName]).catch(() => undefined)
+    }
   }
 }
 

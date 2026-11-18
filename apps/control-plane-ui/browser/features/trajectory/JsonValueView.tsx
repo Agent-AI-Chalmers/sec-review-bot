@@ -4,9 +4,7 @@ import { HighlightText } from './TrajectoryText.js'
 
 const JSON_MAX_DEPTH = 3
 
-function isPrimitive(
-  value: unknown
-): value is string | number | boolean | null {
+function isPrimitive(value: unknown): value is string | number | boolean | null {
   return (
     value === null ||
     typeof value === 'string' ||
@@ -20,11 +18,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function recordPreview(value: unknown): string {
-  if (!isRecord(value)) return ''
+  if (!isRecord(value)) {
+    return ''
+  }
   for (const key of ['title', 'name', 'label', 'summary']) {
     const candidate = value[key]
-    if (typeof candidate === 'string' && candidate.trim() !== '')
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
       return candidate.slice(0, 110)
+    }
   }
   const first = Object.values(value).find(
     (candidate) => typeof candidate === 'string' && candidate.trim() !== ''
@@ -32,13 +33,7 @@ function recordPreview(value: unknown): string {
   return typeof first === 'string' ? first.slice(0, 110) : ''
 }
 
-function JsonRaw({
-  value,
-  query
-}: {
-  value: unknown
-  query: string
-}): React.JSX.Element {
+function JsonRaw({ value, query }: { value: unknown; query: string }) {
   return (
     <details className="json-raw">
       <summary>Raw JSON</summary>
@@ -49,47 +44,43 @@ function JsonRaw({
   )
 }
 
-function JsonPrimitive({
-  value,
-  query
-}: {
-  value: unknown
-  query: string
-}): React.JSX.Element {
-  if (value === null || value === undefined)
+function JsonPrimitive({ value, query }: { value: unknown; query: string }): React.JSX.Element {
+  if (value === null || value === undefined) {
     return <span className="json-null">null</span>
+  }
   if (typeof value === 'string') {
-    if (value.includes('\n'))
+    if (value.includes('\n')) {
       return (
         <pre className="json-code json-code-block">
           <HighlightText value={value} query={query} />
         </pre>
       )
+    }
     return (
       <code className="json-code">
         <HighlightText value={value} query={query} />
       </code>
     )
   }
-  return <code className="json-code">{String(value)}</code>
+  return (
+    <code className="json-code">{isPrimitive(value) ? String(value) : JSON.stringify(value)}</code>
+  )
 }
 
-function JsonTableValue({
-  value,
-  query
-}: {
-  value: unknown
-  query: string
-}): React.JSX.Element {
-  if (value === null || value === undefined)
+function JsonTableValue({ value, query }: { value: unknown; query: string }): React.JSX.Element {
+  if (value === null || value === undefined) {
     return <span className="json-null">null</span>
-  if (typeof value === 'string')
+  }
+  if (typeof value === 'string') {
     return (
       <span className="json-table-text">
         <HighlightText value={value} query={query} />
       </span>
     )
-  return <code className="json-code">{String(value)}</code>
+  }
+  return (
+    <code className="json-code">{isPrimitive(value) ? String(value) : JSON.stringify(value)}</code>
+  )
 }
 
 function JsonObjectView({
@@ -102,12 +93,14 @@ function JsonObjectView({
   depth: number
 }): React.JSX.Element {
   const entries = Object.entries(value)
-  if (entries.length === 0) return <span className="json-empty">{'{}'}</span>
+  if (entries.length === 0) {
+    return <span className="json-empty">{'{}'}</span>
+  }
   return (
     <div className="json-object">
       {entries.map(([key, child]) => {
         const complex = Array.isArray(child) || isRecord(child)
-        if (complex)
+        if (complex) {
           return (
             <div className="json-field" key={key}>
               <div className="json-field-key">
@@ -118,6 +111,7 @@ function JsonObjectView({
               </div>
             </div>
           )
+        }
         return (
           <div className="json-row" key={key}>
             <div className="json-key">
@@ -147,9 +141,7 @@ function JsonTable({
       const values = rows
         .map((row) => row[key])
         .filter((value) => value !== null && value !== undefined)
-      return (
-        values.length > 0 && values.every((value) => typeof value === 'number')
-      )
+      return values.length > 0 && values.every((value) => typeof value === 'number')
     })
   )
   return (
@@ -158,12 +150,7 @@ function JsonTable({
         <thead>
           <tr>
             {keys.map((key) => (
-              <th
-                className={
-                  numericKeys.has(key) ? 'json-table-number' : undefined
-                }
-                key={key}
-              >
+              <th className={numericKeys.has(key) ? 'json-table-number' : undefined} key={key}>
                 <HighlightText value={key} query={query} />
               </th>
             ))}
@@ -174,9 +161,7 @@ function JsonTable({
             <tr key={index}>
               {keys.map((key) => (
                 <td
-                  className={
-                    numericKeys.has(key) ? 'json-table-number' : undefined
-                  }
+                  className={numericKeys.has(key) ? 'json-table-number' : undefined}
                   data-label={key}
                   key={key}
                 >
@@ -200,16 +185,15 @@ function JsonArrayView({
   query: string
   depth: number
 }): React.JSX.Element {
-  if (value.length === 0) return <span className="json-empty">[]</span>
+  if (value.length === 0) {
+    return <span className="json-empty">[]</span>
+  }
 
   const allPrimitive = value.every(isPrimitive)
   const allShortPrimitive =
     allPrimitive &&
-    value.every(
-      (item) =>
-        typeof item !== 'string' || (item.length <= 120 && !item.includes('\n'))
-    )
-  if (allShortPrimitive)
+    value.every((item) => typeof item !== 'string' || (item.length <= 120 && !item.includes('\n')))
+  if (allShortPrimitive) {
     return (
       <div className="json-chips">
         {value.map((item, index) => (
@@ -219,23 +203,19 @@ function JsonArrayView({
         ))}
       </div>
     )
+  }
 
   const allFlatObjects =
     value.length > 0 &&
-    value.every(
-      (item) => isRecord(item) && Object.values(item).every(isPrimitive)
-    )
+    value.every((item) => isRecord(item) && Object.values(item).every(isPrimitive))
   const keys = allFlatObjects
-    ? [
-        ...new Set(
-          value.flatMap((item) => (isRecord(item) ? Object.keys(item) : []))
-        )
-      ]
+    ? [...new Set(value.flatMap((item) => (isRecord(item) ? Object.keys(item) : [])))]
     : []
-  if (allFlatObjects && keys.length > 0 && keys.length <= 6)
+  if (allFlatObjects && keys.length > 0 && keys.length <= 6) {
     return <JsonTable rows={value.filter(isRecord)} keys={keys} query={query} />
+  }
 
-  if (value.every(isRecord))
+  if (value.every(isRecord)) {
     return (
       <div className="json-array">
         {value.map((item, index) => (
@@ -253,6 +233,7 @@ function JsonArrayView({
         ))}
       </div>
     )
+  }
 
   return (
     <div className="json-array">
@@ -275,11 +256,14 @@ export function JsonValueView({
   query: string
   depth?: number
 }): React.JSX.Element {
-  if ((Array.isArray(value) || isRecord(value)) && depth > JSON_MAX_DEPTH)
+  if ((Array.isArray(value) || isRecord(value)) && depth > JSON_MAX_DEPTH) {
     return <JsonRaw value={value} query={query} />
-  if (Array.isArray(value))
+  }
+  if (Array.isArray(value)) {
     return <JsonArrayView value={value} query={query} depth={depth} />
-  if (isRecord(value))
+  }
+  if (isRecord(value)) {
     return <JsonObjectView value={value} query={query} depth={depth} />
+  }
   return <JsonPrimitive value={value} query={query} />
 }

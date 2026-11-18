@@ -40,7 +40,9 @@ export function CursorPagination({
           comboboxProps={{ withinPortal: true }}
           data={pageSizeOptions.map((size) => String(size))}
           onChange={(value) => {
-            if (value !== null) onPageSizeChange(value)
+            if (value !== null) {
+              onPageSizeChange(value)
+            }
           }}
         />
       </Group>

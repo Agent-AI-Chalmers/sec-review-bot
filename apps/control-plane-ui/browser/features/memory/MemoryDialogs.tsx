@@ -4,14 +4,10 @@ import { Alert, Button, Group, Modal } from '@mantine/core'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
 import { useMessages } from '../../shared/i18n.js'
 
-function sameFiles(
-  left: Record<string, string>,
-  right: Record<string, string>
-): boolean {
+function sameFiles(left: Record<string, string>, right: Record<string, string>): boolean {
   const names = Object.keys(left)
   return (
-    names.length === Object.keys(right).length &&
-    names.every((name) => left[name] === right[name])
+    names.length === Object.keys(right).length && names.every((name) => left[name] === right[name])
   )
 }
 
@@ -37,16 +33,16 @@ export function MemoryEditorDialog({
   const [discardOpen, setDiscardOpen] = React.useState(false)
   const dirty = !sameFiles(files, initialFiles)
   const modifiedFiles = React.useMemo(
-    () =>
-      new Set(
-        Object.keys(files).filter((name) => files[name] !== initialFiles[name])
-      ),
+    () => new Set(Object.keys(files).filter((name) => files[name] !== initialFiles[name])),
     [files, initialFiles]
   )
 
   const requestClose = (): void => {
-    if (dirty) setDiscardOpen(true)
-    else onClose()
+    if (dirty) {
+      setDiscardOpen(true)
+    } else {
+      onClose()
+    }
   }
 
   return (

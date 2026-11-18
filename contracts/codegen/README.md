@@ -10,6 +10,10 @@ Kubb's resolver names operation aggregates `…ResponseBodyByStatus` and `…Res
 
 The renderer uses Kubb's supported resolver for naming and a syntax-aware normalization for the response map and aggregate. Unsupported output fails generation instead of silently retaining a different shape. It does not rewrite unrelated schema declarations or contract data.
 
+The renderer uses Oxc to parse generated declarations and apply local structural edits, without the TypeScript Compiler API. Type-equivalence tests check the final artifact through the TypeScript compiler CLI.
+
+`formatGenerated()` reads the output destination’s nearest `.oxfmtrc.json` on each render. Generated Markdown preserves semantic paragraphs and embedded examples. Ignore patterns control CLI file selection, not whether a declared projection is rendered. Unsupported config overrides fail explicitly rather than silently changing output. Register this helper and each destination config in the owning artifact manifest’s `code_inputs`.
+
 Run checks from this directory:
 
 ```bash

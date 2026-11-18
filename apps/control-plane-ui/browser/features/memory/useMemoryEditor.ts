@@ -15,10 +15,10 @@ interface MemoryEditSession extends EditorFiles {
 
 interface MemoryEditor {
   session: EditorFiles | undefined
-  begin(baseVersion: number): Promise<void>
-  changeFiles(files: Record<string, string>): void
-  close(): void
-  commit(): Promise<void>
+  begin: (baseVersion: number) => Promise<void>
+  changeFiles: (files: Record<string, string>) => void
+  close: () => void
+  commit: () => Promise<void>
 }
 
 /** Own the edit's base version and retry identity; the page owns operation feedback and refresh. */
@@ -30,24 +30,20 @@ export function useMemoryEditor(): MemoryEditor {
     const files =
       baseVersion === 0
         ? { 'MEMORY.md': '# Security Review Experience Memory\n' }
-        : (
-            await api<MemoryTreeContentResponse>(
-              `/memory/versions/${baseVersion}/content`
-            )
-          ).files
+        : (await api<MemoryTreeContentResponse>(`/memory/versions/${baseVersion}/content`)).files
     setSession({ baseVersion, files, initialFiles: files })
   }
 
   const changeFiles = (files: Record<string, string>): void => {
-    setSession((previous) =>
-      previous === undefined ? undefined : { ...previous, files }
-    )
+    setSession((previous) => (previous === undefined ? undefined : { ...previous, files }))
   }
 
   const close = (): void => setSession(undefined)
 
   const commit = async (): Promise<void> => {
-    if (session === undefined) return
+    if (session === undefined) {
+      return
+    }
     const content = JSON.stringify(
       Object.entries(session.files).sort(([a], [b]) => a.localeCompare(b))
     )

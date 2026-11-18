@@ -15,13 +15,19 @@ test('only the latest request may commit data, error, or loading state', async (
     state.error = undefined
     return work
       .then((data) => {
-        if (request.isCurrent()) state.data = data
+        if (request.isCurrent()) {
+          state.data = data
+        }
       })
       .catch((error: unknown) => {
-        if (request.isCurrent()) state.error = error
+        if (request.isCurrent()) {
+          state.error = error
+        }
       })
       .finally(() => {
-        if (request.isCurrent()) state.loading = false
+        if (request.isCurrent()) {
+          state.loading = false
+        }
       })
   }
 

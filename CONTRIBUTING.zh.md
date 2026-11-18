@@ -51,6 +51,20 @@
 
 列出你实际运行的检查命令，并说明结果。如果还有与本次修改有关的检查没有运行，也要写清楚。
 
+## 格式化与 Lint 职责
+
+<!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
+
+使用 Oxfmt 格式化，目标行宽为 100 列，保留 fixtures 排除规则。生成产物应直接通过格式检查，无须再次改写；重复生成应保持相同字节。修改生成器时，参阅[契约工具指南](contracts/codegen/README.zh.md)。
+
+<!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
+
+所有 TypeScript 包使用共享的 Oxlint 正确性规则和类型感知检查。import 应位于可执行语句之前，控制流程语句体应使用大括号，并明确处理 Promise 失败。
+
+简单内部函数和回调优先推断返回类型。定义稳定接口的导出函数应显式标注；已有上下文类型或通过 `satisfies` 检查的契约无需重复标注。
+
+声明前后留空行以便阅读，相邻类型别名和函数重载可保持分组。
+
 ## 提交 Pull Request
 
 ### 标题

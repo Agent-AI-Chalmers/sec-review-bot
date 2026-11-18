@@ -57,7 +57,9 @@ export class ExecutionStore {
       `,
         [runId, this.connectorId]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -73,18 +75,16 @@ export class ExecutionStore {
     runId: string,
     storage: ExecutionArtifactStorage | undefined
   ): Promise<void> {
-    if (storage === undefined) return
+    if (storage === undefined) {
+      return
+    }
     await this.pool.query(
       `
       UPDATE executions
       SET artifact_storage=$3::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
     `,
-      [
-        runId,
-        this.connectorId,
-        JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
-      ]
+      [runId, this.connectorId, JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))]
     )
   }
 
@@ -121,7 +121,9 @@ export class ExecutionStore {
             : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
         ]
       )
-      if (result.rowCount !== 1) return false
+      if (result.rowCount !== 1) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -155,15 +157,11 @@ export class ExecutionStore {
             OR claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
         RETURNING claim_token
       `,
-        [
-          runId,
-          token,
-          this.connectorId,
-          this.claimTimeoutMs,
-          maxUnresolvedRecoveries
-        ]
+        [runId, token, this.connectorId, this.claimTimeoutMs, maxUnresolvedRecoveries]
       )
-      if (result.rows[0] === undefined) return null
+      if (result.rows[0] === undefined) {
+        return null
+      }
       // The state stays `uncertain`; taking the claim is not a transition, so record it as a
       // self-event to keep the operator timeline showing when a replay started.
       await appendEvent(client, {
@@ -184,8 +182,7 @@ export class ExecutionStore {
   async resumeDisconnectedSubmissionRecovery(runId: string): Promise<boolean> {
     return await transaction(
       this.pool,
-      async (client) =>
-        await this.resumeDisconnectedSubmissionRecoveryOn(client, runId)
+      async (client) => await this.resumeDisconnectedSubmissionRecoveryOn(client, runId)
     )
   }
 
@@ -203,7 +200,9 @@ export class ExecutionStore {
          RETURNING run_id`,
         [runId, this.connectorId]
       )
-      if (result.rows[0] === undefined) return false
+      if (result.rows[0] === undefined) {
+        return false
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -243,7 +242,9 @@ export class ExecutionStore {
       `,
         [runId, this.connectorId, maxUnresolvedRecoveries, this.claimTimeoutMs]
       )
-      if (result.rows[0] === undefined) return false
+      if (result.rows[0] === undefined) {
+        return false
+      }
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -265,10 +266,7 @@ export class ExecutionStore {
   }
 
   /** Count one replay whose acceptance remains unknown, retaining the lease to pace retries. */
-  async recordUnknownRecoveryOutcome(
-    runId: string,
-    token: string
-  ): Promise<boolean> {
+  async recordUnknownRecoveryOutcome(runId: string, token: string): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `

@@ -70,15 +70,13 @@ test('viewer projects execution events and retains model provenance', () => {
     { seq: 4, event: 'model_call_end', call_id: 'call', message_id: 'answer' },
     { seq: 5, event: 'model_calls_end', status: 'completed' }
   ]
-  const events = parseViewerInput(
-    records.map((record) => JSON.stringify(record)).join('\n')
-  )
+  const events = parseViewerInput(records.map((record) => JSON.stringify(record)).join('\n'))
   expect(events).toHaveLength(5)
   expect(events[2]?.call_id).toBe('call')
   expect(events[2]?.parent_ids).toStrictEqual(['root', 'child'])
-  expect(() =>
-    parseViewerInput(JSON.stringify([{ seq: 1, event: 'unrecognized' }]))
-  ).toThrow(/invalid_trajectory_artifact/)
+  expect(() => parseViewerInput(JSON.stringify([{ seq: 1, event: 'unrecognized' }]))).toThrow(
+    /invalid_trajectory_artifact/
+  )
 })
 
 test('viewer rejects duplicate identities, unordered records, and inconsistent call references', () => {
@@ -102,6 +100,7 @@ test('viewer rejects duplicate identities, unordered records, and inconsistent c
       { seq: 2, event: 'model_calls_end', status: 'failed' },
       { ...message, seq: 3 }
     ]
-  ])
+  ]) {
     expect(() => parseViewerInput(encode(records))).toThrow()
+  }
 })

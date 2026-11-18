@@ -1,0 +1,42 @@
+{
+  "ignorePatterns": [
+    "dist/**",
+    "dist-server/**",
+    "node_modules/**",
+    "playwright-report/**",
+    "test-results/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "globals": {
+        "console": "readonly",
+        "document": "readonly",
+        "fetch": "readonly",
+        "window": "readonly",
+        "Buffer": "readonly",
+        "process": "readonly",
+        "URL": "readonly"
+      }
+    },
+    {
+      "files": ["**/*.mjs"],
+      "globals": {
+        "process": "readonly"
+      }
+    },
+    {
+      "files": ["test/**/*.mjs"],
+      "globals": {
+        "console": "readonly",
+        "document": "readonly",
+        "fetch": "readonly",
+        "getComputedStyle": "readonly",
+        "localStorage": "readonly",
+        "navigator": "readonly",
+        "URL": "readonly"
+      }
+    }
+  ],
+  "extends": ["../../.oxlintrc.json"]
+}

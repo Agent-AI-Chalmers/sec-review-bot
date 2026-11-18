@@ -1,8 +1,7 @@
 // Generated from contracts/execution-api/v1/schemas. Do not edit by hand.
 // Regenerate with `pnpm --dir contracts/execution-api/tools run generate`.
 
-export type WorkflowName =
-  'issue-review' | 'pull-request-review' | 'repository-review'
+export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-review'
 
 export interface InputBundleArtifactRef {
   uri: string
@@ -30,8 +29,7 @@ export interface RepositoryScanScope {
   paths_ignore: string[]
   incremental_changed_files: {
     path: string
-    status:
-      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+    status: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
     previous_path: string | null
   }[]
 }
@@ -69,16 +67,9 @@ export interface ReviewRecord {
   verification: {
     overview: string | null
     target_claim: string | null
-    validation_level:
-      | 'static'
-      | 'logic-simulated'
-      | 'runtime-partial'
-      | 'runtime-endpoint'
-      | null
-    coverage:
-      'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | null
-    regression:
-      'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
+    validation_level: 'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint' | null
+    coverage: 'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | null
+    regression: 'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
     next_step: 'none' | 'retry-ai' | 'manual-review' | null
     findings: string[]
     evidence: string[]

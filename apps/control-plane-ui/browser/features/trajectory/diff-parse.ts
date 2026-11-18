@@ -41,7 +41,7 @@ export interface DiffFile {
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
 
-function stripPrefix(path: string): string {
+function stripPrefix(path: string) {
   return path.replace(/^[ab]\//, '')
 }
 
@@ -72,7 +72,9 @@ export function parsePatch(text: string): ParsedPatch {
 
   const ensureFile = (path: string): DiffFile => {
     const existing = files.find((file) => file.path === path)
-    if (existing) return existing
+    if (existing) {
+      return existing
+    }
     const created = { path, hunks: [] }
     files.push(created)
     return created
@@ -84,7 +86,9 @@ export function parsePatch(text: string): ParsedPatch {
 
   for (const line of lines) {
     if (currentHunk && countedHunk && (oldRemaining > 0 || newRemaining > 0)) {
-      if (line.startsWith('\\')) continue
+      if (line.startsWith('\\')) {
+        continue
+      }
       if (line.startsWith(' ') && oldRemaining > 0 && newRemaining > 0) {
         addRow('context', line.slice(1))
         oldRemaining -= 1
@@ -110,18 +114,19 @@ export function parsePatch(text: string): ParsedPatch {
     // The Begin Patch dialect has no line counts; its body runs until the next
     // section marker. "---"/"+++" are content there, never file headers.
     if (currentHunk && !countedHunk) {
-      if (
-        line.startsWith('@@') ||
-        line.startsWith('*** ') ||
-        line.startsWith('Index: ')
-      ) {
+      if (line.startsWith('@@') || line.startsWith('*** ') || line.startsWith('Index: ')) {
         currentHunk = undefined
       } else {
-        if (line.startsWith('\\')) continue
-        if (line.startsWith('+')) addRow('add', line.slice(1))
-        else if (line.startsWith('-')) addRow('remove', line.slice(1))
-        else if (line.startsWith(' ')) addRow('context', line.slice(1))
-        else if (line !== '') {
+        if (line.startsWith('\\')) {
+          continue
+        }
+        if (line.startsWith('+')) {
+          addRow('add', line.slice(1))
+        } else if (line.startsWith('-')) {
+          addRow('remove', line.slice(1))
+        } else if (line.startsWith(' ')) {
+          addRow('context', line.slice(1))
+        } else if (line !== '') {
           invalid = true
           break
         }
@@ -206,7 +211,9 @@ export function parsePatch(text: string): ParsedPatch {
         }
       } else {
         currentFile = ensureFile(stripPrefix(path))
-        if (pendingOldIsNull) currentFile.status = 'added'
+        if (pendingOldIsNull) {
+          currentFile.status = 'added'
+        }
       }
       currentHunk = undefined
       pendingOldPath = undefined
@@ -272,9 +279,15 @@ export function parsePatch(text: string): ParsedPatch {
       break
     }
   }
-  if (countedHunk && (oldRemaining > 0 || newRemaining > 0)) invalid = true
-  if (awaitingNewHeader) invalid = true
-  if (invalid) return { files: [], invalid: true }
+  if (countedHunk && (oldRemaining > 0 || newRemaining > 0)) {
+    invalid = true
+  }
+  if (awaitingNewHeader) {
+    invalid = true
+  }
+  if (invalid) {
+    return { files: [], invalid: true }
+  }
   return {
     files: files.filter(
       (file) =>

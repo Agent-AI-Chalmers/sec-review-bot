@@ -1,15 +1,10 @@
 import type { TrajectoryMessageView } from './trajectory-model.js'
 
-export function scrollToTrajectoryElement(
-  id: string,
-  behavior?: ScrollBehavior
-): void {
+export function scrollToTrajectoryElement(id: string, behavior?: ScrollBehavior): void {
   document.getElementById(id)?.scrollIntoView({
     behavior:
       behavior ??
-      (window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'auto'
-        : 'smooth'),
+      (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'),
     block: 'center'
   })
 }

@@ -31,21 +31,14 @@ const statistics: NonNullable<Run['execution_statistics']> = {
 
 test('execution details open in a drawer with the token breakdown', async () => {
   const user = userEvent.setup()
-  renderComponent(
-    <ExecutionStatistics
-      statistics={statistics}
-      workflow="pull-request-review"
-    />
-  )
+  renderComponent(<ExecutionStatistics statistics={statistics} workflow="pull-request-review" />)
 
   expect(screen.getByText('2 Calls · 6,200 tokens')).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'View details' }))
 
   const drawer = await screen.findByRole('dialog')
-  expect(
-    within(drawer).getByText('Agent Execution Details')
-  ).toBeInTheDocument()
+  expect(within(drawer).getByText('Agent Execution Details')).toBeInTheDocument()
   expect(within(drawer).getByText('5,200')).toBeInTheDocument()
   expect(within(drawer).getByText('Cache read 1,600')).toBeInTheDocument()
   expect(within(drawer).getByText('Cache write 104')).toBeInTheDocument()
@@ -73,9 +66,7 @@ test('empty and partial snapshots expose only their applicable states', () => {
   )
 
   expect(screen.getByTestId('statistics-no-observations')).toBeInTheDocument()
-  expect(
-    screen.queryByRole('button', { name: 'View details' })
-  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'View details' })).not.toBeInTheDocument()
 
   rerender(
     <ExecutionStatistics
@@ -89,19 +80,13 @@ test('empty and partial snapshots expose only their applicable states', () => {
   )
 
   expect(screen.getByTestId('statistics-warning')).toBeInTheDocument()
-  expect(
-    screen.queryByTestId('statistics-no-observations')
-  ).not.toBeInTheDocument()
+  expect(screen.queryByTestId('statistics-no-observations')).not.toBeInTheDocument()
 })
 
 test('statistics render in the selected language', () => {
-  renderComponent(
-    <ExecutionStatistics
-      statistics={statistics}
-      workflow="pull-request-review"
-    />,
-    { language: 'zh' }
-  )
+  renderComponent(<ExecutionStatistics statistics={statistics} workflow="pull-request-review" />, {
+    language: 'zh'
+  })
 
   expect(screen.getByText('模型用量')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '查看明细' })).toBeInTheDocument()
@@ -133,45 +118,24 @@ test.each(['en', 'zh'] as const)(
             feedback: '反馈重试'
           }
     renderComponent(
-      <ExecutionStatistics
-        statistics={run.execution_statistics}
-        workflow={run.workflow}
-      />,
+      <ExecutionStatistics statistics={run.execution_statistics} workflow={run.workflow} />,
       { language }
     )
     await user.click(screen.getByRole('button', { name: labels.details }))
     const drawer = await screen.findByRole('dialog')
-    await user.click(
-      within(drawer).getByRole('button', { name: new RegExp(labels.scan) })
-    )
-    await user.click(
-      await within(drawer).findByRole('row', { name: /repository-triager/ })
-    )
+    await user.click(within(drawer).getByRole('button', { name: new RegExp(labels.scan) }))
+    await user.click(await within(drawer).findByRole('row', { name: /repository-triager/ }))
     await waitFor(() => {
-      expect(
-        within(drawer).getByText(labels.draft, { exact: true })
-      ).toBeVisible()
-      expect(
-        within(drawer).getByText(labels.refinement, { exact: true })
-      ).toBeVisible()
+      expect(within(drawer).getByText(labels.draft, { exact: true })).toBeVisible()
+      expect(within(drawer).getByText(labels.refinement, { exact: true })).toBeVisible()
     })
 
-    await user.click(
-      within(drawer).getByRole('button', { name: new RegExp(labels.review) })
-    )
-    await user.click(
-      await within(drawer).findByRole('button', { name: /Case case-1/ })
-    )
+    await user.click(within(drawer).getByRole('button', { name: new RegExp(labels.review) }))
+    await user.click(await within(drawer).findByRole('button', { name: /Case case-1/ }))
     await waitFor(() => {
-      expect(
-        within(drawer).getByText(labels.initial, { exact: true })
-      ).toBeVisible()
-      expect(
-        within(drawer).getByText(labels.feedback + ' 1', { exact: true })
-      ).toBeVisible()
-      expect(
-        within(drawer).getByText(labels.feedback + ' 2', { exact: true })
-      ).toBeVisible()
+      expect(within(drawer).getByText(labels.initial, { exact: true })).toBeVisible()
+      expect(within(drawer).getByText(labels.feedback + ' 1', { exact: true })).toBeVisible()
+      expect(within(drawer).getByText(labels.feedback + ' 2', { exact: true })).toBeVisible()
     })
   }
 )
@@ -193,10 +157,6 @@ test('feedback without an observed retry number is not presented as retry one', 
   )
   await user.click(screen.getByRole('button', { name: 'View details' }))
   const drawer = await screen.findByRole('dialog')
-  expect(
-    within(drawer).getByText('Feedback retry', { exact: true })
-  ).toBeInTheDocument()
-  expect(
-    within(drawer).queryByText('Feedback retry 1', { exact: true })
-  ).not.toBeInTheDocument()
+  expect(within(drawer).getByText('Feedback retry', { exact: true })).toBeInTheDocument()
+  expect(within(drawer).queryByText('Feedback retry 1', { exact: true })).not.toBeInTheDocument()
 })

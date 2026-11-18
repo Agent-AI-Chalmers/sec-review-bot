@@ -68,9 +68,7 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
     let totalBytes = 0
     let done = false
     const timer = setTimeout(() => {
-      fail(
-        new DispatchBodyReadError('Dispatch request body read timed out.', 408)
-      )
+      fail(new DispatchBodyReadError('Dispatch request body read timed out.', 408))
       request.destroy()
     }, readTimeoutMs)
 
@@ -94,9 +92,7 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       totalBytes += buffer.byteLength
       if (totalBytes > maxBodyBytes) {
-        fail(
-          new DispatchBodyReadError('Dispatch request body is too large.', 413)
-        )
+        fail(new DispatchBodyReadError('Dispatch request body is too large.', 413))
         request.destroy()
         return
       }
@@ -152,9 +148,7 @@ export async function handleRepositoryReviewDispatch({
   }
   let payload: RepositoryReviewDispatchPayload
   try {
-    payload = normalizeRepositoryReviewDispatchPayload(
-      JSON.parse(raw_body.toString('utf8'))
-    )
+    payload = normalizeRepositoryReviewDispatchPayload(JSON.parse(raw_body.toString('utf8')))
   } catch {
     writeJson(response, 400, {
       ok: false,
@@ -163,9 +157,12 @@ export async function handleRepositoryReviewDispatch({
     return
   }
 
-  const repo_full_name = String(payload.repo_full_name ?? '').trim()
-  const target_branch = String(payload.target_branch ?? '').trim()
-  const correlation_id = String(payload.correlation_id ?? '').trim()
+  const repo_full_name =
+    typeof payload.repo_full_name === 'string' ? payload.repo_full_name.trim() : ''
+  const target_branch =
+    typeof payload.target_branch === 'string' ? payload.target_branch.trim() : ''
+  const correlation_id =
+    typeof payload.correlation_id === 'string' ? payload.correlation_id.trim() : ''
 
   if (!repo_full_name) {
     writeJson(response, 400, {
@@ -202,9 +199,7 @@ export async function handleRepositoryReviewDispatch({
     })
     writeJson(response, 400, {
       ok: false,
-      error:
-        asErrorMessage(error) ||
-        'Repository review dispatch request is invalid.'
+      error: asErrorMessage(error) || 'Repository review dispatch request is invalid.'
     })
     return
   }

@@ -80,7 +80,7 @@ export async function publishDraftPullRequest({
     head: `${owner}:${plan.branch_name}`
   })
   const existingPullRequest = existingPullRequests.data[0]
-  if (existingPullRequest !== undefined)
+  if (existingPullRequest !== undefined) {
     return {
       branch_name: plan.branch_name,
       title: existingPullRequest.title,
@@ -89,6 +89,7 @@ export async function publishDraftPullRequest({
       number: existingPullRequest.number,
       reused: true
     }
+  }
 
   const commitResponse = await octokit.rest.git.getCommit({
     owner,
@@ -98,7 +99,9 @@ export async function publishDraftPullRequest({
   const baseTreeSha = commitResponse.data.tree.sha
 
   const tree = await plan.build_tree()
-  if (tree.length === 0) throw new Error(plan.empty_tree_message)
+  if (tree.length === 0) {
+    throw new Error(plan.empty_tree_message)
+  }
 
   await assert_claim()
   const treeResponse = await octokit.rest.git.createTree({
@@ -128,7 +131,9 @@ export async function publishDraftPullRequest({
   } catch (error) {
     // An existing run-specific branch is a recovery checkpoint only when it still
     // represents this run's validated result. Do not overwrite it.
-    if (!isBranchAlreadyExists(error)) throw error
+    if (!isBranchAlreadyExists(error)) {
+      throw error
+    }
     await assert_claim()
     const existingRef = await octokit.rest.git.getRef({
       owner,

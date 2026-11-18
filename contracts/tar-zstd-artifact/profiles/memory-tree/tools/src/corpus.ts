@@ -22,7 +22,9 @@ function paxRecord(key: string, value: string): Buffer {
   for (;;) {
     const record = `${length} ${payload}`
     const actual = Buffer.byteLength(record)
-    if (actual === length) return Buffer.from(record)
+    if (actual === length) {
+      return Buffer.from(record)
+    }
     length = actual
   }
 }
@@ -52,13 +54,7 @@ const fixture = (
 
 export function corpusCaseDefinitions(): CorpusCaseDefinition[] {
   return [
-    fixture(
-      'valid-minimal.tar.zst',
-      'The smallest valid memory tree.',
-      'valid',
-      null,
-      minimal()
-    ),
+    fixture('valid-minimal.tar.zst', 'The smallest valid memory tree.', 'valid', null, minimal()),
     fixture(
       'valid-topics.tar.zst',
       'A valid memory tree with nested and top-level topic files.',
@@ -145,10 +141,7 @@ export function corpusCaseDefinitions(): CorpusCaseDefinition[] {
       'The archive contains a character-device entry.',
       'invalid',
       'UNSUPPORTED_TYPE',
-      [
-        ...minimal(),
-        { path: 'memory/topics/device.md', kind: 'character-device' }
-      ]
+      [...minimal(), { path: 'memory/topics/device.md', kind: 'character-device' }]
     ),
     fixture(
       'valid-pax-path.tar.zst',

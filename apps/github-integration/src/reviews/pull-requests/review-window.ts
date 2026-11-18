@@ -44,10 +44,7 @@ export interface ResolvedReviewWindow {
   files: PullRequestFile[]
 }
 
-export function fullReviewWindow(pr: {
-  base_sha: string
-  head_sha: string
-}): ReviewWindow {
+export function fullReviewWindow(pr: { base_sha: string; head_sha: string }): ReviewWindow {
   return {
     kind: 'full',
     base_sha: pr.base_sha,

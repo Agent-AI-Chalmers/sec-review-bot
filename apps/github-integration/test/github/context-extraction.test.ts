@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest'
 
-import {
-  extractIssueContext,
-  IssueContextExtractionError
-} from '../../src/github/issue-service.js'
+import { extractIssueContext, IssueContextExtractionError } from '../../src/github/issue-service.js'
 import {
   extractPullRequestContext,
   PullRequestContextExtractionError
@@ -13,8 +10,7 @@ test('extractIssueContext rejects payloads missing required identity fields', ()
   expect(() => extractIssueContext({})).toThrow(
     expect.toSatisfy(
       (error: unknown) =>
-        error instanceof IssueContextExtractionError &&
-        /repository\.name/.test(error.message)
+        error instanceof IssueContextExtractionError && /repository\.name/.test(error.message)
     )
   )
 })
@@ -51,8 +47,7 @@ test('extractPullRequestContext rejects payloads missing required identity field
   expect(() => extractPullRequestContext({})).toThrow(
     expect.toSatisfy(
       (error: unknown) =>
-        error instanceof PullRequestContextExtractionError &&
-        /repository\.name/.test(error.message)
+        error instanceof PullRequestContextExtractionError && /repository\.name/.test(error.message)
     )
   )
 })

@@ -44,12 +44,10 @@ test('identical bundles from different attempts publish one independent file', a
   await fs.rm(fileURLToPath(first.uri))
   await fs.writeFile(fileURLToPath(second.uri), 'changed staging file')
   expect(await inputBundleExists(left)).toBe(true)
-  expect(await fs.readFile(new URL(left.uri), 'utf8')).toBe(
-    'same immutable archive'
-  )
-  expect(await fs.readdir(path.dirname(fileURLToPath(left.uri)))).toStrictEqual(
-    ['input-bundle.v1.tar.zst']
-  )
+  expect(await fs.readFile(new URL(left.uri), 'utf8')).toBe('same immutable archive')
+  expect(await fs.readdir(path.dirname(fileURLToPath(left.uri)))).toStrictEqual([
+    'input-bundle.v1.tar.zst'
+  ])
 })
 
 test('an incomplete or invalid staging copy never occupies the final path', async () => {
@@ -59,9 +57,7 @@ test('an incomplete or invalid staging copy never occupies the final path', asyn
   await fs.writeFile(new URL(source.uri), 'corrupt')
   await expect(publishInputBundle(source, run)).rejects.toThrow(/differs/)
   expect(await inputBundleExists(published)).toBe(false)
-  expect(
-    await fs.readdir(path.dirname(fileURLToPath(published.uri)))
-  ).toStrictEqual([])
+  expect(await fs.readdir(path.dirname(fileURLToPath(published.uri)))).toStrictEqual([])
   const rebuilt = await bundle()
   expect(await publishInputBundle(rebuilt, run)).toStrictEqual(published)
 })
@@ -69,21 +65,14 @@ test('an incomplete or invalid staging copy never occupies the final path', asyn
 test('conflicting bytes at the final path are rejected without overwrite', async () => {
   const source = await bundle()
   const run = randomUUID()
-  const destination = fileURLToPath(
-    publishedInputBundleReference(source, run).uri
-  )
+  const destination = fileURLToPath(publishedInputBundleReference(source, run).uri)
   await fs.mkdir(path.dirname(destination), { recursive: true })
   await fs.writeFile(destination, 'conflicting bytes')
   await expect(publishInputBundle(source, run)).rejects.toThrow(/differs/)
   expect(await fs.readFile(destination, 'utf8')).toBe('conflicting bytes')
 })
 
-for (const crash of [
-  'reserved',
-  'published',
-  'confirmed',
-  'committed'
-] as const) {
+for (const crash of ['reserved', 'published', 'confirmed', 'committed'] as const) {
   test(`file publication recovers after ${crash} and staging loss`, async () => {
     const run = randomUUID()
     const source = await bundle()
@@ -98,12 +87,13 @@ for (const crash of [
     }
     const store: InputBundlePublicationStore = {
       async reserveInputBundleCandidate(runId, _token, intent) {
-        if (candidate)
+        if (candidate) {
           expect(intent).toStrictEqual({
             reference: candidate.reference,
             input: candidate.input,
             publish_context: candidate.publish_context
           })
+        }
         candidate = {
           run_id: runId,
           digest: intent.reference.digest,
@@ -118,9 +108,13 @@ for (const crash of [
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
         expect.assert(candidate)
-        if (status === 'present') crashOnce('published')
+        if (status === 'present') {
+          crashOnce('published')
+        }
         candidate.status = status
-        if (status === 'present') crashOnce('confirmed')
+        if (status === 'present') {
+          crashOnce('confirmed')
+        }
         return candidate
       },
       async submitPreparedRun(_run, _token, savedContext, input) {
@@ -137,11 +131,7 @@ for (const crash of [
       })
     ).rejects.toThrow(/worker stopped/)
     await fs.rm(fileURLToPath(source.uri))
-    const recovered = await recoverInputBundlePublication(
-      store,
-      run,
-      'takeover'
-    )
+    const recovered = await recoverInputBundlePublication(store, run, 'takeover')
     if (crash === 'reserved') {
       expect(recovered).toBe(false)
       expect(candidate?.status).toBe('abandoned')
@@ -150,7 +140,9 @@ for (const crash of [
       await publishAndSubmitInputBundle(store, run, 'takeover', context, {
         input_bundle: rebuilt
       })
-    } else expect(recovered).toBe(true)
+    } else {
+      expect(recovered).toBe(true)
+    }
     expect(candidate?.status).toBe('selected')
     expect(await inputBundleExists(candidate!.reference)).toBe(true)
   })

@@ -18,7 +18,7 @@ export async function request({
   token,
   headers,
   json
-}: RequestOptions) {
+}: RequestOptions): Promise<Response> {
   const response = await fetch(`${base}${path}`, {
     method,
     headers: {
@@ -29,11 +29,7 @@ export async function request({
     ...(json === undefined ? {} : { body: JSON.stringify(json) }),
     signal: AbortSignal.timeout(10000)
   })
-  assert.equal(
-    response.status,
-    expectedStatus,
-    `${base}${path}: ${await response.clone().text()}`
-  )
+  assert.equal(response.status, expectedStatus, `${base}${path}: ${await response.clone().text()}`)
   console.error(`ok: ${expectedStatus} ${base}${path}`)
   return response
 }

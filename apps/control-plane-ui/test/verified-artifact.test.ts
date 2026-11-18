@@ -14,6 +14,8 @@ for (const failure of ['metadata', 'storage'] as const) {
     const open = fs.open
     const close = fs.close
     const rm = fsPromises.rm
+    // Capture before spying; invoke with .call(this, error) below to retain the receiver.
+    // oxlint-disable-next-line typescript/unbound-method
     const destroy = fs.WriteStream.prototype.destroy
     const pendingOpen = Promise.withResolvers<void>()
     const releaseOpen = Promise.withResolvers<void>()
@@ -56,7 +58,9 @@ for (const failure of ['metadata', 'storage'] as const) {
         withVerifiedArtifactFile(
           {
             getObject: async () => {
-              if (failure === 'storage') throw new Error('storage unavailable')
+              if (failure === 'storage') {
+                throw new Error('storage unavailable')
+              }
               return { body: Readable.from(['wrong']), contentLength: 5 }
             }
           },
@@ -67,13 +71,10 @@ for (const failure of ['metadata', 'storage'] as const) {
             maximumSize: 8
           },
           { idleTimeoutMs: 1000, filename: 'artifact.tar.zst' },
-          async () =>
-            expect.unreachable('an unverified artifact must not be served')
+          async () => expect.unreachable('an unverified artifact must not be served')
         )
       ).rejects.toThrow(
-        failure === 'metadata'
-          ? /artifact_identity_mismatch/
-          : /storage unavailable/
+        failure === 'metadata' ? /artifact_identity_mismatch/ : /storage unavailable/
       )
       await pendingOpen.promise
       await sinkDestroyed.promise
@@ -81,18 +82,11 @@ for (const failure of ['metadata', 'storage'] as const) {
       expect(fs.existsSync(path.dirname(filename))).toBe(true)
       releaseOpen.resolve()
       await completion
-      expect(
-        observedClose,
-        'rejection must wait for the sink to close'
-      ).toHaveBeenCalledTimes(1)
-      expect(
-        directoryExistedAtClose,
-        'the directory must survive until the sink closes'
-      ).toEqual([true])
-      expect(
-        closesBeforeRemoval,
-        'directory removal must start after the file closes'
-      ).toEqual([1])
+      expect(observedClose, 'rejection must wait for the sink to close').toHaveBeenCalledTimes(1)
+      expect(directoryExistedAtClose, 'the directory must survive until the sink closes').toEqual([
+        true
+      ])
+      expect(closesBeforeRemoval, 'directory removal must start after the file closes').toEqual([1])
       expect(fs.existsSync(path.dirname(filename))).toBe(false)
     } finally {
       releaseOpen.resolve()

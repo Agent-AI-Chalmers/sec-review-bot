@@ -487,12 +487,7 @@ a {
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
-  font-family: var(
-    --mantine-font-family-monospace,
-    ui-monospace,
-    SFMono-Regular,
-    monospace
-  );
+  font-family: var(--mantine-font-family-monospace, ui-monospace, SFMono-Regular, monospace);
 }
 
 .artifact-digest-toggle {

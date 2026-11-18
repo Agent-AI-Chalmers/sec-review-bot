@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { parse } from 'yaml'
 
 import { staleGeneratedArtifacts } from '../src/check.js'
@@ -43,25 +43,20 @@ interface Manifest {
 }
 
 function exportedTypeNames(source: string): Set<string> {
-  const file = ts.createSourceFile(
-    'generated.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS
-  )
+  const { program, errors } = parseSync('generated.ts', source)
+  expect(errors).toStrictEqual([])
   const names = new Set<string>()
-  for (const statement of file.statements) {
-    if (
-      !ts.isInterfaceDeclaration(statement) &&
-      !ts.isTypeAliasDeclaration(statement)
-    ) {
+  for (const statement of program.body) {
+    if (statement.type !== 'ExportNamedDeclaration') {
       continue
     }
-    const exported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
-    )
-    if (exported) names.add(statement.name.text)
+    const declaration = statement.declaration
+    if (
+      declaration?.type === 'TSInterfaceDeclaration' ||
+      declaration?.type === 'TSTypeAliasDeclaration'
+    ) {
+      names.add(declaration.id.name)
+    }
   }
   return names
 }
@@ -74,21 +69,12 @@ const WORKFLOW_INPUT_TYPES = [
 
 function assertHasWorkflowInputs(names: Set<string>): void {
   for (const name of WORKFLOW_INPUT_TYPES) {
-    expect.assert(
-      names.has(name),
-      `generated declarations do not export ${name}`
-    )
+    expect.assert(names.has(name), `generated declarations do not export ${name}`)
   }
 }
 
 test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {
-  const sourcePath = path.join(
-    REPO_ROOT,
-    'contracts',
-    'execution-api',
-    'v1',
-    'openapi.yaml'
-  )
+  const sourcePath = path.join(REPO_ROOT, 'contracts', 'execution-api', 'v1', 'openapi.yaml')
   const contract = parse(readFileSync(sourcePath, 'utf8')) as {
     openapi?: unknown
     info?: { version?: unknown }
@@ -100,9 +86,7 @@ test('the HTTP contract is a hand-maintained YAML source, not a service projecti
 })
 
 test('contract declaration projections expose only the types each consumer owns', async () => {
-  const workflowInputs = exportedTypeNames(
-    await renderWorkflowInputDeclarations()
-  )
+  const workflowInputs = exportedTypeNames(await renderWorkflowInputDeclarations())
   const executionApi = exportedTypeNames(await renderExecutionApiDeclarations())
 
   assertHasWorkflowInputs(workflowInputs)
@@ -115,9 +99,7 @@ test('contract declaration projections expose only the types each consumer owns'
 })
 
 test('the Execution API projection remains limited to workflow inputs', async () => {
-  const names = exportedTypeNames(
-    await renderExecutionApiTypes(REVIEW_RUNS_OUTPUT_PATH)
-  )
+  const names = exportedTypeNames(await renderExecutionApiTypes(REVIEW_RUNS_OUTPUT_PATH))
 
   assertHasWorkflowInputs(names)
   expect(names.has('ReviewRecord')).toBe(false)
@@ -153,9 +135,8 @@ test('the manifest lists exactly the artifacts the generators write', () => {
 })
 
 test('every file the manifest names exists', () => {
-  for (const generator of (
-    JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
-  ).generators) {
+  for (const generator of (JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest)
+    .generators) {
     for (const file of [
       generator.script,
       ...(generator.code_inputs ?? []),
@@ -231,7 +212,9 @@ test('the selected workflow schemas declare the generated contract version', () 
 /** Does any glob in `patterns` cover `filePath`? Supports `**` and `*`; exact strings match. */
 function globCovers(patterns: string[], filePath: string): boolean {
   return patterns.some((pattern) => {
-    if (pattern === filePath) return true
+    if (pattern === filePath) {
+      return true
+    }
     const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
     const regex = new RegExp(
       '^' +
@@ -252,17 +235,14 @@ test('the contract-tools CI filter triggers on every artifact of this family', (
   // by `dorny/paths-filter`; `.github/ci/check-changed-areas.mjs` guards the model itself).
 
   const filters = parse(
-    readFileSync(
-      path.join(REPO_ROOT, '.github', 'ci', 'changed-areas.yml'),
-      'utf8'
-    )
+    readFileSync(path.join(REPO_ROOT, '.github', 'ci', 'changed-areas.yml'), 'utf8')
   ) as Record<string, string[]>
   const patterns = filters['contract-tools'] ?? []
   expect.assert(patterns.length > 0, 'no patterns for the contract-tools area')
 
-  const required = (
-    JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
-  ).generators.flatMap((generator) => generator.outputs)
+  const required = (JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest).generators.flatMap(
+    (generator) => generator.outputs
+  )
   for (const output of required) {
     expect.assert(
       globCovers(patterns, output),

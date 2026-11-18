@@ -72,10 +72,7 @@ export function TrajectoryViewer({
       }}
     >
       {target && (
-        <TrajectoryContent
-          contentHref={target.contentHref}
-          minimapPlacement="container"
-        />
+        <TrajectoryContent contentHref={target.contentHref} minimapPlacement="container" />
       )}
     </Modal>
   )

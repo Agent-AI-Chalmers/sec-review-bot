@@ -31,29 +31,30 @@ async function setup(t: TestContext) {
   }
   for (const [name, value] of Object.entries(environment)) {
     const previous = process.env[name]
-    if (value === undefined) delete process.env[name]
-    else process.env[name] = value
+    if (value === undefined) {
+      delete process.env[name]
+    } else {
+      process.env[name] = value
+    }
     t.onTestFinished(() => {
-      if (previous === undefined) delete process.env[name]
-      else process.env[name] = previous
+      if (previous === undefined) {
+        delete process.env[name]
+      } else {
+        process.env[name] = previous
+      }
     })
   }
   let opens = 0
   let closes = 0
   let closeFailure: Error | undefined
-  vi.spyOn(
-    PostgresMemoryCatalogStore.prototype,
-    'initialize'
-  ).mockImplementation(() => {
+  vi.spyOn(PostgresMemoryCatalogStore.prototype, 'initialize').mockImplementation(() => {
     opens += 1
     return Promise.resolve()
   })
-  vi.spyOn(PostgresMemoryCatalogStore.prototype, 'close').mockImplementation(
-    () => {
-      closes += 1
-      return closeFailure ? Promise.reject(closeFailure) : Promise.resolve()
-    }
-  )
+  vi.spyOn(PostgresMemoryCatalogStore.prototype, 'close').mockImplementation(() => {
+    closes += 1
+    return closeFailure ? Promise.reject(closeFailure) : Promise.resolve()
+  })
   return {
     occupied,
     opens: () => opens,
@@ -113,9 +114,7 @@ test('shutdown does not close the backend twice after a backend close error', as
 test('invalid configuration fails before opening backend resources', async (t) => {
   const fixture = await setup(t)
   delete process.env.MEMORY_CATALOG_WORKER_TOKEN
-  await expect(startMemoryCatalogServer()).rejects.toThrow(
-    /MEMORY_CATALOG_WORKER_TOKEN/
-  )
+  await expect(startMemoryCatalogServer()).rejects.toThrow(/MEMORY_CATALOG_WORKER_TOKEN/)
   expect(fixture.opens()).toBe(0)
 })
 
@@ -123,26 +122,23 @@ test('startup retains the original failure when backend cleanup also fails', asy
   const fixture = await setup(t)
   const failure = new Error('backend cleanup failed')
   fixture.failClose(failure)
-  await expect(startMemoryCatalogServer()).rejects.toSatisfy(
-    (error: unknown) => {
-      expect.assert(error instanceof SuppressedError)
-      expect(error.error).toBe(failure)
-      const original: unknown = error.suppressed
-      expect.assert(original instanceof Error && 'code' in original)
-      expect(original.code).toBe('EADDRINUSE')
-      return true
-    }
-  )
+  await expect(startMemoryCatalogServer()).rejects.toSatisfy((error: unknown) => {
+    expect.assert(error instanceof SuppressedError)
+    expect(error.error).toBe(failure)
+    const original: unknown = error.suppressed
+    expect.assert(original instanceof Error && 'code' in original)
+    expect(original.code).toBe('EADDRINUSE')
+    return true
+  })
   expect(fixture.closes()).toBe(1)
 })
 
 test('initialization failure releases the partially initialized backend', async (t) => {
   const fixture = await setup(t)
   const failure = new Error('schema initialization failed')
-  vi.spyOn(
-    PostgresMemoryCatalogStore.prototype,
-    'initialize'
-  ).mockImplementation(() => Promise.reject(failure))
+  vi.spyOn(PostgresMemoryCatalogStore.prototype, 'initialize').mockImplementation(() =>
+    Promise.reject(failure)
+  )
   await expect(startMemoryCatalogServer()).rejects.toMatchObject({
     ...failure,
     name: failure.name,

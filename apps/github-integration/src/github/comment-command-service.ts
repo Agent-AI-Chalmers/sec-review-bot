@@ -1,8 +1,5 @@
 import type { TestChangesPolicy } from '../execution/input.js'
-import {
-  currentAppBotLogin,
-  getGitHubAppMetadata
-} from './github-app-metadata-service.js'
+import { currentAppBotLogin, getGitHubAppMetadata } from './github-app-metadata-service.js'
 
 /** The forms a user may type to address this app in a command comment.
  *
@@ -21,7 +18,7 @@ function buildMentionCandidates(): string[] {
   return [slug, bot_login].filter((item): item is string => Boolean(item))
 }
 
-function stripMarkdownQuotedLines(body: string): string {
+function stripMarkdownQuotedLines(body: string) {
   // GitHub quote replies copy the original comment as Markdown blockquotes.
   // Commands inside those quoted lines are historical text, not a new request.
   return body
@@ -101,9 +98,13 @@ const MAIL_DOMAIN = /^[a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63})*\.[a-z]{2,}$/
  * makes that look like the app is broken. The caller logs these mentions so an unmatched command
  * is diagnosable instead of invisible, while the parser itself stays a pure function. */
 export function unmatchedMentions(body: unknown): string[] {
-  if (typeof body !== 'string' || body.trim() === '') return []
+  if (typeof body !== 'string' || body.trim() === '') {
+    return []
+  }
   const normalizedBody = stripMarkdownQuotedLines(body).trim().toLowerCase()
-  if (normalizedBody === '') return []
+  if (normalizedBody === '') {
+    return []
+  }
   const candidates = buildMentionCandidates()
   const mentions: string[] = []
   for (const match of normalizedBody.matchAll(MENTION_PATTERN)) {
@@ -112,10 +113,13 @@ export function unmatchedMentions(body: unknown): string[] {
     // An `@` glued to a word is an address only when the token itself is a mail domain. This is
     // what distinguishes `name_@example.com` from the markdown-wrapped `__@bot__` and from a
     // word ending in `_` followed by a mention.
-    const gluedToWord =
-      start > 0 && /[a-z0-9_]/.test(normalizedBody[start - 1] ?? '')
-    if (gluedToWord && MAIL_DOMAIN.test(login)) continue
-    if (login !== '' && !candidates.includes(login)) mentions.push(login)
+    const gluedToWord = start > 0 && /[a-z0-9_]/.test(normalizedBody[start - 1] ?? '')
+    if (gluedToWord && MAIL_DOMAIN.test(login)) {
+      continue
+    }
+    if (login !== '' && !candidates.includes(login)) {
+      mentions.push(login)
+    }
   }
   return mentions
 }
@@ -137,10 +141,7 @@ export function extractCommentCommand(body: unknown): {
   }
 
   for (const candidate of buildMentionCandidates()) {
-    const pattern = new RegExp(
-      `(?:^|\\s)@${RegExp.escape(candidate)}(?:[,:]|\\s|$)`,
-      'i'
-    )
+    const pattern = new RegExp(`(?:^|\\s)@${RegExp.escape(candidate)}(?:[,:]|\\s|$)`, 'i')
     const match = normalizedBody.match(pattern)
 
     if (!match) {

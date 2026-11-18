@@ -22,10 +22,7 @@ export interface StatePosition {
  * Keeping each kind of state on its own row is what lets an edge's direction carry meaning:
  * right is progress, down is trouble, up is recovery.
  */
-export const STATE_LAYOUT: Record<
-  CoordinationAxis,
-  Record<string, StatePosition>
-> = {
+export const STATE_LAYOUT: Record<CoordinationAxis, Record<string, StatePosition>> = {
   preparation: {
     pending: { col: 0, row: 0 },
     preparing: { col: 1, row: 0 },
@@ -64,11 +61,7 @@ export const STATE_LAYOUT: Record<
  * edge that happens to point left or up is not a retry by virtue of its direction.
  */
 export const RETURN_EDGES: Record<CoordinationAxis, readonly string[]> = {
-  preparation: [
-    'preparing->pending',
-    'uncertain->preparing',
-    'disconnected->uncertain'
-  ],
+  preparation: ['preparing->pending', 'uncertain->preparing', 'disconnected->uncertain'],
   execution: ['uncertain->queued', 'disconnected->uncertain'],
   publication: [
     'publishing->pending',
@@ -85,17 +78,10 @@ export const SELF_LOOP_SIDE: Record<string, 'above' | 'below'> = {
   'execution:uncertain': 'below'
 }
 
-export function isReturnEdge(
-  axis: CoordinationAxis,
-  from: string,
-  to: string
-): boolean {
+export function isReturnEdge(axis: CoordinationAxis, from: string, to: string): boolean {
   return RETURN_EDGES[axis].includes(`${from}->${to}`)
 }
 
-export function selfLoopSide(
-  axis: CoordinationAxis,
-  state: string
-): 'above' | 'below' {
+export function selfLoopSide(axis: CoordinationAxis, state: string): 'above' | 'below' {
   return SELF_LOOP_SIDE[`${axis}:${state}`] ?? 'above'
 }

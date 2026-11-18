@@ -9,9 +9,7 @@ import { REPOSITORY_ROOT } from './paths.js'
 const temporaryRoot = mkdtempSync(path.join(tmpdir(), 'memory-tree-artifact-'))
 try {
   generateCorpus(temporaryRoot)
-  for (const artifact of generatedArtifacts.generators.flatMap(
-    ({ outputs }) => outputs
-  )) {
+  for (const artifact of generatedArtifacts.generators.flatMap(({ outputs }) => outputs)) {
     const committed = path.resolve(REPOSITORY_ROOT, artifact)
     const generated = path.join(temporaryRoot, path.basename(artifact))
     if (!readFileSync(committed).equals(readFileSync(generated))) {

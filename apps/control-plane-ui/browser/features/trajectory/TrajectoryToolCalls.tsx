@@ -1,11 +1,6 @@
 import React from 'react'
 import { Badge, Button, Code, Collapse, Group, Text } from '@mantine/core'
-import {
-  IconArrowDown,
-  IconChevronDown,
-  IconChevronRight,
-  IconTool
-} from '@tabler/icons-react'
+import { IconArrowDown, IconChevronDown, IconChevronRight, IconTool } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import type { ToolCallView } from './trajectory-model.js'
@@ -14,38 +9,23 @@ import { HighlightText } from './TrajectoryText.js'
 import { DiffView } from './DiffView.js'
 import { ToolArguments } from './ToolArguments.js'
 
-function ToolCall({
-  call,
-  query
-}: {
-  call: ToolCallView
-  query: string
-}): React.JSX.Element {
+function ToolCall({ call, query }: { call: ToolCallView; query: string }): React.JSX.Element {
   const t = useMessages()
   const jump = (): void => {
-    if (!call.resultMessageId) return
+    if (!call.resultMessageId) {
+      return
+    }
     scrollToTrajectoryElement(`trajectory-${call.resultMessageId}`)
   }
   return (
-    <div
-      className="trajectory-tool-call"
-      data-result-status={call.resultStatus}
-    >
-      <Group
-        justify="space-between"
-        wrap="nowrap"
-        className="trajectory-tool-call-header"
-      >
+    <div className="trajectory-tool-call" data-result-status={call.resultStatus}>
+      <Group justify="space-between" wrap="nowrap" className="trajectory-tool-call-header">
         <Group gap="xs" wrap="nowrap" className="trajectory-tool-call-identity">
           <IconTool size={ICON_SIZE.md} color="var(--trajectory-tool-color)" />
           <Text
             fw={600}
             size="sm"
-            c={
-              call.resultStatus === 'error'
-                ? 'var(--failure-text)'
-                : 'var(--mantine-color-text)'
-            }
+            c={call.resultStatus === 'error' ? 'var(--failure-text)' : 'var(--mantine-color-text)'}
             truncate
           >
             <HighlightText value={call.name} query={query} />
@@ -71,11 +51,7 @@ function ToolCall({
         {call.diff ? (
           // The tool reported a real diff (context included); prefer it over
           // reconstructing anything from the call arguments.
-          <DiffView
-            text={call.diff}
-            query={query}
-            truncated={call.diffTruncated === true}
-          />
+          <DiffView text={call.diff} query={query} truncated={call.diffTruncated === true} />
         ) : Object.keys(call.args).length === 0 ? (
           <Code>{t('trajectoryEmptyArguments')}</Code>
         ) : (
@@ -99,7 +75,9 @@ export function TrajectoryToolCalls({
   const [opened, setOpened] = React.useState(true)
   const previousForce = React.useRef(force)
   React.useEffect(() => {
-    if (force === previousForce.current) return
+    if (force === previousForce.current) {
+      return
+    }
     previousForce.current = force
     setOpened(force > 0)
   }, [force])

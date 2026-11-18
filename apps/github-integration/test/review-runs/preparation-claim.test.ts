@@ -24,9 +24,7 @@ test('preparation heartbeat renews the claim while work remains active', async (
   onTestFinished(async () => {
     await heartbeat.stop()
   })
-  await expect
-    .poll(() => renewals, { timeout: 500, interval: 10 })
-    .toBeGreaterThanOrEqual(2)
+  await expect.poll(() => renewals, { timeout: 500, interval: 10 }).toBeGreaterThanOrEqual(2)
   expect(await heartbeat.stop()).toBe(true)
   expect.assert(renewals >= 2)
 })
@@ -56,9 +54,7 @@ test('preparation heartbeat fences active work when its claim is lost', async ()
   )
 
   current = false
-  await expect(heartbeat.assertOwned()).rejects.toThrow(
-    PreparationClaimLostError
-  )
+  await expect(heartbeat.assertOwned()).rejects.toThrow(PreparationClaimLostError)
   expect(await heartbeat.stop()).toBe(false)
 })
 
@@ -71,7 +67,9 @@ test('a transport failure during renewal blocks further work but does not claim 
   const heartbeat = await startPreparationClaimHeartbeat(
     {
       renewPreparationClaim: async () => {
-        if (!reachable) throw new Error('connect ECONNREFUSED')
+        if (!reachable) {
+          throw new Error('connect ECONNREFUSED')
+        }
         return true
       },
       preparationHeartbeatIntervalMs: () => 60_000

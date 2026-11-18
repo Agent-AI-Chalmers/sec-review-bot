@@ -36,10 +36,12 @@ export function RunJump(): React.JSX.Element {
           onSubmit={(event) => {
             event.preventDefault()
             const requestedRunId = value.trim()
-            if (!requestedRunId) return
+            if (!requestedRunId) {
+              return
+            }
             setOpened(false)
             setValue('')
-            navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+            void navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
           }}
         >
           <Group gap="xs" align="flex-end" wrap="nowrap">
@@ -52,12 +54,7 @@ export function RunJump(): React.JSX.Element {
               style={{ flex: 1 }}
               onChange={(event) => setValue(event.currentTarget.value)}
             />
-            <ActionIcon
-              type="submit"
-              aria-label={t('goToRun')}
-              variant="filled"
-              size={36}
-            >
+            <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
               <IconArrowRight size={ICON_SIZE.md} />
             </ActionIcon>
           </Group>

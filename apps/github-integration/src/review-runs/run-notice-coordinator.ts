@@ -27,36 +27,30 @@ class InvalidRunNoticeInputError extends Error {
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (!isRecord(value))
-    throw new InvalidRunNoticeInputError(
-      `Run notice input is missing ${label}.`
-    )
+  if (!isRecord(value)) {
+    throw new InvalidRunNoticeInputError(`Run notice input is missing ${label}.`)
+  }
   return value
 }
 
 function requireText(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.trim() === '')
-    throw new InvalidRunNoticeInputError(
-      `Run notice input is missing ${label}.`
-    )
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new InvalidRunNoticeInputError(`Run notice input is missing ${label}.`)
+  }
   return value
 }
 
 /** Resolve the repository whose GitHub App installation must deliver a notice. */
 function noticeRepository(input: Record<string, unknown>): string | null {
-  if (isRecord(input.issue))
+  if (isRecord(input.issue)) {
     return requireText(input.issue.repo_full_name, 'issue.repo_full_name')
-  if (isRecord(input.pr))
+  }
+  if (isRecord(input.pr)) {
     return requireText(input.pr.repo_full_name, 'pr.repo_full_name')
+  }
   if (isRecord(input.pr_reference)) {
-    const owner = requireText(
-      input.pr_reference.owner_login,
-      'pr_reference.owner_login'
-    )
-    const name = requireText(
-      input.pr_reference.repo_name,
-      'pr_reference.repo_name'
-    )
+    const owner = requireText(input.pr_reference.owner_login, 'pr_reference.owner_login')
+    const name = requireText(input.pr_reference.repo_name, 'pr_reference.repo_name')
     return `${owner}/${name}`
   }
   return repositoryFullName(input.verified_repository)
@@ -71,32 +65,29 @@ export async function deliverRunNoticeOnce({
   store?: RunNoticeCoordinatorStore
 }): Promise<boolean> {
   const notice = await store.claimNextRunNotice()
-  if (notice === null) return false
+  if (notice === null) {
+    return false
+  }
   let heartbeat: RunNoticeClaimHeartbeat | undefined
   try {
-    heartbeat = await startRunNoticeClaimHeartbeat(
-      store,
-      notice.notice_id,
-      notice.claim_token
-    )
+    heartbeat = await startRunNoticeClaimHeartbeat(store, notice.notice_id, notice.claim_token)
     const input = requireRecord(notice.input, 'object')
     const repo = noticeRepository(input)
     const delivered =
       repo === null
         ? null
-        : await sendRunNoticeReply(
-            await installationOctokitForRepo(app, repo),
-            {
-              run_id: notice.run_id,
-              notice_id: notice.notice_id,
-              input,
-              axis: notice.axis,
-              kind: notice.kind,
-              reason_code: notice.reason_code,
-              assert_notice_claim: heartbeat.assertOwned
-            }
-          )
-    if (!(await heartbeat.stop())) return true
+        : await sendRunNoticeReply(await installationOctokitForRepo(app, repo), {
+            run_id: notice.run_id,
+            notice_id: notice.notice_id,
+            input,
+            axis: notice.axis,
+            kind: notice.kind,
+            reason_code: notice.reason_code,
+            assert_notice_claim: heartbeat.assertOwned
+          })
+    if (!(await heartbeat.stop())) {
+      return true
+    }
     if (delivered === null) {
       await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
     } else {
@@ -108,7 +99,9 @@ export async function deliverRunNoticeOnce({
       )
     }
   } catch (error) {
-    if (heartbeat !== undefined) await heartbeat.stop()
+    if (heartbeat !== undefined) {
+      await heartbeat.stop()
+    }
     if (error instanceof RunNoticeClaimLostError) {
       logError('review_run_notice_claim_lost', {
         error,
@@ -118,14 +111,9 @@ export async function deliverRunNoticeOnce({
     }
     // Retry transient GitHub faults after the claim lease expires. Deterministic input or
     // installation failures are concluded so one undeliverable notice cannot loop forever.
-    if (
-      !classifyPreparationFailure(
-        error,
-        1,
-        error instanceof InvalidRunNoticeInputError
-      ).retry
-    )
+    if (!classifyPreparationFailure(error, 1, error instanceof InvalidRunNoticeInputError).retry) {
       await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
+    }
     logError('review_run_notice_delivery_failed', {
       error,
       run_id: notice.run_id
@@ -146,15 +134,15 @@ export function startRunNoticeCoordinator({
   let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = (async () => {
       while (!stopped && (await deliverRunNoticeOnce({ app, store }))) {
         // Drain currently available notices before returning to the poll interval.
       }
     })()
-      .catch((error) =>
-        logError('review_run_notice_coordinator_failed', { error })
-      )
+      .catch((error) => logError('review_run_notice_coordinator_failed', { error }))
       .finally(() => {
         active = null
       })

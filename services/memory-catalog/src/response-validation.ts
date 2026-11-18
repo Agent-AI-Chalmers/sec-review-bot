@@ -13,19 +13,16 @@ export function registerResponseValidation(app: FastifyInstance): void {
   })
   addFormats.default(ajv)
   app.addHook('onRoute', (route) => {
-    if (!route.schema?.response) return
+    if (!route.schema?.response) {
+      return
+    }
     const validators = new Map(
       Object.entries(route.schema.response).map(([status, schema]) => [
         status,
         ajv.compile(schema as object)
       ])
     )
-    const validateResponse: preSerializationHookHandler = (
-      _request,
-      reply,
-      payload,
-      done
-    ) => {
+    const validateResponse: preSerializationHookHandler = (_request, reply, payload, done) => {
       const validate = validators.get(String(reply.statusCode))
       if (!validate || !validate(payload)) {
         done(

@@ -4,16 +4,14 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import {
-  ExecutionRunConflictError,
-  type ExecutionWorkflowInput
-} from '../../src/execution.js'
+import { ExecutionRunConflictError, type ExecutionWorkflowInput } from '../../src/execution.js'
 import type { IssueReviewInput } from '../../src/execution-api-types-generated.js'
 import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
 
 const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS
-if (temporalAddress === undefined)
+if (temporalAddress === undefined) {
   throw new Error('TEST_TEMPORAL_ADDRESS is required for integration tests.')
+}
 
 async function issueReviewInput(): Promise<IssueReviewInput> {
   return JSON.parse(

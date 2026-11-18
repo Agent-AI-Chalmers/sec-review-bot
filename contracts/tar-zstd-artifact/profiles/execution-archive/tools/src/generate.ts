@@ -7,25 +7,11 @@ import { zstdCompressSync } from 'node:zlib'
 const profileRoot = path.resolve(import.meta.dirname, '../..')
 const corpusRoot = path.join(profileRoot, 'v1', 'corpus')
 
-function writeOctal(
-  header: Buffer,
-  offset: number,
-  length: number,
-  value: number
-) {
-  header.write(
-    `${value.toString(8).padStart(length - 1, '0')}\0`,
-    offset,
-    length,
-    'ascii'
-  )
+function writeOctal(header: Buffer, offset: number, length: number, value: number) {
+  header.write(`${value.toString(8).padStart(length - 1, '0')}\0`, offset, length, 'ascii')
 }
 
-function rawEntry(
-  name: string,
-  type: string,
-  body: Buffer = Buffer.alloc(0)
-): Buffer {
+function rawEntry(name: string, type: string, body: Buffer = Buffer.alloc(0)): Buffer {
   const header = Buffer.alloc(512)
   header.write(name, 0, 100, 'utf8')
   writeOctal(header, 100, 8, type === '5' ? 0o755 : 0o644)
@@ -39,11 +25,7 @@ function rawEntry(
   header.write('00', 263, 2, 'ascii')
   const checksum = header.reduce((sum, byte) => sum + byte, 0)
   header.write(`${checksum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii')
-  return Buffer.concat([
-    header,
-    body,
-    Buffer.alloc((512 - (body.length % 512)) % 512)
-  ])
+  return Buffer.concat([header, body, Buffer.alloc((512 - (body.length % 512)) % 512)])
 }
 
 function paxRecord(value: string): Buffer {
@@ -51,24 +33,20 @@ function paxRecord(value: string): Buffer {
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
     const record = Buffer.from(`${length} ${payload}`)
-    if (record.length === length) return record
+    if (record.length === length) {
+      return record
+    }
     length = record.length
   }
 }
 
 type EntrySpec = [name: string, type: string, body?: Buffer]
 
-function entry(
-  name: string,
-  type: string,
-  body: Buffer = Buffer.alloc(0)
-): Buffer[] {
-  if (Buffer.byteLength(name) <= 100) return [rawEntry(name, type, body)]
-  const marker = crypto
-    .createHash('sha256')
-    .update(name)
-    .digest('hex')
-    .slice(0, 24)
+function entry(name: string, type: string, body: Buffer = Buffer.alloc(0)): Buffer[] {
+  if (Buffer.byteLength(name) <= 100) {
+    return [rawEntry(name, type, body)]
+  }
+  const marker = crypto.createHash('sha256').update(name).digest('hex').slice(0, 24)
   return [
     rawEntry(`PaxHeaders/${marker}`, 'x', paxRecord(name)),
     rawEntry(`PaxPath/${marker}`, type, body)
@@ -79,10 +57,7 @@ function json(value: unknown): Buffer {
   return Buffer.from(`${JSON.stringify(value)}\n`)
 }
 
-function manifest(
-  trajectories: string[],
-  overrides: Record<string, unknown> = {}
-) {
+function manifest(trajectories: string[], overrides: Record<string, unknown> = {}) {
   return {
     version: 1,
     run_id: 'run-1',
@@ -94,10 +69,7 @@ function manifest(
 
 function archive(entries: EntrySpec[]): Buffer {
   return zstdCompressSync(
-    Buffer.concat([
-      ...entries.flatMap((item) => entry(...item)),
-      Buffer.alloc(1024)
-    ])
+    Buffer.concat([...entries.flatMap((item) => entry(...item)), Buffer.alloc(1024)])
   )
 }
 
@@ -135,11 +107,7 @@ const definitions = [
     expected: 'invalid',
     unitId: 'unit-1',
     bytes: archive([
-      [
-        'manifest.json',
-        '0',
-        json(manifest([trajectory], { result: 'other.json' }))
-      ],
+      ['manifest.json', '0', json(manifest([trajectory], { result: 'other.json' }))],
       ['result.json', '0', json({})],
       ['artifact-tree/', '5'],
       [trajectory, '0', Buffer.from('{}\n')]
@@ -222,9 +190,7 @@ const manifestValue = {
     size: bytes.length
   }))
 }
-const outputs = new Map(
-  definitions.map(({ file, bytes }) => [path.join(corpusRoot, file), bytes])
-)
+const outputs = new Map(definitions.map(({ file, bytes }) => [path.join(corpusRoot, file), bytes]))
 outputs.set(
   path.join(corpusRoot, 'manifest.json'),
   Buffer.from(`${JSON.stringify(manifestValue, null, 2)}\n`)

@@ -5,11 +5,7 @@ import { useMessages } from '../../../shared/i18n.js'
 import { CopyAction } from '../../../shared/CopyAction.js'
 import { ExplainedCode } from './ExplainedCode.js'
 import { PlatformMark } from '../PlatformMark.js'
-import {
-  PreparationStatus,
-  ExecutionStatus,
-  PublicationStatus
-} from '../status.js'
+import { PreparationStatus, ExecutionStatus, PublicationStatus } from '../status.js'
 import { workflowLabel } from '../format.js'
 
 export function RunSummary({ run }: { run: Run }): React.JSX.Element {
@@ -20,11 +16,7 @@ export function RunSummary({ run }: { run: Run }): React.JSX.Element {
         <Title order={1} className="run-id" ff="monospace">
           {run.run_id}
         </Title>
-        <CopyAction
-          value={run.run_id}
-          name={t('copyRunId')}
-          copiedName={t('runIdCopied')}
-        />
+        <CopyAction value={run.run_id} name={t('copyRunId')} copiedName={t('runIdCopied')} />
       </Group>
       <div className="run-summary-grid">
         <div className="run-summary-item">
@@ -57,12 +49,7 @@ export function RunSummary({ run }: { run: Run }): React.JSX.Element {
             <Text c="var(--muted)" size="xs">
               {t('integrationInstance')}
             </Text>
-            <Text
-              size="sm"
-              ff="monospace"
-              className="integration-id"
-              title={run.connector_id}
-            >
+            <Text size="sm" ff="monospace" className="integration-id" title={run.connector_id}>
               {run.connector_id}
             </Text>
           </Group>

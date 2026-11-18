@@ -2,10 +2,7 @@ import { expect, test } from 'vitest'
 
 import { prepareIssueReview } from '../../../src/reviews/issues/prepare-review.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
-import type {
-  IssueReviewInput,
-  TestChangesPolicy
-} from '../../../src/execution/input.js'
+import type { IssueReviewInput, TestChangesPolicy } from '../../../src/execution/input.js'
 import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import type { prepareIssueReviewInput } from '../../../src/reviews/issues/prepare-input.js'
 import { unusedGitHub } from '../../github-client.js'
@@ -99,16 +96,12 @@ test('audit review forwards an explicit test_changes to the execution input', as
 })
 
 test('audit review without a test_changes leaves the field absent', async () => {
-  expect(await runWith('audit', null)).toStrictEqual([
-    { review_objective: 'audit' }
-  ])
+  expect(await runWith('audit', null)).toStrictEqual([{ review_objective: 'audit' }])
 })
 
 test('repair review without a test_changes leaves the field absent', async () => {
   // The Execution Worker owns the default (`allow`); the GitHub integration never injects one.
-  expect(await runWith('repair', null)).toStrictEqual([
-    { review_objective: 'repair' }
-  ])
+  expect(await runWith('repair', null)).toStrictEqual([{ review_objective: 'repair' }])
 })
 
 test('repair review forwards an explicit test_changes', async () => {

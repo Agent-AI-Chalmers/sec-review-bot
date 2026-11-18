@@ -21,22 +21,22 @@ export function Detail(): React.JSX.Element {
   const location = useLocation()
   // Restore the list's filters and cursor when the reader came from it. A reload or
   // a deep link has no such state, so fall back to an unfiltered first page.
-  const listSearch = (location.state as { listSearch?: string } | null)
-    ?.listSearch
+  const listSearch = (location.state as { listSearch?: string } | null)?.listSearch
   const backTo = listSearch ? `/runs?${listSearch}` : '/runs'
   const { run, steps, events, error, load, terminal } = useRunDetail(runId)
   const [, setClockTick] = React.useState(0)
   React.useEffect(() => {
-    if (terminal) return
-    const timer = window.setInterval(
-      () => setClockTick((tick) => tick + 1),
-      10_000
-    )
+    if (terminal) {
+      return
+    }
+    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 10_000)
     return (): void => window.clearInterval(timer)
   }, [terminal])
   const titleRunId = run?.run_id
   React.useEffect(() => {
-    if (titleRunId === undefined) return
+    if (titleRunId === undefined) {
+      return
+    }
     document.title = `${titleRunId} · Control Plane UI`
     return (): void => {
       document.title = 'Control Plane UI'
@@ -70,7 +70,7 @@ export function Detail(): React.JSX.Element {
         </Container>
       )
     }
-    throw error
+    throw error instanceof Error ? error : new Error('Run request failed', { cause: error })
   }
   return (
     <Container size="lg" py="xl">

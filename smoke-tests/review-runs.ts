@@ -17,7 +17,8 @@ export type Admission = {
 }
 type RunPage = { runs: Run[] }
 type ObservedRun = { run: Run }
-export async function admit() {
+
+export async function admit(): Promise<void> {
   for (const base of [gateway, runs, catalog]) {
     const response = await request({
       base: base,
@@ -114,7 +115,7 @@ export async function admit() {
   console.log(JSON.stringify(admission))
 }
 
-export async function verifyRecovery(runId: string) {
+export async function verifyRecovery(runId: string): Promise<void> {
   assert.match(runId ?? '', /^[0-9a-f-]{36}$/, 'A workflow ID is required')
   const persisted = (await (
     await request({
@@ -152,14 +153,11 @@ export async function verifyRecovery(runId: string) {
       token: readToken
     })
     const { run } = (await response.json()) as ObservedRun
-    if (run.execution.status === 'failed') break
-    assert.ok(
-      Date.now() < deadline,
-      `Execution did not become failed: ${run.execution.status}`
-    )
+    if (run.execution.status === 'failed') {
+      break
+    }
+    assert.ok(Date.now() < deadline, `Execution did not become failed: ${run.execution.status}`)
     await setTimeout(250)
   }
-  console.error(
-    'ok: Restarted Review Runs observed the execution terminated while it was offline'
-  )
+  console.error('ok: Restarted Review Runs observed the execution terminated while it was offline')
 }

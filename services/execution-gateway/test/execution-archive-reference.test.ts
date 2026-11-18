@@ -14,9 +14,7 @@ const artifact = {
 } as const
 
 test('accepts the workflow-owned execution archive reference', () => {
-  expect(parseExecutionArchiveArtifact(artifact, 'run-1')).toStrictEqual(
-    artifact
-  )
+  expect(parseExecutionArchiveArtifact(artifact, 'run-1')).toStrictEqual(artifact)
 })
 
 test('rejects the deleted standalone trajectory object', () => {

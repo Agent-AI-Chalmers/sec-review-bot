@@ -25,10 +25,7 @@ import type { PagedResource } from './usePagedResource.js'
 import { CursorPagination } from '../../shared/CursorPagination.js'
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { LoadingState } from '../../shared/StateMessage.js'
-import {
-  TrajectoryViewer,
-  type TrajectoryTarget
-} from '../trajectory/TrajectoryViewer.js'
+import { TrajectoryViewer, type TrajectoryTarget } from '../trajectory/TrajectoryViewer.js'
 
 type Version = MemoryTreeVersion
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
@@ -59,13 +56,11 @@ export function Memory(): React.JSX.Element {
   const [restoreVersion, setRestoreVersion] = React.useState<number>()
   const [viewVersion, setViewVersion] = React.useState<number>()
   const [diffVersion, setDiffVersion] = React.useState<Version>()
-  const [trajectoryTarget, setTrajectoryTarget] =
-    React.useState<TrajectoryTarget>()
+  const [trajectoryTarget, setTrajectoryTarget] = React.useState<TrajectoryTarget>()
   const [activeTab, setActiveTab] = React.useState<string | null>('overview')
   const [versionView, setVersionView] = React.useState('graph')
   const [highlightedVersion, setHighlightedVersion] = React.useState<number>()
-  const [highlightedObservation, setHighlightedObservation] =
-    React.useState<string>()
+  const [highlightedObservation, setHighlightedObservation] = React.useState<string>()
   const [error, setError] = React.useState('')
   const [editError, setEditError] = React.useState('')
   const [restoreError, setRestoreError] = React.useState('')
@@ -100,10 +95,10 @@ export function Memory(): React.JSX.Element {
     })
   }
 
-  const automationAction = async (
-    action: 'pause' | 'resume'
-  ): Promise<void> => {
-    if (automation.data === undefined) return
+  const automationAction = async (action: 'pause' | 'resume'): Promise<void> => {
+    if (automation.data === undefined) {
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -114,7 +109,9 @@ export function Memory(): React.JSX.Element {
       await apiPost(`/memory/tree/automation/${action}`, request)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryAutomationConflict')
@@ -125,24 +122,33 @@ export function Memory(): React.JSX.Element {
     }
   }
   const beginEdit = async (): Promise<void> => {
-    if (activeVersion === undefined) return
+    if (activeVersion === undefined) {
+      return
+    }
     setEditError('')
     try {
       await editor.begin(activeVersion)
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
-      else setError(t('memoryLoadFailed'))
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      } else {
+        setError(t('memoryLoadFailed'))
+      }
     }
   }
   const commitEdit = async (): Promise<void> => {
-    if (editor.session === undefined) return
+    if (editor.session === undefined) {
+      return
+    }
     setBusy(true)
     setEditError('')
     try {
       await editor.commit()
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setEditError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryVersionConflict')
@@ -153,7 +159,9 @@ export function Memory(): React.JSX.Element {
     }
   }
   const restore = async (): Promise<void> => {
-    if (restoreVersion === undefined || activeVersion === undefined) return
+    if (restoreVersion === undefined || activeVersion === undefined) {
+      return
+    }
     setBusy(true)
     setRestoreError('')
     try {
@@ -166,7 +174,9 @@ export function Memory(): React.JSX.Element {
       setRestoreVersion(undefined)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
+      if (isUnauthorizedApiError(failure)) {
+        setQueryFailure(failure)
+      }
       setRestoreError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRestoreConflict')
@@ -194,19 +204,10 @@ export function Memory(): React.JSX.Element {
   // A failure the boundary should handle is not also rendered as a per-panel message.
   const failureText = (failure: unknown, message: Message): string =>
     failure === undefined || isUnauthorizedApiError(failure) ? '' : t(message)
-  const automationError = failureText(
-    automation.error,
-    'memoryAutomationLoadFailed'
-  )
+  const automationError = failureText(automation.error, 'memoryAutomationLoadFailed')
   const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
-  const graphVersionsError = failureText(
-    graphVersions.error,
-    'memoryVersionsLoadFailed'
-  )
-  const versionPageError = failureText(
-    versionPages.resource.error,
-    'memoryVersionsLoadFailed'
-  )
+  const graphVersionsError = failureText(graphVersions.error, 'memoryVersionsLoadFailed')
+  const versionPageError = failureText(versionPages.resource.error, 'memoryVersionsLoadFailed')
   const observationsError = failureText(
     observationPages.resource.error,
     'memoryObservationsLoadFailed'
@@ -241,10 +242,9 @@ export function Memory(): React.JSX.Element {
         refreshing={refreshing}
         lastChecked={lastChecked}
         onToggleAutomation={() => {
-          if (automation.data)
-            void automationAction(
-              automation.data.state === 'enabled' ? 'pause' : 'resume'
-            )
+          if (automation.data) {
+            void automationAction(automation.data.state === 'enabled' ? 'pause' : 'resume')
+          }
         }}
         onEdit={() => void beginEdit()}
       />
@@ -254,11 +254,7 @@ export function Memory(): React.JSX.Element {
           title={t('memoryUnavailable')}
           message={t('memoryUnavailableHelp')}
           actions={
-            <Button
-              variant="default"
-              loading={refreshing}
-              onClick={() => void refresh()}
-            >
+            <Button variant="default" loading={refreshing} onClick={() => void refresh()}>
               {t('retry')}
             </Button>
           }
@@ -277,11 +273,7 @@ export function Memory(): React.JSX.Element {
                 title={overviewError}
                 message={t('resourceRetryHelp')}
                 actions={
-                  <Button
-                    variant="default"
-                    loading={refreshing}
-                    onClick={() => void refresh()}
-                  >
+                  <Button variant="default" loading={refreshing} onClick={() => void refresh()}>
                     {t('retry')}
                   </Button>
                 }
@@ -332,9 +324,7 @@ export function Memory(): React.JSX.Element {
           </Tabs.Panel>
           <Tabs.Panel value="observations" pt="md">
             <MemoryObservationList
-              observations={
-                observationPages.resource.data?.page.observations ?? []
-              }
+              observations={observationPages.resource.data?.page.observations ?? []}
               loading={observationPages.resource.loading}
               error={observationsError}
               pagination={pagination(
@@ -364,18 +354,9 @@ export function Memory(): React.JSX.Element {
           </Tabs.Panel>
         </Tabs>
       )}
-      <MemoryFilesViewer
-        version={viewVersion}
-        onClose={() => setViewVersion(undefined)}
-      />
-      <MemoryVersionDiffViewer
-        target={diffVersion}
-        onClose={() => setDiffVersion(undefined)}
-      />
-      <TrajectoryViewer
-        target={trajectoryTarget}
-        onClose={() => setTrajectoryTarget(undefined)}
-      />
+      <MemoryFilesViewer version={viewVersion} onClose={() => setViewVersion(undefined)} />
+      <MemoryVersionDiffViewer target={diffVersion} onClose={() => setDiffVersion(undefined)} />
+      <TrajectoryViewer target={trajectoryTarget} onClose={() => setTrajectoryTarget(undefined)} />
       <MemoryRestoreDialog
         error={restoreError}
         version={restoreVersion}
@@ -412,7 +393,9 @@ function pagination<Filter, Cursor, Page>(
     onPageSizeChange: (value) => void paged.openFirst({ limit: Number(value) }),
     onPreviousPage: () => void paged.openPrevious(),
     onNextPage: (): void => {
-      if (next != null) void paged.openNext(next)
+      if (next != null) {
+        void paged.openNext(next)
+      }
     }
   }
 }

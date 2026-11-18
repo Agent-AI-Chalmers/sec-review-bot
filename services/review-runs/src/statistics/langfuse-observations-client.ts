@@ -1,9 +1,6 @@
 import { TextDecoder } from 'node:util'
 
-import {
-  ResponseTooLargeError,
-  readBoundedResponseBody
-} from '../bounded-response.js'
+import { ResponseTooLargeError, readBoundedResponseBody } from '../bounded-response.js'
 import {
   REVIEW_AGENT_NAMES,
   type ExecutionStatisticsRead,
@@ -21,13 +18,16 @@ export class LangfuseRateLimitError extends Error {
 }
 
 async function readBoundedPageJson(response: Response): Promise<unknown> {
-  if (response.body === null)
+  if (response.body === null) {
     throw new Error('Langfuse observations response has no body.')
+  }
   let body: Uint8Array
   try {
     body = await readBoundedResponseBody(response, MAX_LANGFUSE_PAGE_BYTES)
   } catch (error) {
-    if (!(error instanceof ResponseTooLargeError)) throw error
+    if (!(error instanceof ResponseTooLargeError)) {
+      throw error
+    }
     throw new Error('Langfuse response is larger than the page budget.', {
       cause: error
     })
@@ -37,8 +37,12 @@ async function readBoundedPageJson(response: Response): Promise<unknown> {
 
 function retryAfterMs(response: Response): number | null {
   const value = response.headers.get('retry-after')?.trim()
-  if (!value) return null
-  if (/^\d+$/.test(value)) return Number(value) * 1_000
+  if (!value) {
+    return null
+  }
+  if (/^\d+$/.test(value)) {
+    return Number(value) * 1_000
+  }
   const instant = Date.parse(value)
   return Number.isNaN(instant) ? null : Math.max(0, instant - Date.now())
 }
@@ -51,34 +55,34 @@ function objectValue(value: unknown): Record<string, unknown> | null {
 
 function parseObservation(value: unknown, index: number): LangfuseObservation {
   const item = objectValue(value)
-  if (item === null)
+  if (item === null) {
     throw new Error(`Langfuse observation data[${index}] is not an object.`)
-  if (typeof item.id !== 'string' || item.id === '')
+  }
+  if (typeof item.id !== 'string' || item.id === '') {
     throw new Error(`Langfuse observation data[${index}] has no id.`)
+  }
   const traceId = item.traceId
-  if (typeof traceId !== 'string' || traceId === '')
+  if (typeof traceId !== 'string' || traceId === '') {
     throw new Error(`Langfuse observation ${item.id} has no traceId.`)
+  }
   const metadataValue = item.metadata
   const parsedMetadata = objectValue(metadataValue)
-  if (
-    metadataValue !== undefined &&
-    metadataValue !== null &&
-    parsedMetadata === null
-  )
+  if (metadataValue !== undefined && metadataValue !== null && parsedMetadata === null) {
     throw new Error(`Langfuse observation ${item.id} has invalid metadata.`)
+  }
   const metadata = parsedMetadata ?? {}
   const observation: LangfuseObservation = { id: item.id, traceId, metadata }
   if (item.model !== undefined && item.model !== null) {
-    if (typeof item.model !== 'string')
+    if (typeof item.model !== 'string') {
       throw new Error(`Langfuse observation ${item.id} has invalid model.`)
+    }
     observation.model = item.model
   }
   const usageDetails = objectValue(item.usageDetails)
   if (item.usageDetails !== undefined && item.usageDetails !== null) {
-    if (usageDetails === null)
-      throw new Error(
-        `Langfuse observation ${item.id} has invalid usageDetails.`
-      )
+    if (usageDetails === null) {
+      throw new Error(`Langfuse observation ${item.id} has invalid usageDetails.`)
+    }
     observation.usageDetails = usageDetails
   }
   return observation
@@ -103,10 +107,13 @@ export class LangfuseObservationsClient {
     let cursor: string | undefined
     do {
       const url = new URL(OBSERVATIONS_V2_PATH, this.baseUrl)
-      for (const [name, value] of Object.entries(parameters))
+      for (const [name, value] of Object.entries(parameters)) {
         url.searchParams.set(name, value)
+      }
       url.searchParams.set('limit', '1000')
-      if (cursor !== undefined) url.searchParams.set('cursor', cursor)
+      if (cursor !== undefined) {
+        url.searchParams.set('cursor', cursor)
+      }
       const response = await fetch(url, {
         headers: { authorization: this.authorization },
         signal: AbortSignal.timeout(this.timeoutMs)
@@ -117,25 +124,20 @@ export class LangfuseObservationsClient {
       }
       if (!response.ok) {
         await response.body?.cancel()
-        throw new Error(
-          `Langfuse observations request failed with HTTP ${response.status}.`
-        )
+        throw new Error(`Langfuse observations request failed with HTTP ${response.status}.`)
       }
       const body = objectValue(await readBoundedPageJson(response))
       const data = body?.data
       const meta = objectValue(body?.meta)
-      if (!Array.isArray(data) || meta === null)
+      if (!Array.isArray(data) || meta === null) {
         throw new Error('Langfuse observations response has an invalid shape.')
+      }
       for (const [index, value] of data.entries()) {
         const observation = parseObservation(value, index)
         observations.set(observation.id, observation)
       }
       const nextCursor = meta.cursor
-      if (
-        nextCursor === undefined ||
-        nextCursor === null ||
-        nextCursor === ''
-      ) {
+      if (nextCursor === undefined || nextCursor === null || nextCursor === '') {
         cursor = undefined
       } else if (typeof nextCursor === 'string') {
         cursor = nextCursor
@@ -180,8 +182,7 @@ export class LangfuseObservationsClient {
       toStartTime
     })
     for (const call of calls) {
-      const agentName =
-        call.metadata.sec_review_agent ?? rootAgentByTraceId.get(call.traceId)
+      const agentName = call.metadata.sec_review_agent ?? rootAgentByTraceId.get(call.traceId)
       if (typeof agentName !== 'string' || !REVIEW_AGENT_NAMES.has(agentName)) {
         continue
       }
@@ -189,9 +190,7 @@ export class LangfuseObservationsClient {
       // The producer suppresses provider-SDK duplicates before export. Seeing one here means
       // that invariant regressed; failing the read is safer than silently changing the bill.
       if (call.metadata['scope.name'] !== LANGFUSE_SDK_INSTRUMENTATION_SCOPE) {
-        throw new Error(
-          `Review generation ${call.id} has unexpected instrumentation scope.`
-        )
+        throw new Error(`Review generation ${call.id} has unexpected instrumentation scope.`)
       }
       generations.set(call.id, call)
     }

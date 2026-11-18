@@ -1,18 +1,6 @@
 import React from 'react'
-import {
-  ActionIcon,
-  Button,
-  Collapse,
-  Group,
-  SegmentedControl,
-  Tooltip
-} from '@mantine/core'
-import {
-  IconCheck,
-  IconChevronDown,
-  IconChevronRight,
-  IconCopy
-} from '@tabler/icons-react'
+import { ActionIcon, Button, Collapse, Group, SegmentedControl, Tooltip } from '@mantine/core'
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import { TrajectoryText } from './TrajectoryText.js'
@@ -33,11 +21,7 @@ function CopyButton({ value }: { value: string }): React.JSX.Element {
         aria-label={copied ? t('copied') : t('copy')}
         onClick={() => void copy()}
       >
-        {copied ? (
-          <IconCheck size={ICON_SIZE.sm} />
-        ) : (
-          <IconCopy size={ICON_SIZE.sm} />
-        )}
+        {copied ? <IconCheck size={ICON_SIZE.sm} /> : <IconCopy size={ICON_SIZE.sm} />}
       </ActionIcon>
     </Tooltip>
   )
@@ -68,17 +52,15 @@ export function TrajectorySection({
   const [opened, setOpened] = React.useState(openedInitially)
   const previousForce = React.useRef(force)
   React.useEffect(() => {
-    if (force === previousForce.current) return
+    if (force === previousForce.current) {
+      return
+    }
     previousForce.current = force
     setOpened(force > 0)
   }, [force])
   return (
     <div className="trajectory-section" data-trajectory-section={kind}>
-      <Group
-        justify="space-between"
-        wrap="nowrap"
-        className="trajectory-section-header"
-      >
+      <Group justify="space-between" wrap="nowrap" className="trajectory-section-header">
         <Button
           variant="subtle"
           color={color}

@@ -113,9 +113,7 @@ export async function handlePullRequestReviewRun({
   const context = parsePullRequestReviewPublishContext(run.publish_context)
   const workflow_result = pullRequestReviewResultFromWorkflowResult(result)
   if (workflow_result === null) {
-    throw new Error(
-      `Pull request review run ${run.run_id} is not ready to publish.`
-    )
+    throw new Error(`Pull request review run ${run.run_id} is not ready to publish.`)
   }
   const octokit = await installation_octokit_for_repo(context.pr.repo_full_name)
   await publishPullRequestReviewResult({
@@ -131,16 +129,14 @@ export async function handlePullRequestReviewRun({
   })
 }
 
-function shouldPublishSuggestions(
-  review_record: ReviewRecord | null | undefined
-): boolean {
+function shouldPublishSuggestions(review_record: ReviewRecord | null | undefined) {
   return (
     typeof review_record?.mitigation?.patch_diff === 'string' &&
     review_record.mitigation.patch_diff.trim() !== ''
   )
 }
 
-function pullRequestReviewRunMarker(run_id: string): string {
+function pullRequestReviewRunMarker(run_id: string) {
   // Publication retries use this identity to recover a review accepted by GitHub
   // when the response or the following local state update was lost.
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
@@ -186,9 +182,7 @@ function appendUnmappedSuggestionSection(
   review_body: string,
   manifest: SuggestionManifestLike
 ): string {
-  const unmapped = Array.isArray(manifest.unmapped_changes)
-    ? manifest.unmapped_changes
-    : []
+  const unmapped = Array.isArray(manifest.unmapped_changes) ? manifest.unmapped_changes : []
   if (unmapped.length === 0) {
     return review_body
   }
@@ -203,15 +197,11 @@ function appendUnmappedSuggestionSection(
 
   for (const item of unmapped.slice(0, 10)) {
     const path = String(item.path ?? '').trim() || '(unknown path)'
-    const reason =
-      String(item.reason ?? '').trim() || 'Not anchorable to PR diff.'
+    const reason = String(item.reason ?? '').trim() || 'Not anchorable to PR diff.'
     const hunk = item.hunk ?? {}
     const new_start = Number(hunk.new_start ?? 0)
     const new_count = Number(hunk.new_count ?? 0)
-    const range =
-      new_start > 0 && new_count > 0
-        ? ` [new:${new_start}, count:${new_count}]`
-        : ''
+    const range = new_start > 0 && new_count > 0 ? ` [new:${new_start}, count:${new_count}]` : ''
     lines.push(`- \`${path}\`${range}: ${reason}`)
   }
 
@@ -262,9 +252,7 @@ async function publishPullRequestReviewResult({
         pr_number: pr.pr_number,
         marker
       })
-      return existing === null
-        ? null
-        : { id: existing.id, url: existing.html_url }
+      return existing === null ? null : { id: existing.id, url: existing.html_url }
     },
     effect: async () =>
       await publishPullRequestReviewSideEffect({
@@ -299,10 +287,9 @@ async function publishPullRequestReviewSideEffect({
   let review: SuggestionReviewResult | null = null
   const review_record = workflow_result.review_record
   const marker = pullRequestReviewRunMarker(run_id)
-  const commentBody = [
-    marker,
-    renderAnalysisSummaryCommentFromReviewRecord(review_record)
-  ].join('\n\n')
+  const commentBody = [marker, renderAnalysisSummaryCommentFromReviewRecord(review_record)].join(
+    '\n\n'
+  )
   const reviewEvent = reviewEventForRecord(review_record, pr)
 
   if (shouldPublishSuggestions(review_record)) {
@@ -329,24 +316,23 @@ async function publishPullRequestReviewSideEffect({
       if (suggestionManifest.candidates.length > 0) {
         const reviewBodyWithUnmapped = appendUnmappedSuggestionSection(
           commentBody,
-          suggestionManifest as SuggestionManifestLike
+          suggestionManifest
         )
-        review = (await publishSuggestionReview(octokit, {
+        review = await publishSuggestionReview(octokit, {
           pr,
           review_body: reviewBodyWithUnmapped,
           event: reviewEvent,
           candidates: suggestionManifest.candidates,
           marker,
           assert_publication_claim
-        })) as SuggestionReviewResult
+        })
         logInfo('suggestion_review_completed', {
           comment_count: review.count,
           event_type,
           unmapped_count: Array.isArray(
             (suggestionManifest as SuggestionManifestLike).unmapped_changes
           )
-            ? ((suggestionManifest as SuggestionManifestLike).unmapped_changes
-                ?.length ?? 0)
+            ? ((suggestionManifest as SuggestionManifestLike).unmapped_changes?.length ?? 0)
             : 0,
           pr: pr.pr_number,
           review_id: review.review_id,
@@ -357,8 +343,7 @@ async function publishPullRequestReviewSideEffect({
         logInfo('suggestion_pipeline_completed', {
           event_type,
           pr: pr.pr_number,
-          reason:
-            suggestionManifest.skipped_reason ?? 'No eligible patch candidate.'
+          reason: suggestionManifest.skipped_reason ?? 'No eligible patch candidate.'
         })
       }
     }
@@ -387,20 +372,17 @@ async function publishPullRequestReviewSideEffect({
     repo: pr.repo_full_name
   })
 
-  const reviewComment = await createPullRequestReviewUnlessMarkerExists(
-    octokit,
-    {
-      owner_login: pr.owner_login,
-      repo_name: pr.repo_name,
-      pr_number: pr.pr_number,
-      commit_id: pr.head_sha,
-      body: commentBody,
-      marker,
-      event: reviewEvent,
-      comments: [],
-      assert_publication_claim
-    }
-  )
+  const reviewComment = await createPullRequestReviewUnlessMarkerExists(octokit, {
+    owner_login: pr.owner_login,
+    repo_name: pr.repo_name,
+    pr_number: pr.pr_number,
+    commit_id: pr.head_sha,
+    body: commentBody,
+    marker,
+    event: reviewEvent,
+    comments: [],
+    assert_publication_claim
+  })
 
   logInfo('analysis_review_publish_completed', {
     event_type,

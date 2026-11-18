@@ -62,12 +62,8 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     })
     expect(download.status).toBe(200)
     expect(await download.text()).toBe('artifact')
-    expect(requestedKey).toBe(
-      `runs/${runId}/artifacts/execution-archive.v1.tar.zst`
-    )
-    expect(download.headers.get('content-type')).toBe(
-      'application/octet-stream'
-    )
+    expect(requestedKey).toBe(`runs/${runId}/artifacts/execution-archive.v1.tar.zst`)
+    expect(download.headers.get('content-type')).toBe('application/octet-stream')
     expect(download.headers.get('content-disposition')).toBe(
       'attachment; filename="execution-archive.v1.tar.zst"'
     )
@@ -375,9 +371,7 @@ test('BFF times out a stalled artifact download', async () => {
     artifactStore: {
       async getObject(_key, signal): Promise<{ body: Readable }> {
         return await new Promise((_, reject) => {
-          signal.addEventListener('abort', () =>
-            reject(new DOMException('Aborted', 'AbortError'))
-          )
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
         })
       }
     }
@@ -487,7 +481,9 @@ test('BFF lets a progressing artifact preview outlive the metadata timeout', asy
   let started = false
   const body = new Readable({
     read(): void {
-      if (started) return
+      if (started) {
+        return
+      }
       started = true
       this.push(bundle.subarray(0, 1))
       setTimeout(() => {

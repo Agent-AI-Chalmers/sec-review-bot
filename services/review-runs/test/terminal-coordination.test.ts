@@ -46,11 +46,7 @@ function store(events: unknown[][]): ObservationStore {
       events.push(['running', id])
       return true
     },
-    async recordExecutionSuccess(
-      id: string,
-      result: unknown,
-      artifact?: unknown
-    ) {
+    async recordExecutionSuccess(id: string, result: unknown, artifact?: unknown) {
       events.push(['succeeded', id, result, artifact])
       return true
     },
@@ -102,9 +98,7 @@ test('successful Execution result is durably recorded for later publication', as
       () => false
     )
   ).toBe('succeeded')
-  expect(events).toStrictEqual([
-    ['succeeded', 'run-1', { answer: 42 }, artifact]
-  ])
+  expect(events).toStrictEqual([['succeeded', 'run-1', { answer: 42 }, artifact]])
 })
 
 test('transient polling failure leaves the run active', async () => {
@@ -138,12 +132,7 @@ test('terminal polling failure fails the run without publication', async () => {
     )
   ).toBe('failed')
   expect(events).toStrictEqual([
-    [
-      'failed',
-      'run-1',
-      { code: 'EXECUTION_RUN_NOT_FOUND', message: 'missing' },
-      undefined
-    ]
+    ['failed', 'run-1', { code: 'EXECUTION_RUN_NOT_FOUND', message: 'missing' }, undefined]
   ])
 })
 
@@ -171,12 +160,7 @@ test('Execution failure records its artifact atomically with the terminal failur
     )
   ).toBe('failed')
   expect(events).toStrictEqual([
-    [
-      'failed',
-      'run-1',
-      { code: 'EXECUTION_FAILED', message: 'failed' },
-      artifact
-    ]
+    ['failed', 'run-1', { code: 'EXECUTION_FAILED', message: 'failed' }, artifact]
   ])
 })
 

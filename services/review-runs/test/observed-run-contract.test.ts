@@ -8,11 +8,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-import {
-  Ajv2020,
-  type AnySchemaObject,
-  type ValidateFunction
-} from 'ajv/dist/2020.js'
+import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import * as ajvFormats from 'ajv-formats'
 
 import { REPO_ROOT } from './generated-paths.js'
@@ -25,9 +21,7 @@ const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')
 const root = REPO_ROOT
 // One contract version can hold several schemas, so each fixture is validated against the schema the
 // manifest names for it rather than against whichever schema was loaded first.
-const manifest = JSON.parse(
-  readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')
-) as {
+const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {
   schema_fixtures: Record<string, string>
   invalid_schema_fixtures: Record<string, string>
 }
@@ -40,7 +34,9 @@ const validators = new Map<string, ValidateFunction>()
 
 function validate(schemaName: string, value: unknown): boolean {
   const cached = validators.get(schemaName)
-  if (cached !== undefined) return cached(value)
+  if (cached !== undefined) {
+    return cached(value)
+  }
   const schema = JSON.parse(
     readFileSync(path.join(root, CONTRACT_VERSION_DIR, schemaName), 'utf8')
   ) as AnySchemaObject
@@ -53,9 +49,7 @@ function validate(schemaName: string, value: unknown): boolean {
   // import, a namespace import's `.default`, and `import ... = require(...)`, with and
   // without `esModuleInterop`. The plugin really is on `default` at runtime, which the
   // assertions below prove the moment they run — a wrong cast makes them fail, not pass.
-  const addFormats = ajvFormats.default as unknown as (
-    instance: Ajv2020
-  ) => Ajv2020
+  const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
   addFormats(ajv)
   const validator = ajv.compile(schema) as ValidateFunction
   validators.set(schemaName, validator)
@@ -66,18 +60,10 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Review Runs never sends, so both directions are asserted.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    expect(
-      validate(schemaName, fixture(name)),
-      `${name} must be accepted`
-    ).toBe(true)
+    expect(validate(schemaName, fixture(name)), `${name} must be accepted`).toBe(true)
   }
-  for (const [name, schemaName] of Object.entries(
-    manifest.invalid_schema_fixtures
-  )) {
-    expect(
-      validate(schemaName, fixture(name)),
-      `${name} must be rejected`
-    ).toBe(false)
+  for (const [name, schemaName] of Object.entries(manifest.invalid_schema_fixtures)) {
+    expect(validate(schemaName, fixture(name)), `${name} must be rejected`).toBe(false)
   }
 })
 
@@ -116,8 +102,8 @@ function paths(value: unknown, prefix = ''): string[] {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return [prefix]
   }
-  return Object.entries(value as Record<string, unknown>).flatMap(
-    ([key, child]) => paths(child, prefix === '' ? key : `${prefix}.${key}`)
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+    paths(child, prefix === '' ? key : `${prefix}.${key}`)
   )
 }
 
@@ -128,7 +114,9 @@ function tokenUsages(value: unknown): Array<Record<string, number | null>> {
       node.forEach(walk)
       return
     }
-    if (typeof node !== 'object' || node === null) return
+    if (typeof node !== 'object' || node === null) {
+      return
+    }
     const record = node as Record<string, unknown>
     const usage = record.token_usage
     if (typeof usage === 'object' && usage !== null) {
@@ -145,7 +133,9 @@ test('token usage keeps the documented subset invariants', () => {
   // contract text and the fixtures pin it. A fixture that broke it would teach consumers to
   // add fields that must not be added.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    if (schemaName !== 'observed-run.schema.json') continue
+    if (schemaName !== 'observed-run.schema.json') {
+      continue
+    }
     for (const usage of tokenUsages(fixture(name))) {
       const input = usage.input_tokens
       const cacheRead = usage.cache_read_input_tokens
@@ -166,10 +156,9 @@ test('token usage keeps the documented subset invariants', () => {
       }
       const total = usage.total_tokens
       if (total != null && input != null && output != null) {
-        expect(
-          total,
-          `${name}: total_tokens must equal input_tokens + output_tokens`
-        ).toBe(input + output)
+        expect(total, `${name}: total_tokens must equal input_tokens + output_tokens`).toBe(
+          input + output
+        )
       }
     }
   }
@@ -189,7 +178,9 @@ test('each invalid fixture differs from its valid counterpart only where it inte
   for (const [valid, prefix] of pairs) {
     const expected = paths(fixture(valid)).sort()
     for (const name of Object.keys(manifest.invalid_schema_fixtures)) {
-      if (!name.startsWith(prefix)) continue
+      if (!name.startsWith(prefix)) {
+        continue
+      }
       // Only a fixture whose name says a field is missing may omit valid paths. Every other one
       // has to carry the complete valid shape and differ by value (or by one stray field), so a
       // required field added to the contract forces all of them to be updated instead of quietly
@@ -207,9 +198,7 @@ test('each invalid fixture differs from its valid counterpart only where it inte
   }
 })
 
-function recordWith(
-  artifactStorage: ReviewRunRecord['artifact_storage']
-): ReviewRunRecord {
+function recordWith(artifactStorage: ReviewRunRecord['artifact_storage']): ReviewRunRecord {
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
@@ -247,7 +236,7 @@ function recordWith(
     notices: [],
     execution_input: { must: 'not leak' },
     publish_context: { repository: 'octo/example' }
-  } as ReviewRunRecord
+  }
 }
 
 test('the redacted read never carries a field the observed schema does not declare', () => {
@@ -277,11 +266,7 @@ test('the redacted read never carries a field the observed schema does not decla
     'workflow'
   ])
   // The connector-owned record fields are the ones that must not survive redaction.
-  for (const dropped of [
-    'publish_context',
-    'execution_input',
-    'failure_message'
-  ]) {
+  for (const dropped of ['publish_context', 'execution_input', 'failure_message']) {
     expect.assert(
       !(dropped in observed),
       `${dropped} is record-only and must not reach the redacted read`
@@ -324,7 +309,7 @@ test('what observeRun returns validates against the shared schema', () => {
         digest: `sha256:${'ab'.repeat(32)}`,
         size_bytes: 1234
       }
-    } as ReviewRunRecord['artifact_storage'])
+    })
   )
   expect(
     validate('observed-run.schema.json', withArtifact),

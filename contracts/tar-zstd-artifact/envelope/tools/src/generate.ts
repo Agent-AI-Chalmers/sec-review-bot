@@ -8,12 +8,7 @@ const root = path.resolve(import.meta.dirname, '../..')
 const corpus = path.join(root, 'v1', 'corpus')
 
 function octal(header: Buffer, offset: number, length: number, value: number) {
-  header.write(
-    `${value.toString(8).padStart(length - 1, '0')}\0`,
-    offset,
-    length,
-    'ascii'
-  )
+  header.write(`${value.toString(8).padStart(length - 1, '0')}\0`, offset, length, 'ascii')
 }
 
 type EntryMetadata = {
@@ -46,11 +41,7 @@ function entry(
   header.write(metadata.gname ?? '', 297, 32, 'utf8')
   const checksum = header.reduce((sum, byte) => sum + byte, 0)
   header.write(`${checksum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii')
-  return Buffer.concat([
-    header,
-    body,
-    Buffer.alloc((512 - (body.length % 512)) % 512)
-  ])
+  return Buffer.concat([header, body, Buffer.alloc((512 - (body.length % 512)) % 512)])
 }
 
 function record(key: string, value: string): Buffer {
@@ -58,7 +49,9 @@ function record(key: string, value: string): Buffer {
   let length = Buffer.byteLength(payload) + 3
   for (;;) {
     const bytes = Buffer.from(`${length} ${payload}`)
-    if (bytes.length === length) return bytes
+    if (bytes.length === length) {
+      return bytes
+    }
     length = bytes.length
   }
 }
@@ -69,11 +62,7 @@ function archive(parts: Buffer[]): Buffer {
 
 const longPath = `tree/${'a'.repeat(110)}.txt`
 const definitions: [file: string, expected: string, bytes: Buffer][] = [
-  [
-    'valid-ustar.tar.zst',
-    'valid',
-    archive([entry('tree/file.txt', '0', Buffer.from('ok\n'))])
-  ],
+  ['valid-ustar.tar.zst', 'valid', archive([entry('tree/file.txt', '0', Buffer.from('ok\n'))])],
   [
     'valid-pax-path.tar.zst',
     'valid',
@@ -127,11 +116,7 @@ const definitions: [file: string, expected: string, bytes: Buffer][] = [
       })
     ])
   ],
-  [
-    'invalid-directory-size.tar.zst',
-    'invalid',
-    archive([entry('tree/', '5', Buffer.from('x'))])
-  ]
+  ['invalid-directory-size.tar.zst', 'invalid', archive([entry('tree/', '5', Buffer.from('x'))])]
 ]
 
 const manifest = {
@@ -142,9 +127,7 @@ const manifest = {
     size: bytes.length
   }))
 }
-const outputs = new Map(
-  definitions.map(([file, , bytes]) => [path.join(corpus, file), bytes])
-)
+const outputs = new Map(definitions.map(([file, , bytes]) => [path.join(corpus, file), bytes]))
 outputs.set(
   path.join(corpus, 'manifest.json'),
   Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`)
@@ -153,11 +136,7 @@ outputs.set(
 fs.mkdirSync(corpus, { recursive: true })
 for (const [target, bytes] of outputs) {
   if (process.argv.includes('--check')) {
-    assert.deepEqual(
-      fs.readFileSync(target),
-      bytes,
-      `${path.relative(root, target)} is stale`
-    )
+    assert.deepEqual(fs.readFileSync(target), bytes, `${path.relative(root, target)} is stale`)
   } else {
     fs.writeFileSync(target, bytes)
   }

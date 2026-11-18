@@ -31,9 +31,7 @@ test('pull request renderer preserves inline code in review prose', () => {
       regression: 'not-run',
       next_step: 'none',
       findings: [],
-      evidence: [
-        '`agents/tests/memory/test_memory.py` covers the prompt contract.'
-      ],
+      evidence: ['`agents/tests/memory/test_memory.py` covers the prompt contract.'],
       residual_risks: []
     },
     cvss: null
@@ -76,9 +74,7 @@ test('pull request renderer summarizes each review stage without implying PR fil
 
   expect(body).toMatch(/- Analysis: `no actionable security finding`/)
   expect(body).toMatch(/- Mitigation: `not needed`/)
-  expect(body).toMatch(
-    /- Verification: `full coverage; static review; checks not run`/
-  )
+  expect(body).toMatch(/- Verification: `full coverage; static review; checks not run`/)
   expect(body).not.toMatch(/- Tests:/)
   expect(body).not.toMatch(/Changed files: `0`/)
   expect(body).not.toMatch(/Next step: `none`/)

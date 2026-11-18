@@ -1,12 +1,5 @@
-import type {
-  PublicationStepRecord,
-  ReviewRunRecord
-} from './persistence/review-run-store.js'
-import type {
-  ExecutionStatisticsSummary,
-  ObservedRun,
-  PublicationStepSummary
-} from './shapes.js'
+import type { PublicationStepRecord, ReviewRunRecord } from './persistence/review-run-store.js'
+import type { ExecutionStatisticsSummary, ObservedRun, PublicationStepSummary } from './shapes.js'
 
 export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
@@ -37,9 +30,7 @@ export function observeRun(
   }
 }
 
-export function observePublicationStep(
-  step: PublicationStepRecord
-): PublicationStepSummary {
+export function observePublicationStep(step: PublicationStepRecord): PublicationStepSummary {
   return {
     step_key: step.step_key,
     status: step.status,

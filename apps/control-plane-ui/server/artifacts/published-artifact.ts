@@ -31,27 +31,36 @@ export function publishedArtifact(
   value: unknown,
   expected: ArtifactExpectation
 ): PublishedArtifact {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { kind: 'invalid' }
+  }
   const record = value as Record<string, unknown>
   const digest = record.digest
   const uri = record.uri
   const sizeBytes = record.size_bytes
-  if (typeof digest !== 'string' || !DIGEST.test(digest))
+  if (typeof digest !== 'string' || !DIGEST.test(digest)) {
     return { kind: 'invalid' }
-  if (typeof uri !== 'string') return { kind: 'invalid' }
-  if (record.media_type !== expected.mediaType) return { kind: 'invalid' }
-  if (
-    typeof sizeBytes !== 'number' ||
-    !Number.isSafeInteger(sizeBytes) ||
-    sizeBytes < 0
-  )
+  }
+  if (typeof uri !== 'string') {
     return { kind: 'invalid' }
+  }
+  if (record.media_type !== expected.mediaType) {
+    return { kind: 'invalid' }
+  }
+  if (typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes < 0) {
+    return { kind: 'invalid' }
+  }
   const prefix = `s3://${expected.bucket}/`
-  if (!uri.startsWith(prefix)) return { kind: 'invalid' }
+  if (!uri.startsWith(prefix)) {
+    return { kind: 'invalid' }
+  }
   const key = uri.slice(prefix.length)
-  if (!expected.acceptsKey(key, digest)) return { kind: 'invalid' }
-  if (sizeBytes > expected.maximumSize) return { kind: 'too_large' }
+  if (!expected.acceptsKey(key, digest)) {
+    return { kind: 'invalid' }
+  }
+  if (sizeBytes > expected.maximumSize) {
+    return { kind: 'too_large' }
+  }
   return {
     kind: 'available',
     artifact: {

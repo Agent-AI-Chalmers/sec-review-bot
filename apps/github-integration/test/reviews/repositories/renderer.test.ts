@@ -5,10 +5,7 @@ import {
   buildDeliveryDraftPrBody,
   renderRepositorySecuritySummaryComment
 } from '../../../src/reviews/repositories/renderer.js'
-import {
-  coverageHeadline,
-  renderReviewStatusLines
-} from '../../../src/reviews/view-utils.js'
+import { coverageHeadline, renderReviewStatusLines } from '../../../src/reviews/view-utils.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type {
   RepositoryCaseResult,
@@ -64,9 +61,7 @@ function reviewRecord(
   }
 }
 
-function scanSummary(
-  overrides: Partial<RepositoryScanSummary> = {}
-): RepositoryScanSummary {
+function scanSummary(overrides: Partial<RepositoryScanSummary> = {}): RepositoryScanSummary {
   return {
     scannable_file_count: 0,
     scanned_file_count: 0,
@@ -103,10 +98,9 @@ function summaryView(
     deletion_review_skipped?: boolean
   } = {}
 ) {
-  return buildRepositorySummaryWorkflowView(
-    repositoryResult(case_results, options),
-    { run_id: 'run-1' }
-  )
+  return buildRepositorySummaryWorkflowView(repositoryResult(case_results, options), {
+    run_id: 'run-1'
+  })
 }
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
@@ -124,8 +118,7 @@ test('repository renderer derives blocked confirmed case cards from case results
     },
     mitigation: {
       overview: 'The attempted patch covers direct webhook requests only.',
-      patch_diff:
-        'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
+      patch_diff: 'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
     },
     verification: {
       coverage: 'partial',
@@ -169,16 +162,13 @@ test('repository renderer derives blocked confirmed case cards from case results
   expect(body).toMatch(/```diff\n(?:.|\n)*verifyRetrySignature/)
   expect(body).toMatch(/<summary>Verification<\/summary>/)
   expect.assert(
-    body.indexOf('<summary>Analysis</summary>') <
-      body.indexOf('<summary>CVSS</summary>')
+    body.indexOf('<summary>Analysis</summary>') < body.indexOf('<summary>CVSS</summary>')
   )
   expect.assert(
-    body.indexOf('<summary>CVSS</summary>') <
-      body.indexOf('<summary>Mitigation</summary>')
+    body.indexOf('<summary>CVSS</summary>') < body.indexOf('<summary>Mitigation</summary>')
   )
   expect.assert(
-    body.indexOf('<summary>Mitigation</summary>') <
-      body.indexOf('<summary>Verification</summary>')
+    body.indexOf('<summary>Mitigation</summary>') < body.indexOf('<summary>Verification</summary>')
   )
 
   // The card reuses the shared status vocabulary instead of restating it, and the
@@ -190,13 +180,9 @@ test('repository renderer derives blocked confirmed case cards from case results
       verification: review_record.verification
     }).join('\n')
   )
-  const titleLine = body
-    .split('\n')
-    .find((line) => line.startsWith('<summary>[medium] case-1'))
+  const titleLine = body.split('\n').find((line) => line.startsWith('<summary>[medium] case-1'))
   expect.assert(titleLine)
-  expect(titleLine).not.toContain(
-    coverageHeadline(review_record.verification.coverage)
-  )
+  expect(titleLine).not.toContain(coverageHeadline(review_record.verification.coverage))
 })
 
 test('repository blocked confirmed case uses deliverable reason as mitigation and verification fallback', () => {
@@ -224,9 +210,7 @@ test('repository blocked confirmed case uses deliverable reason as mitigation an
     target_branch: 'main'
   })
 
-  expect(body).toMatch(
-    /<summary>Mitigation<\/summary>\n\nVerifier rejected the incomplete patch\./
-  )
+  expect(body).toMatch(/<summary>Mitigation<\/summary>\n\nVerifier rejected the incomplete patch\./)
   expect(body).toMatch(
     /<summary>Verification<\/summary>\n\nVerifier rejected the incomplete patch\./
   )
@@ -279,9 +263,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
   expect(summary).toMatch(/CVSS scored cases: `1`/)
   expect(summary).toMatch(/CVSS not-scored cases: `1`/)
   expect(summary).toMatch(/Case CVSS severities: `critical=0`, `high=1`/)
-  expect(summary).toMatch(
-    /Grouped by each delivery PR's highest case CVSS severity\./
-  )
+  expect(summary).toMatch(/Grouped by each delivery PR's highest case CVSS severity\./)
   expect(summary).toMatch(/#### not-scored \(1\)/)
   expect(summary).toMatch(/\[CVSS not-scored\] \[sec\] container-runs-as-root/)
   expect(summary).not.toMatch(/\[CVSS 0\.0\]/)
@@ -329,9 +311,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
   expect(body).not.toMatch(/#### Analyzer Result/)
   expect(body).not.toMatch(/#### CVSS Scoring/)
   expect(body).not.toMatch(/<summary>Audit metadata<\/summary>/)
-  expect(body).not.toMatch(
-    /This is hardening, not an independent vulnerability\./
-  )
+  expect(body).not.toMatch(/This is hardening, not an independent vulnerability\./)
   expect(body).not.toMatch(/CVSS v4 base score: `n\/a` \(`unknown`\)/)
   expect(body).not.toMatch(/Target claim: \(none\)/)
 })
@@ -477,9 +457,7 @@ test('repository draft PR case details use delivery fallback text', () => {
     ]
   })
 
-  expect(body).toMatch(
-    /<summary>Mitigation<\/summary>\n\nNo mitigation overview was recorded\./
-  )
+  expect(body).toMatch(/<summary>Mitigation<\/summary>\n\nNo mitigation overview was recorded\./)
   expect(body).toMatch(
     /<summary>Verification<\/summary>\n\nNo verification overview was recorded\./
   )
@@ -558,10 +536,7 @@ test('repository renderer warns when deletion review was skipped', () => {
   expect(body).toMatch(/Deletion review skipped/)
   expect(body).toMatch(/`250` files/)
   // The warning sits above the summary details, so skimming the top of the comment shows it.
-  expect.assert(
-    body.indexOf('Deletion review skipped') <
-      body.indexOf('Review summary details')
-  )
+  expect.assert(body.indexOf('Deletion review skipped') < body.indexOf('Review summary details'))
   expect(body).toMatch(/Deleted files in window: `250`/)
 })
 

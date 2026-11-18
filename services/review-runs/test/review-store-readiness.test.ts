@@ -11,18 +11,14 @@ test('fan-out reads refuse to run before initialize()', async () => {
     connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused',
     connectorId: 'readiness'
   })
-  await expect(store.queries.listSubmissionRecoveries()).rejects.toThrow(
-    /initialize/
-  )
+  await expect(store.queries.listSubmissionRecoveries()).rejects.toThrow(/initialize/)
   await expect(store.queries.listActiveRuns()).rejects.toThrow(/initialize/)
   // Added later than the two above; every read that reaches the pool belongs to this guard, not
   // only the fan-out ones that originally motivated it.
   await expect(store.queries.listParkedRuns()).rejects.toThrow(/initialize/)
   await expect(store.queries.listEvents('run-1')).rejects.toThrow(/initialize/)
   await expect(store.queries.runExists('run-1')).rejects.toThrow(/initialize/)
-  await expect(store.queries.getExecutionStatistics(['run-1'])).rejects.toThrow(
-    /initialize/
-  )
+  await expect(store.queries.getExecutionStatistics(['run-1'])).rejects.toThrow(/initialize/)
 })
 
 test('an idle-client pool error is reported instead of crashing the process', async () => {

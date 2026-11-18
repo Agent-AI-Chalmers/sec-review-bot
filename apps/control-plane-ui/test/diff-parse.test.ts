@@ -1,22 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 
-import {
-  parsePatch,
-  parseUnifiedDiff
-} from '../browser/features/trajectory/diff-parse.js'
+import { parsePatch, parseUnifiedDiff } from '../browser/features/trajectory/diff-parse.js'
 
 function fixture(name: string): string {
-  return readFileSync(
-    new URL('./fixtures/diffs/' + name, import.meta.url),
-    'utf8'
-  )
+  return readFileSync(new URL('./fixtures/diffs/' + name, import.meta.url), 'utf8')
 }
 
 function rowsOf(text: string): Array<[string, string]> {
   const files = parseUnifiedDiff(text)
   expect(files).toHaveLength(1)
-  return files[0]!.hunks.flatMap((hunk) =>
+  return files[0].hunks.flatMap((hunk) =>
     hunk.rows.map((row) => [row.kind, row.text] as [string, string])
   )
 }
@@ -63,27 +57,18 @@ test('a deleted file keeps the old path and is marked deleted', () => {
     ['/workspace/keep.txt', undefined],
     ['/workspace/gone.txt', 'deleted']
   ])
-  expect(files[1]!.hunks[0]!.rows.map((row) => row.kind)).toStrictEqual([
-    'remove',
-    'remove'
-  ])
+  expect(files[1].hunks[0].rows.map((row) => row.kind)).toStrictEqual(['remove', 'remove'])
 })
 
 test('a new file with /dev/null on the old side is marked added', () => {
   const files = parseUnifiedDiff(
-    [
-      'Index: /workspace/new.txt',
-      '--- /dev/null',
-      '+++ b/new.txt',
-      '@@ -0,0 +1 @@',
-      '+hello'
-    ].join('\n')
+    ['Index: /workspace/new.txt', '--- /dev/null', '+++ b/new.txt', '@@ -0,0 +1 @@', '+hello'].join(
+      '\n'
+    )
   )
   expect(files).toHaveLength(1)
-  expect(files[0]!.status).toBe('added')
-  expect(files[0]!.hunks[0]!.rows).toStrictEqual([
-    { kind: 'add', text: 'hello' }
-  ])
+  expect(files[0].status).toBe('added')
+  expect(files[0].hunks[0].rows).toStrictEqual([{ kind: 'add', text: 'hello' }])
 })
 
 test('Begin Patch move and delete keep the operation metadata', () => {
@@ -100,15 +85,15 @@ test('Begin Patch move and delete keep the operation metadata', () => {
     ].join('\n')
   )
   expect(files).toHaveLength(2)
-  expect(files[0]!.path).toBe('/workspace/new.py')
-  expect(files[0]!.movedFrom).toBe('/workspace/old.py')
-  expect(files[0]!.hunks[0]!.rows).toStrictEqual([
+  expect(files[0].path).toBe('/workspace/new.py')
+  expect(files[0].movedFrom).toBe('/workspace/old.py')
+  expect(files[0].hunks[0].rows).toStrictEqual([
     { kind: 'remove', text: 'x = 1' },
     { kind: 'add', text: 'x = 2' }
   ])
-  expect(files[1]!.path).toBe('/workspace/gone.py')
-  expect(files[1]!.status).toBe('deleted')
-  expect(files[1]!.hunks[0]!.rows).toHaveLength(0)
+  expect(files[1].path).toBe('/workspace/gone.py')
+  expect(files[1].status).toBe('deleted')
+  expect(files[1].hunks[0].rows).toHaveLength(0)
 })
 
 test('Begin Patch update content without @@ is rejected, not dropped', () => {
@@ -130,15 +115,11 @@ test('Begin Patch update content without @@ is rejected, not dropped', () => {
 
 test('operation-only files survive the empty-hunk filter', () => {
   const files = parseUnifiedDiff(
-    [
-      '*** Begin Patch',
-      '*** Delete File: /workspace/gone.py',
-      '*** End Patch'
-    ].join('\n')
+    ['*** Begin Patch', '*** Delete File: /workspace/gone.py', '*** End Patch'].join('\n')
   )
   expect(files).toHaveLength(1)
-  expect(files[0]!.path).toBe('/workspace/gone.py')
-  expect(files[0]!.status).toBe('deleted')
+  expect(files[0].path).toBe('/workspace/gone.py')
+  expect(files[0].status).toBe('deleted')
 })
 
 test('a hunk whose counts end early is rejected', () => {
@@ -157,13 +138,7 @@ test('a hunk whose counts end early is rejected', () => {
 
 test('a hunk that runs out of input is rejected', () => {
   const files = parseUnifiedDiff(
-    [
-      'Index: /workspace/a.txt',
-      '--- a/a.txt',
-      '+++ b/a.txt',
-      '@@ -1,4 +1,4 @@',
-      ' keep'
-    ].join('\n')
+    ['Index: /workspace/a.txt', '--- a/a.txt', '+++ b/a.txt', '@@ -1,4 +1,4 @@', ' keep'].join('\n')
   )
   expect(files).toStrictEqual([])
 })
@@ -184,14 +159,7 @@ test('a header before the counts run out is rejected', () => {
 
 test('a bare @@ in a unified diff is rejected', () => {
   const files = parseUnifiedDiff(
-    [
-      'Index: /workspace/a.txt',
-      '--- a/a.txt',
-      '+++ b/a.txt',
-      '@@',
-      '-old',
-      '+new'
-    ].join('\n')
+    ['Index: /workspace/a.txt', '--- a/a.txt', '+++ b/a.txt', '@@', '-old', '+new'].join('\n')
   )
   expect(files).toStrictEqual([])
 })
@@ -203,17 +171,11 @@ test('plain text without hunks is not treated as a diff', () => {
 test('a real OpenCode edit diff parses into one file', () => {
   const files = parseUnifiedDiff(fixture('opencode-edit.diff'))
   expect(files).toHaveLength(1)
-  expect(files[0]!.path).toBe('/workspace/shescape/src/win.js')
-  expect(files[0]!.hunks).toHaveLength(1)
-  const rows = files[0]!.hunks[0]!.rows
-  expect.assert(
-    rows.some(
-      (row) => row.kind === 'remove' && row.text.includes('arg.replace(/"/g')
-    )
-  )
-  expect.assert(
-    rows.some((row) => row.kind === 'add' && row.text.includes('match ==='))
-  )
+  expect(files[0].path).toBe('/workspace/shescape/src/win.js')
+  expect(files[0].hunks).toHaveLength(1)
+  const rows = files[0].hunks[0].rows
+  expect.assert(rows.some((row) => row.kind === 'remove' && row.text.includes('arg.replace(/"/g')))
+  expect.assert(rows.some((row) => row.kind === 'add' && row.text.includes('match ===')))
 })
 
 test('a real OpenCode apply_patch diff keeps both files', () => {
@@ -236,9 +198,7 @@ test('a real Begin Patch keeps both updates', () => {
 
 test('CRLF input is normalized before parsing', () => {
   const lf = fixture('opencode-edit.diff')
-  expect(parseUnifiedDiff(lf.replace(/\n/g, '\r\n'))).toStrictEqual(
-    parseUnifiedDiff(lf)
-  )
+  expect(parseUnifiedDiff(lf.replace(/\n/g, '\r\n'))).toStrictEqual(parseUnifiedDiff(lf))
 })
 
 test('a hunk before the matching +++ is rejected', () => {
@@ -263,22 +223,14 @@ test('a hunk before the matching +++ is rejected', () => {
 })
 
 test('an unpaired --- header at end of input is rejected', () => {
-  const parsed = parsePatch(
-    ['Index: /workspace/a.txt', '--- /workspace/a.txt'].join('\n')
-  )
+  const parsed = parsePatch(['Index: /workspace/a.txt', '--- /workspace/a.txt'].join('\n'))
   expect(parsed.invalid).toBe(true)
   expect(parsed.files).toStrictEqual([])
 })
 
 test('parsePatch reports damaged input instead of partial files', () => {
   const parsed = parsePatch(
-    [
-      'Index: /workspace/a.txt',
-      '--- a/a.txt',
-      '+++ b/a.txt',
-      '@@ -1,4 +1,4 @@',
-      ' keep'
-    ].join('\n')
+    ['Index: /workspace/a.txt', '--- a/a.txt', '+++ b/a.txt', '@@ -1,4 +1,4 @@', ' keep'].join('\n')
   )
   expect(parsed.invalid).toBe(true)
   expect(parsed.files).toStrictEqual([])

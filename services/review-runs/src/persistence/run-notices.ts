@@ -24,14 +24,7 @@ export async function queueRunNotice(
        (run_id, connector_id, source_event_id, kind, axis, reason_code, status)
      VALUES ($1, $2, $3, $4, $5, $6, 'pending')
      ON CONFLICT (source_event_id) DO NOTHING`,
-    [
-      args.runId,
-      args.connectorId,
-      args.sourceEventId,
-      args.kind,
-      args.axis,
-      args.reasonCode
-    ]
+    [args.runId, args.connectorId, args.sourceEventId, args.kind, args.axis, args.reasonCode]
   )
 }
 
@@ -98,7 +91,9 @@ export class RunNoticeStore {
         [this.connectorId, this.claimTimeoutMs]
       )
       const work = candidate.rows[0]
-      if (work === undefined) return null
+      if (work === undefined) {
+        return null
+      }
       const token = crypto.randomUUID()
       // Recheck the claimable state under the row lock before issuing a fresh fencing token.
       const claimedNotice = await client.query<{
@@ -110,16 +105,11 @@ export class RunNoticeStore {
          WHERE notice_id=$1 AND connector_id=$3 AND status=$4
            AND ($4 <> 'delivering' OR claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
          RETURNING status`,
-        [
-          work.notice_id,
-          token,
-          this.connectorId,
-          work.status,
-          this.claimTimeoutMs
-        ]
+        [work.notice_id, token, this.connectorId, work.status, this.claimTimeoutMs]
       )
-      if (claimedNotice.rowCount !== 1)
+      if (claimedNotice.rowCount !== 1) {
         throw new Error(`Run notice ${work.notice_id} could not be claimed.`)
+      }
       return { ...work, claim_token: token }
     })
   }
@@ -134,17 +124,13 @@ export class RunNoticeStore {
     if (delivered && (commentUrl === undefined || commentUrl === null)) {
       // A delivered notice with nowhere to point would claim the requester was told while giving
       // no way to verify it, so the caller's mistake is surfaced instead of stored.
-      throw new Error(
-        `Run notice ${noticeId} cannot be delivered without a comment_url.`
-      )
+      throw new Error(`Run notice ${noticeId} cannot be delivered without a comment_url.`)
     }
     if (!delivered && commentUrl !== undefined && commentUrl !== null) {
       // The other half of the same contract: an undelivered notice has no destination, so a URL
       // here means the caller believes something was posted. Discarding it silently would hide
       // that disagreement.
-      throw new Error(
-        `Run notice ${noticeId} cannot carry a comment_url when delivery failed.`
-      )
+      throw new Error(`Run notice ${noticeId} cannot carry a comment_url when delivery failed.`)
     }
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
@@ -152,13 +138,7 @@ export class RunNoticeStore {
            claimed_at=NULL, comment_url=$5, updated_at=clock_timestamp()
          WHERE notice_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
         // `failed`, not `skipped`: the connector attempted delivery and could not complete it.
-        [
-          noticeId,
-          this.connectorId,
-          token,
-          delivered ? 'delivered' : 'failed',
-          commentUrl ?? null
-        ]
+        [noticeId, this.connectorId, token, delivered ? 'delivered' : 'failed', commentUrl ?? null]
       )
       return result.rowCount === 1
     })

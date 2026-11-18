@@ -23,8 +23,9 @@ async function memoryTreeArchive(
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>)
+    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
       chunks.push(Buffer.from(chunk))
+    }
   })()
   for (const item of entries) {
     const body =
@@ -44,10 +45,12 @@ async function memoryTreeArchive(
         uid: 0,
         gid: 0
       }
-      const done = (error?: Error | null): void =>
-        error ? reject(error) : resolve()
-      if (body === undefined) pack.entry(header, done)
-      else pack.entry(header, body, done)
+      const done = (error?: Error | null): void => (error ? reject(error) : resolve())
+      if (body === undefined) {
+        pack.entry(header, done)
+      } else {
+        pack.entry(header, body, done)
+      }
     })
   }
   pack.finalize()
@@ -69,9 +72,7 @@ test('TypeScript memory tree artifacts round trip deterministically', async () =
   expect(first.digest).toBe(second.digest)
   expect(first.objectKey).toBe(memoryTreeObjectKey(first.digest))
   expect(restored.get('MEMORY.md')?.toString('utf8')).toBe('# Index\n')
-  expect(restored.get('topics/parsing.md')?.toString('utf8')).toBe(
-    '# Parsing\n'
-  )
+  expect(restored.get('topics/parsing.md')?.toString('utf8')).toBe('# Parsing\n')
 })
 
 test('TypeScript memory tree builder rejects content outside the contract', async () => {
@@ -90,12 +91,11 @@ test('TypeScript memory tree builder rejects content outside the contract', asyn
 
 test('TypeScript memory tree entry limit includes parent directories', async () => {
   const content = new Map<string, string>([['MEMORY.md', '# Index\n']])
-  for (let index = 0; index < 4999; index += 1)
+  for (let index = 0; index < 4999; index += 1) {
     content.set(`topics/group-${index}/topic.md`, '# Topic\n')
+  }
 
-  await expect(buildMemoryTreeArtifact(content)).rejects.toThrow(
-    /entry count limit/
-  )
+  await expect(buildMemoryTreeArtifact(content)).rejects.toThrow(/entry count limit/)
 })
 
 test('TypeScript memory tree builder uses PAX for long paths', async () => {
@@ -134,9 +134,9 @@ test('TypeScript reader matches the shared memory tree corpus', async () => {
     'v1',
     'corpus'
   )
-  const manifest = JSON.parse(
-    await readFile(path.join(fixtureRoot, 'manifest.json'), 'utf8')
-  ) as { corpus: Array<{ file: string; expected: 'valid' | 'invalid' }> }
+  const manifest = JSON.parse(await readFile(path.join(fixtureRoot, 'manifest.json'), 'utf8')) as {
+    corpus: Array<{ file: string; expected: 'valid' | 'invalid' }>
+  }
 
   for (const fixture of manifest.corpus) {
     const bytes = await readFile(path.join(fixtureRoot, fixture.file))

@@ -11,7 +11,7 @@ export interface Resource<T> {
   /** The failure of the latest attempt, cleared by the next success. */
   error: unknown
   /** Run the query again. Resolves when this attempt settles and never rejects. */
-  reload(): Promise<void>
+  reload: () => Promise<void>
 }
 
 interface ResourceState<T> {
@@ -33,9 +33,7 @@ interface ResourceState<T> {
  * The hook does not start a load by itself: the caller's scheduler owns when a query runs,
  * so a route that refreshes through `useRefresh` does not issue its queries twice.
  */
-export function useResource<T>(
-  load: (signal: AbortSignal) => Promise<T>
-): Resource<T> {
+export function useResource<T>(load: (signal: AbortSignal) => Promise<T>): Resource<T> {
   const [state, setState] = React.useState<ResourceState<T>>({
     data: undefined,
     error: undefined,
@@ -61,10 +59,14 @@ export function useResource<T>(
     setState((previous) => ({ ...previous, loading: true }))
     try {
       const data = await loadRef.current(next.signal)
-      if (attempt !== generation.current) return
+      if (attempt !== generation.current) {
+        return
+      }
       setState({ data, error: undefined, loading: false })
     } catch (error) {
-      if (attempt !== generation.current || isAbortError(error)) return
+      if (attempt !== generation.current || isAbortError(error)) {
+        return
+      }
       setState((previous) => ({ ...previous, error, loading: false }))
     }
   }, [])

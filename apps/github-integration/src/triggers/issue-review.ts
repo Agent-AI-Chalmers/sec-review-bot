@@ -38,11 +38,7 @@ interface StartIssueReviewCommandArgs {
   open_pr?: boolean | null
   delivery_id: string
   claimed_preparation?: ClaimedPreparation
-  on_admitted?: (admission: {
-    run_id: string
-    status: string
-    replayed: boolean
-  }) => void
+  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartIssueReviewCommandDeps>
 }
 

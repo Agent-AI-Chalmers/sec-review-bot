@@ -10,22 +10,14 @@ import type { ExecutionRunStatusBatch } from '../execution-client.js'
 
 export type CoordinationStore = {
   preparations: Pick<ReviewRunStore['preparations'], 'expireStale'>
-  queries: Pick<
-    ReviewRunStore['queries'],
-    'listSubmissionRecoveries' | 'listActiveRuns'
-  >
+  queries: Pick<ReviewRunStore['queries'], 'listSubmissionRecoveries' | 'listActiveRuns'>
 }
 
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
   /** Read the whole pass's execution statuses in one request. */
-  readExecutionStatuses: (
-    runs: readonly ReviewRunRecord[]
-  ) => Promise<ExecutionRunStatusBatch>
-  observeActiveRun: (
-    run: ReviewRunRecord,
-    statuses: ExecutionRunStatusBatch
-  ) => Promise<void>
+  readExecutionStatuses: (runs: readonly ReviewRunRecord[]) => Promise<ExecutionRunStatusBatch>
+  observeActiveRun: (run: ReviewRunRecord, statuses: ExecutionRunStatusBatch) => Promise<void>
   /** Report a stored row the contract cannot represent. The pass continues without it, so a
    * single corrupt row degrades one run's coordination instead of stopping the whole pass. */
   onDroppedRunRow: (dropped: DroppedRunRow) => void
@@ -63,7 +55,9 @@ export async function coordinateReviewRunsOnce(
   for (const droppedRow of dropped) {
     handlers.onDroppedRunRow(droppedRow)
   }
-  if (active.length === 0) return
+  if (active.length === 0) {
+    return
+  }
   // One request for the whole pass rather than one per run. The per-run shape made the
   // number of requests grow with the number of runs in flight, so the busiest moments
   // were the ones that checked least often.
@@ -92,7 +86,9 @@ export function startReviewRunCoordinatorLoop({
   let stopped = false
   let active: Promise<void> | null = null
   const tick = (): void => {
-    if (stopped || active !== null) return
+    if (stopped || active !== null) {
+      return
+    }
     active = runOnce()
       .catch(onError)
       .finally(() => {

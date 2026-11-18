@@ -71,10 +71,9 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(
-      `${base}/api/memory/versions/2/trajectory/content`,
-      { headers: { cookie } }
-    )
+    const response = await fetch(`${base}/api/memory/versions/2/trajectory/content`, {
+      headers: { cookie }
+    })
     expect(response.status).toBe(200)
     expect(await response.json()).toStrictEqual({
       events: [
@@ -322,7 +321,9 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
   let bodyClosed = false
   const body = new Readable({
     read(): void {
-      if (sentChunk) return
+      if (sentChunk) {
+        return
+      }
       sentChunk = true
       this.push('x')
     }
@@ -352,10 +353,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
         headers: { cookie }
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('memory artifact did not time out')),
-          500
-        )
+        setTimeout(() => reject(new Error('memory artifact did not time out')), 500)
       )
     ])
     expect(response.status).toBe(504)
@@ -438,9 +436,7 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
   maintenance: Buffer
   extraction: Buffer
 }> {
-  const tree = await buildMemoryTreeArtifact(
-    new Map([['MEMORY.md', '# Memory\n']])
-  )
+  const tree = await buildMemoryTreeArtifact(new Map([['MEMORY.md', '# Memory\n']]))
   const trajectory = (content: string): Buffer =>
     zstdCompressSync(
       Buffer.from(
@@ -458,8 +454,7 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
     )
   const maintenance = trajectory('Maintenance trajectory')
   const extraction = trajectory('Extraction trajectory')
-  const maintenanceKey =
-    'memory/trajectories/maintenance/trajectory.v1.jsonl.zst'
+  const maintenanceKey = 'memory/trajectories/maintenance/trajectory.v1.jsonl.zst'
   const extractionKey = 'memory/trajectories/extraction/trajectory.v1.jsonl.zst'
   const trajectoryReference = (key: string, bytes: Buffer): object => ({
     uri: `s3://sec-review/${key}`,
@@ -498,9 +493,7 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
     response.end(catalogReply.body)
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
-  t.onTestFinished(
-    () => new Promise<void>((resolve) => catalog.close(() => resolve()))
-  )
+  t.onTestFinished(() => new Promise<void>((resolve) => catalog.close(() => resolve())))
   const catalogAddress = catalog.address()
   expect.assert(catalogAddress && typeof catalogAddress === 'object')
   const ui = createControlPlaneUiBffServer({
@@ -519,9 +512,7 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
     }
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
-  t.onTestFinished(
-    () => new Promise<void>((resolve) => ui.close(() => resolve()))
-  )
+  t.onTestFinished(() => new Promise<void>((resolve) => ui.close(() => resolve())))
   const address = ui.address()
   expect.assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
@@ -541,22 +532,12 @@ test('memory artifact routes select the declared source for downloads and conten
   const fixture = await memoryArtifactFixture(t)
   for (const [path, bytes, filename] of [
     ['/versions/2/artifact', fixture.tree, 'memory-tree.v1.tar.zst'],
-    [
-      '/versions/2/trajectory',
-      fixture.maintenance,
-      'memory-trajectory.v1.jsonl.zst'
-    ],
-    [
-      '/extractions/extract-1/trajectory',
-      fixture.extraction,
-      'memory-trajectory.v1.jsonl.zst'
-    ]
+    ['/versions/2/trajectory', fixture.maintenance, 'memory-trajectory.v1.jsonl.zst'],
+    ['/extractions/extract-1/trajectory', fixture.extraction, 'memory-trajectory.v1.jsonl.zst']
   ] as const) {
     const response = await fixture.get(path)
     expect(response.status, path).toBe(200)
-    expect(response.headers.get('content-disposition')).toBe(
-      `attachment; filename="${filename}"`
-    )
+    expect(response.headers.get('content-disposition')).toBe(`attachment; filename="${filename}"`)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(Buffer.from(await response.arrayBuffer())).toStrictEqual(bytes)
   }
@@ -633,9 +614,7 @@ test('malformed Catalog records fail as upstream errors before reading object st
 test('version trajectories reject non-maintainer sources while unavailable references remain 409', async (t) => {
   const fixture = await memoryArtifactFixture(t)
   const record: unknown = JSON.parse(fixture.catalogReply.body)
-  expect.assert(
-    record && typeof record === 'object' && 'trajectory_reference' in record
-  )
+  expect.assert(record && typeof record === 'object' && 'trajectory_reference' in record)
   for (const source of [
     undefined,
     null,
@@ -658,16 +637,18 @@ test('version trajectories reject non-maintainer sources while unavailable refer
 
 test('reorganization trajectories support verified download and content preview', async (t) => {
   const fixture = await memoryArtifactFixture(t)
-  const record = JSON.parse(fixture.catalogReply.body)
+  const record = JSON.parse(fixture.catalogReply.body) as {
+    source: { kind: string }
+  }
   record.source.kind = 'reorganization'
   fixture.catalogReply.body = JSON.stringify(record)
   const download = await fixture.get('/versions/2/trajectory')
   expect(download.status).toBe(200)
-  expect(Buffer.from(await download.arrayBuffer())).toStrictEqual(
-    fixture.maintenance
-  )
+  expect(Buffer.from(await download.arrayBuffer())).toStrictEqual(fixture.maintenance)
   const preview = await fixture.get('/versions/2/trajectory/content')
   expect(preview.status).toBe(200)
-  const content = await preview.json()
+  const content = (await preview.json()) as {
+    events: { message: { content: string } }[]
+  }
   expect(content.events[0].message.content).toBe('Maintenance trajectory')
 })

@@ -41,9 +41,7 @@ const stepStore = {
   failPublicationStep: async () => true
 } satisfies PublicationStepStore
 
-function pullRequestContext(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function pullRequestContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -67,10 +65,8 @@ function pullRequestContext(
     html_url: 'https://example.test/octo/example/pull/7',
     api_url: 'https://api.example.test/repos/octo/example/pulls/7',
     commits_url: 'https://api.example.test/repos/octo/example/pulls/7/commits',
-    review_comments_url:
-      'https://api.example.test/repos/octo/example/pulls/7/comments',
-    comments_url:
-      'https://api.example.test/repos/octo/example/issues/7/comments',
+    review_comments_url: 'https://api.example.test/repos/octo/example/pulls/7/comments',
+    comments_url: 'https://api.example.test/repos/octo/example/issues/7/comments',
     issue_url: 'https://api.example.test/repos/octo/example/issues/7',
     head_repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example',
@@ -79,9 +75,7 @@ function pullRequestContext(
   }
 }
 
-function review_record(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function review_record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     analysis: {
       verdict: 'confirmed-vulnerability',
@@ -126,11 +120,11 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       issueComments.push(body)
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
-      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/reviews$/.exec(
-        pathname
-      )
+      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/reviews$/.exec(pathname)
       pullReviews.push({
         owner: match?.[1],
         repo: match?.[2],
@@ -143,7 +137,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -189,17 +185,10 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     event: 'COMMENT',
     comments: []
   })
-  expect(reviewArgs.body).toMatch(
-    /<!-- sec-review-bot:pull-request-review-run:run-1 -->/
-  )
+  expect(reviewArgs.body).toMatch(/<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
   expect(reviewArgs.body).toMatch(/## PR Security Review/)
   expect(completed).toStrictEqual([
-    [
-      'run-1',
-      'test-claim',
-      'pull-request:review',
-      { id: 2, url: 'https://example.test/review/2' }
-    ]
+    ['run-1', 'test-claim', 'pull-request:review', { id: 2, url: 'https://example.test/review/2' }]
   ])
 })
 
@@ -207,7 +196,9 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       return githubJson({
@@ -216,7 +207,9 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -269,7 +262,9 @@ test('pull request publish approves when analysis is not confirmed', async () =>
       issueComments.push(body)
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       return githubJson({
@@ -278,7 +273,9 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         state: 'APPROVED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -333,7 +330,9 @@ test('pull request publish comments instead of approving a PR authored by the ap
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       return githubJson({
@@ -342,7 +341,9 @@ test('pull request publish comments instead of approving a PR authored by the ap
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -377,20 +378,20 @@ test('pull request publish comments instead of approving a PR authored by the ap
     setGitHubAppMetadata({ slug: 'web-sec-bot' })
   }
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual(['COMMENT'])
 })
 
 test('pull request publish falls back to comment when GitHub rejects own PR approval', async () => {
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       // Approving your own PR is a real 422 from GitHub, so the client must fall back to COMMENT.
-      if ((body as { event?: string } | undefined)?.event === 'APPROVE')
+      if ((body as { event?: string } | undefined)?.event === 'APPROVE') {
         return githubJson(
           {
             message: 'Unprocessable Entity',
@@ -398,13 +399,16 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
           },
           422
         )
+      }
       return githubJson({
         id: 3,
         html_url: 'https://example.test/review/3',
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -433,20 +437,23 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['APPROVE', 'COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual([
+    'APPROVE',
+    'COMMENT'
+  ])
 })
 
 test('pull request publish falls back to comment when own PR approval error is in response message', async () => {
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       // Same 422, but the explanation is in `message` rather than `errors`.
-      if ((body as { event?: string } | undefined)?.event === 'APPROVE')
+      if ((body as { event?: string } | undefined)?.event === 'APPROVE') {
         return githubJson(
           {
             message: 'Review cannot approve your own pull request',
@@ -454,13 +461,16 @@ test('pull request publish falls back to comment when own PR approval error is i
           },
           422
         )
+      }
       return githubJson({
         id: 3,
         html_url: 'https://example.test/review/3',
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -489,16 +499,19 @@ test('pull request publish falls back to comment when own PR approval error is i
     installation_octokit_for_repo: async () => octokit
   })
 
-  expect(
-    pullReviews.map((item) => (item as { event: string }).event)
-  ).toStrictEqual(['APPROVE', 'COMMENT'])
+  expect(pullReviews.map((item) => (item as { event: string }).event)).toStrictEqual([
+    'APPROVE',
+    'COMMENT'
+  ])
 })
 
 test('pull request publish leaves confirmed risks as non-blocking comments with inline suggestions', async () => {
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       return githubJson({
@@ -507,7 +520,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -569,12 +584,16 @@ test('pull request publish does not create a fallback review after an uncertain 
   let createCalls = 0
   const { octokit } = fakeGitHub(({ method, url }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       createCalls += 1
       throw new Error('connection reset after request body was sent')
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -625,7 +644,9 @@ test('an unattributable PR author is never approved', async () => {
   const pullReviews: unknown[] = []
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
-    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([])
+    }
     if (pathname.endsWith('/reviews') && method === 'POST') {
       pullReviews.push(body)
       return githubJson({
@@ -634,7 +655,9 @@ test('an unattributable PR author is never approved', async () => {
         state: 'COMMENTED'
       })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -720,7 +743,9 @@ test('an exhausted PR review step is concluded from the review already on the pu
       pullReviews.push({ body: 'unexpected' })
       return githubJson({ id: 2, html_url: 'https://example.test/review/2' })
     }
-    if (pathname.endsWith('/files')) return githubJson([])
+    if (pathname.endsWith('/files')) {
+      return githubJson([])
+    }
     return githubJson({})
   })
 
@@ -749,8 +774,5 @@ test('an exhausted PR review step is concluded from the review already on the pu
       found: { remote: { id: 31, url: 'https://example.test/review/31' } }
     }
   ])
-  expect(
-    pullReviews,
-    'a settled step must never submit another review'
-  ).toStrictEqual([])
+  expect(pullReviews, 'a settled step must never submit another review').toStrictEqual([])
 })

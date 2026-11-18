@@ -5,9 +5,7 @@ import { chooseRunFilter } from './runs-fixture-support.mjs'
 
 export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   const rows = () =>
-    page.$$eval('tbody tr td:first-child', (cells) =>
-      cells.map((cell) => cell.textContent)
-    )
+    page.$$eval('tbody tr td:first-child', (cells) => cells.map((cell) => cell.textContent))
   const previous = page.getByRole('button', { name: 'Previous page' })
   const next = page.getByRole('button', { name: 'Next page' })
   const perPage = page.getByRole('combobox', { name: 'Rows per page' })
@@ -20,15 +18,9 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   }
 
   await choosePageSize('20')
-  await waitUntil(
-    async () => (await rows()).length === 20,
-    `${name} selected page size must apply`
-  )
+  await waitUntil(async () => (await rows()).length === 20, `${name} selected page size must apply`)
   await choosePageSize('50')
-  await waitUntil(
-    async () => (await rows()).length === 50,
-    `${name} default page size must apply`
-  )
+  await waitUntil(async () => (await rows()).length === 50, `${name} default page size must apply`)
 
   const allRows = (await rows()).length
 
@@ -59,8 +51,7 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   await page.getByRole('combobox', { name: 'Execution', exact: true }).click()
   const executionStates = await page.getByRole('option').allTextContents()
   assert.ok(
-    executionStates.includes('Uncertain') &&
-      executionStates.includes('Skipped'),
+    executionStates.includes('Uncertain') && executionStates.includes('Skipped'),
     `${name} the Execution filter must include uncertain and skipped`
   )
   await page.keyboard.press('Escape')
@@ -90,9 +81,7 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   await next.click()
   await waitUntil(async () => {
     const pageIds = await rows()
-    return (
-      pageIds.length > 0 && pageIds.every((runId) => !firstPage.includes(runId))
-    )
+    return pageIds.length > 0 && pageIds.every((runId) => !firstPage.includes(runId))
   }, `${name} next page must not repeat the first page`)
   assert.ok((await rows()).length > 0)
   assert.ok(!(await previous.isDisabled()))
@@ -105,8 +94,7 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
   await page.locator('tbody tr:first-child td a').first().click()
   await page.waitForSelector('.run-progress-timeline')
-  const knownRunId =
-    (await page.locator('.run-id').first().textContent())?.trim() ?? ''
+  const knownRunId = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
   assert.ok(knownRunId.length > 0)
   await page.getByRole('link', { name: 'Back to runs' }).click()
   await page.waitForURL(`${base}/runs`)
@@ -117,19 +105,13 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   await jump.fill(knownRunId)
   await page.getByRole('button', { name: 'Go to run' }).click()
   await page.waitForSelector('.run-progress-timeline')
-  assert.strictEqual(
-    (await page.locator('.run-id').first().textContent())?.trim(),
-    knownRunId
-  )
+  assert.strictEqual((await page.locator('.run-id').first().textContent())?.trim(), knownRunId)
 
   await page.getByRole('button', { name: 'Jump to run' }).click()
   await jump.fill('00000000-0000-0000-0000-000000000000')
   await page.getByRole('button', { name: 'Go to run' }).click()
   await page.getByRole('heading', { name: 'Run not found' }).waitFor()
-  assert.strictEqual(
-    await page.getByText('Unable to load this page').count(),
-    0
-  )
+  assert.strictEqual(await page.getByText('Unable to load this page').count(), 0)
   assert.strictEqual(await page.getByText('Refresh failed').count(), 0)
   assert.strictEqual(await page.locator('.run-id').count(), 0)
 }
@@ -152,9 +134,7 @@ export async function runFixtureRunRangeFlow({ page }) {
     const from =
       minutes === null
         ? null
-        : new Date(
-            Math.floor(now.getTime() / 60_000) * 60_000 - minutes * 60_000
-          ).toISOString()
+        : new Date(Math.floor(now.getTime() / 60_000) * 60_000 - minutes * 60_000).toISOString()
     // Register before clicking; background and previous-range responses cannot
     // satisfy this wait. UI assertions start only once this query has answered.
     const responsePromise = page.waitForResponse((response) => {
@@ -170,20 +150,14 @@ export async function runFixtureRunRangeFlow({ page }) {
       chooseRunFilter(page, 'Time range', label)
     ])
     expect(response.ok()).toBe(true)
-    await expect(page).toHaveURL(
-      (url) => url.searchParams.get('range') === range
-    )
+    await expect(page).toHaveURL((url) => url.searchParams.get('range') === range)
     const result = await response.json()
-    const expectedLinks = result.runs.map(
-      (run) => `/runs/${encodeURIComponent(run.run_id)}`
-    )
+    const expectedLinks = result.runs.map((run) => `/runs/${encodeURIComponent(run.run_id)}`)
     await expect
       .poll(() =>
         page
           .locator('tbody tr td:first-child a')
-          .evaluateAll((links) =>
-            links.map((link) => link.getAttribute('href'))
-          )
+          .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
       )
       .toEqual(expectedLinks)
     const count = result.runs.length

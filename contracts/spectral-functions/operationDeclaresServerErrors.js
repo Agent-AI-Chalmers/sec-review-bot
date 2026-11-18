@@ -22,26 +22,20 @@
  * @param {{ path: (string | number)[] }} context
  * @returns {{ message: string, path: (string | number)[] }[]}
  */
-export default function operationDeclaresServerErrors(
-  operation,
-  _options,
-  context
-) {
+export default function operationDeclaresServerErrors(operation, _options, context) {
   const responses = operation.responses ?? {}
   /** @type {{ message: string, path: (string | number)[] }[]} */
   const problems = []
 
   if (responses['500'] === undefined) {
     problems.push({
-      message:
-        'operation must declare a `500` response (any internal fault can return it).',
+      message: 'operation must declare a `500` response (any internal fault can return it).',
       path: [...context.path, 'responses']
     })
   }
   if (operation.requestBody !== undefined && responses['413'] === undefined) {
     problems.push({
-      message:
-        'operation reads a request body, so it must declare a `413` response.',
+      message: 'operation reads a request body, so it must declare a `413` response.',
       path: [...context.path, 'responses']
     })
   }

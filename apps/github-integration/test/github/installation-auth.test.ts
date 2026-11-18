@@ -14,14 +14,12 @@ import { fakeGitHub, githubJson } from '../github-client.js'
  * stays the SDK's and no hand-made object is cast into it. */
 function octokitReturning(result: unknown): Octokit {
   const { octokit } = fakeGitHub(() => githubJson({}))
-  octokit.auth = (async () => result) as typeof octokit.auth
+  octokit.auth = async () => result
   return octokit
 }
 
 test('returns the trimmed installation token', async () => {
-  const token = await getInstallationAccessToken(
-    octokitReturning({ token: '  ghs_abc123  ' })
-  )
+  const token = await getInstallationAccessToken(octokitReturning({ token: '  ghs_abc123  ' }))
   expect(token).toBe('ghs_abc123')
 })
 

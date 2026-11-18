@@ -2,13 +2,7 @@ import assert from 'node:assert/strict'
 
 import { openPublishedRepositoryRun } from './runs-fixture-support.mjs'
 
-export async function runFixtureRunDeliveryFlow({
-  name,
-  viewport,
-  page,
-  base,
-  waitUntil
-}) {
+export async function runFixtureRunDeliveryFlow({ name, viewport, page, base, waitUntil }) {
   await openPublishedRepositoryRun({ name, page, base, waitUntil })
 
   const publicationBody =
@@ -19,12 +13,12 @@ export async function runFixtureRunDeliveryFlow({
   if (!/took/.test(publicationBody)) {
     // The publication phase only renders elapsed time when it has a start. Include the
     // served run in the failure because a bad fixture and a stale list row look identical.
-    const runId = decodeURIComponent(new URL(page.url()).pathname)
-      .split('/')
-      .pop()
+    const runId = decodeURIComponent(new URL(page.url()).pathname).split('/').pop()
     const served = await page.evaluate(async (id) => {
       const response = await fetch(`/api/runs/${encodeURIComponent(id)}`)
-      if (!response.ok) return { status: response.status }
+      if (!response.ok) {
+        return { status: response.status }
+      }
       const { run } = await response.json()
       return {
         status: response.status,
@@ -43,10 +37,12 @@ export async function runFixtureRunDeliveryFlow({
   // Compare centres rather than tops because the artifact facts use different font sizes.
   const artifact = await page.evaluate(() => {
     const row = document.querySelector('.artifact-row')
-    if (row === null) return { found: false }
+    if (row === null) {
+      return { found: false }
+    }
     const action = row.querySelector('.artifact-actions')
-    const facts = [...row.querySelectorAll('.artifact-facts > *')].map(
-      (element) => element.getBoundingClientRect()
+    const facts = [...row.querySelectorAll('.artifact-facts > *')].map((element) =>
+      element.getBoundingClientRect()
     )
     const centres = facts.map((box) => Math.round(box.y + box.height / 2))
     return {
@@ -55,28 +51,15 @@ export async function runFixtureRunDeliveryFlow({
       sameLine: new Set(centres).size === 1,
       actionTrails:
         action !== null &&
-        Math.abs(
-          action.getBoundingClientRect().right -
-            row.getBoundingClientRect().right
-        ) < 2
+        Math.abs(action.getBoundingClientRect().right - row.getBoundingClientRect().right) < 2
     }
   })
   assert.ok(artifact.found, `${name} a stored artifact must render`)
-  assert.strictEqual(
-    artifact.facts,
-    3,
-    `${name} the artifact must show size, type and digest`
-  )
+  assert.strictEqual(artifact.facts, 3, `${name} the artifact must show size, type and digest`)
   if (viewport.width >= 768) {
-    assert.ok(
-      artifact.sameLine,
-      `${name} the artifact facts must share one line`
-    )
+    assert.ok(artifact.sameLine, `${name} the artifact facts must share one line`)
   }
-  assert.ok(
-    artifact.actionTrails,
-    `${name} the file viewer must trail the artifact row`
-  )
+  assert.ok(artifact.actionTrails, `${name} the file viewer must trail the artifact row`)
   assert.strictEqual(
     await page.locator('.artifact-row > .mantine-Badge-root').count(),
     1,
@@ -85,19 +68,16 @@ export async function runFixtureRunDeliveryFlow({
 
   // These blocks have crowded the line above them before, so preserve visible spacing.
   const breathing = await page.evaluate(() => {
-    const stamp = [
-      ...document.querySelectorAll('.mantine-Timeline-itemBody p')
-    ].find((paragraph) => paragraph.textContent.includes('\u00b7 took'))
+    const stamp = [...document.querySelectorAll('.mantine-Timeline-itemBody p')].find((paragraph) =>
+      paragraph.textContent.includes('\u00b7 took')
+    )
     const row = document.querySelector('.artifact-row')
     const summary = document.querySelector('.publication-summary p')
     const firstStep = document.querySelector('.delivery-item')
     const gap = (above, below) =>
       above === null || below === null
         ? null
-        : Math.round(
-            below.getBoundingClientRect().top -
-              above.getBoundingClientRect().bottom
-          )
+        : Math.round(below.getBoundingClientRect().top - above.getBoundingClientRect().bottom)
     return {
       artifact: gap(stamp ?? null, row),
       publication: gap(summary ?? null, firstStep)
@@ -146,14 +126,10 @@ export async function runFixtureRunDeliveryFlow({
     2,
     `${name} JSONL preview must render one collapsible record per line`
   )
-  await runFilesDialog
-    .getByRole('radio', { name: 'Source' })
-    .evaluate((element) => element.click())
+  await runFilesDialog.getByRole('radio', { name: 'Source' }).evaluate((element) => element.click())
   await runFilesDialog.locator('.cm-editor').waitFor()
   assert.strictEqual(
-    await runFilesDialog
-      .locator('.cm-content[contenteditable="false"]')
-      .count(),
+    await runFilesDialog.locator('.cm-content[contenteditable="false"]').count(),
     1,
     `${name} run file source must use a read-only CodeMirror view`
   )
@@ -168,12 +144,8 @@ export async function runFixtureRunDeliveryFlow({
   )
   const stepLayout = await page.$$eval('.delivery-item', (items) =>
     items.map((item) => {
-      const badge = item
-        .querySelector('.mantine-Badge-root')
-        ?.getBoundingClientRect()
-      const key = item
-        .querySelector('.delivery-step-key')
-        ?.getBoundingClientRect()
+      const badge = item.querySelector('.mantine-Badge-root')?.getBoundingClientRect()
+      const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
       const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
       return {
         badgeY: badge?.y ?? null,
@@ -183,17 +155,11 @@ export async function runFixtureRunDeliveryFlow({
       }
     })
   )
-  assert.ok(
-    stepLayout.length > 0,
-    `${name} the published run must list its steps`
-  )
+  assert.ok(stepLayout.length > 0, `${name} the published run must list its steps`)
   for (const step of stepLayout) {
     if (step.badgeY !== null && step.keyY !== null) {
       if (stacked) {
-        assert.ok(
-          step.keyY > step.badgeY,
-          `${name} a stacked step must read status then key`
-        )
+        assert.ok(step.keyY > step.badgeY, `${name} a stacked step must read status then key`)
       } else {
         assert.ok(
           Math.abs(step.badgeY - step.keyY) < 6,
@@ -202,10 +168,7 @@ export async function runFixtureRunDeliveryFlow({
       }
     }
     if (!stacked && step.linkLeft !== null && step.keyRight !== null) {
-      assert.ok(
-        step.linkLeft > step.keyRight,
-        `${name} a step link must trail its row`
-      )
+      assert.ok(step.linkLeft > step.keyRight, `${name} a step link must trail its row`)
     }
   }
 
@@ -217,10 +180,9 @@ export async function runFixtureRunDeliveryFlow({
 
   // A single-result workflow uses the same row shape. Set both filters in the URL because
   // changing the two URL-backed selects back to back can discard one navigation.
-  await page.goto(
-    `${base}/runs?workflow=issue-review&publication_status=published`,
-    { waitUntil: 'networkidle' }
-  )
+  await page.goto(`${base}/runs?workflow=issue-review&publication_status=published`, {
+    waitUntil: 'networkidle'
+  })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.locator('tbody tr:first-child td a').first().waitFor()
   await page.locator('tbody tr:first-child td a').first().click()
@@ -232,10 +194,10 @@ export async function runFixtureRunDeliveryFlow({
   )
   const single = await page.evaluate(() => {
     const item = document.querySelector('.delivery-item')
-    if (item === null) return { found: false }
-    const key = item
-      .querySelector('.delivery-step-key')
-      ?.getBoundingClientRect()
+    if (item === null) {
+      return { found: false }
+    }
+    const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
     const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
     return {
       found: true,
@@ -244,12 +206,6 @@ export async function runFixtureRunDeliveryFlow({
       trailing: link !== undefined && key !== undefined && link.left > key.right
     }
   })
-  assert.ok(
-    single.found && single.badge && single.key,
-    `${name} a single result needs its row`
-  )
-  assert.ok(
-    single.found && single.trailing,
-    `${name} a single exit must trail its row`
-  )
+  assert.ok(single.found && single.badge && single.key, `${name} a single result needs its row`)
+  assert.ok(single.found && single.trailing, `${name} a single exit must trail its row`)
 }

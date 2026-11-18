@@ -1,7 +1,7 @@
 export interface LatestRequest {
   readonly signal: AbortSignal
-  isCurrent(): boolean
-  cancel(): void
+  isCurrent: () => boolean
+  cancel: () => void
 }
 
 /** Owns the latest request for one component query. Abort reduces unnecessary work; the
@@ -17,8 +17,7 @@ export class LatestRequestGuard {
     this.controller = controller
     return {
       signal: controller.signal,
-      isCurrent: () =>
-        generation === this.generation && !controller.signal.aborted,
+      isCurrent: () => generation === this.generation && !controller.signal.aborted,
       cancel: () => controller.abort()
     }
   }

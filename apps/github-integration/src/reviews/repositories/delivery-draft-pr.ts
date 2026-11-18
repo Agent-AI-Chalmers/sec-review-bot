@@ -1,3 +1,4 @@
+import { displayText } from '../view-utils.js'
 import crypto from 'node:crypto'
 
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
@@ -39,14 +40,9 @@ interface DraftPullRequestSummary {
 }
 
 function stableBranchSegment(value: unknown): string {
-  const raw = String(value ?? '').trim() || 'unknown'
-  const readable =
-    sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
-  const digest = crypto
-    .createHash('sha256')
-    .update(raw)
-    .digest('hex')
-    .slice(0, 12)
+  const raw = displayText(value, '').trim() || 'unknown'
+  const readable = sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
+  const digest = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12)
   return `${readable}-${digest}`
 }
 
@@ -58,16 +54,14 @@ export function buildRepositoryDeliveryBranchName(
 }
 
 function normalizeTargetBranch(value: unknown): string {
-  const raw = String(value ?? '').trim()
+  const raw = displayText(value, '').trim()
   if (!raw) {
     return ''
   }
   return raw.startsWith('refs/heads/') ? raw.slice('refs/heads/'.length) : raw
 }
 
-function buildRepositorySecurityDeliveryCommitMessage(
-  delivery: RepositoryDelivery
-): string {
+function buildRepositorySecurityDeliveryCommitMessage(delivery: RepositoryDelivery): string {
   const title = String(buildDeliveryDraftPrTitle(delivery) ?? '').trim()
   const normalizedTitle = title
     .replace(/^\[sec\]\s*/i, '')
@@ -169,21 +163,13 @@ export async function createRepositoryDeliveryDraftPr({
     plan: {
       branch_name,
       head_sha: input.workspace_ref,
-      base_branch:
-        normalizeTargetBranch(input.scan_target?.target_branch) ||
-        repo.default_branch,
+      base_branch: normalizeTargetBranch(input.scan_target?.target_branch) || repo.default_branch,
       title,
       body,
       commit_message: buildRepositorySecurityDeliveryCommitMessage(delivery),
       build_tree: async () =>
-        await buildTreeElements(
-          octokit,
-          delivery,
-          repo,
-          assert_publication_claim
-        ),
-      empty_tree_message:
-        'Repository security delivery requires at least one changed file.',
+        await buildTreeElements(octokit, delivery, repo, assert_publication_claim),
+      empty_tree_message: 'Repository security delivery requires at least one changed file.',
       mismatch_message: `Existing delivery draft PR branch does not match the validated result for ${String(delivery.delivery_id)}.`
     },
     assert_claim: assert_publication_claim

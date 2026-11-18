@@ -4,12 +4,12 @@ import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
-const connectionString =
-  process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
-  if (!connectionString)
+  if (!connectionString) {
     throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  }
   return connectionString
 }
 
@@ -31,11 +31,7 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
     publish_context: {}
   })
   expect.assert(admission.preparation_token)
-  await store.submissionTransitions.markQueued(
-    runId,
-    admission.preparation_token,
-    {}
-  )
+  await store.submissionTransitions.markQueued(runId, admission.preparation_token, {})
   expect(
     await store.executions.recordExecutionSuccess(
       runId,
@@ -69,10 +65,7 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
     const elapsed = Date.now() - started
 
     expect(work?.run_id).toBe(runId)
-    expect.assert(
-      elapsed < 5_000,
-      `the claim should have returned early, took ${elapsed}ms`
-    )
+    expect.assert(elapsed < 5_000, `the claim should have returned early, took ${elapsed}ms`)
   } finally {
     await store.close()
   }
@@ -88,10 +81,7 @@ test('a waiting claim gives up when its wait elapses', async () => {
     const elapsed = Date.now() - started
 
     expect(work).toBe(null)
-    expect.assert(
-      elapsed >= 700,
-      `the claim should have waited, took ${elapsed}ms`
-    )
+    expect.assert(elapsed >= 700, `the claim should have waited, took ${elapsed}ms`)
   } finally {
     await store.close()
   }

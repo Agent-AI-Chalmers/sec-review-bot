@@ -1,13 +1,5 @@
 import React from 'react'
-import {
-  ActionIcon,
-  Alert,
-  Button,
-  Group,
-  Paper,
-  Switch,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Alert, Button, Group, Paper, Switch, Tooltip } from '@mantine/core'
 import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
@@ -82,14 +74,11 @@ export function MemoryHeader({
             {t('editMemoryTree')}
           </Button>
         </Group>
-        <RefreshControls
-          refresh={refresh}
-          refreshing={refreshing}
-          lastChecked={lastChecked}
-        />
+        <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
       </Group>
-      {((automationLoading && !automation) ||
-        (treeLoading && activeVersion === undefined)) && <p>{t('loading')}</p>}
+      {((automationLoading && !automation) || (treeLoading && activeVersion === undefined)) && (
+        <p>{t('loading')}</p>
+      )}
       {automationError && (
         <Alert color="red" mt="md">
           {automationError}

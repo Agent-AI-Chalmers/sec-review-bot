@@ -13,9 +13,7 @@ const repo = {
 }
 
 test('reports an ancestor when GitHub compares the head as "ahead"', async () => {
-  const { octokit, requests } = fakeGitHub(() =>
-    githubJson({ status: 'ahead' })
-  )
+  const { octokit, requests } = fakeGitHub(() => githubJson({ status: 'ahead' }))
   expect(
     await isAncestorCommit({
       octokit,
@@ -61,17 +59,13 @@ test('normalizes the status before comparing it', async () => {
 
 test('treats a missing status as not an ancestor', async () => {
   const { octokit } = fakeGitHub(() => githubJson({}))
-  expect(
-    await isAncestorCommit({ octokit, repo, base_sha: 'b', head_sha: 'h' })
-  ).toBe(false)
+  expect(await isAncestorCommit({ octokit, repo, base_sha: 'b', head_sha: 'h' })).toBe(false)
 })
 
 test('propagates a compare failure instead of guessing', async () => {
   // A failed comparison must not be read as "not an ancestor": the caller has to decide.
-  const { octokit } = fakeGitHub(() =>
-    githubJson({ message: 'Not Found' }, 404)
+  const { octokit } = fakeGitHub(() => githubJson({ message: 'Not Found' }, 404))
+  await expect(isAncestorCommit({ octokit, repo, base_sha: 'b', head_sha: 'h' })).rejects.toSatisfy(
+    (error: { status?: number }) => error.status === 404
   )
-  await expect(
-    isAncestorCommit({ octokit, repo, base_sha: 'b', head_sha: 'h' })
-  ).rejects.toSatisfy((error: { status?: number }) => error.status === 404)
 })

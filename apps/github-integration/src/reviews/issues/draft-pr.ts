@@ -1,3 +1,4 @@
+import { displayText } from '../view-utils.js'
 import {
   buildDraftPullRequestBodyFromReviewRecord,
   buildDraftPullRequestTitleFromReviewRecord,
@@ -18,10 +19,7 @@ interface IssueContext {
   repo_name: string
 }
 
-export function buildDraftBranchName(
-  issue: IssueContext,
-  run_id: string | undefined
-): string {
+export function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {
   // The whole run id, not a slice of it. The branch is the publication's idempotency key: an
   // existing branch is verified against this run's tree and reused, so a name two runs share
   // makes one run adopt the other's branch - or, when the trees differ, conclude that its own
@@ -66,19 +64,16 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
       continue
     }
 
-    const content =
-      typeof rawChange.content === 'string' ? rawChange.content : null
+    const content = typeof rawChange.content === 'string' ? rawChange.content : null
     const content_encoding =
       rawChange.content_encoding === 'base64'
         ? 'base64'
         : rawChange.content_encoding === 'utf-8'
           ? 'utf-8'
           : null
-    const rawMode = String(rawChange.mode ?? '').trim()
+    const rawMode = displayText(rawChange.mode, '').trim()
     const mode: FileMode | null =
-      rawMode === '100644' || rawMode === '100755' || rawMode === '120000'
-        ? rawMode
-        : null
+      rawMode === '100644' || rawMode === '100755' || rawMode === '120000' ? rawMode : null
 
     if (rawMode && mode === null) {
       throw new Error(
@@ -177,9 +172,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     return null
   }
 
-  const file_changes = normalizePublishableFileChanges(
-    review_record?.mitigation?.file_changes
-  )
+  const file_changes = normalizePublishableFileChanges(review_record?.mitigation?.file_changes)
   const owner = issue.owner_login
   const repo = issue.repo_name
   // Resolve the PR base from the API rather than the webhook payload's
@@ -219,8 +212,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
           issue,
           assert_publication_claim
         ),
-      empty_tree_message:
-        'Draft PR creation requires at least one changed file.',
+      empty_tree_message: 'Draft PR creation requires at least one changed file.',
       mismatch_message: `Existing draft PR branch does not match the validated result for run ${run_id}.`
     },
     assert_claim: assert_publication_claim

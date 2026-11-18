@@ -40,12 +40,8 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   await page.getByRole('button', { name: 'Resume', exact: true }).click()
   const resumeDialog = page.getByRole('dialog', { name: 'Resume this run' })
   await resumeDialog.getByLabel('Admin token').fill('rejected-token')
-  await resumeDialog
-    .getByRole('button', { name: 'Resume run', exact: true })
-    .click()
-  await resumeDialog
-    .getByText('That admin token was rejected.', { exact: true })
-    .waitFor()
+  await resumeDialog.getByRole('button', { name: 'Resume run', exact: true }).click()
+  await resumeDialog.getByText('That admin token was rejected.', { exact: true }).waitFor()
   assert.strictEqual(
     await page.getByLabel('Access token').count(),
     0,
@@ -63,23 +59,15 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
     const body = await response.json()
     const sample = body.events.find((event) => event.from_status !== null)
     assert.ok(sample, `${name} fixtures need a transition to synthesize`)
-    const transitions = Array.from(
-      { length: syntheticTransitionCount },
-      (_, index) => ({
-        ...sample,
-        event_id: `synthetic-transition-${index}`,
-        occurred_at: new Date(
-          Date.parse(sample.occurred_at) + (index + 1) * 1000
-        ).toISOString()
-      })
-    )
+    const transitions = Array.from({ length: syntheticTransitionCount }, (_, index) => ({
+      ...sample,
+      event_id: `synthetic-transition-${index}`,
+      occurred_at: new Date(Date.parse(sample.occurred_at) + (index + 1) * 1000).toISOString()
+    }))
     await route.fulfill({
       response,
       json: {
-        events: [
-          ...body.events.filter((event) => event.from_status === null),
-          ...transitions
-        ]
+        events: [...body.events.filter((event) => event.from_status === null), ...transitions]
       }
     })
   })

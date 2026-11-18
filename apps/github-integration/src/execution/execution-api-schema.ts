@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import {
-  Ajv2020,
-  type AnySchemaObject,
-  type ValidateFunction
-} from 'ajv/dist/2020.js'
+import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 
 import type { WorkflowName } from './execution-api-types-generated.js'
 import { EXECUTION_API_VERSION } from './execution-api-version.js'
@@ -23,12 +19,7 @@ let validators: Map<string, ValidateFunction> | null = null
 function executionApiSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   if (configuredRoot !== undefined) {
-    const root = path.resolve(
-      configuredRoot,
-      'execution-api',
-      EXECUTION_API_VERSION,
-      'schemas'
-    )
+    const root = path.resolve(configuredRoot, 'execution-api', EXECUTION_API_VERSION, 'schemas')
     if (!existsSync(path.join(root, 'common.schema.json'))) {
       throw new Error(
         `SEC_REVIEW_CONTRACTS_ROOT=${configuredRoot} does not contain execution-api/${EXECUTION_API_VERSION}/schemas/common.schema.json.`
@@ -38,13 +29,7 @@ function executionApiSchemasRoot(): string {
   }
 
   const candidates = [
-    path.resolve(
-      process.cwd(),
-      'contracts',
-      'execution-api',
-      EXECUTION_API_VERSION,
-      'schemas'
-    ),
+    path.resolve(process.cwd(), 'contracts', 'execution-api', EXECUTION_API_VERSION, 'schemas'),
     path.resolve(
       process.cwd(),
       '..',
@@ -67,9 +52,7 @@ function executionApiSchemasRoot(): string {
 }
 
 function readSchema(root: string, name: string): AnySchemaObject {
-  return JSON.parse(
-    readFileSync(path.join(root, name), 'utf8')
-  ) as AnySchemaObject
+  return JSON.parse(readFileSync(path.join(root, name), 'utf8')) as AnySchemaObject
 }
 
 function resultValidators(): Map<string, ValidateFunction> {
@@ -83,20 +66,12 @@ function resultValidators(): Map<string, ValidateFunction> {
   ajv.addSchema(commonSchema)
 
   validators = new Map<string, ValidateFunction>([
-    [
-      'review-record.schema.json',
-      ajv.compile(readSchema(root, 'review-record.schema.json'))
-    ],
-    [
-      INPUT_BUNDLE_MANIFEST_SCHEMA,
-      ajv.compile(readSchema(root, INPUT_BUNDLE_MANIFEST_SCHEMA))
-    ],
-    ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map(
-      (name): [string, ValidateFunction] => [
-        name,
-        ajv.compile(readSchema(root, name))
-      ]
-    )
+    ['review-record.schema.json', ajv.compile(readSchema(root, 'review-record.schema.json'))],
+    [INPUT_BUNDLE_MANIFEST_SCHEMA, ajv.compile(readSchema(root, INPUT_BUNDLE_MANIFEST_SCHEMA))],
+    ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
+      name,
+      ajv.compile(readSchema(root, name))
+    ])
   ])
   return validators
 }
@@ -108,10 +83,7 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
   }
   if (!validate(value)) {
     const details = validate.errors
-      ?.map(
-        (error) =>
-          `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`
-      )
+      ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
       .join('; ')
     throw new Error(
       `${label} does not match API ${EXECUTION_API_VERSION}${details ? `: ${details}` : '.'}`
@@ -125,10 +97,7 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
  * Version-independent by name: the schema is selected from
  * `EXECUTION_API_VERSION`, so this function tracks API version changes without a rename.
  */
-export function assertWorkflowResult(
-  workflow: WorkflowName,
-  value: unknown
-): void {
+export function assertWorkflowResult(workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
 }
 

@@ -7,7 +7,7 @@
 import { App, Octokit } from 'octokit'
 import crypto from 'node:crypto'
 
-import { githubJson, testFetch, type RecordedRequest } from './github-client.js'
+import { githubJson, type RecordedRequest } from './github-client.js'
 
 /** A throwaway key, generated once per process: the App constructor requires one, but these
  * tests only exercise the unauthenticated `apps.getRepoInstallation` lookup, which never signs. */
@@ -53,8 +53,9 @@ export function fakeApp({
     throttle: { enabled: false },
     retry: { enabled: false },
     request: {
-      fetch: testFetch(async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString()
+      fetch: async (input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
         const method = (init?.method ?? 'GET').toUpperCase()
         const rawBody = init?.body
         const body =
@@ -64,7 +65,7 @@ export function fakeApp({
         const request: RecordedRequest = { method, url, body }
         requests.push(request)
         return await respond(request)
-      })
+      }
     }
   })
   const app = new App({
@@ -79,8 +80,7 @@ export function fakeApp({
     // exercised here (it needs a real private key and a live installation). The wiring that feeds
     // it - the installation id from `getRepoInstallation` - is covered directly in
     // `test/github/installation-client.test.ts`.
-    app.getInstallationOctokit = (async () =>
-      installationOctokit) as typeof app.getInstallationOctokit
+    app.getInstallationOctokit = async () => installationOctokit
   }
   return { app, requests }
 }

@@ -11,32 +11,30 @@ export function createFixtureRouter(): (
 ) => Promise<void> {
   let signedIn = true
   const sourceRunIds = Object.fromEntries(
-    ['repository-review', 'pull-request-review', 'issue-review'].map(
-      (workflow) => {
-        const run = runs.find(
-          (candidate) =>
-            candidate.workflow === workflow &&
-            candidate.source_platform === 'github' &&
-            candidate.execution.status === 'succeeded' &&
-            candidate.publication.status === 'published' &&
-            candidate.artifact_storage?.status === 'available'
+    ['repository-review', 'pull-request-review', 'issue-review'].map((workflow) => {
+      const run = runs.find(
+        (candidate) =>
+          candidate.workflow === workflow &&
+          candidate.source_platform === 'github' &&
+          candidate.execution.status === 'succeeded' &&
+          candidate.publication.status === 'published' &&
+          candidate.artifact_storage?.status === 'available'
+      )
+      if (run === undefined) {
+        throw new Error(
+          `dev fixtures need one completed GitHub ${workflow} run for memory provenance`
         )
-        if (run === undefined)
-          throw new Error(
-            `dev fixtures need one completed GitHub ${workflow} run for memory provenance`
-          )
-        return [workflow, run.run_id]
       }
-    )
-  ) as Record<
-    'repository-review' | 'pull-request-review' | 'issue-review',
-    string
-  >
+      return [workflow, run.run_id]
+    })
+  ) as Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
   const handleMemory = createMemoryHandler(sourceRunIds)
   const handleRuns = createRunsHandler()
 
   return async (request, response, next): Promise<void> => {
-    if (!request.url?.startsWith('/api/')) return next()
+    if (!request.url?.startsWith('/api/')) {
+      return next()
+    }
     response.setHeader('content-type', 'application/json')
 
     if (

@@ -10,11 +10,7 @@ export function renderComponent(
   { language = 'en' }: { language?: Language } = {}
 ): RenderResult {
   localStorage.setItem('ui-language', language)
-  const Providers = ({
-    children
-  }: {
-    children: React.ReactNode
-  }): React.JSX.Element => (
+  const Providers = ({ children }: { children: React.ReactNode }): React.JSX.Element => (
     <LanguageProvider>
       <MantineProvider theme={mantineTheme}>{children}</MantineProvider>
     </LanguageProvider>

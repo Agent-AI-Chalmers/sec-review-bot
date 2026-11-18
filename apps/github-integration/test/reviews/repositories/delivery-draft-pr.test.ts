@@ -23,10 +23,8 @@ test('repository delivery branch identity includes both run and delivery', () =>
 type CreateRepositoryDeliveryDraftPrParams = Parameters<
   typeof createRepositoryDeliveryDraftPrWithClaim
 >[0]
-type CreateRepositoryDeliveryDraftPrRepo =
-  CreateRepositoryDeliveryDraftPrParams['repo']
-type CreateRepositoryDeliveryDraftPrInput =
-  CreateRepositoryDeliveryDraftPrParams['input']
+type CreateRepositoryDeliveryDraftPrRepo = CreateRepositoryDeliveryDraftPrParams['repo']
+type CreateRepositoryDeliveryDraftPrInput = CreateRepositoryDeliveryDraftPrParams['input']
 
 async function createRepositoryDeliveryDraftPr(
   args: Omit<CreateRepositoryDeliveryDraftPrParams, 'assert_publication_claim'>
@@ -62,9 +60,7 @@ function createOctokitMock({
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
-    trees: [] as Array<
-      Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
-    >,
+    trees: [] as Array<Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>>,
     commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
     refs: [] as Array<{ ref: string; sha: string }>,
     pulls: [] as Array<{
@@ -111,8 +107,9 @@ function createOctokitMock({
       return githubJson({ sha: 'commit-sha' })
     }
     if (pathname.endsWith('/git/refs')) {
-      if (createRefMessage !== undefined)
+      if (createRefMessage !== undefined) {
         return githubJson({ message: createRefMessage }, 422)
+      }
       calls.refs.push({
         ref: `refs/${String(payload.ref)}`,
         sha: String(payload.sha)
@@ -140,8 +137,9 @@ function createOctokitMock({
           : { tree: { sha: 'base-tree-sha' } }
       )
     }
-    if (pathname.endsWith('/pulls') && method === 'GET')
+    if (pathname.endsWith('/pulls') && method === 'GET') {
       return githubJson(createdPullRequests)
+    }
     if (pathname.endsWith('/pulls') && method === 'POST') {
       if (lostPullResponse) {
         createdPullRequests.push({
@@ -255,8 +253,9 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
       },
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2)
+        if (ownershipChecks === 2) {
           throw new PublicationClaimLostError('run-claim-loss')
+        }
       }
     })
   ).rejects.toThrow(PublicationClaimLostError)
@@ -296,9 +295,7 @@ test('delivery-draft-pr reuses a PR when the create response is lost', async () 
     } satisfies RepositoryDelivery
   }
 
-  await expect(createRepositoryDeliveryDraftPr(args)).rejects.toSatisfy(
-    () => true
-  )
+  await expect(createRepositoryDeliveryDraftPr(args)).rejects.toSatisfy(() => true)
   const retry = await createRepositoryDeliveryDraftPr(args)
   expect(retry.reused).toBe(true)
   expect(retry.number).toBe(42)
@@ -511,9 +508,7 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
       input: { workspace_ref: 'base-sha' },
       delivery: minimalDelivery('delivery-invalid-ref')
     })
-  ).rejects.toSatisfy(
-    (error: unknown) => (error as { status?: unknown }).status === 422
-  )
+  ).rejects.toSatisfy((error: unknown) => (error as { status?: unknown }).status === 422)
 
   expect(updatedRefs).toStrictEqual([])
 })
@@ -556,9 +551,7 @@ test('delivery-draft-pr publishes symbolic link targets and deletions without de
   })
 
   expect(result.reused).toBe(false)
-  expect(calls.blobs).toStrictEqual([
-    { content: 'dGFyZ2V0Lf8=', encoding: 'base64' }
-  ])
+  expect(calls.blobs).toStrictEqual([{ content: 'dGFyZ2V0Lf8=', encoding: 'base64' }])
   expect(calls.trees).toHaveLength(1)
   expect(calls.trees[0]).toStrictEqual([
     {

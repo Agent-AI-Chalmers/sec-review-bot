@@ -1,9 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
-import type {
-  OperationOptionsById,
-  OperationResponseById
-} from '../contract-types-generated.js'
+import type { OperationOptionsById, OperationResponseById } from '../contract-types-generated.js'
 
 export type OperationId = keyof OperationOptionsById
 
@@ -17,9 +14,7 @@ export type OperationRequest<Id extends OperationId> = FastifyRequest<{
 }>
 
 type OperationResult<Id extends OperationId> =
-  | (OperationResponseById[Id] extends undefined
-      ? void
-      : OperationResponseById[Id])
+  | (OperationResponseById[Id] extends undefined ? void : OperationResponseById[Id])
   | FastifyReply
 
 export type OperationHandler<Id extends OperationId> = (

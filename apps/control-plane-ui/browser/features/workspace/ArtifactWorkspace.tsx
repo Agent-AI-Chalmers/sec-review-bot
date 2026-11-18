@@ -23,7 +23,7 @@ export interface ArtifactFiles {
  */
 export interface ArtifactSource {
   /** Read the files this artifact publishes. */
-  load(signal: AbortSignal): Promise<ArtifactFiles>
+  load: (signal: AbortSignal) => Promise<ArtifactFiles>
   /** The file to open first when the artifact carries it. */
   preferredFile: string
   /** Where the reader can open this workspace as its own page. */
@@ -71,17 +71,15 @@ export function ArtifactWorkspace({
   // Opening on the artifact's own entry point is the difference between a workspace the
   // reader can use and one that opens on whichever file happens to sort first.
   React.useEffect(() => {
-    if (names.length === 0) return
-    setSelectedFile(
-      names.includes(source.preferredFile)
-        ? source.preferredFile
-        : (names[0] ?? '')
-    )
+    if (names.length === 0) {
+      return
+    }
+    setSelectedFile(names.includes(source.preferredFile) ? source.preferredFile : (names[0] ?? ''))
   }, [names, source.preferredFile])
 
   throwIfUnauthorized(artifact.error)
 
-  if (artifact.error !== undefined)
+  if (artifact.error !== undefined) {
     return (
       <div className="content-load-state">
         <ResourceLoadError
@@ -109,8 +107,11 @@ export function ArtifactWorkspace({
         />
       </div>
     )
+  }
 
-  if (!selectedFile) return <LoadingState message={t('loading')} />
+  if (!selectedFile) {
+    return <LoadingState message={t('loading')} />
+  }
 
   return (
     <FileWorkspace

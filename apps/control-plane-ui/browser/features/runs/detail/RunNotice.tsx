@@ -13,11 +13,7 @@ import { useMessages } from '../../../shared/i18n.js'
  * delivery that could not be completed is reported here too, because its absence is the
  * operator's problem to notice.
  */
-export function RunNotice({
-  notice
-}: {
-  notice: Run['notices'][number]
-}): React.JSX.Element {
+export function RunNotice({ notice }: { notice: Run['notices'][number] }): React.JSX.Element {
   const t = useMessages()
   // Phrased as "who knows", not as "a notice was delivered/failed": "Failure notice: delivery
   // failed" says the same thing twice and still leaves the reader asking whether anyone was told.
@@ -55,9 +51,7 @@ export function RunNotice({
           size="xs"
           data-testid="failure-notice-link"
         >
-          {notice.kind === 'attention'
-            ? t('viewAttentionNotice')
-            : t('viewFailureNotice')}
+          {notice.kind === 'attention' ? t('viewAttentionNotice') : t('viewFailureNotice')}
         </Anchor>
       )}
     </Text>

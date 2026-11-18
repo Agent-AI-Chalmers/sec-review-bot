@@ -19,10 +19,9 @@ export function MemoryFilesContent({
       fullPage={fullPage}
       source={{
         load: async (signal) => {
-          const body = await api<MemoryTreeContentResponse>(
-            `/memory/versions/${version}/content`,
-            { signal }
-          )
+          const body = await api<MemoryTreeContentResponse>(`/memory/versions/${version}/content`, {
+            signal
+          })
           return { files: body.files }
         },
         preferredFile: 'MEMORY.md',

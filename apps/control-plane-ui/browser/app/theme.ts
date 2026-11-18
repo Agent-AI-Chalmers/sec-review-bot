@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Button,
-  Card,
-  createTheme,
-  Paper,
-  Select,
-  Table,
-  Timeline
-} from '@mantine/core'
+import { Badge, Button, Card, createTheme, Paper, Select, Table, Timeline } from '@mantine/core'
 
 import { BRAND_COLORS } from './colors.js'
 

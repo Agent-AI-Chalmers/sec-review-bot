@@ -1,14 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { readFileSync, existsSync } from 'node:fs'
+import { parseSync, Visitor } from 'oxc-parser'
+import { ResolverFactory } from 'oxc-resolver'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const require = createRequire(
-  new URL('../../contracts/codegen/package.json', import.meta.url)
-)
-const ts = require('typescript')
+const resolver = new ResolverFactory({
+  tsconfig: 'auto',
+  extensions: ['.ts', '.tsx', '.js', '.mjs', '.cts', '.mts'],
+  extensionAlias: { '.js': ['.ts', '.tsx', '.js'] }
+})
 const codegen = 'contracts/codegen'
 
 export function checkBoundaries(
@@ -24,12 +26,10 @@ export function checkBoundaries(
       manifest: JSON.parse(read(file))
     }))
     .sort((a, b) => b.directory.length - a.directory.length)
-  const owner = (file) =>
-    packages.find(({ directory }) => file.startsWith(`${directory}/`))
+  const owner = (file) => packages.find(({ directory }) => file.startsWith(`${directory}/`))
   const errors = []
   const allowed = (from, to) =>
-    from === to ||
-    (from.startsWith('contracts/') && from.endsWith('/tools') && to === codegen)
+    from === to || (from.startsWith('contracts/') && from.endsWith('/tools') && to === codegen)
   for (const { directory, manifest } of packages) {
     for (const field of [
       'dependencies',
@@ -38,13 +38,9 @@ export function checkBoundaries(
       'optionalDependencies'
     ]) {
       for (const [name, version] of Object.entries(manifest[field] ?? {})) {
-        const target = packages.find(
-          ({ manifest: candidate }) => candidate.name === name
-        )
+        const target = packages.find(({ manifest: candidate }) => candidate.name === name)
         if (target && !allowed(directory, target.directory)) {
-          errors.push(
-            `${directory}/package.json: forbidden ${field} dependency on ${name}`
-          )
+          errors.push(`${directory}/package.json: forbidden ${field} dependency on ${name}`)
         }
         if (/^(file:|link:)/.test(version)) {
           errors.push(
@@ -54,90 +50,67 @@ export function checkBoundaries(
       }
     }
   }
-  const configs = new Map()
   for (const file of files.filter((file) => /\.[cm]?[jt]sx?$/.test(file))) {
     const from = owner(file)
-    if (!from) continue
-    const absoluteFile = path.join(root, file)
-    const configFile = ts.findConfigFile(
-      path.dirname(absoluteFile),
-      ts.sys.fileExists
-    )
-    if (configFile && !configs.has(configFile)) {
-      const config = ts.readConfigFile(configFile, ts.sys.readFile)
-      const parsed = ts.parseJsonConfigFileContent(
-        config.config ?? {},
-        ts.sys,
-        path.dirname(configFile)
-      )
-      configs.set(configFile, parsed.options)
+    if (!from) {
+      continue
     }
-    const source = ts.createSourceFile(
-      file,
-      read(file),
-      ts.ScriptTarget.Latest,
-      true
-    )
-    const visit = (node) => {
-      // Inspect literal module/file references through the AST, including require(),
-      // import types, re-exports, dynamic imports, and new URL(..., import.meta.url).
-      if (ts.isStringLiteralLike(node)) {
-        const value = node.text
-        let targetFile
-        if (value.startsWith('.')) {
-          targetFile = path.posix.normalize(
-            path.posix.join(path.posix.dirname(file), value)
-          )
-        } else {
-          const target = packages.find(
-            ({ manifest }) =>
-              value === manifest.name || value.startsWith(`${manifest.name}/`)
-          )
-          if (target)
-            targetFile = `${target.directory}/${value.slice(target.manifest.name.length)}`
-        }
-        // Resolve tsconfig aliases as well as package names and relative paths.
-        if (!targetFile && configFile) {
-          const resolved = ts.resolveModuleName(
-            value,
-            absoluteFile,
-            configs.get(configFile),
-            ts.sys
-          ).resolvedModule
-          if (resolved)
-            targetFile = path
-              .relative(root, resolved.resolvedFileName)
-              .split(path.sep)
-              .join('/')
-        }
-        const to = targetFile && owner(targetFile)
-        if (to && !allowed(from.directory, to.directory)) {
-          const { line } = source.getLineAndCharacterOfPosition(
-            node.getStart(source)
-          )
-          errors.push(
-            `${file}:${line + 1}: forbidden reference to ${value} (${to.directory})`
-          )
+    const absoluteFile = path.join(root, file)
+    const text = read(file)
+    const { program, errors: parseErrors } = parseSync(file, text)
+    if (parseErrors.length) {
+      errors.push(`${file}: invalid source: ${JSON.stringify(parseErrors)}`)
+      continue
+    }
+    const checkReference = (value, start) => {
+      let targetFile
+      if (value.startsWith('.')) {
+        targetFile = path.posix.normalize(path.posix.join(path.posix.dirname(file), value))
+      } else {
+        const target = packages.find(
+          ({ manifest }) => value === manifest.name || value.startsWith(`${manifest.name}/`)
+        )
+        if (target) {
+          targetFile = `${target.directory}/${value.slice(target.manifest.name.length)}`
         }
       }
-      ts.forEachChild(node, visit)
+      // Resolve tsconfig aliases as well as package names and relative paths.
+      if (!targetFile) {
+        const resolved = resolver.resolveFileSync(absoluteFile, value)
+        if (resolved.path) {
+          targetFile = path.relative(root, resolved.path).split(path.sep).join('/')
+        }
+      }
+      const to = targetFile && owner(targetFile)
+      if (to && !allowed(from.directory, to.directory)) {
+        const line = text.slice(0, start).split('\n').length - 1
+        errors.push(`${file}:${line + 1}: forbidden reference to ${value} (${to.directory})`)
+      }
     }
-    visit(source)
+    new Visitor({
+      Literal(node) {
+        if (typeof node.value === 'string') {
+          checkReference(node.value, node.start)
+        }
+      },
+      TemplateLiteral(node) {
+        if (node.expressions.length === 0) {
+          checkReference(node.quasis[0].value.cooked ?? node.quasis[0].value.raw, node.start)
+        }
+      }
+    }).visit(program)
   }
   return errors
 }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = execFileSync(
     'git',
     ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
     { cwd: root, encoding: 'utf8' }
   )
     .split('\0')
-    .filter((file) => file && ts.sys.fileExists(path.join(root, file)))
+    .filter((file) => file && existsSync(path.join(root, file)))
   const errors = checkBoundaries([...new Set(files)])
   if (errors.length) {
     console.error(errors.join('\n'))

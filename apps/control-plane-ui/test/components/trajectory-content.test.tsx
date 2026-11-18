@@ -72,9 +72,7 @@ test('a failed trajectory load can recover when the content address changes', as
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
       .mockResolvedValueOnce(trajectoryResponse('Recovered trajectory'))
   )
-  const { rerender } = renderComponent(
-    <TrajectoryContent contentHref="/unavailable/trajectory" />
-  )
+  const { rerender } = renderComponent(<TrajectoryContent contentHref="/unavailable/trajectory" />)
   expect(await screen.findByRole('alert')).toBeVisible()
 
   rerender(<TrajectoryContent contentHref="/available/trajectory" />)

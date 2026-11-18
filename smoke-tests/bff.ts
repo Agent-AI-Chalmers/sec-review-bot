@@ -5,11 +5,10 @@ import { uiAccessToken } from './credentials.js'
 
 const ui = 'http://control-plane-ui:8091'
 
-export async function verifyBff(runId: string) {
+export async function verifyBff(runId: string): Promise<void> {
   let cookie = ''
-  function request(
-    options: Omit<RequestOptions, 'base' | 'token' | 'headers'>
-  ) {
+
+  function request(options: Omit<RequestOptions, 'base' | 'token' | 'headers'>) {
     return sendRequest({
       ...options,
       base: ui,
@@ -94,7 +93,5 @@ export async function verifyBff(runId: string) {
     files: Record<string, string>
   }
   assert.deepEqual(content.files, files)
-  console.error(
-    'ok: Console committed a memory version and read its stored contents'
-  )
+  console.error('ok: Console committed a memory version and read its stored contents')
 }

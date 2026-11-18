@@ -6,12 +6,7 @@ import {
   IconMinus,
   IconPlayerPlay
 } from '@tabler/icons-react'
-import {
-  type ArtifactStorage,
-  type PublicationStep,
-  type Run,
-  type RunEvent
-} from './api.js'
+import { type ArtifactStorage, type PublicationStep, type Run, type RunEvent } from './api.js'
 import {
   STATE_MACHINES,
   stateMachine,
@@ -23,24 +18,25 @@ import { ICON_SIZE } from '../../shared/design.js'
 
 export type PublicationStepStatus = PublicationStep['status']
 
-type StatusTone =
-  'waiting' | 'active' | 'complete' | 'failed' | 'neutral' | 'retry'
+type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral' | 'retry'
 
 export function statusToneColor(tone: StatusTone): string {
-  if (tone === 'active') return 'blue'
-  if (tone === 'complete') return 'green'
-  if (tone === 'failed') return 'red'
-  if (tone === 'retry') return 'yellow'
+  if (tone === 'active') {
+    return 'blue'
+  }
+  if (tone === 'complete') {
+    return 'green'
+  }
+  if (tone === 'failed') {
+    return 'red'
+  }
+  if (tone === 'retry') {
+    return 'yellow'
+  }
   return 'gray'
 }
 
-function StatusText({
-  label,
-  tone
-}: {
-  label: string
-  tone: StatusTone
-}): React.JSX.Element {
+function StatusText({ label, tone }: { label: string; tone: StatusTone }) {
   return (
     <span className="status-text">
       <span className={`status-dot status-dot-${tone}`} aria-hidden="true" />
@@ -99,9 +95,7 @@ export function preparationTone(preparation: Run['preparation']): StatusTone {
   return STATE_TONES.preparation[preparation.status]
 }
 
-export function publicationTone(
-  status: Run['publication']['status']
-): StatusTone {
+export function publicationTone(status: Run['publication']['status']): StatusTone {
   return STATE_TONES.publication[status]
 }
 
@@ -111,12 +105,7 @@ export function ExecutionStatus({
   status: Run['execution']['status']
 }): React.JSX.Element {
   const { language } = useLanguage()
-  return (
-    <StatusText
-      label={executionStatusLabel(status, language)}
-      tone={executionTone(status)}
-    />
-  )
+  return <StatusText label={executionStatusLabel(status, language)} tone={executionTone(status)} />
 }
 
 export function PreparationStatus({
@@ -148,20 +137,28 @@ export function PublicationStatus({
 }
 
 export function statusBullet(tone: StatusTone): React.ReactNode {
-  if (tone === 'active') return <IconPlayerPlay size={ICON_SIZE.sm} />
-  if (tone === 'complete') return <IconCheck size={ICON_SIZE.sm} />
-  if (tone === 'failed') return <IconAlertTriangle size={ICON_SIZE.sm} />
-  if (tone === 'retry') return <IconAlertTriangle size={ICON_SIZE.sm} />
-  if (tone === 'neutral') return <IconMinus size={ICON_SIZE.sm} />
+  if (tone === 'active') {
+    return <IconPlayerPlay size={ICON_SIZE.sm} />
+  }
+  if (tone === 'complete') {
+    return <IconCheck size={ICON_SIZE.sm} />
+  }
+  if (tone === 'failed') {
+    return <IconAlertTriangle size={ICON_SIZE.sm} />
+  }
+  if (tone === 'retry') {
+    return <IconAlertTriangle size={ICON_SIZE.sm} />
+  }
+  if (tone === 'neutral') {
+    return <IconMinus size={ICON_SIZE.sm} />
+  }
   return <IconClock size={ICON_SIZE.sm} />
 }
 
 /** The console's languages and the generated state-machine text must name the same languages:
  * a UI language with no overlay would index missing machines at run time. This fails to compile
  * when either side gains a language the other lacks. */
-export type StateMachineLanguagesMatchConsole = [Language] extends [
-  StateMachineLanguage
-]
+export type StateMachineLanguagesMatchConsole = [Language] extends [StateMachineLanguage]
   ? [StateMachineLanguage] extends [Language]
     ? true
     : never
@@ -170,21 +167,12 @@ export type StateMachineLanguagesMatchConsole = [Language] extends [
 true satisfies StateMachineLanguagesMatchConsole
 
 /** A status label from the contract's state machine, in the console's language. */
-function axisStateLabel(
-  axis: CoordinationAxis,
-  status: string,
-  language: Language
-): string {
+function axisStateLabel(axis: CoordinationAxis, status: string, language: Language) {
   return stateMachine(axis, language).details[status]?.label ?? status
 }
 
-export function publicationStatusLabel(
-  status: PublicationStepStatus,
-  language: Language
-): string {
-  return (
-    stateMachine('publication', language).step?.details[status]?.label ?? status
-  )
+export function publicationStatusLabel(status: PublicationStepStatus, language: Language): string {
+  return stateMachine('publication', language).step?.details[status]?.label ?? status
 }
 
 export function publicationStatusColor(status: PublicationStepStatus): string {
@@ -200,7 +188,9 @@ export function executionStatusLabel(
 
 function axisStatuses<A extends CoordinationAxis>(axis: A): Run[A]['status'][] {
   const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
-  if (machine === undefined) throw new Error(`Missing state machine: ${axis}`)
+  if (machine === undefined) {
+    throw new Error(`Missing state machine: ${axis}`)
+  }
   return machine.states.map((state) => state as Run[A]['status'])
 }
 
@@ -226,15 +216,13 @@ export function eventAxisLabel(
   event: Pick<RunEvent, 'axis' | 'step_key'>,
   t: ReturnType<typeof useMessages>
 ): string {
-  if (event.step_key !== null)
+  if (event.step_key !== null) {
     return t('axisPublicationStep', { step: event.step_key })
+  }
   return axisLabel(event.axis, t)
 }
 
-export function axisLabel(
-  axis: CoordinationAxis,
-  t: ReturnType<typeof useMessages>
-): string {
+export function axisLabel(axis: CoordinationAxis, t: ReturnType<typeof useMessages>): string {
   switch (axis) {
     case 'execution':
       return t('axisExecution')
@@ -258,15 +246,21 @@ export function artifactStatusLabel(
   status: NonNullable<ArtifactStorage>['status'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'available') return t('artifactAvailable')
-  if (status === 'unavailable') return t('artifactUnavailable')
+  if (status === 'available') {
+    return t('artifactAvailable')
+  }
+  if (status === 'unavailable') {
+    return t('artifactUnavailable')
+  }
   return t('statusFailed')
 }
 
-export function artifactStatusColor(
-  status: NonNullable<ArtifactStorage>['status']
-): string {
-  if (status === 'available') return 'green'
-  if (status === 'unavailable') return 'yellow'
+export function artifactStatusColor(status: NonNullable<ArtifactStorage>['status']): string {
+  if (status === 'available') {
+    return 'green'
+  }
+  if (status === 'unavailable') {
+    return 'yellow'
+  }
   return 'red'
 }

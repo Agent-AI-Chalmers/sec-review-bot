@@ -1,11 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { LIST_RUN_QUERY_PARAMS } from '../../shared/list-run-query-params.js'
-import {
-  RequestBodyTooLargeError,
-  readBoundedRequestBody,
-  sendJson
-} from '../http.js'
+import { RequestBodyTooLargeError, readBoundedRequestBody, sendJson } from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
@@ -36,7 +32,9 @@ function forwardedPath(bffUrl: string): string {
   const forwarded = new URLSearchParams()
   for (const name of LIST_RUN_QUERY_PARAMS) {
     const value = url.searchParams.get(name)
-    if (value !== null && value !== '') forwarded.set(name, value)
+    if (value !== null && value !== '') {
+      forwarded.set(name, value)
+    }
   }
   const query = forwarded.toString()
   return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
@@ -51,14 +49,19 @@ function forwardedPath(bffUrl: string): string {
  */
 function isAllowedReadPath(bffUrl: string): boolean {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
-  if (url.pathname === '/api/runs') return true
+  if (url.pathname === '/api/runs') {
+    return true
+  }
   // A fixed sub-resource of the run collection, not a run id: it lists the runs coordination
   // has stopped retrying, so the console can show the operator queue without any write access.
-  if (url.pathname === '/api/runs/parked') return true
+  if (url.pathname === '/api/runs/parked') {
+    return true
+  }
   const segments = url.pathname.split('/')
   // ['', 'api', 'runs', '<runId>', ...optional suffix]
-  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')
+  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs') {
     return false
+  }
   let runId: string
   try {
     runId = decodeURIComponent(segments[3] ?? '')
@@ -66,9 +69,15 @@ function isAllowedReadPath(bffUrl: string): boolean {
     // A malformed escape (`%zz`) is not a path this BFF proxies.
     return false
   }
-  if (!RUN_ID.test(runId)) return false
-  if (segments.length === 4) return true
-  if (segments.length !== 5) return false
+  if (!RUN_ID.test(runId)) {
+    return false
+  }
+  if (segments.length === 4) {
+    return true
+  }
+  if (segments.length !== 5) {
+    return false
+  }
   return segments[4] === 'publication-steps' || segments[4] === 'events'
 }
 
@@ -89,7 +98,9 @@ export function createReviewRunsRoutes({
   ): Promise<void> => {
     // A session cookie alone must not authorise a cross-site POST: the same check the
     // sign-out route uses.
-    if (!requireSameOrigin(request, response)) return
+    if (!requireSameOrigin(request, response)) {
+      return
+    }
     const adminToken = request.headers['x-review-runs-admin-token']
     if (typeof adminToken !== 'string' || adminToken.trim() === '') {
       // 401 rather than 400: the request is well-formed, it just carries no operator
@@ -111,11 +122,7 @@ export function createReviewRunsRoutes({
       // The action is taken from the matched route, never from the raw URL, so the
       // upstream path can only be one of the decisions this BFF states it proxies.
       const action =
-        decision[2] === 'resume'
-          ? 'resume'
-          : decision[2] === 'give-up'
-            ? 'give-up'
-            : 'abandon'
+        decision[2] === 'resume' ? 'resume' : decision[2] === 'give-up' ? 'give-up' : 'abandon'
       const upstream = await reviewRuns.decide(
         decodeURIComponent(decision[1] ?? ''),
         action,
@@ -128,10 +135,7 @@ export function createReviewRunsRoutes({
     }
   }
 
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.method === 'POST') {
       const decision = ADMIN_DECISION.exec(request.url ?? '')
       if (decision !== null) {
@@ -139,8 +143,9 @@ export function createReviewRunsRoutes({
         return true
       }
     }
-    if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? ''))
+    if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? '')) {
       return false
+    }
     try {
       const upstream = await reviewRuns.read(forwardedPath(request.url ?? '/'))
       writeUpstreamResult(response, upstream)

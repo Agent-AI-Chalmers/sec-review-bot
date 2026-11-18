@@ -6,7 +6,7 @@ import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 import type { UsageView } from './trajectory-model.js'
 
-function formatTokens(value: number): string {
+function formatTokens(value: number) {
   return new Intl.NumberFormat(undefined, {
     notation: value >= 10_000 ? 'compact' : 'standard',
     maximumFractionDigits: 2
@@ -20,8 +20,9 @@ function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
     value: number | undefined,
     subsets: ReadonlyArray<readonly [string, number | undefined]> = []
   ): React.JSX.Element | null => {
-    if (value === undefined && subsets.every(([, item]) => item === undefined))
+    if (value === undefined && subsets.every(([, item]) => item === undefined)) {
       return null
+    }
     return (
       <div className="trajectory-usage-group">
         <div className="trajectory-usage-metric">
@@ -76,13 +77,7 @@ export function TokenUsagePopover({
 }): React.JSX.Element {
   const t = useMessages()
   return (
-    <Popover
-      width={248}
-      position="bottom-end"
-      shadow="xs"
-      withArrow
-      arrowSize={8}
-    >
+    <Popover width={248} position="bottom-end" shadow="xs" withArrow arrowSize={8}>
       <Popover.Target>
         <Button
           variant="subtle"

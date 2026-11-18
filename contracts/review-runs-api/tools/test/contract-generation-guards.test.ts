@@ -46,24 +46,19 @@ test('a $ref with sibling keywords fails rather than dropping the siblings', () 
   const schemas = { Target: { type: 'string' } }
 
   expect(() =>
-    inlineLocalRefsForTest(
-      { $ref: '#/components/schemas/Target', description: 'kept?' },
-      schemas
-    )
+    inlineLocalRefsForTest({ $ref: '#/components/schemas/Target', description: 'kept?' }, schemas)
   ).toThrow(/\$ref .* has sibling keywords \(description\)/)
 })
 
 test('a bare local $ref is inlined, and a dangling one fails', () => {
   const schemas = { Target: { type: 'string' } }
 
-  expect(
-    inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas)
-  ).toStrictEqual({
+  expect(inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas)).toStrictEqual({
     type: 'string'
   })
-  expect(() =>
-    inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas)
-  ).toThrow(/dangling \$ref/)
+  expect(() => inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas)).toThrow(
+    /dangling \$ref/
+  )
 })
 
 /** The `listRuns` query parameter the projection reads: one form-exploded object whose
@@ -85,7 +80,7 @@ function listRunsSpec(queryObject: Record<string, unknown>): OpenApiDocument {
         }
       }
     }
-  } as unknown as OpenApiDocument
+  }
 }
 
 test('the declared form-exploded query object projects to its property names', () => {
@@ -117,17 +112,13 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
     paths: {
       '/v1/runs': {
         get: {
-          parameters: [
-            { in: 'query', name: 'limit', schema: { type: 'integer' } }
-          ]
+          parameters: [{ in: 'query', name: 'limit', schema: { type: 'integer' } }]
         }
       }
     }
   } as unknown as OpenApiDocument
 
-  expect(() => listRunQueryParameters(spec)).toThrow(
-    /not the expected form-exploded object/
-  )
+  expect(() => listRunQueryParameters(spec)).toThrow(/not the expected form-exploded object/)
 })
 
 // The Chinese overlay may only translate text. Each guard below stands for a way a stale or
@@ -213,9 +204,7 @@ test('empty translated text fails', () => {
 })
 
 test('text left untranslated fails', () => {
-  expect(() => apply(fullOverlay().slice(1))).toThrow(
-    /has no title translation/
-  )
+  expect(() => apply(fullOverlay().slice(1))).toThrow(/has no title translation/)
 })
 
 test('a node translated only in part fails', () => {

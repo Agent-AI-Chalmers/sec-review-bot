@@ -43,30 +43,29 @@ export function useRunsLocation(): RunsLocation {
   // Persisted in sessionStorage because navigating to a run detail unmounts this
   // component; without it, returning would reset the trail and strand the reader
   // with no Previous control (the Detail "Back to runs" link restores only the URL).
-  const [cursorParents, setCursorParents] = React.useState<
-    Record<string, string>
-  >(() => {
+  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>(() => {
     try {
-      return JSON.parse(
-        window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}'
+      const stored: unknown = JSON.parse(window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}')
+      if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) {
+        return {}
+      }
+      return Object.fromEntries(
+        Object.entries(stored).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string'
+        )
       )
     } catch {
       return {}
     }
   })
   React.useEffect(() => {
-    window.sessionStorage.setItem(
-      CURSOR_PARENTS_KEY,
-      JSON.stringify(cursorParents)
-    )
+    window.sessionStorage.setItem(CURSOR_PARENTS_KEY, JSON.stringify(cursorParents))
   }, [cursorParents])
   const cursor = search.get('cursor') ?? ''
   const previousCursor = cursorParents[cursor]
   const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)
   const pageSize =
-    Number.isSafeInteger(requestedPageSize) &&
-    requestedPageSize >= 1 &&
-    requestedPageSize <= 100
+    Number.isSafeInteger(requestedPageSize) && requestedPageSize >= 1 && requestedPageSize <= 100
       ? requestedPageSize
       : DEFAULT_PAGE_SIZE
   // State the page size on every request, so the console never depends on the
@@ -79,7 +78,9 @@ export function useRunsLocation(): RunsLocation {
   const pageQuery = new URLSearchParams()
   for (const name of LIST_RUN_QUERY_PARAMS) {
     const value = search.get(name)
-    if (value !== null && value !== '') pageQuery.set(name, value)
+    if (value !== null && value !== '') {
+      pageQuery.set(name, value)
+    }
   }
   pageQuery.set('limit', String(pageSize))
   const rangeMinutes = RANGE_MINUTES[search.get('range') ?? '']
@@ -106,8 +107,11 @@ export function useRunsLocation(): RunsLocation {
   const updateFilter = (name: string, value: string): void => {
     setCursorParents({})
     replaceSearch((next) => {
-      if (value) next.set(name, value)
-      else next.delete(name)
+      if (value) {
+        next.set(name, value)
+      } else {
+        next.delete(name)
+      }
       next.delete('cursor')
     })
   }
@@ -118,23 +122,32 @@ export function useRunsLocation(): RunsLocation {
     setCursorParents({})
     const next = new URLSearchParams()
     const limit = latestSearch.current.get('limit')
-    if (limit !== null) next.set('limit', limit)
+    if (limit !== null) {
+      next.set('limit', limit)
+    }
     latestSearch.current = next
     setSearch(next)
   }
   const openCursor = (target: string): void => {
     replaceSearch((next) => {
-      if (target) next.set('cursor', target)
-      else next.delete('cursor')
+      if (target) {
+        next.set('cursor', target)
+      } else {
+        next.delete('cursor')
+      }
     })
   }
   const openNextPage = (target: string | null | undefined): void => {
-    if (target === undefined || target === null) return
+    if (target === undefined || target === null) {
+      return
+    }
     setCursorParents((parents) => ({ ...parents, [target]: cursor }))
     openCursor(target)
   }
   const openPreviousPage = (): void => {
-    if (previousCursor === undefined) return
+    if (previousCursor === undefined) {
+      return
+    }
     openCursor(previousCursor)
   }
   // Mantine's pager is numbered, but the read API only walks forward and never
@@ -146,7 +159,9 @@ export function useRunsLocation(): RunsLocation {
     let node = cursorParents[cursor]
     while (node !== undefined) {
       number += 1
-      if (node === '') break
+      if (node === '') {
+        break
+      }
       node = cursorParents[node]
     }
     return number

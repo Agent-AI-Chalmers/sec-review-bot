@@ -11,9 +11,7 @@ function isRecord(value: unknown): value is AnyRecord {
 }
 
 export function nonEmptyText(value: unknown): string {
-  return String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return displayText(value).replace(/\s+/g, ' ').trim()
 }
 
 function finiteNumber(value: unknown): number | null {
@@ -21,7 +19,7 @@ function finiteNumber(value: unknown): number | null {
 }
 
 export function cvssSeverityRank(severity: unknown): number {
-  switch (String(severity ?? '').toLowerCase()) {
+  switch (displayText(severity).toLowerCase()) {
     case 'critical':
       return 5
     case 'high':
@@ -49,10 +47,7 @@ export function displayText(value: unknown, fallback = ''): string {
 
 export function inlineCode(value: unknown, fallback = 'unknown'): string {
   const text = displayText(value, fallback)
-  const longestRun = Math.max(
-    0,
-    ...Array.from(text.matchAll(/`+/g), (match) => match[0].length)
-  )
+  const longestRun = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
   const fence = '`'.repeat(longestRun + 1)
   const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
   return `${fence}${padding}${text}${padding}${fence}`
@@ -133,38 +128,19 @@ export function renderVerificationSummaryLines(
     lines.push(`- Next step: ${inlineCode(nextStep || 'unknown')}`)
   }
 
-  lines.push(
-    `- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`
-  )
+  lines.push(`- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`)
 
   if (options.includeTargetClaim !== false) {
     const targetClaim = nonEmptyText(verification.target_claim)
     if (targetClaim || options.targetClaimFallback !== undefined) {
-      lines.push(
-        '',
-        'Target claim:',
-        '',
-        targetClaim || options.targetClaimFallback || ''
-      )
+      lines.push('', 'Target claim:', '', targetClaim || options.targetClaimFallback || '')
     }
   }
 
   lines.push(
-    ...renderLabeledListLines(
-      'Findings',
-      verification.findings,
-      listItemFormatter
-    ),
-    ...renderLabeledListLines(
-      'Evidence',
-      verification.evidence,
-      listItemFormatter
-    ),
-    ...renderLabeledListLines(
-      'Residual risks',
-      verification.residual_risks,
-      listItemFormatter
-    )
+    ...renderLabeledListLines('Findings', verification.findings, listItemFormatter),
+    ...renderLabeledListLines('Evidence', verification.evidence, listItemFormatter),
+    ...renderLabeledListLines('Residual risks', verification.residual_risks, listItemFormatter)
   )
 
   return lines
@@ -234,14 +210,8 @@ function renderControlReview(control_review: unknown): string[] {
   }
 
   const lines = [
-    ...renderStringListSection(
-      'Reachable assets',
-      control_review.reachable_assets
-    ),
-    ...renderStringListSection(
-      'Security controls',
-      control_review.security_controls
-    ),
+    ...renderStringListSection('Reachable assets', control_review.reachable_assets),
+    ...renderStringListSection('Security controls', control_review.security_controls),
     ...renderStringListSection('Control limits', control_review.control_limits)
   ]
 
@@ -252,19 +222,15 @@ function sortedAnalysisNarratives(narratives: unknown): AnyRecord[] {
   return asList<AnyRecord>(narratives)
     .filter(isRecord)
     .sort((left, right) => {
-      const leftPriority =
-        finiteNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
-      const rightPriority =
-        finiteNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
+      const leftPriority = finiteNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
+      const rightPriority = finiteNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
       return leftPriority - rightPriority
     })
 }
 
 function analysisNarrativeBodyLines(item: AnyRecord): string[] {
   const flow_review = isRecord(item.flow_review) ? item.flow_review : {}
-  const support_review = isRecord(item.support_review)
-    ? item.support_review
-    : {}
+  const support_review = isRecord(item.support_review) ? item.support_review : {}
   const scope_review = isRecord(item.scope_review) ? item.scope_review : {}
   const cwe_mapping = isRecord(item.cwe_mapping) ? item.cwe_mapping : {}
   const metaLines = [
@@ -275,15 +241,12 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ['Outcome control point', scope_review.outcome_deciding_control_point],
     [
       'CWE',
-      [cwe_mapping.cwe_id, cwe_mapping.cwe_name]
-        .map(nonEmptyText)
-        .filter(Boolean)
-        .join(' - ')
+      [cwe_mapping.cwe_id, cwe_mapping.cwe_name].map(nonEmptyText).filter(Boolean).join(' - ')
     ]
   ]
     .map(([key, value]) => [key, nonEmptyText(value)] as const)
     .filter(([, value]) => value.length > 0)
-    .map(([key, value]) => `- ${key}: ${inlineCode(value)}`)
+    .map(([key, value]) => `- ${displayText(key)}: ${inlineCode(value)}`)
 
   const lines: string[] = []
   if (metaLines.length > 0) {
@@ -299,10 +262,7 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ...renderLocationList(item.locations),
     ...renderStringListSection('Source facts', flow_review.source_facts),
     ...renderStringListSection('Sink facts', flow_review.sink_facts),
-    ...renderStringListSection(
-      'Supported inferences',
-      support_review.supported_inferences
-    ),
+    ...renderStringListSection('Supported inferences', support_review.supported_inferences),
     ...renderStringListSection('Proof gaps', support_review.proof_gaps),
     ...renderControlReview(item.control_review),
     ...renderScopeAnalysis(scope_review),
@@ -353,16 +313,11 @@ export function analysisHeadline(verdict: unknown): string {
   }
 }
 
-export function mitigationHeadline(
-  verdict: unknown,
-  changedFiles: unknown[]
-): string {
+export function mitigationHeadline(verdict: unknown, changedFiles: unknown[]): string {
   if (changedFiles.length > 0) {
     return `patch proposed, ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} changed`
   }
-  return verdict === 'no-actionable-finding'
-    ? 'not needed'
-    : 'no patch proposed'
+  return verdict === 'no-actionable-finding' ? 'not needed' : 'no patch proposed'
 }
 
 export function coverageHeadline(coverage: unknown): string {

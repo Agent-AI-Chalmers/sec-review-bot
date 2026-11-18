@@ -36,10 +36,11 @@ export async function submitPreparedRun(
   status: 'queued'
 }> {
   const run = await store.queries.getRun(args.runId)
-  if (run === null)
+  if (run === null) {
     throw Object.assign(new Error(`Review run does not exist: ${args.runId}`), {
       code: 'REVIEW_RUN_NOT_FOUND'
     })
+  }
   let executionAccepted = false
   let submissionStarted = false
   try {
@@ -69,12 +70,9 @@ export async function submitPreparedRun(
         args.preparationToken,
         {
           code:
-            executionAccepted ||
-            error instanceof ExecutionSubmissionUncertainError
+            executionAccepted || error instanceof ExecutionSubmissionUncertainError
               ? SUBMISSION_STATE_UNCERTAIN
-              : error instanceof Error &&
-                  'code' in error &&
-                  typeof error.code === 'string'
+              : error instanceof Error && 'code' in error && typeof error.code === 'string'
                 ? error.code
                 : 'REVIEW_START_FAILED',
           message: error instanceof Error ? error.message : String(error)

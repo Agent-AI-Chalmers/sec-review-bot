@@ -8,10 +8,7 @@ import {
 } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../review-runs/publish-context.js'
 import type { Octokit } from 'octokit'
-import {
-  buildDraftBranchName,
-  createDraftPullRequestFromIssueReviewRecord
-} from './draft-pr.js'
+import { buildDraftBranchName, createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 import { parseIssueReviewPublishContext } from '../../review-runs/publish-context.js'
@@ -32,7 +29,7 @@ interface IssueDraftPullRequest {
   html_url: string
 }
 
-function issueReviewRunMarker(run_id: string): string {
+function issueReviewRunMarker(run_id: string) {
   // The publisher may retry after GitHub accepted a comment but its response was lost.
   // A stable run marker makes that retry observable and idempotent.
   return `<!-- sec-review-bot:issue-review-run:${run_id} -->`
@@ -50,9 +47,7 @@ type CompletedExecutionRun = {
   publish_context: Record<string, unknown>
 }
 
-function issueReviewResultFromWorkflowResult(
-  result: unknown
-): IssueReviewWorkflowResult | null {
+function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
     assertWorkflowResult('issue-review', result)
     const rawResult = result as {
@@ -94,9 +89,7 @@ export async function handleIssueReviewRun({
   if (workflow_result === null) {
     throw new Error(`Issue review run ${run.run_id} is not ready to publish.`)
   }
-  const octokit = await installation_octokit_for_repo(
-    context.issue.repo_full_name
-  )
+  const octokit = await installation_octokit_for_repo(context.issue.repo_full_name)
   await publishIssueReviewResult({
     octokit,
     issue: context.issue,
@@ -176,9 +169,7 @@ async function publishIssueReviewResult({
           repo_name: issue.repo_name,
           branch_name: branch
         })
-        return existing === null
-          ? null
-          : { id: existing.number, url: existing.html_url }
+        return existing === null ? null : { id: existing.number, url: existing.html_url }
       },
       effect: async () => {
         // The creation path is idempotent on its own: the branch is run-specific and an
@@ -191,34 +182,34 @@ async function publishIssueReviewResult({
           review_record,
           assert_publication_claim
         })
-        return created === null
-          ? null
-          : { id: created.number, url: created.html_url }
+        return created === null ? null : { id: created.number, url: created.html_url }
       }
     })
     // A step that was already claimed once may have created the pull request before its
     // publisher died, so this run is a retry rather than a first attempt. Recording the fact
     // keeps the log honest about why it may be recovering.
-    if (draftPrStep.previousAttempts > 1 && !draftPrStep.alreadySucceeded)
+    if (draftPrStep.previousAttempts > 1 && !draftPrStep.alreadySucceeded) {
       logInfo('draft_pr_creation_retry', {
         event_type,
         issue: issue.issue_number,
         repo: issue.repo_full_name,
         previous_attempts: draftPrStep.previousAttempts
       })
+    }
     if (draftPrStep.remote.id !== undefined && draftPrStep.remote.id !== null) {
       draftPullRequest = {
         number: Number(draftPrStep.remote.id),
         html_url: draftPrStep.remote.url ?? ''
       }
     }
-    if (draftPrStep.reconciled && draftPullRequest !== null)
+    if (draftPrStep.reconciled && draftPullRequest !== null) {
       logInfo('draft_pr_creation_reconciled', {
         event_type,
         issue: issue.issue_number,
         repo: issue.repo_full_name,
         draft_pr_number: draftPullRequest.number
       })
+    }
     if (draftPullRequest) {
       logInfo('draft_pr_creation_completed', {
         draft_pr_number: draftPullRequest.number,
@@ -278,7 +269,9 @@ async function publishIssueReviewResult({
     }
   })
   // The comment already existed: nothing left to publish for this step.
-  if (commentStep.alreadySucceeded) return
+  if (commentStep.alreadySucceeded) {
+    return
+  }
 
   logInfo('issue_comment_publish_completed', {
     comment_id: commentStep.remote.id,

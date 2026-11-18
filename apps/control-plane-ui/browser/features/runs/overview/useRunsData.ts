@@ -43,19 +43,20 @@ export function useRunsData(query: string): RunsData {
         }
       })
       .catch((value: unknown) => {
-        if (latestQuery.current === requestedQuery) setAuxiliaryError(value)
+        if (latestQuery.current === requestedQuery) {
+          setAuxiliaryError(value)
+        }
         // The queue is an operator aid, not a precondition for reading runs.
       })
     try {
-      const nextData = await api<ListRunsResponseBody>(
-        `/runs?${requestedQuery}`
-      )
+      const nextData = await api<ListRunsResponseBody>(`/runs?${requestedQuery}`)
       if (latestQuery.current === requestedQuery) {
         setResult({ query: requestedQuery, data: nextData })
       }
     } catch (value) {
-      if (latestQuery.current === requestedQuery)
+      if (latestQuery.current === requestedQuery) {
         setFailure({ query: requestedQuery, error: value })
+      }
     }
     await parkedRequest
   }, [query])

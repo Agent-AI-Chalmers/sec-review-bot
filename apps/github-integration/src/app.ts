@@ -10,10 +10,7 @@ import {
   webhook_max_body_bytes,
   webhook_path
 } from './config.js'
-import {
-  currentAppBotLogin,
-  setGitHubAppMetadata
-} from './github/github-app-metadata-service.js'
+import { currentAppBotLogin, setGitHubAppMetadata } from './github/github-app-metadata-service.js'
 import { createAppHttpHandler } from './ingress/http/app-http-handler.js'
 import { handleRepositoryReviewDispatch } from './ingress/github/actions/repository-review-http-handler.js'
 import { handleIssueCommentCreated } from './ingress/github/webhooks/issue-comment-created.js'
@@ -34,7 +31,10 @@ verifyContractSchemasLoadable()
 
 const app = createGitHubApp()
 
-const { data } = await app.octokit.request('/app')
+const { data } = await app.octokit.request('GET /app')
+if (data === null) {
+  throw new Error('GitHub App metadata is missing')
+}
 setGitHubAppMetadata({
   id: data.id,
   slug: data.slug,
@@ -55,10 +55,7 @@ app.octokit.log.debug(`Authenticated as '${data.name}'`)
 app.webhooks.on('issue_comment.created', handleIssueCommentCreated)
 app.webhooks.on('issues.opened', handleIssueOpened)
 app.webhooks.on('pull_request.opened', handlePullRequestOpened)
-app.webhooks.on(
-  'pull_request.ready_for_review',
-  handlePullRequestReadyForReview
-)
+app.webhooks.on('pull_request.ready_for_review', handlePullRequestReadyForReview)
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
 const publicationCoordinator = startPublicationCoordinator({ app })
 const preparationCoordinator = startPreparationCoordinator({ app })
@@ -80,16 +77,18 @@ app.webhooks.onError((error) => {
 
 const localWebhookUrl = `http://localhost:${port}${webhook_path}`
 const middleware = createNodeMiddleware(app.webhooks, { path: webhook_path })
-const server = http.createServer(
-  createAppHttpHandler({
-    app,
-    port,
-    repository_review_dispatch_path,
-    repository_review_dispatch_handler: handleRepositoryReviewDispatch,
-    webhook_max_body_bytes,
-    webhook_middleware: middleware
-  })
-)
+const handleHttpRequest = createAppHttpHandler({
+  app,
+  port,
+  repository_review_dispatch_path,
+  repository_review_dispatch_handler: handleRepositoryReviewDispatch,
+  webhook_max_body_bytes,
+  webhook_middleware: middleware
+})
+const server = http.createServer((request, response) => {
+  // The handler catches and reports failures before resolving.
+  void handleHttpRequest(request, response)
+})
 
 server.listen(port, () => {
   logInfo('server_started', {
@@ -134,7 +133,7 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
       backgroundPreparations.stop()
     ]))
   ]
-  const shutdownError = results.find(
+  const shutdownError: unknown = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'
   )?.reason
   if (shutdownError !== undefined) {

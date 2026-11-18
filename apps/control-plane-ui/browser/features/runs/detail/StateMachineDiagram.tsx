@@ -81,11 +81,7 @@ export function StateMachineDiagram({
           const pathKey = `${edge.from}->${edge.to}`
           const className = [
             'state-machine-edge',
-            edge.kind === 'self'
-              ? 'is-self-loop'
-              : edge.kind === 'return'
-                ? 'is-revert'
-                : '',
+            edge.kind === 'self' ? 'is-self-loop' : edge.kind === 'return' ? 'is-revert' : '',
             traversed.has(pathKey) ? 'is-traversed' : ''
           ]
             .filter(Boolean)
@@ -93,11 +89,7 @@ export function StateMachineDiagram({
           // One line can stand for several transitions that share a state pair; its tooltip
           // names each of them so no decision is hidden behind another.
           const label = [
-            ...new Set(
-              edge.transitions.map((transition) =>
-                edgeLabel(machine, transition)
-              )
-            )
+            ...new Set(edge.transitions.map((transition) => edgeLabel(machine, transition)))
           ].join(' / ')
           return (
             <g key={pathKey} className={className}>
@@ -122,12 +114,8 @@ export function StateMachineDiagram({
                   event.stopPropagation()
                   setHovered({ label, x: event.clientX, y: event.clientY })
                 }}
-                onMouseEnter={(event) =>
-                  setHovered({ label, x: event.clientX, y: event.clientY })
-                }
-                onMouseMove={(event) =>
-                  setHovered({ label, x: event.clientX, y: event.clientY })
-                }
+                onMouseEnter={(event) => setHovered({ label, x: event.clientX, y: event.clientY })}
+                onMouseMove={(event) => setHovered({ label, x: event.clientX, y: event.clientY })}
                 onMouseLeave={() => setHovered(null)}
                 onFocus={(event) => {
                   const rect = event.currentTarget.getBoundingClientRect()
@@ -144,10 +132,7 @@ export function StateMachineDiagram({
         })}
         {geometry.nodes.map(({ state, center: { x, y } }) => {
           const isCurrent = state === current
-          const className = [
-            'state-machine-node',
-            isCurrent ? 'is-current' : ''
-          ]
+          const className = ['state-machine-node', isCurrent ? 'is-current' : '']
             .filter(Boolean)
             .join(' ')
           return (
@@ -159,11 +144,7 @@ export function StateMachineDiagram({
                 withArrow
                 position="top"
               >
-                <g
-                  tabIndex={0}
-                  role="img"
-                  aria-label={stateLabel(machine, state)}
-                >
+                <g tabIndex={0} role="img" aria-label={stateLabel(machine, state)}>
                   <rect
                     x={x - NODE_W / 2}
                     y={y - NODE_H / 2}
@@ -171,12 +152,7 @@ export function StateMachineDiagram({
                     height={NODE_H}
                     rx={8}
                   />
-                  <text
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                  >
+                  <text x={x} y={y} textAnchor="middle" dominantBaseline="central">
                     {stateLabel(machine, state)}
                   </text>
                 </g>

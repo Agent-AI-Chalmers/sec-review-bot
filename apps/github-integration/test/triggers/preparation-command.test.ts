@@ -16,16 +16,12 @@ const admission = {
 function claimedStore(): PreparationCommandStore {
   return {
     ...inputBundlePublicationStore(),
-    checkpointPreparationInput: async () =>
-      expect.unreachable('this command must not checkpoint'),
-    admitReviewRun: () =>
-      expect.unreachable('a claimed retry must not admit again'),
+    checkpointPreparationInput: async () => expect.unreachable('this command must not checkpoint'),
+    admitReviewRun: () => expect.unreachable('a claimed retry must not admit again'),
     renewPreparationClaim: async () => true,
     preparationHeartbeatIntervalMs: async () => 60_000,
-    submitPreparedRun: () =>
-      expect.unreachable('this preparation must not submit'),
-    failPreparation: () =>
-      expect.unreachable('this owner must not record a failure')
+    submitPreparedRun: () => expect.unreachable('this preparation must not submit'),
+    failPreparation: () => expect.unreachable('this owner must not record a failure')
   }
 }
 
@@ -52,8 +48,7 @@ test('claimed preparation retains its run, fencing token, and retry budget', asy
         attempt_count: 3
       },
       on_admitted: () => expect.unreachable('a retry is not a fresh admission'),
-      publish_context: () =>
-        expect.unreachable('ownership must be proven first'),
+      publish_context: () => expect.unreachable('ownership must be proven first'),
       prepare_review: async ({ run_id }) => {
         expect(run_id).toBe('original-run')
         throw error
@@ -82,8 +77,7 @@ test('claim loss immediately before submission leaves the new owner responsible'
       store,
       admission,
       claimed_preparation: { run_id: 'original-run', token: 'expired-token' },
-      publish_context: () =>
-        expect.unreachable('ownership must be proven first'),
+      publish_context: () => expect.unreachable('ownership must be proven first'),
       prepare_review: async () => ({ review: {}, input: {} })
     })
   ).rejects.toThrow(PreparationClaimLostError)

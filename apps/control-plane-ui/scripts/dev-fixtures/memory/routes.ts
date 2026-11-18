@@ -22,10 +22,7 @@ const trajectoryContent: TrajectoryContentResponse = {
 
 const LOAD_ERROR_VERSION = 404
 
-type SourceRunIds = Record<
-  'repository-review' | 'pull-request-review' | 'issue-review',
-  string
->
+type SourceRunIds = Record<'repository-review' | 'pull-request-review' | 'issue-review', string>
 
 const trajectoryReference = {
   uri: 's3://sec-review/memory/trajectories/fixture/trajectory.v1.jsonl.zst',
@@ -40,8 +37,9 @@ export function createMemoryHandler(
   // E2E pins the clock; interactive fixture previews stay relative to now.
   const fixtureTime = process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME
   const BASE_TIME = fixtureTime ? Date.parse(fixtureTime) : RUNS_BASE_TIME
-  if (!Number.isFinite(BASE_TIME))
+  if (!Number.isFinite(BASE_TIME)) {
     throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
+  }
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
     version: 1,
@@ -241,21 +239,19 @@ export function createMemoryHandler(
   // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
   // Provenance is replaced; chronology, operator edits and reorganization are
   // illustrative. Each observation is registered once, including pending work.
-  for (const record of [...memoryVersions, ...extractionRecords])
+  for (const record of [...memoryVersions, ...extractionRecords]) {
     record.created_at = new Date(
       Date.parse(String(record.created_at)) - 64 * 3_600_000
     ).toISOString()
+  }
   let sampleIndex = 0
   for (let version = 4; version <= 60; version += 1) {
     const predecessor = version === 4 ? 2 : version === 56 ? 53 : version - 1
     const files = { ...memoryFilesByVersion.get(predecessor)! }
-    const createdAt = new Date(
-      BASE_TIME - (61 - version) * 3_600_000
-    ).toISOString()
+    const createdAt = new Date(BASE_TIME - (61 - version) * 3_600_000).toISOString()
     let source: Record<string, unknown>
     if (version % 7 === 0) {
-      files['MEMORY.md'] +=
-        '\nReview only guidance relevant to the current trust boundary.\n'
+      files['MEMORY.md'] += '\nReview only guidance relevant to the current trust boundary.\n'
       source = {
         kind: 'manual',
         operation_id: `fixture-edit-${version}`,
@@ -281,7 +277,7 @@ export function createMemoryHandler(
         }
       }
     } else {
-      const sample = historySamples[sampleIndex++]!
+      const sample = historySamples[sampleIndex++]
       const extractionId = `fixture-history-${sampleIndex}`
       consumedVersionByObservation.set(`observation-${extractionId}-1`, version)
       extractionRecords.push({
@@ -291,17 +287,16 @@ export function createMemoryHandler(
         source_unit_id: `case-${sampleIndex}`,
         execution_archive_digest: `sha256:${'5'.repeat(64)}`,
         trajectory_reference: trajectoryReference,
-        observations: [
-          { observation_id: 'extraction-1', body_markdown: sample.body }
-        ],
+        observations: [{ observation_id: 'extraction-1', body_markdown: sample.body }],
         created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
       })
-      if (sample.action !== 'skipped')
+      if (sample.action !== 'skipped') {
         for (const topic of sample.topics) {
           const path = topic.replace('/memory/', '')
           files[path] =
             `${files[path] ?? '# Review guidance\n'}\n${sample.action === 'conflict' ? '## Unresolved conflict\n\n' : ''}${sample.body}\n`
         }
+      }
       source = {
         kind: 'learning',
         operation_id: `fixture-learning-${version}`,
@@ -329,7 +324,7 @@ export function createMemoryHandler(
     })
   }
   for (; sampleIndex < historySamples.length; sampleIndex += 1) {
-    const sample = historySamples[sampleIndex]!
+    const sample = historySamples[sampleIndex]
     extractionRecords.push({
       extraction_id: `fixture-history-${sampleIndex + 1}`,
       source_workflow: 'repository-review',
@@ -337,20 +332,18 @@ export function createMemoryHandler(
       source_unit_id: `case-${sampleIndex + 1}`,
       execution_archive_digest: `sha256:${'5'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observations: [
-        { observation_id: 'extraction-1', body_markdown: sample.body }
-      ],
-      created_at: new Date(
-        BASE_TIME - (historySamples.length - sampleIndex) * 60_000
-      ).toISOString()
+      observations: [{ observation_id: 'extraction-1', body_markdown: sample.body }],
+      created_at: new Date(BASE_TIME - (historySamples.length - sampleIndex) * 60_000).toISOString()
     })
   }
   // The operator restored the predecessor after inspecting the latest reorganization.
   activeMemoryVersion = 59
   extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
-  for (const record of extractionRecords)
-    for (const [index, observation] of record.observations.entries())
+  for (const record of extractionRecords) {
+    for (const [index, observation] of record.observations.entries()) {
       observation.observation_id = `observation-${record.extraction_id}-${index + 1}`
+    }
+  }
   const authenticationExtraction = extractionRecords.find(
     (record) => record.extraction_id === 'fixture-extraction-2'
   )!
@@ -359,30 +352,24 @@ export function createMemoryHandler(
     body_markdown:
       '**Validate credential shape before comparison.** Reject malformed credential values before invoking the authentication comparator.'
   })
-  const observations: ObservationRecord[] = extractionRecords.flatMap(
-    (record) =>
-      record.observations.map((observation) => ({
-        observation_id: observation.observation_id,
-        extraction_id: record.extraction_id,
-        source_run_id: record.source_run_id,
-        source_unit_id: record.source_unit_id,
-        body_markdown: observation.body_markdown,
-        consumed_version:
-          consumedVersionByObservation.get(observation.observation_id) ?? null,
-        created_at: record.created_at
-      }))
+  const observations: ObservationRecord[] = extractionRecords.flatMap((record) =>
+    record.observations.map((observation) => ({
+      observation_id: observation.observation_id,
+      extraction_id: record.extraction_id,
+      source_run_id: record.source_run_id,
+      source_unit_id: record.source_unit_id,
+      body_markdown: observation.body_markdown,
+      consumed_version: consumedVersionByObservation.get(observation.observation_id) ?? null,
+      created_at: record.created_at
+    }))
   )
-  const unitOutcomes = new Map<
-    string,
-    { source_workflow: string; hasObservation: boolean }
-  >()
+  const unitOutcomes = new Map<string, { source_workflow: string; hasObservation: boolean }>()
   for (const record of extractionRecords) {
     const key = `${record.source_run_id}\u0000${record.source_unit_id}`
     const current = unitOutcomes.get(key)
     unitOutcomes.set(key, {
       source_workflow: record.source_workflow,
-      hasObservation:
-        (current?.hasObservation ?? false) || record.observations.length > 0
+      hasObservation: (current?.hasObservation ?? false) || record.observations.length > 0
     })
   }
   const workflowOutcomes = new Map<string, CatalogOverviewWorkflow>()
@@ -394,17 +381,19 @@ export function createMemoryHandler(
       units_without_observation_count: 0
     }
     current.extracted_unit_count += 1
-    if (outcome.hasObservation) current.units_with_observation_count += 1
-    else current.units_without_observation_count += 1
+    if (outcome.hasObservation) {
+      current.units_with_observation_count += 1
+    } else {
+      current.units_without_observation_count += 1
+    }
     workflowOutcomes.set(outcome.source_workflow, current)
   }
   return async (request, response): Promise<void> => {
     const requestUrl = request.url
-    if (requestUrl === undefined) return
-    if (
-      requestUrl === '/api/memory/tree/automation' &&
-      request.method === 'GET'
-    ) {
+    if (requestUrl === undefined) {
+      return
+    }
+    if (requestUrl === '/api/memory/tree/automation' && request.method === 'GET') {
       response.end(JSON.stringify(memoryAutomation))
       return
     }
@@ -412,14 +401,8 @@ export function createMemoryHandler(
       response.end(JSON.stringify({ version: activeMemoryVersion }))
       return
     }
-    if (
-      requestUrl.startsWith('/api/memory/overview') &&
-      request.method === 'GET'
-    ) {
-      const range = new URL(
-        requestUrl,
-        'http://control-plane-ui.local'
-      ).searchParams.get('range')
+    if (requestUrl.startsWith('/api/memory/overview') && request.method === 'GET') {
+      const range = new URL(requestUrl, 'http://control-plane-ui.local').searchParams.get('range')
       const pointCount = range === '90d' ? 90 : range === 'all' ? 12 : 30
       response.end(
         JSON.stringify({
@@ -452,18 +435,16 @@ export function createMemoryHandler(
             const period = date.toISOString().slice(0, range === 'all' ? 7 : 10)
             const units = new Map<string, boolean>()
             for (const record of extractionRecords) {
-              if (!record.created_at.startsWith(period)) continue
+              if (!record.created_at.startsWith(period)) {
+                continue
+              }
               const key = `${record.source_run_id}:${record.source_unit_id}`
-              units.set(
-                key,
-                (units.get(key) ?? false) || record.observations.length > 0
-              )
+              units.set(key, (units.get(key) ?? false) || record.observations.length > 0)
             }
             return {
               period_start: date.toISOString().slice(0, 10),
               extracted_unit_count: units.size,
-              units_with_observation_count: [...units.values()].filter(Boolean)
-                .length
+              units_with_observation_count: [...units.values()].filter(Boolean).length
             }
           }),
           workflows: [...workflowOutcomes.values()]
@@ -471,10 +452,7 @@ export function createMemoryHandler(
       )
       return
     }
-    if (
-      requestUrl.startsWith('/api/memory/versions?') &&
-      request.method === 'GET'
-    ) {
+    if (requestUrl.startsWith('/api/memory/versions?') && request.method === 'GET') {
       // Honor before_version paging like the catalog: newest first, exclusive.
       const query = new URL(requestUrl, 'http://fixture').searchParams
       const limit = Number(query.get('limit') ?? '50')
@@ -487,17 +465,12 @@ export function createMemoryHandler(
         JSON.stringify({
           versions: page,
           next_before_version:
-            matching.length > limit
-              ? Number(page[page.length - 1]?.version)
-              : null
+            matching.length > limit ? Number(page[page.length - 1]?.version) : null
         })
       )
       return
     }
-    if (
-      requestUrl.startsWith('/api/memory/observations?') &&
-      request.method === 'GET'
-    ) {
+    if (requestUrl.startsWith('/api/memory/observations?') && request.method === 'GET') {
       // Honor the catalog's version filter and cursor so the UI's paging and
       // report-to-observation jump behave as they do against the real catalog.
       const query = new URL(requestUrl, 'http://fixture').searchParams
@@ -508,23 +481,18 @@ export function createMemoryHandler(
         .reverse()
         .filter(
           (observation) =>
-            consumedVersion === null ||
-            observation.consumed_version === Number(consumedVersion)
+            consumedVersion === null || observation.consumed_version === Number(consumedVersion)
         )
       const page = matching.slice(offset, offset + limit)
       response.end(
         JSON.stringify({
           observations: page,
-          next_cursor:
-            offset + limit < matching.length ? String(offset + limit) : null
+          next_cursor: offset + limit < matching.length ? String(offset + limit) : null
         })
       )
       return
     }
-    if (
-      requestUrl.startsWith('/api/memory/extractions?') &&
-      request.method === 'GET'
-    ) {
+    if (requestUrl.startsWith('/api/memory/extractions?') && request.method === 'GET') {
       response.end(
         JSON.stringify({
           extractions: extractionRecords.toReversed(),
@@ -533,22 +501,18 @@ export function createMemoryHandler(
       )
       return
     }
-    const memoryVersionMatch = /^\/api\/memory\/versions\/([1-9][0-9]*)$/.exec(
-      requestUrl
-    )
+    const memoryVersionMatch = /^\/api\/memory\/versions\/([1-9][0-9]*)$/.exec(requestUrl)
     if (request.method === 'GET' && memoryVersionMatch !== null) {
       const version = Number(memoryVersionMatch[1])
-      const record = memoryVersions.find(
-        (item) => Number(item.version) === version
-      )
-      if (record === undefined) response.statusCode = 404
+      const record = memoryVersions.find((item) => Number(item.version) === version)
+      if (record === undefined) {
+        response.statusCode = 404
+      }
       response.end(JSON.stringify(record ?? { error: 'version_not_found' }))
       return
     }
     const memoryTrajectoryContentMatch =
-      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/trajectory\/content$/.exec(
-        requestUrl
-      )
+      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/trajectory\/content$/.exec(requestUrl)
     if (request.method === 'GET' && memoryTrajectoryContentMatch !== null) {
       if (
         memoryTrajectoryContentMatch[1] === 'versions' &&
@@ -562,9 +526,7 @@ export function createMemoryHandler(
       return
     }
     const memoryDownloadMatch =
-      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/(artifact|trajectory)$/.exec(
-        requestUrl
-      )
+      /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/(artifact|trajectory)$/.exec(requestUrl)
     if (request.method === 'GET' && memoryDownloadMatch !== null) {
       const collection = memoryDownloadMatch[1]
       const identity = memoryDownloadMatch[2] ?? ''
@@ -573,33 +535,22 @@ export function createMemoryHandler(
       const available =
         collection === 'versions'
           ? memoryFilesByVersion.has(version) || version === LOAD_ERROR_VERSION
-          : extractionRecords.some(
-              (record) => record.extraction_id === identity
-            )
-      if (
-        !available ||
-        (collection === 'extractions' && kind !== 'trajectory')
-      ) {
+          : extractionRecords.some((record) => record.extraction_id === identity)
+      if (!available || (collection === 'extractions' && kind !== 'trajectory')) {
         response.statusCode = 404
         response.end(JSON.stringify({ error: 'memory_artifact_not_found' }))
         return
       }
       const filename =
-        kind === 'artifact'
-          ? 'memory-tree.v1.tar.zst'
-          : 'memory-trajectory.v1.jsonl.zst'
+        kind === 'artifact' ? 'memory-tree.v1.tar.zst' : 'memory-trajectory.v1.jsonl.zst'
       const content = Buffer.from(`fixture ${collection} ${identity} ${kind}\n`)
       response.setHeader('content-type', 'application/octet-stream')
-      response.setHeader(
-        'content-disposition',
-        `attachment; filename="${filename}"`
-      )
+      response.setHeader('content-disposition', `attachment; filename="${filename}"`)
       response.setHeader('content-length', String(content.length))
       response.end(content)
       return
     }
-    const memoryContentMatch =
-      /^\/api\/memory\/versions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
+    const memoryContentMatch = /^\/api\/memory\/versions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
     if (request.method === 'GET' && memoryContentMatch !== null) {
       const version = Number(memoryContentMatch[1])
       if (version === LOAD_ERROR_VERSION) {
@@ -608,7 +559,9 @@ export function createMemoryHandler(
         return
       }
       const files = memoryFilesByVersion.get(version)
-      if (files === undefined) response.statusCode = 404
+      if (files === undefined) {
+        response.statusCode = 404
+      }
       response.end(
         JSON.stringify(
           files === undefined
@@ -619,16 +572,13 @@ export function createMemoryHandler(
       return
     }
     const memoryWriteMatch =
-      /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
-        requestUrl
-      )
+      /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(requestUrl)
     if (request.method === 'POST' && memoryWriteMatch !== null) {
       const chunks: Buffer[] = []
-      for await (const chunk of request) chunks.push(Buffer.from(chunk))
-      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
-        string,
-        unknown
-      >
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
       const action = memoryWriteMatch[1] ?? memoryWriteMatch[2]
       if (action === 'pause' || action === 'resume') {
         if (body.expected_version !== memoryAutomation.version) {
@@ -674,8 +624,7 @@ export function createMemoryHandler(
         )
         return
       }
-      const nextVersion =
-        Math.max(...memoryVersions.map((item) => Number(item.version))) + 1
+      const nextVersion = Math.max(...memoryVersions.map((item) => Number(item.version))) + 1
       const files = body.files as Record<string, string>
       memoryFilesByVersion.set(nextVersion, { ...files })
       memoryVersions.unshift({

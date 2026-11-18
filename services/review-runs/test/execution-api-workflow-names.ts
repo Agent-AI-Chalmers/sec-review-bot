@@ -12,6 +12,4 @@ type SpecWorkflow = CreateRunOptions['path']['workflow']
 type NarrowerThanString<T> = [string] extends [T] ? false : true
 type Expect<T extends true> = T
 
-export type ContractPublishesWorkflowNames = Expect<
-  NarrowerThanString<SpecWorkflow>
->
+export type ContractPublishesWorkflowNames = Expect<NarrowerThanString<SpecWorkflow>>

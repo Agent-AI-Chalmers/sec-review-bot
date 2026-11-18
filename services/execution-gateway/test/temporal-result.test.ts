@@ -6,10 +6,7 @@ import type { PullRequestReviewInput } from '../src/execution-api-types-generate
 import { TemporalExecutionClient } from '../src/temporal-execution-client.js'
 import { REPOSITORY_ROOT } from './project-paths.js'
 
-function clientFor(
-  value: unknown,
-  onStart = () => {}
-): TemporalExecutionClient {
+function clientFor(value: unknown, onStart = () => {}): TemporalExecutionClient {
   // Exercise the actual client methods with an in-process Temporal transport.
   return Reflect.construct(TemporalExecutionClient, [
     {},
@@ -35,10 +32,7 @@ function clientFor(
 
 const result = JSON.parse(
   readFileSync(
-    path.join(
-      REPOSITORY_ROOT,
-      'contracts/execution-api/v1/fixtures/issue-review-result.json'
-    ),
+    path.join(REPOSITORY_ROOT, 'contracts/execution-api/v1/fixtures/issue-review-result.json'),
     'utf8'
   )
 ) as unknown
@@ -53,15 +47,7 @@ const artifact_storage = {
   }
 }
 
-for (const value of [
-  null,
-  undefined,
-  [],
-  'invalid',
-  42,
-  {},
-  { ok: true, result: {} }
-]) {
+for (const value of [null, undefined, [], 'invalid', 42, {}, { ok: true, result: {} }]) {
   test(`invalid Temporal response becomes a failed run: ${JSON.stringify(value)}`, async () => {
     const record = await clientFor(value).get('run-1')
     expect(record?.status).toBe('failed')
@@ -94,9 +80,7 @@ test('invalid archive makes a completed Temporal result fail', async () => {
   }).get('run-1')
   expect(record?.status).toBe('failed')
   expect(record?.error?.code).toBe('EXECUTION_RESPONSE_INVALID')
-  expect(record?.artifact_storage?.error_code).toBe(
-    'ARTIFACT_REFERENCE_INVALID'
-  )
+  expect(record?.artifact_storage?.error_code).toBe('ARTIFACT_REFERENCE_INVALID')
 })
 
 test('coercible error categories are rejected before crossing HTTP', async () => {

@@ -24,54 +24,50 @@ test('memory artifact reader keeps messages and validates execution record order
     { seq: 5, event: 'model_calls_end', status: 'completed' }
   ]
   const encode = (items: unknown[]): Buffer =>
-    zstdCompressSync(
-      Buffer.from(items.map((item) => JSON.stringify(item)).join('\n'))
-    )
+    zstdCompressSync(Buffer.from(items.map((item) => JSON.stringify(item)).join('\n')))
   const events = readTrajectoryArtifact(encode(records))
   expect(events).toHaveLength(5)
   expect(events[2]?.source).toBe('summarization')
-  expect(() =>
-    readTrajectoryArtifact(encode([...records, records[0]]))
-  ).toThrow(/invalid_trajectory_artifact/)
+  expect(() => readTrajectoryArtifact(encode([...records, records[0]]))).toThrow(
+    /invalid_trajectory_artifact/
+  )
 })
 
 test('parallel subagents with repeated tool IDs link to their own results', () => {
-  const events: TrajectoryEvent[] = ['left', 'right'].flatMap(
-    (branch, index) => [
-      {
-        seq: index * 2 + 1,
-        event: 'message',
-        call_id: `${branch}-model`,
-        parent_ids: ['root', branch, 'model'],
-        agent: branch,
-        message: {
-          id: `${branch}-call`,
-          role: 'assistant',
-          tool_calls: [{ id: 'same-tool-id', name: 'inspect', args: {} }],
-          content: '',
-          usage_metadata: {
-            input_tokens: 10,
-            output_tokens: 2,
-            total_tokens: 12,
-            cache_read_input_tokens: null,
-            cache_creation_input_tokens: null,
-            reasoning_tokens: null
-          }
-        }
-      },
-      {
-        seq: index * 2 + 2,
-        event: 'message',
-        parent_ids: ['root', branch, 'tools'],
-        message: {
-          id: `${branch}-result`,
-          role: 'tool',
-          tool_call_id: 'same-tool-id',
-          content: branch
+  const events: TrajectoryEvent[] = ['left', 'right'].flatMap((branch, index) => [
+    {
+      seq: index * 2 + 1,
+      event: 'message',
+      call_id: `${branch}-model`,
+      parent_ids: ['root', branch, 'model'],
+      agent: branch,
+      message: {
+        id: `${branch}-call`,
+        role: 'assistant',
+        tool_calls: [{ id: 'same-tool-id', name: 'inspect', args: {} }],
+        content: '',
+        usage_metadata: {
+          input_tokens: 10,
+          output_tokens: 2,
+          total_tokens: 12,
+          cache_read_input_tokens: null,
+          cache_creation_input_tokens: null,
+          reasoning_tokens: null
         }
       }
-    ]
-  )
+    },
+    {
+      seq: index * 2 + 2,
+      event: 'message',
+      parent_ids: ['root', branch, 'tools'],
+      message: {
+        id: `${branch}-result`,
+        role: 'tool',
+        tool_call_id: 'same-tool-id',
+        content: branch
+      }
+    }
+  ])
   events.unshift({
     seq: 0,
     event: 'message',
@@ -103,9 +99,7 @@ test('parallel subagents with repeated tool IDs link to their own results', () =
   const document = buildTrajectoryDocument(events)
   expect(document.totalUsage.total).toBe(24)
   for (const branch of ['left', 'right']) {
-    const message = document.messages.find(
-      (message) => message.id === `${branch}-call`
-    )
+    const message = document.messages.find((message) => message.id === `${branch}-call`)
     expect(message?.toolCalls[0]?.resultMessageId).toBe(`${branch}-result`)
     expect(message?.agent).toBe(branch)
   }
@@ -120,33 +114,22 @@ test('runtime fixtures preserve flat conversation order and identify subagents a
     const events = readTrajectoryArtifact(zstdCompressSync(Buffer.from(raw)))
     expect(parseViewerInput(raw)).toStrictEqual(events)
     const document = buildTrajectoryDocument(events)
-    expect(
-      document.messages.slice(0, 2).map((message) => message.role)
-    ).toStrictEqual(['system', 'human'])
+    expect(document.messages.slice(0, 2).map((message) => message.role)).toStrictEqual([
+      'system',
+      'human'
+    ])
     expect(document.totalUsage.total).toBe(tokens)
     if (name === 'subagents') {
       for (const agent of ['source-reviewer', 'test-reviewer']) {
-        const branch = document.messages.filter(
-          (message) => message.agent === agent
-        )
-        expect(branch.slice(0, 2).map((message) => message.role)).toStrictEqual(
-          ['system', 'human']
-        )
+        const branch = document.messages.filter((message) => message.agent === agent)
+        expect(branch.slice(0, 2).map((message) => message.role)).toStrictEqual(['system', 'human'])
         expect.assert(
-          branch
-            .flatMap((message) => message.toolCalls)
-            .every((call) => call.resultMessageId)
+          branch.flatMap((message) => message.toolCalls).every((call) => call.resultMessageId)
         )
       }
     } else {
-      const summary = document.messages.filter(
-        (message) => message.source === 'summarization'
-      )
-      expect(summary.map((message) => message.role)).toStrictEqual([
-        'human',
-        'assistant',
-        'human'
-      ])
+      const summary = document.messages.filter((message) => message.source === 'summarization')
+      expect(summary.map((message) => message.role)).toStrictEqual(['human', 'assistant', 'human'])
       expect(summary[0]?.content ?? '').toMatch(/src\/download.py/)
     }
   }
@@ -164,10 +147,7 @@ test('viewer and memory artifact readers enforce the trajectory contract corpus'
   for (const name of manifest.invalid) {
     const input = trajectoryCorpus(name)
     expect(() => parseViewerInput(input), name).toThrow()
-    expect(
-      () => readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))),
-      name
-    ).toThrow()
+    expect(() => readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))), name).toThrow()
   }
 })
 
@@ -205,13 +185,11 @@ for (const provenance of ['ancestry', 'agent', 'both'] as const) {
         }
       }
     ])
-    const left = document.messages[0]!
+    const left = document.messages[0]
     expect(left.toolCalls[0]?.resultMessageId).toBe(undefined)
     expect(left.toolCalls[0]?.diff).toBe(undefined)
     expect(left.searchable).not.toMatch(/sibling-only-diff/)
-    expect(document.messages[1]?.toolCalls[0]?.resultMessageId).toBe(
-      'right-result'
-    )
+    expect(document.messages[1]?.toolCalls[0]?.resultMessageId).toBe('right-result')
   })
 }
 
@@ -267,9 +245,7 @@ for (const ended of [true, false]) {
           }
         }
       })),
-      ...(ended
-        ? [{ event: 'model_call_end', call_id: 'c', message_id: 'response-13' }]
-        : [])
+      ...(ended ? [{ event: 'model_call_end', call_id: 'c', message_id: 'response-13' }] : [])
     ]
     const input = records
       .map((record, index) => JSON.stringify({ seq: index + 1, ...record }))
@@ -305,9 +281,7 @@ test('an interrupted call with one recorded response retains known usage', () =>
   ]
     .map((record) => JSON.stringify(record))
     .join('\n')
-  expect(
-    buildTrajectoryDocument(parseViewerInput(input)).totalUsage.total
-  ).toBe(12)
+  expect(buildTrajectoryDocument(parseViewerInput(input)).totalUsage.total).toBe(12)
 })
 
 test('a missing call usage keeps aggregate fields unknown independently', () => {
@@ -337,9 +311,7 @@ test('a missing call usage keeps aggregate fields unknown independently', () => 
     { event: 'model_calls_end', status: 'interrupted' }
   ]
   const events = parseViewerInput(
-    records
-      .map((record, index) => JSON.stringify({ seq: index + 1, ...record }))
-      .join('\n')
+    records.map((record, index) => JSON.stringify({ seq: index + 1, ...record })).join('\n')
   )
   const document = buildTrajectoryDocument(events)
   expect(document.messages[0]?.usage?.total).toBe(12)

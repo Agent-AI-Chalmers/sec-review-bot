@@ -90,11 +90,7 @@ test.each([
 })
 
 test('every abandon failure message has a translation in both languages', () => {
-  for (const key of [
-    'abandonWrongToken',
-    'abandonFailed',
-    'sessionExpired'
-  ] as const) {
+  for (const key of ['abandonWrongToken', 'abandonFailed', 'sessionExpired'] as const) {
     for (const language of ['en', 'zh'] as const) {
       const value = (messages[language] as Record<string, string>)[key]
       expect.assert(

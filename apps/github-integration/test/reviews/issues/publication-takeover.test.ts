@@ -20,7 +20,9 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       renewPublicationClaim(runId: string, token: string): Promise<boolean>
     } = {
       initializePublicationSteps: async (_runId, token, keys) => {
-        if (token !== owner) throw new PublicationClaimLostError('run')
+        if (token !== owner) {
+          throw new PublicationClaimLostError('run')
+        }
         expect(keys).toStrictEqual(['issue:summary-comment'])
         step ??= {
           step_key: keys[0]!,
@@ -36,10 +38,14 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       },
       listPublicationSteps: async () => (step ? [step] : []),
       requirePublicationStepClaim: async (_runId, token) => {
-        if (token !== owner) throw new PublicationClaimLostError('run')
+        if (token !== owner) {
+          throw new PublicationClaimLostError('run')
+        }
       },
       completePublicationStep: async (_runId, token, _key, remote) => {
-        if (token !== owner) return false
+        if (token !== owner) {
+          return false
+        }
         expect.assert(step)
         step.status = 'succeeded'
         expect.assert(remote)
@@ -47,7 +53,9 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
         return true
       },
       failPublicationStep: async (_runId, token) => {
-        if (token !== owner) return false
+        if (token !== owner) {
+          return false
+        }
         expect.assert(step)
         step.status = 'failed'
         return true
@@ -106,10 +114,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       expect(method).toBe('POST')
       posts += 1
       expect.assert(
-        body &&
-          typeof body === 'object' &&
-          'body' in body &&
-          typeof body.body === 'string'
+        body && typeof body === 'object' && 'body' in body && typeof body.body === 'string'
       )
       const comment = {
         id: posts,
@@ -133,8 +138,9 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
         store: reviewRunsClient,
         claim_token: token,
         assert_publication_claim: async () => {
-          if (!(await reviewRunsClient.renewPublicationClaim(runId, token)))
+          if (!(await reviewRunsClient.renewPublicationClaim(runId, token))) {
             throw new PublicationClaimLostError(runId)
+          }
         },
         installation_octokit_for_repo: async () => octokit
       })
@@ -154,9 +160,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       await publish(nextToken)
       release.resolve()
       await oldRejected
-      expect(
-        await reviewRunsClient.renewPublicationClaim(runId, firstToken)
-      ).toBe(false)
+      expect(await reviewRunsClient.renewPublicationClaim(runId, firstToken)).toBe(false)
       expect(posts).toBe(1)
       expect(comments).toHaveLength(1)
       expect(step?.status).toBe('succeeded')

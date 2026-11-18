@@ -5,10 +5,7 @@ import type {
   ListRunsOptions,
   SubmitPreparedRunOptions
 } from '../src/contract-types-generated.js'
-import type {
-  OperationHandlers,
-  OperationRequest
-} from '../src/http/route-handlers.js'
+import type { OperationHandlers, OperationRequest } from '../src/http/route-handlers.js'
 
 // This file is compiler-analyzed only; the registry is a type fixture, never executed.
 declare const handlers: OperationHandlers
@@ -20,21 +17,22 @@ test('submission handlers read exactly the contract body', () => {
 })
 
 test('publication step handlers read exactly the contract body', () => {
-  expectTypeOf<
-    OperationRequest<'initializePublicationSteps'>['body']
-  >().toEqualTypeOf<InitializePublicationStepsOptions['body']>()
+  expectTypeOf<OperationRequest<'initializePublicationSteps'>['body']>().toEqualTypeOf<
+    InitializePublicationStepsOptions['body']
+  >()
 })
 
 test('publication step path parameters belong to that operation', () => {
-  expectTypeOf<
-    OperationRequest<'completePublicationStep'>['params']
-  >().toEqualTypeOf<{ runId: string; stepKey: string }>()
+  expectTypeOf<OperationRequest<'completePublicationStep'>['params']>().toEqualTypeOf<{
+    runId: string
+    stepKey: string
+  }>()
 })
 
 test('publication step keys remain an array of strings', () => {
-  expectTypeOf<
-    OperationRequest<'initializePublicationSteps'>['body']['step_keys']
-  >().toEqualTypeOf<string[]>()
+  expectTypeOf<OperationRequest<'initializePublicationSteps'>['body']['step_keys']>().toEqualTypeOf<
+    string[]
+  >()
 })
 
 test('the handler registry rejects unknown, missing, and mismatched operations', () => {
@@ -44,8 +42,7 @@ test('the handler registry rejects unknown, missing, and mismatched operations',
   const missing: OperationHandlers = { getHealth: handlers.getHealth }
   void missing
   // @ts-expect-error A notice claim cannot be used as a publication step request.
-  const wrong: OperationHandlers['initializePublicationSteps'] =
-    handlers.renewRunNoticeClaim
+  const wrong: OperationHandlers['initializePublicationSteps'] = handlers.renewRunNoticeClaim
   void wrong
 })
 

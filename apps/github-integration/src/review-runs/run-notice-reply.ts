@@ -24,17 +24,15 @@ function replyTarget(input: Record<string, unknown>): {
     source === null ||
     typeof source.owner_login !== 'string' ||
     typeof source.repo_name !== 'string' ||
-    (typeof source.issue_number !== 'number' &&
-      typeof source.pr_number !== 'number')
-  )
+    (typeof source.issue_number !== 'number' && typeof source.pr_number !== 'number')
+  ) {
     return null
+  }
   return {
     owner_login: source.owner_login,
     repo_name: source.repo_name,
     issue_number:
-      typeof source.issue_number === 'number'
-        ? source.issue_number
-        : (source.pr_number as number)
+      typeof source.issue_number === 'number' ? source.issue_number : (source.pr_number as number)
   }
 }
 
@@ -58,13 +56,19 @@ function repositoryScope(input: Record<string, unknown>): {
   owner_login: string
   repo_name: string
 } | null {
-  if (input.kind !== 'github_repository_review') return null
+  if (input.kind !== 'github_repository_review') {
+    return null
+  }
   // The same normalization the installation lookup uses, so a value one path rejects is also
   // rejected here instead of being posted to a repository the scan never named.
   const fullName = repositoryFullName(input.verified_repository)
-  if (fullName === null) return null
+  if (fullName === null) {
+    return null
+  }
   const [owner_login, repo_name] = fullName.split('/')
-  if (!owner_login || !repo_name) return null
+  if (!owner_login || !repo_name) {
+    return null
+  }
   return { owner_login, repo_name }
 }
 
@@ -90,8 +94,7 @@ export type RunNoticeAxis = 'preparation' | 'execution' | 'publication'
 const STAGE_SENTENCE: Record<RunNoticeAxis, string> = {
   preparation: 'Security review could not be started after automatic retries.',
   execution: 'Security review started but could not be completed.',
-  publication:
-    'Security review completed but its result could not be delivered.'
+  publication: 'Security review completed but its result could not be delivered.'
 }
 
 /** The summary issue that reports for a repository scan.
@@ -156,15 +159,13 @@ export async function sendRunNoticeReply(
   } else {
     // Neither a conversation nor a repository to report to: there is nowhere for the requester
     // to read the outcome, which the caller records as a failed delivery.
-    if (scanScope === null) return null
+    if (scanScope === null) {
+      return null
+    }
     await assertRepositoryAccessible(octokit, scanScope)
     target = {
       ...scanScope,
-      issue_number: await ensureRepositorySummaryIssue(
-        octokit,
-        scanScope,
-        args.assert_notice_claim
-      )
+      issue_number: await ensureRepositorySummaryIssue(octokit, scanScope, args.assert_notice_claim)
     }
   }
 

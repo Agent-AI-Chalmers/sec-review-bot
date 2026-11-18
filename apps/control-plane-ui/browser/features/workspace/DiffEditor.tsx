@@ -6,8 +6,7 @@ import { MergeView, unifiedMergeView } from '@codemirror/merge'
 import { basicSetup, EditorView } from 'codemirror'
 
 function editorExtensions(language: 'markdown' | 'json' | 'text'): Extension[] {
-  const languageExtension =
-    language === 'markdown' ? markdown() : language === 'json' ? json() : []
+  const languageExtension = language === 'markdown' ? markdown() : language === 'json' ? json() : []
   return [
     basicSetup,
     languageExtension,
@@ -35,7 +34,9 @@ export function DiffEditor({
   const hostRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
-    if (!hostRef.current) return
+    if (!hostRef.current) {
+      return
+    }
     if (mode === 'side-by-side') {
       const merge = new MergeView({
         parent: hostRef.current,

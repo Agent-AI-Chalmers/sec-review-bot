@@ -119,12 +119,8 @@ test('hunk content starting with --- or +++ is data, not a file header', () => {
   const stats = document.querySelector('.trajectory-diff-file-stats')
   expect(stats).toHaveTextContent('+1')
   expect(stats).toHaveTextContent('−1')
-  expect(
-    document.querySelector('[data-patch-line="remove"]')
-  ).toHaveTextContent('--- old')
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
-    '+++ new'
-  )
+  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent('--- old')
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+++ new')
 })
 
 test('a deleted file keeps its own path and does not join the previous file', () => {
@@ -177,12 +173,8 @@ test('a deleted file keeps its own path and does not join the previous file', ()
 
   const files = document.querySelectorAll('.trajectory-diff-file')
   expect(files).toHaveLength(2)
-  expect(
-    files[1]?.querySelector('.trajectory-diff-file-path')
-  ).toHaveTextContent('gone.txt')
-  expect(files[1]?.querySelectorAll('[data-patch-line="remove"]')).toHaveLength(
-    2
-  )
+  expect(files[1]?.querySelector('.trajectory-diff-file-path')).toHaveTextContent('gone.txt')
+  expect(files[1]?.querySelectorAll('[data-patch-line="remove"]')).toHaveLength(2)
   expect(files[1]).toHaveTextContent('line two')
   expect(within(files[1] as HTMLElement).getByText('Deleted')).toBeVisible()
 })
@@ -234,18 +226,12 @@ test('Begin Patch delete and move keep their operation metadata', () => {
   const files = document.querySelectorAll('.trajectory-diff-file')
   expect(files).toHaveLength(2)
   const moved = files[0] as HTMLElement
-  expect(moved.querySelector('.trajectory-diff-file-path')).toHaveTextContent(
-    'old.py → new.py'
-  )
+  expect(moved.querySelector('.trajectory-diff-file-path')).toHaveTextContent('old.py → new.py')
   expect(within(moved).getByText('Moved')).toBeVisible()
-  expect(moved.querySelector('.trajectory-diff-file-stats')).toHaveTextContent(
-    '+1 −1'
-  )
+  expect(moved.querySelector('.trajectory-diff-file-stats')).toHaveTextContent('+1 −1')
 
   const deleted = files[1] as HTMLElement
-  expect(deleted.querySelector('.trajectory-diff-file-path')).toHaveTextContent(
-    'gone.py'
-  )
+  expect(deleted.querySelector('.trajectory-diff-file-path')).toHaveTextContent('gone.py')
   expect(within(deleted).getByText('Deleted')).toBeVisible()
   // An operation-only file has no line stats to show.
   expect(deleted.querySelector('.trajectory-diff-file-stats')).toBeNull()
@@ -504,12 +490,8 @@ test('a tool-provided diff wins over the call arguments', () => {
   ]
   renderComponent(<TrajectoryTimeline events={diffEvents} />)
 
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
-    '+const fresh = 2'
-  )
-  expect(
-    document.querySelector('[data-patch-line="remove"]')
-  ).toHaveTextContent('-const old = 1')
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+const fresh = 2')
+  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent('-const old = 1')
   // The real diff replaces the argument preview entirely.
   expect(screen.queryByText('oldString')).not.toBeInTheDocument()
   expect(screen.queryByText('newString')).not.toBeInTheDocument()
@@ -560,20 +542,12 @@ test('a real diff can switch to side-by-side', async () => {
 
   expect(document.querySelector('[data-diff-mode="unified"]')).not.toBeNull()
   await user.click(screen.getByText('Side by side'))
-  expect(
-    document.querySelector('[data-diff-mode="side-by-side"]')
-  ).not.toBeNull()
-  expect(document.querySelector('[data-diff-kind="add"]')).toHaveTextContent(
-    'const fresh = 2'
-  )
+  expect(document.querySelector('[data-diff-mode="side-by-side"]')).not.toBeNull()
+  expect(document.querySelector('[data-diff-kind="add"]')).toHaveTextContent('const fresh = 2')
   // Both sides of a paired row are marked as changed, not just the row kind.
   const pairedRow = document.querySelector('[data-diff-kind="add"]')
-  expect(
-    pairedRow?.querySelector('.trajectory-diff-cell.old.changed')
-  ).not.toBeNull()
-  expect(
-    pairedRow?.querySelector('.trajectory-diff-cell.new.changed')
-  ).not.toBeNull()
+  expect(pairedRow?.querySelector('.trajectory-diff-cell.old.changed')).not.toBeNull()
+  expect(pairedRow?.querySelector('.trajectory-diff-cell.new.changed')).not.toBeNull()
 })
 
 test('assistant messages show model provenance before the agent name', () => {
@@ -635,12 +609,10 @@ test('apply_patch arguments render as a line-oriented patch', async () => {
   await user.click(screen.getByRole('button', { name: 'Expand all' }))
 
   expect(document.querySelector('[data-trajectory-patch]')).not.toBeNull()
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
-    '+const safe = true'
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+const safe = true')
+  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent(
+    '-const unsafe = true'
   )
-  expect(
-    document.querySelector('[data-patch-line="remove"]')
-  ).toHaveTextContent('-const unsafe = true')
   // The parsed file header is shown as a path, not as a raw patch line.
   expect(screen.getByText('src/main.js')).toBeVisible()
   // The raw argument key must not also appear as a JSON field.
@@ -653,17 +625,13 @@ test('tool results show result data without repeating call arguments', async () 
 
   await user.click(screen.getByRole('button', { name: 'Expand all' }))
 
-  const toolResult = document.querySelector<HTMLElement>(
-    '[data-trajectory-role="tool"]'
-  )
+  const toolResult = document.querySelector<HTMLElement>('[data-trajectory-role="tool"]')
   expect(toolResult).not.toBeNull()
   const result = within(toolResult!)
 
   expect(result.getByRole('button', { name: 'Back to call' })).toBeVisible()
   expect(result.getByText('replacement complete')).toBeVisible()
-  const artifact = toolResult!.querySelector(
-    '[data-trajectory-section="artifact"]'
-  )
+  const artifact = toolResult!.querySelector('[data-trajectory-section="artifact"]')
   expect(artifact).toHaveTextContent(/changed_files.*1/)
   expect(result.queryByText('old_string')).not.toBeInTheDocument()
   expect(result.queryByText('unsafe')).not.toBeInTheDocument()
@@ -692,12 +660,10 @@ test('usage details expose totals and token subsets', async () => {
   ]
   renderComponent(<TrajectoryTimeline events={usageEvents} />)
 
-  await user.click(screen.getAllByRole('button', { name: 'Usage details' })[0]!)
+  await user.click(screen.getAllByRole('button', { name: 'Usage details' })[0])
 
   const details = await waitFor(() => {
-    const element = document.querySelector<HTMLElement>(
-      '.trajectory-usage-details'
-    )
+    const element = document.querySelector<HTMLElement>('.trajectory-usage-details')
     expect(element).not.toBeNull()
     return element!
   })
@@ -719,48 +685,38 @@ test('optional trajectory controls are absent without their source data', () => 
   ]
   renderComponent(<TrajectoryTimeline events={sparseEvents} />)
 
-  const result = document.querySelector<HTMLElement>(
-    '[data-trajectory-role="tool"]'
-  )
+  const result = document.querySelector<HTMLElement>('[data-trajectory-role="tool"]')
   expect(result).not.toBeNull()
-  expect(
-    result!.querySelector('[data-trajectory-action="back-to-call"]')
-  ).not.toBeInTheDocument()
-  expect(
-    result!.querySelector('[data-trajectory-section="artifact"]')
-  ).not.toBeInTheDocument()
-  expect(
-    screen.queryByRole('button', { name: 'Usage details' })
-  ).not.toBeInTheDocument()
+  expect(result!.querySelector('[data-trajectory-action="back-to-call"]')).not.toBeInTheDocument()
+  expect(result!.querySelector('[data-trajectory-section="artifact"]')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Usage details' })).not.toBeInTheDocument()
 })
 
 test('reverse navigation follows the resolved branch and hides unresolved links', async () => {
-  const parallel: TrajectoryEvent[] = ['left', 'right'].flatMap(
-    (branch, index) => [
-      {
-        seq: index * 2 + 1,
-        event: 'message',
-        agent: branch,
-        message: {
-          id: `${branch}-request`,
-          role: 'assistant',
-          content: '',
-          tool_calls: [{ id: 'same', name: 'inspect', args: {} }]
-        }
-      },
-      {
-        seq: index * 2 + 2,
-        event: 'message',
-        agent: branch,
-        message: {
-          id: `${branch}-result`,
-          role: 'tool',
-          content: 'Done',
-          tool_call_id: 'same'
-        }
+  const parallel: TrajectoryEvent[] = ['left', 'right'].flatMap((branch, index) => [
+    {
+      seq: index * 2 + 1,
+      event: 'message',
+      agent: branch,
+      message: {
+        id: `${branch}-request`,
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'same', name: 'inspect', args: {} }]
       }
-    ]
-  )
+    },
+    {
+      seq: index * 2 + 2,
+      event: 'message',
+      agent: branch,
+      message: {
+        id: `${branch}-result`,
+        role: 'tool',
+        content: 'Done',
+        tool_call_id: 'same'
+      }
+    }
+  ])
   parallel.push({
     seq: 5,
     event: 'message',
@@ -771,9 +727,7 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
       tool_call_id: 'missing'
     }
   })
-  const { container } = renderComponent(
-    <TrajectoryTimeline events={parallel} />
-  )
+  const { container } = renderComponent(<TrajectoryTimeline events={parallel} />)
   const left = container.querySelector(
     '#trajectory-left-request .trajectory-tool-calls-body > div'
   )!
@@ -785,18 +739,14 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
   const rightScroll = vi.fn()
   Object.defineProperty(left, 'scrollIntoView', { value: leftScroll })
   Object.defineProperty(right, 'scrollIntoView', { value: rightScroll })
-  const result = container.querySelector(
-    '#trajectory-right-result'
-  )! as HTMLElement
-  await userEvent
-    .setup()
-    .click(within(result).getByRole('button', { name: /back to call/i }))
+  const result = container.querySelector<HTMLElement>('#trajectory-right-result')!
+  await userEvent.setup().click(within(result).getByRole('button', { name: /back to call/i }))
   expect(rightScroll).toHaveBeenCalledOnce()
   expect(leftScroll).not.toHaveBeenCalled()
   expect(
-    within(
-      container.querySelector('#trajectory-unresolved')! as HTMLElement
-    ).queryByRole('button', { name: /back to call/i })
+    within(container.querySelector<HTMLElement>('#trajectory-unresolved')!).queryByRole('button', {
+      name: /back to call/i
+    })
   ).not.toBeInTheDocument()
 })
 

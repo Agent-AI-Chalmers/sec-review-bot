@@ -6,19 +6,13 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import prettier from 'prettier'
+import { formatGenerated } from '@sec-review-bot/contract-codegen'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
 
-const SPEC_PATH = path.resolve(
-  REPO_ROOT,
-  'contracts',
-  'review-runs-api',
-  'v1',
-  'openapi.yaml'
-)
+const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', 'openapi.yaml')
 
 /** The languages the console shows. English is the contract itself; every other language is an
  * overlay of it. */
@@ -70,11 +64,7 @@ export interface StateMachine extends MachineBody {
   step?: MachineBody
 }
 
-const AXES: readonly CoordinationAxis[] = [
-  'preparation',
-  'execution',
-  'publication'
-]
+const AXES: readonly CoordinationAxis[] = ['preparation', 'execution', 'publication']
 
 /** Read and validate the `x-state-machines` block. Validation here is deliberately strict:
  * a generator that silently accepts a malformed machine would produce a diagram that no
@@ -84,8 +74,9 @@ export function readStateMachines(language: Language = 'en'): StateMachine[] {
     'x-state-machines'?: Record<string, unknown>
   }
   const block = spec['x-state-machines']
-  if (block === undefined)
+  if (block === undefined) {
     throw new Error('openapi.yaml has no x-state-machines block')
+  }
   if (language !== 'en') {
     const overlay = OVERLAY_SOURCES[language]
     applyTextOverlay(
@@ -94,13 +85,10 @@ export function readStateMachines(language: Language = 'en'): StateMachine[] {
       overlay
     )
   }
-  const unknown = Object.keys(block).filter(
-    (key) => !(AXES as readonly string[]).includes(key)
-  )
-  if (unknown.length > 0)
-    throw new Error(
-      `x-state-machines declares ${unknown.join(', ')}, which is not an axis`
-    )
+  const unknown = Object.keys(block).filter((key) => !(AXES as readonly string[]).includes(key))
+  if (unknown.length > 0) {
+    throw new Error(`x-state-machines declares ${unknown.join(', ')}, which is not an axis`)
+  }
   const machines = AXES.map((axis): StateMachine => {
     const raw = asRecord(block[axis], axis)
     const body = readMachineBody(raw, axis)
@@ -121,33 +109,29 @@ export function readStateMachines(language: Language = 'en'): StateMachine[] {
   return machines.sort((left, right) => left.order - right.order)
 }
 
-function readMachineBody(
-  raw: Record<string, unknown>,
-  where: string
-): MachineBody {
+function readMachineBody(raw: Record<string, unknown>, where: string): MachineBody {
   const { states, details } = readStates(raw.states, `${where}.states`)
   const terminal = asStringArray(raw.terminal, `${where}.terminal`)
   const initial = asString(raw.initial, `${where}.initial`)
   const field = asString(raw.field, `${where}.field`)
-  if (!states.includes(initial))
-    throw new Error(
-      `x-state-machines.${where}.initial is not one of its states`
-    )
-  for (const state of terminal)
-    if (!states.includes(state))
-      throw new Error(
-        `x-state-machines.${where}.terminal ${state} is not a state`
-      )
-  if (!Array.isArray(raw.transitions))
+  if (!states.includes(initial)) {
+    throw new Error(`x-state-machines.${where}.initial is not one of its states`)
+  }
+  for (const state of terminal) {
+    if (!states.includes(state)) {
+      throw new Error(`x-state-machines.${where}.terminal ${state} is not a state`)
+    }
+  }
+  if (!Array.isArray(raw.transitions)) {
     throw new Error(`x-state-machines.${where}.transitions must be an array`)
+  }
   const transitions = raw.transitions.map((edge, index): StateTransition => {
     const record = asRecord(edge, `${where}.transitions[${index}]`)
     const from = asString(record.from, `${where}.transitions[${index}].from`)
     const to = asString(record.to, `${where}.transitions[${index}].to`)
-    if (!states.includes(from) || !states.includes(to))
-      throw new Error(
-        `x-state-machines.${where}.transitions[${index}] names an unknown state`
-      )
+    if (!states.includes(from) || !states.includes(to)) {
+      throw new Error(`x-state-machines.${where}.transitions[${index}] names an unknown state`)
+    }
     return {
       from,
       to,
@@ -159,8 +143,9 @@ function readMachineBody(
 }
 
 function asRecord(value: unknown, where: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`x-state-machines.${where} must be an object`)
+  }
   return value as Record<string, unknown>
 }
 
@@ -171,13 +156,15 @@ function readStates(
   value: unknown,
   where: string
 ): { states: string[]; details: Record<string, StateDetail> } {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`x-state-machines.${where} must be a state map`)
+  }
   const details: Record<string, StateDetail> = {}
   const states: string[] = []
   for (const [state, raw] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof raw !== 'object' || raw === null)
+    if (typeof raw !== 'object' || raw === null) {
       throw new Error(`x-state-machines.${where}.${state} must be an object`)
+    }
     const record = raw as Record<string, unknown>
     details[state] = {
       label: asString(record.label, `${where}.${state}.label`),
@@ -186,26 +173,30 @@ function readStates(
     }
     states.push(state)
   }
-  if (states.length === 0)
+  if (states.length === 0) {
     throw new Error(`x-state-machines.${where} must declare at least one state`)
+  }
   return { states, details }
 }
 
 function asStringArray(value: unknown, where: string): string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error(`x-state-machines.${where} must be a string array`)
+  }
   return value as string[]
 }
 
 function asNumber(value: unknown, where: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value))
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`x-state-machines.${where} must be a number`)
+  }
   return value
 }
 
 function asString(value: unknown, where: string): string {
-  if (typeof value !== 'string')
+  if (typeof value !== 'string') {
     throw new Error(`x-state-machines.${where} must be a string`)
+  }
   return value
 }
 
@@ -233,29 +224,35 @@ export function applyTextOverlay(
   where: string
 ): void {
   const overlay = asRecord(document, where)
-  if (typeof overlay.overlay !== 'string' || !overlay.overlay.startsWith('1.'))
+  if (typeof overlay.overlay !== 'string' || !overlay.overlay.startsWith('1.')) {
     throw new Error(`${where} must be an Overlay 1.x document`)
-  if (!Array.isArray(overlay.actions))
+  }
+  if (!Array.isArray(overlay.actions)) {
     throw new Error(`${where} must list actions`)
+  }
   const updated = new Map<object, Set<string>>()
   for (const [index, raw] of overlay.actions.entries()) {
     const action = asRecord(raw, `${where} actions[${index}]`)
     const target = asString(action.target, `${where} actions[${index}].target`)
     const node = resolveTarget(block, target)
-    if (node === undefined)
+    if (node === undefined) {
       throw new Error(`${where}: ${target} matches no node in openapi.yaml`)
-    if (updated.has(node))
+    }
+    if (updated.has(node)) {
       throw new Error(`${where}: ${target} is updated by more than one action`)
+    }
     const fields = new Set<string>()
     updated.set(node, fields)
     const update = asRecord(action.update, `${where} ${target}.update`)
     for (const [field, value] of Object.entries(update)) {
-      if (!TEXT_FIELDS.has(field) || !(field in node))
+      if (!TEXT_FIELDS.has(field) || !(field in node)) {
         throw new Error(
           `${where}: ${target} may only replace the existing title, label, summary, or description, not ${field}`
         )
-      if (typeof value !== 'string' || value.trim() === '')
+      }
+      if (typeof value !== 'string' || value.trim() === '') {
         throw new Error(`${where}: ${target}.${field} must be non-empty text`)
+      }
       ;(node as Record<string, unknown>)[field] = value
       fields.add(field)
     }
@@ -264,47 +261,49 @@ export function applyTextOverlay(
   // still show English in the translated console.
   for (const node of textNodes(block)) {
     const fields = updated.get(node)
-    for (const field of TEXT_FIELDS)
-      if (field in node && !fields?.has(field))
+    for (const field of TEXT_FIELDS) {
+      if (field in node && !fields?.has(field)) {
         throw new Error(
           `${where} has no ${field} translation for ${JSON.stringify(node).slice(0, 80)}`
         )
+      }
+    }
   }
 }
 
-function resolveTarget(
-  block: Record<string, unknown>,
-  target: string
-): object | undefined {
+function resolveTarget(block: Record<string, unknown>, target: string): object | undefined {
   const match = TARGET.exec(target)
-  if (match === null)
+  if (match === null) {
     throw new Error(
       `overlay target ${target} is not a machine, state, or transition by from/to/reason`
     )
+  }
   const [, axis, step, state, from, to, reason] = match
   const axisNode = block[axis!] as Record<string, unknown> | undefined
   const machine = (step === undefined ? axisNode : axisNode?.step) as
-    Record<string, unknown> | undefined
-  if (machine === undefined) return undefined
-  if (state !== undefined)
+    | Record<string, unknown>
+    | undefined
+  if (machine === undefined) {
+    return undefined
+  }
+  if (state !== undefined) {
     return (machine.states as Record<string, object> | undefined)?.[state]
-  if (from === undefined) return machine
-  if (!Array.isArray(machine.transitions))
-    throw new Error(
-      `overlay target ${target} names a machine without transitions`
-    )
+  }
+  if (from === undefined) {
+    return machine
+  }
+  if (!Array.isArray(machine.transitions)) {
+    throw new Error(`overlay target ${target} names a machine without transitions`)
+  }
   const matches = (machine.transitions as Record<string, unknown>[]).filter(
     (edge) =>
       edge.from === from &&
       edge.to === to &&
-      (reason === undefined
-        ? edge.reason === undefined
-        : edge.reason === reason)
+      (reason === undefined ? edge.reason === undefined : edge.reason === reason)
   )
-  if (matches.length > 1)
-    throw new Error(
-      `overlay target ${target} matches ${matches.length} transitions`
-    )
+  if (matches.length > 1) {
+    throw new Error(`overlay target ${target} matches ${matches.length} transitions`)
+  }
   return matches[0]
 }
 
@@ -312,19 +311,20 @@ function resolveTarget(
 function textNodes(block: Record<string, unknown>): object[] {
   const nodes: object[] = []
   const visit = (machine: Record<string, unknown>) => {
-    if ('title' in machine) nodes.push(machine)
+    if ('title' in machine) {
+      nodes.push(machine)
+    }
     nodes.push(...Object.values(machine.states as Record<string, object>))
     nodes.push(
-      ...(machine.transitions as Record<string, unknown>[]).filter(
-        (edge) => 'label' in edge
-      )
+      ...(machine.transitions as Record<string, unknown>[]).filter((edge) => 'label' in edge)
     )
   }
   for (const axis of AXES) {
     const machine = block[axis] as Record<string, unknown>
     visit(machine)
-    if (machine.step !== undefined)
+    if (machine.step !== undefined) {
       visit(machine.step as Record<string, unknown>)
+    }
   }
   return nodes
 }
@@ -339,9 +339,7 @@ const OVERLAY_SOURCES: Readonly<Record<Exclude<Language, 'en'>, string>> = {
 function sources(languages: readonly Language[]): string[] {
   return [
     'contracts/review-runs-api/v1/openapi.yaml',
-    ...languages.flatMap((language) =>
-      language === 'en' ? [] : [OVERLAY_SOURCES[language]]
-    )
+    ...languages.flatMap((language) => (language === 'en' ? [] : [OVERLAY_SOURCES[language]]))
   ]
 }
 
@@ -349,9 +347,7 @@ function moduleHeader(languages: readonly Language[]): string {
   return `// Generated from (paths relative to the repository root):
 ${sources(languages)
   .map((source) => `//   ${source}\n`)
-  .join(
-    ''
-  )}// Do not edit. The contract's \`x-state-machines\` block is the single source of truth;
+  .join('')}// Do not edit. The contract's \`x-state-machines\` block is the single source of truth;
 // this file is its TypeScript view. Change state, transition, or title text there and regenerate
 // with \`pnpm --dir contracts/review-runs-api/tools run generate\`.
 `
@@ -366,9 +362,7 @@ async function renderStateMachinesModule(): Promise<string> {
 export const STATE_MACHINES_BY_LANGUAGE: Readonly<
   Record<Language, readonly StateMachine[]>
 > = ${JSON.stringify(
-    Object.fromEntries(
-      LANGUAGES.map((language) => [language, readStateMachines(language)])
-    ),
+    Object.fromEntries(LANGUAGES.map((language) => [language, readStateMachines(language)])),
     null,
     2
   )} as const
@@ -384,7 +378,9 @@ export function stateMachine(
   const machine = STATE_MACHINES_BY_LANGUAGE[language].find(
     (candidate) => candidate.axis === axis
   )
-  if (machine === undefined) throw new Error(\`no state machine for \${axis}\`)
+  if (machine === undefined) {
+    throw new Error(\`no state machine for \${axis}\`)
+  }
   return machine
 }
 
@@ -433,19 +429,8 @@ export interface StateMachine extends MachineBody {
 }
 
 ${machines}`
-  const options = await prettier.resolveConfig(
+  return formatGenerated(
     path.resolve(
-      REPO_ROOT,
-      'apps',
-      'control-plane-ui',
-      'browser',
-      'features',
-      'runs'
-    )
-  )
-  return await prettier.format(rendered, {
-    ...options,
-    filepath: path.resolve(
       REPO_ROOT,
       'apps',
       'control-plane-ui',
@@ -453,8 +438,9 @@ ${machines}`
       'features',
       'runs',
       'state-machines.generated.ts'
-    )
-  })
+    ),
+    rendered
+  )
 }
 
 /** Escape text for a Markdown table cell. */
@@ -472,10 +458,11 @@ function mermaidText(text: string): string {
 function mermaid(machine: MachineBody, prefix: string): string {
   const id = (state: string) => `${prefix}_${state}`
   const lines = ['```mermaid', 'flowchart LR']
-  for (const state of machine.states) lines.push(`  ${id(state)}["${state}"]`)
+  for (const state of machine.states) {
+    lines.push(`  ${id(state)}["${state}"]`)
+  }
   for (const edge of machine.transitions) {
-    const label =
-      edge.label === undefined ? '' : `|"${mermaidText(edge.label)}"|`
+    const label = edge.label === undefined ? '' : `|"${mermaidText(edge.label)}"|`
     lines.push(`  ${id(edge.from)} -->${label} ${id(edge.to)}`)
   }
   lines.push('```')
@@ -562,18 +549,11 @@ ${transitions}
 /** The human-readable view of the same block, in one language: per machine a diagram, what each
  * state means, and every allowed transition. Generated so the only place a reader learns what a
  * status means is the contract and its overlay. */
-async function renderStateMachinesMarkdown(
-  language: Language
-): Promise<string> {
+async function renderStateMachinesMarkdown(language: Language): Promise<string> {
   const text = PAGE_TEXT[language]
   const machines = readStateMachines(language)
   const sections = machines.flatMap((machine) => {
-    const own = machineSection(
-      text,
-      `## ${machine.title}`,
-      machine,
-      machine.axis
-    )
+    const own = machineSection(text, `## ${machine.title}`, machine, machine.axis)
     return machine.step === undefined
       ? [own]
       : [
@@ -597,29 +577,26 @@ ${text.intro(machines.map((machine) => `\`${machine.axis}\``).join(text.listSepa
 ${text.loops}
 
 ${sections.join('\n')}`
-  return await prettier.format(rendered, { parser: 'markdown' })
+  return formatGenerated(
+    path.resolve(
+      REPO_ROOT,
+      'contracts',
+      'review-runs-api',
+      'v1',
+      `STATE_MACHINES.${language === 'zh' ? 'zh.md' : 'md'}`
+    ),
+    rendered
+  )
 }
 
 export function generatedArtifacts(): GeneratedArtifact[] {
   return [
     {
-      output: path.resolve(
-        REPO_ROOT,
-        'contracts',
-        'review-runs-api',
-        'v1',
-        'STATE_MACHINES.md'
-      ),
+      output: path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', 'STATE_MACHINES.md'),
       render: () => renderStateMachinesMarkdown('en')
     },
     {
-      output: path.resolve(
-        REPO_ROOT,
-        'contracts',
-        'review-runs-api',
-        'v1',
-        'STATE_MACHINES.zh.md'
-      ),
+      output: path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', 'STATE_MACHINES.zh.md'),
       render: () => renderStateMachinesMarkdown('zh')
     },
     {

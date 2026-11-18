@@ -13,7 +13,9 @@ interface TestFixtures {
 
 function fixturePort(): number {
   const configuredPort = process.env.CONTROL_PLANE_UI_E2E_PORT
-  if (configuredPort === undefined) return 0
+  if (configuredPort === undefined) {
+    return 0
+  }
 
   const port = Number(configuredPort)
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
@@ -57,8 +59,9 @@ export const test = base.extend<TestFixtures>({
         })
         await server.listen()
         const resolvedURL = server.resolvedUrls?.local[0]
-        if (resolvedURL === undefined)
+        if (resolvedURL === undefined) {
           throw new Error('Vite did not report its fixture server URL.')
+        }
         const baseURL = resolvedURL.replace(/\/$/, '')
         await use({ baseURL, server })
       } finally {
@@ -95,10 +98,7 @@ export { expect }
 export async function openRunFilters(page: Page): Promise<void> {
   await page.getByRole('heading', { name: 'Runs', exact: true }).waitFor()
   const toggle = page.getByRole('button', { name: /^Filters(?: \(\d+\))?$/ })
-  if (
-    (await toggle.isVisible()) &&
-    (await toggle.getAttribute('aria-expanded')) === 'false'
-  ) {
+  if ((await toggle.isVisible()) && (await toggle.getAttribute('aria-expanded')) === 'false') {
     await toggle.click()
   }
 }

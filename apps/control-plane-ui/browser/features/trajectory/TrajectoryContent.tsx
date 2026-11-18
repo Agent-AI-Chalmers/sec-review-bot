@@ -1,11 +1,7 @@
 import React from 'react'
 
 import type { TrajectoryContentResponse } from '../../../shared/artifact-content.js'
-import {
-  api,
-  isAbortError,
-  throwIfUnauthorized
-} from '../../shared/api-client.js'
+import { api, isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 import { LatestRequestGuard } from '../../shared/latest-request.js'
@@ -35,25 +31,32 @@ export function TrajectoryContent({
       signal: request.signal
     })
       .then((body) => {
-        if (request.isCurrent()) setEvents(body.events)
+        if (request.isCurrent()) {
+          setEvents(body.events)
+        }
       })
       .catch((failure: unknown) => {
-        if (request.isCurrent() && !isAbortError(failure)) setError(failure)
+        if (request.isCurrent() && !isAbortError(failure)) {
+          setError(failure)
+        }
       })
       .finally(() => {
-        if (request.isCurrent()) setLoading(false)
+        if (request.isCurrent()) {
+          setLoading(false)
+        }
       })
     return request.cancel
   }, [t, contentHref])
   throwIfUnauthorized(error)
-  if (error !== undefined)
+  if (error !== undefined) {
     return (
       <div className="content-load-state">
         <ResourceLoadError message={t('trajectoryLoadFailed')} />
       </div>
     )
-  if (loading) return <LoadingState message={t('loading')} />
-  return (
-    <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
-  )
+  }
+  if (loading) {
+    return <LoadingState message={t('loading')} />
+  }
+  return <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
 }

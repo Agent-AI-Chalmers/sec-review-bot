@@ -10,26 +10,23 @@
   "scripts": {
     "generate": "node --import tsx src/generate.ts",
     "check": "node --import tsx src/check.ts",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "ajv": "^8.20.0",
-    "prettier": "^3.9.10"
+    "ajv": "^8.20.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "5.1.0"
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007"
   }
 }

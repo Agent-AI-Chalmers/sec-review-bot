@@ -22,9 +22,7 @@ interface PublishFailureClassification {
 // condition and fails identically. Treat them as terminal instead of looping.
 const DETERMINISTIC_REVIEW_RUNS_PUBLICATION_CODES = new Set<string>(
   Object.values(REVIEW_RUNS_PUBLICATION_ERROR_CODES).filter(
-    (code) =>
-      code !==
-      REVIEW_RUNS_PUBLICATION_ERROR_CODES.publication_step_retry_exhausted
+    (code) => code !== REVIEW_RUNS_PUBLICATION_ERROR_CODES.publication_step_retry_exhausted
   )
 )
 
@@ -42,11 +40,8 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   const headers = errorInfo.response?.headers ?? {}
   const retryAfter = headers['retry-after'] ?? headers['Retry-After']
-  const rateRemaining =
-    headers['x-ratelimit-remaining'] ?? headers['X-RateLimit-Remaining']
-  const message = [errorInfo.message, errorInfo.response?.data?.message]
-    .join(' ')
-    .toLowerCase()
+  const rateRemaining = headers['x-ratelimit-remaining'] ?? headers['X-RateLimit-Remaining']
+  const message = [errorInfo.message, errorInfo.response?.data?.message].join(' ').toLowerCase()
   return (
     retryAfter !== undefined ||
     rateRemaining === '0' ||
@@ -55,9 +50,7 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
   )
 }
 
-export function classifyPublicationFailure(
-  error: unknown
-): PublishFailureClassification {
+export function classifyPublicationFailure(error: unknown): PublishFailureClassification {
   if (isDeterministicExecutionPublishError(error)) {
     return {
       retry: false,
@@ -76,10 +69,7 @@ export function classifyPublicationFailure(
   // Treating that as a verdict would end a publication whose steps were never refused, so a fault
   // with no HTTP status, or one a proxy or load balancer answered, stays retryable and the next
   // owner re-reads the step instead.
-  if (
-    errorCode(error) ===
-    EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
-  ) {
+  if (errorCode(error) === EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted) {
     const retry = isTransportFault(error)
     return {
       retry,
@@ -89,10 +79,7 @@ export function classifyPublicationFailure(
     }
   }
   const reviewRunsCode = errorCode(error)
-  if (
-    reviewRunsCode !== null &&
-    DETERMINISTIC_REVIEW_RUNS_PUBLICATION_CODES.has(reviewRunsCode)
-  ) {
+  if (reviewRunsCode !== null && DETERMINISTIC_REVIEW_RUNS_PUBLICATION_CODES.has(reviewRunsCode)) {
     return {
       retry: false,
       scope: 'step',
@@ -102,13 +89,14 @@ export function classifyPublicationFailure(
   }
 
   const responseStatus = asErrorWithResponse(error).status
-  if (responseStatus === undefined)
+  if (responseStatus === undefined) {
     return {
       retry: true,
       scope: 'publication',
       code: errorCode(error),
       reason: 'unknown-publish-error'
     }
+  }
   if (
     responseStatus >= 500 ||
     responseStatus === 408 ||
@@ -135,8 +123,7 @@ export function classifyPublicationFailure(
       retry: false,
       // Nothing else in this publication can succeed while the credential is refused.
       scope: 'publication',
-      code:
-        errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_auth_rejected,
+      code: errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_auth_rejected,
       reason: 'github-auth-rejected'
     }
   }
@@ -152,9 +139,7 @@ export function classifyPublicationFailure(
     return {
       retry: false,
       scope: 'step',
-      code:
-        errorCode(error) ??
-        EXECUTION_PUBLISH_ERROR_CODES.github_validation_rejected,
+      code: errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_validation_rejected,
       reason: 'github-validation-rejected'
     }
   }
@@ -162,9 +147,7 @@ export function classifyPublicationFailure(
     return {
       retry: false,
       scope: 'step',
-      code:
-        errorCode(error) ??
-        EXECUTION_PUBLISH_ERROR_CODES.github_publish_rejected,
+      code: errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_publish_rejected,
       reason: 'github-deterministic-response'
     }
   }

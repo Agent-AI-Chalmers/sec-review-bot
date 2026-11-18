@@ -1,13 +1,5 @@
 import type React from 'react'
-import {
-  Anchor,
-  Badge,
-  Group,
-  Paper,
-  Text,
-  Timeline,
-  Title
-} from '@mantine/core'
+import { Anchor, Badge, Group, Paper, Text, Timeline, Title } from '@mantine/core'
 import { IconArrowUpRight, IconClock } from '@tabler/icons-react'
 import type { PublicationStep, Run, RunEvent } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
@@ -49,15 +41,11 @@ export function RunProgress({
   const t = useMessages()
   const { language } = useLanguage()
   const publicationOutcomes = steps.filter(
-    (step) =>
-      step.status !== 'succeeded' ||
-      safeExternalUrl(step.remote_object_url) !== undefined
+    (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
   const publicationIndex = 3
   const timelineActive =
-    run.publication.status === 'pending'
-      ? publicationIndex - 1
-      : publicationIndex
+    run.publication.status === 'pending' ? publicationIndex - 1 : publicationIndex
   // A publication timestamp only exists once the phase has begun: `publication.started_at`
   // is written on the first claim and `publication.finished_at` when it reaches a terminal
   // state. A run that is still `pending`, or whose publication was ruled out as `skipped`,
@@ -68,13 +56,7 @@ export function RunProgress({
   // real publication. `started_at` is exactly the fact being reported.
   const publishedStart = run.publication.started_at ?? null
   return (
-    <Paper
-      component="section"
-      withBorder
-      radius="sm"
-      p="md"
-      className="run-progress-panel"
-    >
+    <Paper component="section" withBorder radius="sm" p="md" className="run-progress-panel">
       <Title order={2} mb="lg">
         {t('runProgress')}
       </Title>
@@ -84,10 +66,7 @@ export function RunProgress({
         lineWidth={2}
         className="run-progress-timeline"
       >
-        <Timeline.Item
-          bullet={<IconClock size={ICON_SIZE.sm} />}
-          title={t('created')}
-        >
+        <Timeline.Item bullet={<IconClock size={ICON_SIZE.sm} />} title={t('created')}>
           <Text c="var(--muted)" size="sm">
             {formatDate(run.created_at, language)}
           </Text>
@@ -108,11 +87,7 @@ export function RunProgress({
             {run.preparation.started_at !== null && (
               <>
                 {' · '}
-                {phaseElapsed(
-                  run.preparation.started_at,
-                  run.preparation.finished_at,
-                  t
-                )}
+                {phaseElapsed(run.preparation.started_at, run.preparation.finished_at, t)}
               </>
             )}
             {' · '}
@@ -154,14 +129,9 @@ export function RunProgress({
             </Text>
           )}
           {observationAgeMs(run) !== null && (
-            <Text
-              c={isObservationStale(run) ? 'yellow' : 'var(--muted)'}
-              size="xs"
-              mt={2}
-            >
+            <Text c={isObservationStale(run) ? 'yellow' : 'var(--muted)'} size="xs" mt={2}>
               {isObservationStale(run) && '⚠ '}
-              {t('observedAgo')}:{' '}
-              {formatDuration(observationAgeMs(run) ?? 0, t)}
+              {t('observedAgo')}: {formatDuration(observationAgeMs(run) ?? 0, t)}
               {isObservationStale(run) && ` · ${t('observationStale')}`}
             </Text>
           )}
@@ -176,10 +146,7 @@ export function RunProgress({
             </div>
           )}
           {run.execution.started_at !== null && (
-            <ExecutionStatistics
-              statistics={run.execution_statistics}
-              workflow={run.workflow}
-            />
+            <ExecutionStatistics statistics={run.execution_statistics} workflow={run.workflow} />
           )}
         </Timeline.Item>
         <Timeline.Item
@@ -195,11 +162,8 @@ export function RunProgress({
                             polling wait and is not publishing time. The guard above proves the
                             start exists, and `finished_at` is present exactly for terminal
                             states, so neither is papered over with a fallback. */}
-                {formatDate(
-                  run.publication.finished_at ?? publishedStart,
-                  language
-                )}{' '}
-                · {phaseElapsed(publishedStart, run.publication.finished_at, t)}
+                {formatDate(run.publication.finished_at ?? publishedStart, language)} ·{' '}
+                {phaseElapsed(publishedStart, run.publication.finished_at, t)}
               </Text>
             )}
           </div>
@@ -208,23 +172,17 @@ export function RunProgress({
               {publicationOutcomes.map((step) => {
                 const externalUrl = safeExternalUrl(step.remote_object_url)
                 const succeeded = step.status === 'succeeded'
-                const failure = step.failure_code
-                  ? failureCodeLabel(step.failure_code, t)
-                  : null
+                const failure = step.failure_code ? failureCodeLabel(step.failure_code, t) : null
                 // Coordination-owned codes have stable localized explanations. Connector
                 // messages remain the fallback because their open-ended codes cannot be
                 // translated without inventing meaning the console does not own.
-                const failureMessage =
-                  failure?.explanation ?? step.failure_message
+                const failureMessage = failure?.explanation ?? step.failure_message
                 return (
                   <div className="delivery-item" key={step.step_key}>
                     {/* Identity on one line: the step's own key belongs beside its
                                 status, not stranded on a line of its own. */}
                     <div className="delivery-main">
-                      <Badge
-                        variant="light"
-                        color={publicationStatusColor(step.status)}
-                      >
+                      <Badge variant="light" color={publicationStatusColor(step.status)}>
                         {publicationStatusLabel(step.status, language)}
                       </Badge>
                       <code className="delivery-step-key">{step.step_key}</code>
@@ -239,26 +197,16 @@ export function RunProgress({
                         className="delivery-link"
                       >
                         {t('openExternalLink')}
-                        <IconArrowUpRight
-                          size={ICON_SIZE.sm}
-                          aria-hidden="true"
-                        />
+                        <IconArrowUpRight size={ICON_SIZE.sm} aria-hidden="true" />
                       </Anchor>
                     )}
                     {!succeeded &&
-                      (step.failure_message ||
-                        step.failure_code ||
-                        step.attempt_count > 0) && (
+                      (step.failure_message || step.failure_code || step.attempt_count > 0) && (
                         <div className="delivery-error">
-                          {failureMessage && (
-                            <Text size="sm">{failureMessage}</Text>
-                          )}
+                          {failureMessage && <Text size="sm">{failureMessage}</Text>}
                           <Group gap="sm">
                             {step.failure_code && (
-                              <ExplainedCode
-                                code={step.failure_code}
-                                tone="neutral"
-                              />
+                              <ExplainedCode code={step.failure_code} tone="neutral" />
                             )}
                             {step.attempt_count > 0 && (
                               <Text c="dimmed" size="xs">

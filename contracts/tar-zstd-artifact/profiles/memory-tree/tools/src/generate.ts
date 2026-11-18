@@ -23,9 +23,7 @@ export interface CorpusManifestEntry {
   }>
 }
 
-function effectiveEntries(
-  entries: ReturnType<typeof corpusCaseDefinitions>[number]['entries']
-) {
+function effectiveEntries(entries: ReturnType<typeof corpusCaseDefinitions>[number]['entries']) {
   let pendingPath: string | undefined
   const projected: Array<{
     path: string
@@ -51,9 +49,7 @@ function effectiveEntries(
   return projected
 }
 
-export function generateCorpus(
-  outputRoot = FIXTURE_ROOT
-): CorpusManifestEntry[] {
+export function generateCorpus(outputRoot = FIXTURE_ROOT): CorpusManifestEntry[] {
   mkdirSync(outputRoot, { recursive: true })
   const records = corpusCaseDefinitions().map((fixture) => {
     const archive = buildArchive(fixture.entries)
@@ -84,9 +80,6 @@ export function generateCorpus(
   return records
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.filename === path.resolve(process.argv[1])
-) {
+if (process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1])) {
   generateCorpus()
 }

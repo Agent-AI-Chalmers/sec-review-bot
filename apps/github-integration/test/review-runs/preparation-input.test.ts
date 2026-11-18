@@ -61,9 +61,7 @@ test('extracted issue input survives persistence with unknown logins and empty m
 
 test('extracted PR snapshot survives persistence without changing its push window', () => {
   const input = prInput()
-  expect(
-    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))
-  ).toStrictEqual(input)
+  expect(parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))).toStrictEqual(input)
 })
 
 test('issue recovery rejects invalid event and policy values', () => {
@@ -77,9 +75,9 @@ test('issue recovery rejects invalid event and policy values', () => {
     ['open_pr', 'true'],
     ['open_pr', undefined]
   ]) {
-    expect(() =>
-      parseIssuePreparationInput({ ...issueInput(), [field!]: value })
-    ).toThrow(InvalidPreparationInputError)
+    expect(() => parseIssuePreparationInput({ ...issueInput(), [field!]: value })).toThrow(
+      InvalidPreparationInputError
+    )
   }
 })
 
@@ -89,9 +87,7 @@ test('PR recovery validates references and policies before performing GitHub wor
     pr: undefined,
     pr_reference: { owner_login: 'octo', repo_name: 'example', pr_number: 7 }
   }
-  expect(
-    parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))
-  ).toStrictEqual({
+  expect(parsePullRequestPreparationInput(JSON.parse(JSON.stringify(input)))).toStrictEqual({
     kind: input.kind,
     pr_reference: input.pr_reference,
     trusted_default_branch,
@@ -112,9 +108,9 @@ test('PR recovery validates references and policies before performing GitHub wor
     { pr: null },
     { pr_reference: null }
   ]) {
-    expect(() =>
-      parsePullRequestPreparationInput({ ...input, ...changes })
-    ).toThrow(InvalidPreparationInputError)
+    expect(() => parsePullRequestPreparationInput({ ...input, ...changes })).toThrow(
+      InvalidPreparationInputError
+    )
   }
 })
 

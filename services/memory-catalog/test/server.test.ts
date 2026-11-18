@@ -59,9 +59,7 @@ const extraction = {
     media_type: 'application/zstd',
     size_bytes: 42
   },
-  observations: [
-    { observation_id: 'extraction-1', body_markdown: 'Remember this.' }
-  ]
+  observations: [{ observation_id: 'extraction-1', body_markdown: 'Remember this.' }]
 }
 
 const emptyOverview = {
@@ -101,10 +99,8 @@ test('the contract authenticates and validates extraction registration', async (
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -115,11 +111,9 @@ test('the contract authenticates and validates extraction registration', async (
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -237,18 +231,15 @@ test('an extraction identity conflict is a declared 409', async () => {
     listVersionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
-    registerExtraction: () =>
-      Promise.reject(new ExtractionConflictError('different content')),
+    registerExtraction: () => Promise.reject(new ExtractionConflictError('different content')),
     changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
     getLearningInput: () => Promise.resolve(null),
     createMemoryTreeVersion: () => Promise.resolve(versionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -259,11 +250,9 @@ test('an extraction identity conflict is a declared 409', async () => {
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -277,9 +266,7 @@ test('an extraction identity conflict is a declared 409', async () => {
   expect(response.statusCode).toBe(409)
   const payload: unknown = response.json()
   expect(
-    typeof payload === 'object' && payload !== null && 'code' in payload
-      ? payload.code
-      : null
+    typeof payload === 'object' && payload !== null && 'code' in payload ? payload.code : null
   ).toBe('CONFLICT')
   await app.close()
 })
@@ -313,12 +300,9 @@ test('completed extractions are queryable with or without an observation', async
     createMemoryTreeVersion: () => Promise.resolve(versionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
-      getExtraction: (extractionId) =>
-        Promise.resolve(records.get(extractionId)),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      getExtraction: (extractionId) => Promise.resolve(records.get(extractionId)),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -329,11 +313,9 @@ test('completed extractions are queryable with or without an observation', async
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -401,9 +383,7 @@ test('UI catalog reads expose paginated records and durable control state', asyn
       listExtractions: (cursor, limit, filters) => {
         calls.push(['extractions', cursor, limit, filters])
         return Promise.resolve({
-          extractions: [
-            { ...extraction, created_at: '2026-10-23T00:00:00.000Z' }
-          ],
+          extractions: [{ ...extraction, created_at: '2026-10-23T00:00:00.000Z' }],
           next_cursor: 'next-extraction'
         })
       },
@@ -457,11 +437,9 @@ test('UI catalog reads expose paginated records and durable control state', asyn
         })
       },
       getMemoryTreeAutomation: () => Promise.resolve(control),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -565,9 +543,7 @@ test('learning input is read and a version is created with resource semantics', 
   const learningInput = {
     expected_active_version: 0,
     active_memory_tree_reference: null,
-    observations: [
-      { observation_id: 'extraction-1', body_markdown: 'Remember this.' }
-    ]
+    observations: [{ observation_id: 'extraction-1', body_markdown: 'Remember this.' }]
   }
   const store: MemoryCatalogStore = {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
@@ -581,8 +557,7 @@ test('learning input is read and a version is created with resource semantics', 
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
     changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
-    getLearningInput: (limit) =>
-      Promise.resolve(limit === 10 ? learningInput : null),
+    getLearningInput: (limit) => Promise.resolve(limit === 10 ? learningInput : null),
     createMemoryTreeVersion: (input) =>
       Promise.resolve({
         created: true,
@@ -603,10 +578,8 @@ test('learning input is read and a version is created with resource semantics', 
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 1, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -617,11 +590,9 @@ test('learning input is read and a version is created with resource semantics', 
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -680,10 +651,8 @@ function storeWithVersionFailure(error: Error): MemoryCatalogStore {
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -694,11 +663,9 @@ function storeWithVersionFailure(error: Error): MemoryCatalogStore {
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 0, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 0, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
 }
@@ -723,16 +690,12 @@ async function postVersion(store: MemoryCatalogStore) {
 
 function responseCode(response: { json: () => unknown }): unknown {
   const payload = response.json()
-  return typeof payload === 'object' && payload !== null && 'code' in payload
-    ? payload.code
-    : null
+  return typeof payload === 'object' && payload !== null && 'code' in payload ? payload.code : null
 }
 
 test('version conflicts are declared as 409', async () => {
   const response = await postVersion(
-    storeWithVersionFailure(
-      new MemoryTreeVersionConflictError('stale expected active version')
-    )
+    storeWithVersionFailure(new MemoryTreeVersionConflictError('stale expected active version'))
   )
 
   expect(response.statusCode).toBe(409)
@@ -782,7 +745,7 @@ test('maintenance reports must match consumed extractions before reaching the st
   ]
   const app = await createApp({ store, ...auth })
   try {
-    for (const source of invalidSources)
+    for (const source of invalidSources) {
       for (const url of [
         '/v1/memory-tree/versions',
         '/v1/memory-tree/versions/publications/reserve',
@@ -798,12 +761,10 @@ test('maintenance reports must match consumed extractions before reaching the st
             source
           }
         })
-        expect(
-          response.statusCode,
-          `${url} ${source.maintenance_report.summary}`
-        ).toBe(400)
+        expect(response.statusCode, `${url} ${source.maintenance_report.summary}`).toBe(400)
         expect(responseCode(response)).toBe('INVALID_BODY')
       }
+    }
   } finally {
     await app.close()
   }
@@ -813,9 +774,7 @@ test('maintenance reports must match consumed extractions before reaching the st
 test('a paused automatic version commit has its own 409 code', async () => {
   const response = await postVersion(
     storeWithVersionFailure(
-      new AutomationPausedError(
-        'Automatic memory-tree version commits are paused.'
-      )
+      new AutomationPausedError('Automatic memory-tree version commits are paused.')
     )
   )
 
@@ -849,10 +808,8 @@ test('restore moves the active pointer through its own operation', async () => {
     },
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -863,11 +820,9 @@ test('restore moves the active pointer through its own operation', async () => {
           changed_by: { kind: 'service', id: 'memory-catalog' },
           changed_at: '2026-10-23T00:00:00.000Z'
         }),
-      getMemoryTree: () =>
-        Promise.resolve({ version: 2, memory_tree_reference: null }),
+      getMemoryTree: () => Promise.resolve({ version: 2, memory_tree_reference: null }),
       getMemoryTreeVersion: () => Promise.resolve(undefined),
-      listMemoryTreeVersions: () =>
-        Promise.resolve({ versions: [], next_before_version: null })
+      listMemoryTreeVersions: () => Promise.resolve({ versions: [], next_before_version: null })
     }
   }
   const app = await createApp({ store, ...auth })
@@ -917,10 +872,8 @@ test('memory tree version history is queryable through the public contract', asy
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
       getExtraction: () => Promise.resolve(undefined),
-      listExtractions: () =>
-        Promise.resolve({ extractions: [], next_cursor: null }),
-      listObservations: () =>
-        Promise.resolve({ observations: [], next_cursor: null }),
+      listExtractions: () => Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () => Promise.resolve({ observations: [], next_cursor: null }),
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
@@ -1011,10 +964,8 @@ test('publication endpoints enforce producer roles and return complete recovery 
     calls.push(input)
     return Promise.resolve({ intent: input, status: 'reserved' })
   }
-  store.confirmVersionPublication = (input) =>
-    Promise.resolve({ intent: input, status: 'present' })
-  store.listVersionPublications = () =>
-    Promise.resolve([{ intent, status: 'reserved' }])
+  store.confirmVersionPublication = (input) => Promise.resolve({ intent: input, status: 'present' })
+  store.listVersionPublications = () => Promise.resolve([{ intent, status: 'reserved' }])
   store.reserveExtractionPublication = (input) =>
     Promise.resolve({ intent: input, status: 'reserved' })
   const app = await createApp({ store, ...auth })
@@ -1127,9 +1078,7 @@ test('only workers can abandon automatic publications and abandoned commits have
       }
     })
     expect(committed.statusCode).toBe(409)
-    expect(committed.json<{ code: string }>().code).toBe(
-      'PUBLICATION_ABANDONED'
-    )
+    expect(committed.json<{ code: string }>().code).toBe('PUBLICATION_ABANDONED')
   } finally {
     await app.close()
   }

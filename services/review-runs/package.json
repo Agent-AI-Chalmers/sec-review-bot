@@ -16,10 +16,10 @@
     "test": "pnpm run build && vitest run --project unit",
     "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm run test:types",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "test:types": "vitest run --project types"
   },
   "dependencies": {
@@ -28,18 +28,16 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "eslint": "^10.14.0",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.9.10",
+    "oxc-parser": "0.159.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
+    "typescript": "7.0.2",
     "vitest": "5.1.0",
     "yaml": "^2.9.1"
   }

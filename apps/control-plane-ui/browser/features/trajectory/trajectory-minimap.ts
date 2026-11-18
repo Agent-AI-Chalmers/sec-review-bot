@@ -16,7 +16,9 @@ const MINIMAP_PREVIEW_WIDTH = 18
 const MINIMAP_CURRENT_WIDTH = 20
 
 export function minimapTicks(count: number): { start: number; gap: number } {
-  if (count <= 1) return { start: MINIMAP_HEIGHT / 2, gap: 0 }
+  if (count <= 1) {
+    return { start: MINIMAP_HEIGHT / 2, gap: 0 }
+  }
   const gap = Math.min(MINIMAP_TICK_GAP, MINIMAP_GROUP_HEIGHT / (count - 1))
   return {
     start: (MINIMAP_HEIGHT - gap * (count - 1)) / 2,
@@ -25,7 +27,9 @@ export function minimapTicks(count: number): { start: number; gap: number } {
 }
 
 export function minimapMarkWidth(current: boolean, preview: boolean): number {
-  if (current) return MINIMAP_CURRENT_WIDTH
+  if (current) {
+    return MINIMAP_CURRENT_WIDTH
+  }
   return preview ? MINIMAP_PREVIEW_WIDTH : MINIMAP_MARK_WIDTH
 }
 
@@ -49,7 +53,9 @@ export function minimapBuckets(
   ticks: { start: number; gap: number },
   maxMarks: number = MAX_MINIMAP_MARKS
 ): MinimapBucket[] {
-  if (count === 0) return []
+  if (count === 0) {
+    return []
+  }
   const bucketSize = Math.max(1, Math.ceil(count / maxMarks))
   const buckets: MinimapBucket[] = []
   for (let start = 0; start < count; start += bucketSize) {
@@ -72,31 +78,37 @@ export function nearestSegment(
   segments: readonly { top: number; height: number }[],
   center: number
 ): number {
-  if (segments.length === 0) return 0
+  if (segments.length === 0) {
+    return 0
+  }
   let low = 0
   let high = segments.length - 1
   while (low < high) {
     const middle = (low + high) >> 1
-    const segment = segments[middle]!
-    if (segment.top + segment.height < center) low = middle + 1
-    else high = middle
+    const segment = segments[middle]
+    if (segment.top + segment.height < center) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
   }
-  const candidate = segments[low]!
-  if (center >= candidate.top) return low
-  if (low === 0) return 0
-  const previous = segments[low - 1]!
+  const candidate = segments[low]
+  if (center >= candidate.top) {
+    return low
+  }
+  if (low === 0) {
+    return 0
+  }
+  const previous = segments[low - 1]
   const previousDistance = Math.abs(previous.top + previous.height / 2 - center)
-  const candidateDistance = Math.abs(
-    candidate.top + candidate.height / 2 - center
-  )
+  const candidateDistance = Math.abs(candidate.top + candidate.height / 2 - center)
   return previousDistance <= candidateDistance ? low - 1 : low
 }
 
-export function sameSegments(
-  left: MinimapSegment[],
-  right: MinimapSegment[]
-): boolean {
-  if (left.length !== right.length) return false
+export function sameSegments(left: MinimapSegment[], right: MinimapSegment[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
   return left.every((segment, index) => {
     const other = right[index]
     return (

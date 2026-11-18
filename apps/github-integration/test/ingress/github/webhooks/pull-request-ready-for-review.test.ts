@@ -81,10 +81,7 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
     }
   )
 
-  expect(
-    reviewStarted,
-    'fork PR must not auto-review on ready_for_review'
-  ).toBe(false)
+  expect(reviewStarted, 'fork PR must not auto-review on ready_for_review').toBe(false)
   expect(configFetched).toBe(false)
 })
 

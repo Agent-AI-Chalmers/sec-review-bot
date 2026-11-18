@@ -31,14 +31,21 @@ function parseMemoryArtifactRequest(
   identity: string,
   representation: string
 ): MemoryArtifactRequest | null {
-  if (collection !== 'versions' && collection !== 'extractions') return null
-  if (collection === 'versions' && !/^[1-9][0-9]*$/.test(identity)) return null
-  if (collection === 'extractions' && !/^[A-Za-z0-9._:-]+$/.test(identity))
+  if (collection !== 'versions' && collection !== 'extractions') {
     return null
+  }
+  if (collection === 'versions' && !/^[1-9][0-9]*$/.test(identity)) {
+    return null
+  }
+  if (collection === 'extractions' && !/^[A-Za-z0-9._:-]+$/.test(identity)) {
+    return null
+  }
   switch (representation) {
     case 'artifact':
     case 'content':
-      if (collection !== 'versions') return null
+      if (collection !== 'versions') {
+        return null
+      }
       return {
         collection,
         identity,
@@ -66,17 +73,19 @@ function publishedMemoryArtifact(
   record: unknown,
   request: MemoryArtifactRequest
 ): PublishedArtifact {
-  if (!isRecord(record)) throw new Error('invalid_memory_catalog_record')
-  if (request.kind === 'tree')
+  if (!isRecord(record)) {
+    throw new Error('invalid_memory_catalog_record')
+  }
+  if (request.kind === 'tree') {
     return catalogArtifactReference(record.memory_tree_reference, 'tree')
-  if (request.collection === 'extractions')
+  }
+  if (request.collection === 'extractions') {
     return catalogArtifactReference(record.trajectory_reference, 'trajectory')
+  }
   const source = record.source
-  if (
-    !isRecord(source) ||
-    (source.kind !== 'learning' && source.kind !== 'reorganization')
-  )
+  if (!isRecord(source) || (source.kind !== 'learning' && source.kind !== 'reorganization')) {
     return { kind: 'invalid' }
+  }
   return catalogArtifactReference(source.trajectory_reference, 'trajectory')
 }
 
@@ -87,12 +96,15 @@ function memoryArtifactFailure(error: unknown): {
   if (
     error instanceof ArtifactDownloadTimeoutError ||
     (error instanceof UpstreamRequestError && error.kind === 'timeout')
-  )
+  ) {
     return { status: 504, error: 'memory_artifact_download_timeout' }
-  if (error instanceof UpstreamRequestError && error.kind === 'too_large')
+  }
+  if (error instanceof UpstreamRequestError && error.kind === 'too_large') {
     return { status: 502, error: 'upstream_response_too_large' }
-  if (error instanceof Error && error.message === 'artifact_identity_mismatch')
+  }
+  if (error instanceof Error && error.message === 'artifact_identity_mismatch') {
     return { status: 502, error: 'artifact_identity_mismatch' }
+  }
   return { status: 502, error: 'memory_artifact_download_failed' }
 }
 
@@ -110,25 +122,22 @@ export function createMemoryArtifactRoutes({
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs: number
 }): MemoryArtifactRoutes {
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse
-  ): Promise<boolean> => {
-    if (request.method !== 'GET') return false
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    if (request.method !== 'GET') {
+      return false
+    }
     const match =
       /^\/api\/memory\/(versions|extractions)\/([^/?]+)\/(artifact|trajectory|content|trajectory\/content)$/.exec(
         request.url ?? ''
       )
-    if (match === null) return false
+    if (match === null) {
+      return false
+    }
     if (catalog === undefined || artifactStore === undefined) {
       sendJson(response, 503, { error: 'memory_artifact_unavailable' })
       return true
     }
-    const artifactRequest = parseMemoryArtifactRequest(
-      match[1],
-      match[2],
-      match[3]
-    )
+    const artifactRequest = parseMemoryArtifactRequest(match[1], match[2], match[3])
     if (artifactRequest === null) {
       sendJson(response, 404, { error: 'memory_artifact_not_found' })
       return true
@@ -141,9 +150,7 @@ export function createMemoryArtifactRoutes({
       if (upstream.status < 200 || upstream.status >= 300) {
         sendJson(response, upstream.status === 404 ? 404 : 502, {
           error:
-            upstream.status === 404
-              ? 'memory_artifact_not_found'
-              : 'memory_catalog_unavailable'
+            upstream.status === 404 ? 'memory_artifact_not_found' : 'memory_catalog_unavailable'
         })
         return true
       }
@@ -157,11 +164,9 @@ export function createMemoryArtifactRoutes({
         sendJson(response, 413, { error: 'artifact_too_large' })
         return true
       }
-      const complete = await readVerifiedArtifactBuffer(
-        artifactStore,
-        published.artifact,
-        { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
-      )
+      const complete = await readVerifiedArtifactBuffer(artifactStore, published.artifact, {
+        idleTimeoutMs: artifactDownloadIdleTimeoutMs
+      })
       if (artifactRequest.view === 'content') {
         let content: MemoryTreeContentResponse | TrajectoryContentResponse
         if (artifactRequest.kind === 'tree') {

@@ -11,10 +11,7 @@ if (mode !== 'unit' && mode !== 'integration') {
 }
 
 const require = createRequire(import.meta.url)
-const vitest = join(
-  dirname(require.resolve('vitest/package.json')),
-  'vitest.mjs'
-)
+const vitest = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs')
 
 // Fixtures own their Git configuration, including commit identities. Do not
 // inherit user/system config or Git environment overrides into their subprocesses.
@@ -30,10 +27,7 @@ let result
 try {
   // Git otherwise reads the user's default XDG attributes even without global config.
   env.GIT_CONFIG_GLOBAL = join(configRoot, 'config')
-  await writeFile(
-    env.GIT_CONFIG_GLOBAL,
-    `[core]\n\tattributesFile = ${JSON.stringify(devNull)}\n`
-  )
+  await writeFile(env.GIT_CONFIG_GLOBAL, `[core]\n\tattributesFile = ${JSON.stringify(devNull)}\n`)
   result = await new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
@@ -49,5 +43,8 @@ try {
 } finally {
   await rm(configRoot, { recursive: true, force: true })
 }
-if (result.signal) process.kill(process.pid, result.signal)
-else process.exitCode = result.code ?? 1
+if (result.signal) {
+  process.kill(process.pid, result.signal)
+} else {
+  process.exitCode = result.code ?? 1
+}

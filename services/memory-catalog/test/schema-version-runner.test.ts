@@ -30,48 +30,32 @@ test('applies the complete catalog schema as version 1', async () => {
 
   await applySchemaVersions(poolWithAppliedVersions([], statements))
 
-  expect.assert(
-    statements.some(({ sql }) =>
-      sql.includes('create table memory_tree_versions')
-    )
-  )
-  expect.assert(
-    statements.some(({ sql }) =>
-      sql.includes('create table memory_tree_automation')
-    )
-  )
+  expect.assert(statements.some(({ sql }) => sql.includes('create table memory_tree_versions')))
+  expect.assert(statements.some(({ sql }) => sql.includes('create table memory_tree_automation')))
   expect.assert(statements.some(({ sql }) => sql.includes('source_kind text')))
   expect.assert(
-    statements.some(({ sql }) =>
-      sql.includes('create table memory_tree_automation_operations')
-    )
+    statements.some(({ sql }) => sql.includes('create table memory_tree_automation_operations'))
   )
-  const ledgerInserts = statements.filter(({ sql }) =>
-    sql.includes('insert into schema_versions')
-  )
-  expect(
-    ledgerInserts.map(({ parameters }) => parameters?.slice(0, 2))
-  ).toStrictEqual([[1, 'initial_catalog']])
-  for (const insert of ledgerInserts)
+  const ledgerInserts = statements.filter(({ sql }) => sql.includes('insert into schema_versions'))
+  expect(ledgerInserts.map(({ parameters }) => parameters?.slice(0, 2))).toStrictEqual([
+    [1, 'initial_catalog']
+  ])
+  for (const insert of ledgerInserts) {
     expect(String(insert.parameters?.[2])).toMatch(/^[a-f0-9]{64}$/)
+  }
 })
 
 test('rejects a database schema newer than this catalog understands', async () => {
   await expect(
     applySchemaVersions(
-      poolWithAppliedVersions([
-        { version: 2, name: 'future', checksum: 'future' }
-      ])
+      poolWithAppliedVersions([{ version: 2, name: 'future', checksum: 'future' }])
     )
   ).rejects.toThrow(/schema version 2 is newer/)
 })
 
 test('rejects changes to an applied schema version', async () => {
   const sql = await readFile(
-    new URL(
-      '../src/database/schema-versions/001_initial_catalog.sql',
-      import.meta.url
-    ),
+    new URL('../src/database/schema-versions/001_initial_catalog.sql', import.meta.url),
     'utf8'
   )
   const checksum = crypto.createHash('sha256').update(sql).digest('hex')

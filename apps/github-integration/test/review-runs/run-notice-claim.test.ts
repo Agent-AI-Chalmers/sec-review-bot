@@ -24,9 +24,7 @@ test('run notice heartbeat renews the claim while delivery remains active', asyn
   onTestFinished(async () => {
     await heartbeat.stop()
   })
-  await expect
-    .poll(() => renewals, { timeout: 500, interval: 10 })
-    .toBeGreaterThanOrEqual(2)
+  await expect.poll(() => renewals, { timeout: 500, interval: 10 }).toBeGreaterThanOrEqual(2)
   expect(await heartbeat.stop()).toBe(true)
   expect.assert(renewals >= 2)
 })
@@ -49,7 +47,9 @@ test('an unconfirmed run notice renewal revokes permission to write', async () =
   const heartbeat = await startRunNoticeClaimHeartbeat(
     {
       renewRunNoticeClaim: async () => {
-        if (!reachable) throw new Error('Review Runs unavailable')
+        if (!reachable) {
+          throw new Error('Review Runs unavailable')
+        }
         return true
       },
       runNoticeHeartbeatIntervalMs: async () => 60_000

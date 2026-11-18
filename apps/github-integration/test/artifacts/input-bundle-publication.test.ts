@@ -43,9 +43,7 @@ for (const crash of [
   'after-commit'
 ] as const) {
   test(`recovers the original input after ${crash} failure`, async () => {
-    const directory = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'publication-crash-')
-    )
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'publication-crash-'))
     const source = path.join(directory, 'bundle')
     const bytes = Buffer.from('immutable bundle')
     await fs.writeFile(source, bytes)
@@ -68,10 +66,11 @@ for (const crash of [
     s3.reset()
     s3.on(ListObjectsV2Command).resolves({ Contents: [] })
     s3.on(HeadObjectCommand).callsFake(() => {
-      if (!uploaded)
+      if (!uploaded) {
         throw Object.assign(new Error('missing'), {
           $metadata: { httpStatusCode: 404 }
         })
+      }
       return {
         ContentLength: bytes.length,
         Metadata: {
@@ -82,7 +81,9 @@ for (const crash of [
     })
     s3.on(PutObjectCommand).callsFake(() => {
       uploaded = true
-      if (crash === 'upload-response') failOnce()
+      if (crash === 'upload-response') {
+        failOnce()
+      }
       return {}
     })
     const store: InputBundlePublicationStore = {
@@ -93,27 +94,35 @@ for (const crash of [
           ...structuredClone(intent),
           status: 'reserved'
         }
-        if (crash === 'before-upload') failOnce()
+        if (crash === 'before-upload') {
+          failOnce()
+        }
         return candidate
       },
       async listInputBundleCandidates() {
-        return candidate && candidate.status !== 'abandoned'
-          ? [structuredClone(candidate)]
-          : []
+        return candidate && candidate.status !== 'abandoned' ? [structuredClone(candidate)] : []
       },
       async settleInputBundleCandidate(_run, _token, _digest, status) {
         expect.assert(candidate)
-        if (crash === 'after-upload') failOnce()
+        if (crash === 'after-upload') {
+          failOnce()
+        }
         candidate.status = status
-        if (crash === 'after-confirm') failOnce()
+        if (crash === 'after-confirm') {
+          failOnce()
+        }
         return candidate
       },
       async submitPreparedRun(_run, _token, savedContext, input) {
-        if (crash === 'before-commit') failOnce()
+        if (crash === 'before-commit') {
+          failOnce()
+        }
         expect.assert(candidate)
         candidate.status = 'selected'
         authoritative = structuredClone({ context: savedContext, input })
-        if (crash === 'after-commit') failOnce()
+        if (crash === 'after-commit') {
+          failOnce()
+        }
       }
     }
     try {
@@ -123,20 +132,13 @@ for (const crash of [
           subject: 'original snapshot'
         })
       ).rejects.toThrow(/process died/)
-      expect.assert(
-        candidate,
-        'intent must be durable before the first external write'
-      )
+      expect.assert(candidate, 'intent must be durable before the first external write')
       if (crash === 'before-upload') {
-        expect(
-          await recoverInputBundlePublication(store, 'run', 'takeover')
-        ).toBe(false)
+        expect(await recoverInputBundlePublication(store, 'run', 'takeover')).toBe(false)
         expect(candidate.status).toBe('abandoned')
         expect(authoritative).toBe(undefined)
       } else {
-        expect(
-          await recoverInputBundlePublication(store, 'run', 'takeover')
-        ).toBe(true)
+        expect(await recoverInputBundlePublication(store, 'run', 'takeover')).toBe(true)
         expect(authoritative).toStrictEqual({
           context,
           input: {
@@ -187,7 +189,7 @@ test('an unavailable store is not evidence that the intent should be abandoned',
       expect.unreachable('must not submit unverified bytes')
     }
   }
-  await expect(
-    recoverInputBundlePublication(store, 'run', 'current')
-  ).rejects.toThrow(/storage unavailable/)
+  await expect(recoverInputBundlePublication(store, 'run', 'current')).rejects.toThrow(
+    /storage unavailable/
+  )
 })

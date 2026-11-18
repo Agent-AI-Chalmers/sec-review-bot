@@ -68,13 +68,11 @@ type CompletedExecutionRun = {
   publish_context: Record<string, unknown>
 }
 
-function repositorySummaryRunMarker(run_id: string): string {
+function repositorySummaryRunMarker(run_id: string) {
   return `<!-- sec-review-bot:repository-summary-run:${run_id} -->`
 }
 
-function repositoryResultFromWorkflowResult(
-  result: unknown
-): RepositoryWorkflowResult | null {
+function repositoryResultFromWorkflowResult(result: unknown): RepositoryWorkflowResult | null {
   try {
     return parseRepositoryWorkflowResult(result)
   } catch (error) {
@@ -142,9 +140,7 @@ function deliveryCvssFieldsFromCases(
   return {
     case_count,
     cvss_outcome:
-      cvssCount > 0 && notScoredCount === cvssCount
-        ? 'not-scored'
-        : first_non_scored_outcome,
+      cvssCount > 0 && notScoredCount === cvssCount ? 'not-scored' : first_non_scored_outcome,
     cvss_base_score: null,
     cvss_severity: null
   }
@@ -185,10 +181,7 @@ export async function publishDeliveryDraftPrs({
     )
   }
   const persistedSteps = new Map(
-    (await store.listPublicationSteps(run_id)).map((step) => [
-      step.step_key,
-      step
-    ])
+    (await store.listPublicationSteps(run_id)).map((step) => [step.step_key, step])
   )
   // A reconciliation lookup that could not reach an answer is about its own step: the failure is
   // already recorded there and spends that step's budget. Stopping the loop on it would starve
@@ -205,7 +198,9 @@ export async function publishDeliveryDraftPrs({
       const persisted = persistedSteps.get(stepKey)
       // A deterministic rejection is already final for this delivery. Later
       // publication retries still need to reach the summary and other deliveries.
-      if (persisted?.status === 'terminal_failed') continue
+      if (persisted?.status === 'terminal_failed') {
+        continue
+      }
       const result =
         persisted?.status === 'succeeded' &&
         persisted.remote_object_id &&
@@ -232,8 +227,9 @@ export async function publishDeliveryDraftPrs({
               assert_publication_claim
             })
       if ('outcome' in result) {
-        if (result.recording === 'not_owned')
+        if (result.recording === 'not_owned') {
           throw new PublicationClaimLostError(run_id)
+        }
         reconciliationFailure = result
         throw result.error
       }
@@ -246,9 +242,7 @@ export async function publishDeliveryDraftPrs({
         cvss_severity: deliveryCvss.cvss_severity,
         title: draftPullRequest.title,
         html_url: draftPullRequest.html_url,
-        file_changes: Array.isArray(delivery.file_changes)
-          ? delivery.file_changes
-          : []
+        file_changes: Array.isArray(delivery.file_changes) ? delivery.file_changes : []
       })
       logInfo('delivery_draft_pr_completed', {
         delivery_id: delivery.delivery_id,
@@ -259,7 +253,9 @@ export async function publishDeliveryDraftPrs({
         reused: draftPullRequest.reused
       })
     } catch (error) {
-      if (isPublicationClaimLostError(error)) throw error
+      if (isPublicationClaimLostError(error)) {
+        throw error
+      }
       const errorMessage = asErrorMessage(error)
       const failure = classifyPublicationFailure(error)
       // A failed reconciliation lookup was already recorded on its step by settleExhaustedStep.
@@ -296,14 +292,16 @@ export async function publishDeliveryDraftPrs({
           `Failed to publish repository delivery ${String(delivery?.delivery_id ?? '(unknown)')}: ${errorMessage}`,
           { cause: error }
         )
-        if (reconciliationFailure?.recording !== 'accepted')
+        if (reconciliationFailure?.recording !== 'accepted') {
           throw publicationFailure
+        }
         deferredReconciliationFailure ??= publicationFailure
       }
     }
   }
-  if (deferredReconciliationFailure !== null)
+  if (deferredReconciliationFailure !== null) {
     throw deferredReconciliationFailure
+  }
 
   return published_delivery_entries
 }
@@ -372,24 +370,20 @@ async function claimOrReconcileSummaryIssue({
       return existing === null ? null : { id: existing.number }
     },
     effect: async () => ({
-      id: await ensureSummaryIssueNumber(
-        octokit,
-        repo,
-        assert_publication_claim
-      )
+      id: await ensureSummaryIssueNumber(octokit, repo, assert_publication_claim)
     })
   })
   const issueNumber = Number(step.remote.id)
-  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1)
-    throw new Error(
-      'Repository summary issue step is succeeded without a recorded issue number.'
-    )
-  if (step.reconciled)
+  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1) {
+    throw new Error('Repository summary issue step is succeeded without a recorded issue number.')
+  }
+  if (step.reconciled) {
     logInfo('repository_summary_issue_reconciled', {
       event_type,
       repo: repo.repo_full_name,
       issue_number: issueNumber
     })
+  }
   return issueNumber
 }
 
@@ -437,7 +431,9 @@ async function publishOrReconcileDeliveryDraftPr({
   try {
     await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
   } catch (error) {
-    if (!isPublicationStepExhausted(error)) throw error
+    if (!isPublicationStepExhausted(error)) {
+      throw error
+    }
     const settled = await settleExhaustedStep({
       store,
       runId: run_id,
@@ -449,14 +445,15 @@ async function publishOrReconcileDeliveryDraftPr({
           repo_name: repo.repo_name,
           branch_name: buildRepositoryDeliveryBranchName(run_id, delivery)
         })
-        return existing === null
-          ? null
-          : { id: existing.number, url: existing.html_url }
+        return existing === null ? null : { id: existing.number, url: existing.html_url }
       }
     })
-    if (settled.outcome === 'lookup_failed') return settled
-    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
+    if (settled.outcome === 'lookup_failed') {
+      return settled
+    }
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded') {
       throw error
+    }
     logInfo('delivery_draft_pr_reconciled', {
       delivery_id: delivery.delivery_id,
       draft_pr_number: Number(settled.remote.id),
@@ -544,12 +541,9 @@ async function publishRepositoryReviewResult({
   })
 
   const steps = await store.listPublicationSteps(run_id)
-  const summaryIssueStep = steps.find(
-    (step) => step.step_key === 'repository:summary-issue'
-  )
+  const summaryIssueStep = steps.find((step) => step.step_key === 'repository:summary-issue')
   const summaryIssueNumber =
-    summaryIssueStep?.status === 'succeeded' &&
-    summaryIssueStep.remote_object_id
+    summaryIssueStep?.status === 'succeeded' && summaryIssueStep.remote_object_id
       ? Number(summaryIssueStep.remote_object_id)
       : await claimOrReconcileSummaryIssue({
           octokit: github,
@@ -590,9 +584,7 @@ async function publishRepositoryReviewResult({
         issue_number: summaryIssueNumber,
         marker
       })
-      return existing === null
-        ? null
-        : { id: existing.id, url: existing.html_url }
+      return existing === null ? null : { id: existing.id, url: existing.html_url }
     },
     effect: async () => {
       const comment = await createIssueCommentUnlessMarkerExists(github, {
@@ -607,7 +599,9 @@ async function publishRepositoryReviewResult({
       return { id: comment.id, url: comment.html_url }
     }
   })
-  if (commentStep.alreadySucceeded) return
+  if (commentStep.alreadySucceeded) {
+    return
+  }
   logInfo('repository_summary_comment_publish_completed', {
     comment_id: commentStep.remote.id,
     comment_url: commentStep.remote.url,
@@ -636,13 +630,9 @@ export async function handleRepositoryReviewRun({
   const context = parseRepositoryReviewPublishContext(run.publish_context)
   const workflow_result = repositoryResultFromWorkflowResult(result)
   if (workflow_result === null) {
-    throw new Error(
-      `Repository review run ${run.run_id} is not ready to publish.`
-    )
+    throw new Error(`Repository review run ${run.run_id} is not ready to publish.`)
   }
-  const octokit = await installation_octokit_for_repo(
-    context.repo.repo_full_name
-  )
+  const octokit = await installation_octokit_for_repo(context.repo.repo_full_name)
   await publishRepositoryReviewResult({
     octokit,
     repo: context.repo,

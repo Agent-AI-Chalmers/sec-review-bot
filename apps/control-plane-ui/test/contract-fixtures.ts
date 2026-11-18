@@ -4,17 +4,10 @@ import path from 'node:path'
 // Repository layout is local to this package's shared contract fixtures.
 const contractsRoot = path.resolve(import.meta.dirname, '../../../contracts')
 
-export const TRAJECTORY_CONTRACT_ROOT = path.join(
-  contractsRoot,
-  'agent-trajectory',
-  'v1'
-)
+export const TRAJECTORY_CONTRACT_ROOT = path.join(contractsRoot, 'agent-trajectory', 'v1')
 
 export function trajectoryCorpus(name: string): string {
-  return readFileSync(
-    path.join(TRAJECTORY_CONTRACT_ROOT, 'corpus', name),
-    'utf8'
-  )
+  return readFileSync(path.join(TRAJECTORY_CONTRACT_ROOT, 'corpus', name), 'utf8')
 }
 
 export function trajectoryManifest(): { valid: string[]; invalid: string[] } {
@@ -34,9 +27,6 @@ export const TAR_ZSTD_CORPUS_ROOT = path.join(
 
 export function reviewRunsFixture(name: string): unknown {
   return JSON.parse(
-    readFileSync(
-      path.join(contractsRoot, 'review-runs-api', 'v1', 'fixtures', name),
-      'utf8'
-    )
+    readFileSync(path.join(contractsRoot, 'review-runs-api', 'v1', 'fixtures', name), 'utf8')
   ) as unknown
 }
