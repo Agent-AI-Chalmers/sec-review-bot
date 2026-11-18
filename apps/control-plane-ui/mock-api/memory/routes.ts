@@ -233,10 +233,9 @@ export function createMemoryHandler(
     ['observation-fixture-extraction-3-1', 2],
     ['observation-fixture-extraction-4-1', 2]
   ])
-  // Forty-two distinct observations and decisions adapted from the five
-  // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
-  // Provenance is replaced; chronology, operator edits and reorganization are
-  // illustrative. Each observation is registered once, including pending work.
+  // Sanitized observation samples exercise learning, operator edits, and
+  // reorganization across an illustrative history. Each observation is registered
+  // once, including pending work.
   for (const record of [...memoryVersions, ...extractionRecords]) {
     record.created_at = new Date(
       Date.parse(String(record.created_at)) - 64 * 3_600_000

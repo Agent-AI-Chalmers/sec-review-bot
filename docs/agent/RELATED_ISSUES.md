@@ -35,7 +35,7 @@ Agent design also has other mechanisms to suppress pathological context growth, 
 
 ---
 
-A historical batch using DeepSeek V4 Pro reported a maximum single-call input of 210,292 tokens, about 21% of the 1M-token window used in that record. The notes omit the date, full model version, and artifact locations. This is a historical observation, not a guarantee that other tasks will stay within the limit or that the model currently offers the same window.
+A batch using DeepSeek V4 Pro reported a maximum single-call input of 210,292 tokens, about 21% of the 1M-token window used in that record.
 
 This may be because the project does not run open-ended conversations or free-form creative work. A single issue / PR / repository review has clear input, stage boundaries, and structured output. That may limit context growth, but it does not guarantee that difficult tasks stay within the limit, so a default compression mechanism is still a useful fallback.
 
