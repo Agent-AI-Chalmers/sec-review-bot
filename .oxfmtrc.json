@@ -26,7 +26,6 @@
     "pnpm-lock.yaml",
     "contracts/**/*.json",
     "contracts/**/*.yaml",
-    "contracts/**/*.yml",
-    "**/*.toml"
+    "contracts/**/*.yml"
   ]
 }
