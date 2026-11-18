@@ -125,10 +125,26 @@ Additional UI consistency checks:
 <!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
 - `pnpm test`: runs logic and API tests in Node and UI component tests in Chrome.
-- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests in real Chrome with Vitest Browser Mode. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
+- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests in real Chrome with Vitest Browser Mode. During development, prefer a relevant test file, for example `pnpm test test/logic/api-error.test.ts`.
 - `pnpm run typecheck`: checks browser and server source types and reports type-test results. CI uses this command. Use `pnpm run test:types` to view the type-test results separately.
-- `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
+- `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/logic/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
 - `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, editor wrapping, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+
+<!-- doc-default: control-plane-ui.test-layout; source=apps/control-plane-ui/vitest.config.ts -->
+
+Test ownership follows the directories below. `test:logic` runs the Node tests in `logic/`, `server/`, and `checks/`; the directory split does not add new test commands.
+
+| Directory under `test/` | Responsibility                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `logic/`                | Pure browser and shared logic                                                    |
+| `server/`               | BFF routes, upstream relay, storage and artifacts; server-only helpers stay here |
+| `checks/`               | Styles, icons, import boundaries and development-fixture validation              |
+| `types/`                | Compiler-only contracts                                                          |
+| `components/`           | Real-browser component and React hook tests                                      |
+| `e2e/`                  | Application user flows and visual baselines                                      |
+| `browser-flows/`        | Existing reusable E2E flow functions                                             |
+| `fixtures/`             | Test input assets                                                                |
+| `support/`              | Helpers shared across test groups, including contract fixture loading            |
 
 Component tests mount components with application CSS and use native browser interactions. They replace DOM emulation; Playwright E2E remains responsible for application navigation and complete user flows. Hook tests use the same component project to exercise React lifecycle behavior without introducing another DOM environment. Module and API mocks remain local to tests that protect asynchronous ownership or error behavior.
 

@@ -7,7 +7,7 @@
 //
 // Every drawn axis places every state explicitly. A computed grid cannot know which path is the
 // normal one, and a state added to the contract without a cell here would otherwise land
-// wherever a heuristic put it; `test/state-machine-layout.test.ts` fails instead.
+// wherever a heuristic put it; `test/logic/state-machine-layout.test.ts` fails instead.
 import type { CoordinationAxis } from '../state-machines.generated.js'
 
 export interface StatePosition {

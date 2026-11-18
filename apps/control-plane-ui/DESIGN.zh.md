@@ -16,7 +16,7 @@
 
 <!-- doc-default: control-plane-ui.state-presentation; source=apps/control-plane-ui/browser/features/runs/status.tsx -->
 
-运行摘要、筛选器、状态图和事件历史共用状态标签。[status.tsx](browser/features/runs/status.tsx) 负责视觉映射。状态、转换和状态机标题不属于界面文案：它们的中英文都来自生成的状态机模块，由契约和[中文覆盖层](../../contracts/review-runs-api/v1/overlays/zh.yaml)生成，要修改请改那里。[展示测试](test/state-presentation.test.ts) 检查各处在每种语言下显示的标签一致。
+运行摘要、筛选器、状态图和事件历史共用状态标签。[status.tsx](browser/features/runs/status.tsx) 负责视觉映射。状态、转换和状态机标题不属于界面文案：它们的中英文都来自生成的状态机模块，由契约和[中文覆盖层](../../contracts/review-runs-api/v1/overlays/zh.yaml)生成，要修改请改那里。[展示测试](test/logic/state-presentation.test.ts) 检查各处在每种语言下显示的标签一致。
 
 ## 视觉基础
 

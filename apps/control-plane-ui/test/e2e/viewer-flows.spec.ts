@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { trajectoryCorpus } from '../contract-fixtures.js'
+import { trajectoryCorpus } from '../support/contract-fixtures.js'
 import { expect } from '@playwright/test'
 
 import { runViewerFlow } from '../browser-flows/viewer.js'

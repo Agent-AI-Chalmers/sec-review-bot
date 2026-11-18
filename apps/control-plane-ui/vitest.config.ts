@@ -33,7 +33,7 @@ export default defineConfig({
             enabled: true,
             only: true,
             tsconfig: 'tsconfig.server.json',
-            include: ['test/**/*.test-d.ts']
+            include: ['test/types/**/*.test-d.ts']
           }
         }
       },
@@ -42,7 +42,11 @@ export default defineConfig({
         test: {
           name: 'logic',
           environment: 'node',
-          include: ['test/*.test.ts']
+          include: [
+            'test/logic/**/*.test.ts',
+            'test/server/**/*.test.ts',
+            'test/checks/**/*.test.ts'
+          ]
         }
       },
       {
