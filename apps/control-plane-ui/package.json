@@ -17,8 +17,6 @@
     "test:component": "vitest run --project components",
     "test:e2e": "playwright test",
     "test:e2e:update-visuals": "playwright test test/e2e/visual.spec.ts --update-snapshots",
-    "colors:check": "tsx scripts/check-colors.ts",
-    "icons:check": "tsx scripts/check-icons.ts",
     "styles:report": "tsx scripts/report-style-literals.ts",
     "lint": "oxlint . --deny-warnings",
     "lint:fix": "oxlint . --fix --deny-warnings",

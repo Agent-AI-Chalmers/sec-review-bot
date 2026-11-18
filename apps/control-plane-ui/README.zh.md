@@ -111,19 +111,19 @@ Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默�
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run colors:check
-pnpm run icons:check
 pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-额外的 UI 一致性检查包括：
+颜色和图标规则纳入 `pnpm test`。也可以单独运行，或生成样式报告：
 
-- `pnpm run colors:check`：检查自定义颜色是否同时存在于浅色和深色主题中，指定的文字与背景组合是否仍然清晰，以及品牌色是否保持从浅到深排列。相邻颜色过于接近时只报告提示，不会导致 CI 失败。
-- `pnpm run icons:check`：要求浏览器图标来自 Tabler，并使用共享的 `ICON_SIZE` 尺寸等级。
+- `pnpm test test/checks/color-rules.test.ts`：检查自定义颜色是否同时存在于浅色和深色主题中，指定的文字与背景组合是否仍然清晰，以及品牌色是否保持从浅到深排列。相邻颜色过于接近时只报告提示，不会导致 CI 失败。
+- `pnpm test test/checks/icon-rules.test.ts`：要求浏览器图标来自 Tabler，并使用共享的 `ICON_SIZE` 尺寸等级。
 - `pnpm run styles:report`：列出维护中的 CSS 里直接写入的间距、圆角和字号值。该报告仅供检查，不会导致 CI 失败。
+
+这些检查从测试导入图之外读取 CSS 和 TSX 文件。修改主题 CSS 或应用图标后，请显式运行上面的对应测试或完整的 `pnpm test`；仅运行增量测试可能遗漏这些改动。
 
 ### 测试范围
 

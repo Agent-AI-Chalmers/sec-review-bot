@@ -109,19 +109,19 @@ The console supports continuously updated modern browsers. Keep your browser up 
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run colors:check
-pnpm run icons:check
 pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-Additional UI consistency checks:
+Color and icon rules run as part of `pnpm test`. To run them separately or generate the informational style report:
 
-- `pnpm run colors:check`: checks that custom colors exist in both themes, required text/background pairs remain readable, and the brand palette stays ordered from light to dark. Very similar neighboring shades are reported but do not fail CI.
-- `pnpm run icons:check`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
+- `pnpm test test/checks/color-rules.test.ts`: checks that custom colors exist in both themes, required text/background pairs remain readable, and the brand palette stays ordered from light to dark. Very similar neighboring shades are reported but do not fail CI.
+- `pnpm test test/checks/icon-rules.test.ts`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
 - `pnpm run styles:report`: lists spacing, border-radius, and font-size values written directly in maintained CSS. This is an informational report and does not fail CI.
+
+These checks read CSS and TSX files outside the test import graph. After editing theme CSS or application icons, explicitly run the relevant check above or the full `pnpm test`; incremental test selection alone may miss those edits.
 
 ### Test Coverage
 

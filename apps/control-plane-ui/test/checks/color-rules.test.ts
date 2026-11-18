@@ -1,10 +1,14 @@
+import { readFile } from 'node:fs/promises'
+
 import { expect, test } from 'vitest'
+
+import { BRAND_COLORS } from '../../browser/app/colors.js'
 
 import {
   parseThemeColors,
   validateColorContract,
   validateThemeTransitionCoverage
-} from '../../scripts/color-contract.js'
+} from './color-rules.js'
 
 const validThemes = {
   light: {
@@ -106,4 +110,22 @@ test('brand shades must get darker while near-duplicates only warn', () => {
   expect.assert(
     duplicate.some((issue) => issue.severity === 'warning' && issue.message.includes('ΔE2000'))
   )
+})
+
+// Exercise the maintained stylesheet as well as the malformed examples above.
+// These files are read outside Vitest's import graph; select this test explicitly
+// when changing base.css rather than relying on --since-last-run.
+test('application themes and brand palette satisfy the color rules', async () => {
+  const stylesheet = await readFile(
+    new URL('../../browser/styles/base.css', import.meta.url),
+    'utf8'
+  )
+  const issues = [
+    ...validateColorContract(parseThemeColors(stylesheet), BRAND_COLORS),
+    ...validateThemeTransitionCoverage(stylesheet)
+  ]
+  for (const issue of issues.filter((issue) => issue.severity === 'warning')) {
+    console.warn(issue.message)
+  }
+  expect(issues.filter((issue) => issue.severity === 'error')).toStrictEqual([])
 })
