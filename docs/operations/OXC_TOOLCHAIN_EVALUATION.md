@@ -1,12 +1,12 @@
 # Oxc 工具链评估
 
-评估日期：2026-11-18。本报告记录迁移前的实验与建议；实验阶段未修改格式化器、linter、依赖、hook 或生成器配置。后续迁移采用下文的职责划分与验收标准。
+评估日期：2026-11-18。本报告记录迁移前的实验与建议；实验阶段未修改格式化器、linter、依赖、hook 或生成器配置。后续迁移采用下文的职责划分与验收标准；声明空行经复核后作为代码评审约定保留，不引入专用插件。
 
 ## 结论与目标
 
 建议推进 Oxfmt 和 Oxlint 的迁移，分开验证两者。目标是缩短反馈时间、减少配置与插件依赖，同时保留正确性检查和生成物的确定性。节省 LLM token 不作为迁移目标。
 
-迁移应围绕检查目的重新选择规则：用原生 import 位置规则替代自定义 selector，保留类型感知的正确性检查，取消声明之间空行的强制规则，避免仅为空行保留 JavaScript 插件兼容层。Markdown lint 和中文排版检查继续承担各自职责。
+迁移应围绕检查目的重新选择规则：用原生 import 位置规则替代自定义 selector，保留类型感知的正确性检查，声明之间的空行作为代码评审约定保留。Markdown lint 和中文排版检查继续承担各自职责。
 
 契约生成器的核心要求是：**生成产物符合最终格式规则，随后运行格式化不产生额外变化；重复生成结果稳定。** 新工具达到这个效果即可。迁移可以调整生成器最后的格式化步骤、使用新的 API 或 CLI，无须复刻 Prettier 的配置解析接口，也无须保留它原先的具体换行。迁移时首次统一排版产生的 diff 应单独审查；契约字段、结构和运行行为仍须保持预期。
 
@@ -16,7 +16,7 @@
 | --------------------------------------- | ---------------------------- | ---------------------------------------------- |
 | 源码、编辑器、CI 与生成器的格式一致     | 由 Oxfmt 负责                | 生成物落盘后应直接通过格式检查。               |
 | 行宽、引号、分号、尾逗号                | 初期保留当前设置             | 先验证换工具的收益，行宽调整另行决定。         |
-| 声明之间的空行                          | 保留作者排版，取消 lint 强制 | 可读性偏好不足以支撑额外插件链。               |
+| 声明之间的空行                          | 作为代码评审约定保留         | 避免仅为空行增加插件及其 peer dependencies。   |
 | import 位于可执行语句之前               | 使用 Oxlint `import/first`   | 直接表达目的，并允许模块指令在 import 前。     |
 | UI 函数显式返回类型                     | 初期保留原生 TypeScript 规则 | 已有原生能力，不必因迁移同时改变策略。         |
 | 未处理 Promise、不安全赋值              | 使用 Oxlint 类型感知规则     | 保护运行时正确性，不能被更快的纯语法检查替代。 |
@@ -82,7 +82,7 @@ Oxfmt 支持关闭嵌入语言格式化并保留 prose 换行，能够用于保�
 
 <!-- doc-time-sensitive: oxc-evaluation-js-plugins; checked=2026-11-18; source=https://oxc.rs/docs/guide/usage/linter/js-plugins -->
 
-Oxlint JS 插件能力仍为 alpha。本次建议采用能直接表达所需策略的原生规则，取消仅服务声明空行的插件依赖。[JS 插件](https://oxc.rs/docs/guide/usage/linter/js-plugins)、[import 位置](https://oxc.rs/docs/guide/usage/linter/rules/import/first)、[类型感知检查](https://oxc.rs/docs/guide/usage/linter/type-aware.html)。
+Oxlint JS 插件能力仍为 alpha。优先采用能直接表达所需策略的原生规则；声明空行作为评审约定保留，不为此增加插件及其 ESLint peer dependency。[JS 插件](https://oxc.rs/docs/guide/usage/linter/js-plugins)、[import 位置](https://oxc.rs/docs/guide/usage/linter/rules/import/first)、[类型感知检查](https://oxc.rs/docs/guide/usage/linter/type-aware.html)。
 
 ## 正式迁移验收标准
 

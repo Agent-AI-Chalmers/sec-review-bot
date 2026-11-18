@@ -7,6 +7,7 @@ const ui = 'http://control-plane-ui:8091'
 
 export async function verifyBff(runId: string) {
   let cookie = ''
+
   function request(
     options: Omit<RequestOptions, 'base' | 'token' | 'headers'>
   ) {

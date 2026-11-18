@@ -17,6 +17,7 @@ export type Admission = {
 }
 type RunPage = { runs: Run[] }
 type ObservedRun = { run: Run }
+
 export async function admit() {
   for (const base of [gateway, runs, catalog]) {
     const response = await request({
