@@ -82,6 +82,7 @@ def _repository_result_from_delivery_replay(
     return {
         "api_version": EXECUTION_API_VERSION,
         "scan_summary": _previous_scan_summary(previous_result),
+        "case_count": len(case_results),
         "deliveries": [
             item.model_dump(mode="json") for item in delivery_result.deliveries
         ],
@@ -166,7 +167,7 @@ async def main() -> None:
     )
     if not delivery_case_inputs:
         raise RuntimeError(
-            "Repository result does not contain keep case_results for delivery execution."
+            "Repository result does not contain deliverable cases for delivery execution."
         )
 
     persist_delivery_execution_input(
@@ -216,7 +217,7 @@ async def main() -> None:
                 "run_id": run_artifacts.name,
                 "delivery_plan_status": delivery_plan.status,
                 "delivery_plan_delivery_count": len(delivery_plan.deliveries),
-                "deliverable": delivery_result.status,
+                "delivery_status": delivery_result.status,
                 "delivery_count": len(delivery_result.deliveries),
                 "case_result_count": len(case_results),
                 "result_path": str(run_artifacts / "repository-review-result.json"),

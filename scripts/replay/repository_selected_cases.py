@@ -324,6 +324,7 @@ def _repository_result_from_replay(
             and not replayed_case_ids.intersection(item["case_ids"])
         ],
         "case_results": case_results,
+        "case_count": len(case_results),
         # Rebuilt results satisfy the same contract as a live run, including this field. A missing
         # value is not "review ran": it means the source result predates the field, and guessing
         # false would turn an unreviewed window into a reviewed one.

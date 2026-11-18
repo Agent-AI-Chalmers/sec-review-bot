@@ -95,7 +95,7 @@ async def main() -> None:
     )
     if not delivery_case_inputs:
         raise RuntimeError(
-            "Repository result does not contain keep case_results for delivery planning."
+            "Repository result does not contain deliverable cases for delivery planning."
         )
 
     delivery_plan = await generate_delivery_plan(
