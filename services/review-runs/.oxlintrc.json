@@ -1,27 +1,4 @@
 {
   "ignorePatterns": ["dist/**", "node_modules/**", ".agent-input-bundles/**"],
-  "overrides": [
-    {
-      "files": ["**/*.ts"],
-      "globals": {
-        "process": "readonly",
-        "console": "readonly",
-        "Buffer": "readonly",
-        "URL": "readonly",
-        "Request": "readonly",
-        "RequestInit": "readonly",
-        "Response": "readonly",
-        "ReadableStream": "readonly",
-        "AbortController": "readonly",
-        "AbortSignal": "readonly",
-        "fetch": "readonly",
-        "structuredClone": "readonly",
-        "clearTimeout": "readonly",
-        "setImmediate": "readonly",
-        "setInterval": "readonly",
-        "setTimeout": "readonly"
-      }
-    }
-  ],
   "extends": ["../../.oxlintrc.json"]
 }

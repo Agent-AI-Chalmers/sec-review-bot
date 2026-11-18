@@ -8,12 +8,11 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { format } from 'oxfmt'
+import { formatGenerated, renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { renderWorkflowInputDeclarations } from './generate-api-types.js'
-import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -75,20 +74,7 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
   }
 `
   const rendered = HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
-  const result = await format(outputPath, rendered, {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    sortImports: false,
-    sortPackageJson: false,
-    embeddedLanguageFormatting: 'off',
-    proseWrap: 'preserve'
-  })
-  if (result.errors.length > 0) {
-    throw new Error(`Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`)
-  }
-  return result.code
+  return formatGenerated(outputPath, rendered)
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */

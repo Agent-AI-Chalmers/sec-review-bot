@@ -11,11 +11,10 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { format } from 'oxfmt'
+import { formatGenerated, renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
-import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -142,7 +141,7 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
       .map((code) => `  ${code.toLowerCase()}: '${code}'`)
       .join(',\n') +
     '\n} as const\n'
-  return formatOutput(OUTPUT_PATH, rendered)
+  return formatGenerated(OUTPUT_PATH, rendered)
 }
 
 // Generate the server's closed error-code vocabulary from the contract enum.
@@ -192,7 +191,7 @@ export const PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT = [\n${array}\n] as cons
 /** Every code the contract's ErrorResponse.code enum allows. */
 export const ERROR_RESPONSE_CODES_FROM_CONTRACT = [\n${all}\n] as const
 `
-  return formatOutput(ERROR_CODES_PATH, body)
+  return formatGenerated(ERROR_CODES_PATH, body)
 }
 
 // The server's projection of the contract's domain shapes. The hand-written openapi.yaml owns
@@ -220,7 +219,7 @@ ${renderOperationTypeMaps(spec)}
 
 export type ObservedStep = ObservedPublicationStep
 `
-  return formatOutput(CONTRACT_TYPES_PATH, body)
+  return formatGenerated(CONTRACT_TYPES_PATH, body)
 }
 
 // The console's projection of the parameters `listRuns` accepts. The document models the
@@ -306,7 +305,7 @@ export const LIST_RUN_QUERY_PARAMS = [
 ${entries}
 ] as const
 `
-  return formatOutput(LIST_RUN_QUERY_PARAMS_PATH, body)
+  return formatGenerated(LIST_RUN_QUERY_PARAMS_PATH, body)
 }
 
 /** The console reads Review Runs through the BFF, so it needs the same response shapes
@@ -340,7 +339,7 @@ export type Run = ObservedRun
 export type RunEvent = ReviewRunEvent
 export type PublicationStep = ObservedPublicationStep
 `
-  return formatOutput(UI_TYPES_PATH, body)
+  return formatGenerated(UI_TYPES_PATH, body)
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */
@@ -352,21 +351,4 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams },
     { output: UI_TYPES_PATH, render: renderUiContractTypes }
   ]
-}
-
-async function formatOutput(file: string, source: string): Promise<string> {
-  const result = await format(file, source, {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    sortImports: false,
-    sortPackageJson: false,
-    embeddedLanguageFormatting: 'off',
-    proseWrap: 'preserve'
-  })
-  if (result.errors.length > 0) {
-    throw new Error(`Failed to format ${file}: ${JSON.stringify(result.errors)}`)
-  }
-  return result.code
 }

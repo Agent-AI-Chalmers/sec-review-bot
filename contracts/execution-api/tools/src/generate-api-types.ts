@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { compile } from 'json-schema-to-typescript'
-import { format } from 'oxfmt'
+import { formatGenerated } from '@sec-review-bot/contract-codegen'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
@@ -351,7 +351,7 @@ async function renderGatewayVersion(output: string): Promise<string> {
     `export const EXECUTION_API_VERSION = '${EXECUTION_API_VERSION}' as const`,
     ''
   ].join('\n')
-  return formatOutput(output, rendered)
+  return formatGenerated(output, rendered)
 }
 
 async function renderConnectorVersion(output: string): Promise<string> {
@@ -364,7 +364,7 @@ async function renderConnectorVersion(output: string): Promise<string> {
     'export type ExecutionApiVersion = typeof EXECUTION_API_VERSION',
     ''
   ].join('\n')
-  return formatOutput(output, rendered)
+  return formatGenerated(output, rendered)
 }
 
 function inputTypesOutput(): string {
@@ -386,7 +386,7 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     {
       output: apiTypesOutput,
       render: async () => {
-        return formatOutput(apiTypesOutput, await renderFile())
+        return formatGenerated(apiTypesOutput, await renderFile())
       }
     },
     {
@@ -398,21 +398,4 @@ export function generatedArtifacts(): GeneratedArtifact[] {
       render: async () => await renderConnectorVersion(connectorVersion)
     }
   ]
-}
-
-async function formatOutput(file: string, source: string): Promise<string> {
-  const result = await format(file, source, {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    sortImports: false,
-    sortPackageJson: false,
-    embeddedLanguageFormatting: 'off',
-    proseWrap: 'preserve'
-  })
-  if (result.errors.length > 0) {
-    throw new Error(`Failed to format ${file}: ${JSON.stringify(result.errors)}`)
-  }
-  return result.code
 }

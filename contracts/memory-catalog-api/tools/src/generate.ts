@@ -1,10 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { format } from 'oxfmt'
+import { formatGenerated, renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { parse } from 'yaml'
-
-import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 
 import { REPOSITORY_ROOT as repositoryRoot, SPEC_PATH as contractPath } from './paths.js'
 
@@ -44,20 +42,7 @@ export async function renderGeneratedTypes(outputPath: string): Promise<string> 
   const generated = await renderOpenApiTypes(contractPath)
   const spec = parse(await readFile(contractPath, 'utf8')) as unknown
   const source = `// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.\n${generated}\n\n${renderOperationOptionsById(spec)}\n`
-  const result = await format(outputPath, source, {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    sortImports: false,
-    sortPackageJson: false,
-    embeddedLanguageFormatting: 'off',
-    proseWrap: 'preserve'
-  })
-  if (result.errors.length > 0) {
-    throw new Error(`Failed to format ${outputPath}: ${JSON.stringify(result.errors)}`)
-  }
-  return result.code
+  return formatGenerated(outputPath, source)
 }
 
 export { outputPaths }

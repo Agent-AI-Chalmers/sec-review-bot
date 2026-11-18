@@ -67,8 +67,8 @@ Actions are pinned by major tag in `.github/workflows/` and updated by Dependabo
 
 Current declarations: every TypeScript package pins `engines.node` to `>=26.13.0 <27`, CI installs Node from `package.json` via `node-version-file`, and Dependabot ignores semver-major for `typescript` and `@types/node`. The agents package declares `requires-python = "==3.14.*"` with the exact patch in `agents/.python-version`, and CI installs Python via `python-version-file`.
 
-When the next version can be adopted:
+<!-- doc-default: typescript-compiler; source=contracts/codegen/package.json -->
 
-- TypeScript 7: after verifying compatibility with Oxfmt, Oxlint, and package typechecking and build tools.
+TypeScript packages use the native TypeScript 7 compiler. Repository syntax tooling uses Oxc rather than the legacy TypeScript Compiler API.
 
 Review major upgrades separately. Update version declarations, CI version configuration, and relevant Dockerfile base images together, then run the complete checks; a lockfile-only update is insufficient.

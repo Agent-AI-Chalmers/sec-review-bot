@@ -11,7 +11,13 @@
         "services/memory-catalog/src/contract-types-generated.ts",
         "apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
       ],
-      "code_inputs": ["contracts/codegen/src/index.ts", "contracts/codegen/package.json"]
+      "code_inputs": [
+        "contracts/codegen/src/index.ts",
+        "contracts/codegen/package.json",
+        "contracts/codegen/src/format-generated.ts",
+        "services/memory-catalog/.oxfmtrc.json",
+        "apps/control-plane-ui/.oxfmtrc.json"
+      ]
     }
   ]
 }

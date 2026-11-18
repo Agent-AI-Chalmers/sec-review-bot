@@ -46,6 +46,10 @@ ops:
   - '.github/workflows/ci.yml'
 
 contract-tools:
+  # Generated projections use the destination package's formatter configuration.
+  - '.oxfmtrc.json'
+  - 'apps/*/.oxfmtrc.json'
+  - 'services/*/.oxfmtrc.json'
   - '.oxlintrc.json'
   - 'package.json'
   - 'pnpm-workspace.yaml'

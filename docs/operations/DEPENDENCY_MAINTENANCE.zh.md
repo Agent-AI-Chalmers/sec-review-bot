@@ -69,8 +69,8 @@ action 以 major tag 固定在 `.github/workflows/`，由 Dependabot 的 `github
 
 当前声明：每个 TypeScript 包把 `engines.node` 钉在 `>=26.13.0 <27`，CI 通过 `node-version-file` 从 `package.json` 安装 Node，Dependabot 忽略 `typescript` 与 `@types/node` 的 semver-major。agents 包声明 `requires-python = "==3.14.*"`，精确补丁版本记在 `agents/.python-version`，CI 通过 `python-version-file` 安装 Python。
 
-何时可以升级到下一个版本：
+<!-- doc-default: typescript-compiler; source=contracts/codegen/package.json -->
 
-- TypeScript 7：确认 Oxfmt、Oxlint 和各包的类型检查与构建工具兼容后再升级。
+TypeScript 包使用原生 TypeScript 7 编译器。仓库的语法工具使用 Oxc，不依赖旧 TypeScript Compiler API。
 
 大版本升级应单独审查。同步修改版本声明、CI 版本配置和相关 Dockerfile 基础镜像，再运行完整检查；不能只更新 lockfile。

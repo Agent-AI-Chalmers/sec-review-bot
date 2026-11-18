@@ -14,7 +14,14 @@
         "apps/control-plane-ui/browser/features/runs/api-types.generated.ts",
         "apps/control-plane-ui/shared/list-run-query-params.ts"
       ],
-      "code_inputs": ["contracts/codegen/src/index.ts", "contracts/codegen/package.json"]
+      "code_inputs": [
+        "contracts/codegen/src/index.ts",
+        "contracts/codegen/package.json",
+        "contracts/codegen/src/format-generated.ts",
+        "services/review-runs/.oxfmtrc.json",
+        "apps/github-integration/.oxfmtrc.json",
+        "apps/control-plane-ui/.oxfmtrc.json"
+      ]
     },
     {
       "name": "schemas",
@@ -24,6 +31,11 @@
       "outputs": [
         "contracts/review-runs-api/v1/observed-run.schema.json",
         "contracts/review-runs-api/v1/review-run-record.schema.json"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/format-generated.ts",
+        "contracts/codegen/package.json",
+        ".oxfmtrc.json"
       ]
     },
     {
@@ -39,6 +51,13 @@
         "contracts/review-runs-api/v1/STATE_MACHINES.zh.md",
         "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts",
         "services/review-runs/src/state-machines.generated.ts"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/format-generated.ts",
+        "contracts/codegen/package.json",
+        ".oxfmtrc.json",
+        "apps/control-plane-ui/.oxfmtrc.json",
+        "services/review-runs/.oxfmtrc.json"
       ]
     }
   ]

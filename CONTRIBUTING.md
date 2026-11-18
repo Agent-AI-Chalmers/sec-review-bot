@@ -53,13 +53,15 @@ List the commands you ran to check the change and report the results. Also note 
 
 <!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
 
-Oxfmt owns formatting, including the final formatting of contract projections. A generator must produce output that passes the formatter without another rewrite; repeating generation must leave the same bytes. Set Oxfmt’s `printWidth` explicitly to 100 in CLI configs and generator options, and retain fixture exclusions.
+Use Oxfmt for formatting with a 100-column target. Preserve fixture exclusions. Generated artifacts must pass formatting without another rewrite, and repeated generation must leave the same bytes. See the [contract tooling guide](contracts/codegen/README.md) when changing generators.
 
 <!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
 
-Oxlint uses the shared native rule baseline in `.oxlintrc.json` and package-specific overrides. All TypeScript packages, including applications, services, contract tools, and smoke probes, use the same type-aware correctness rules. Prefer inferred return types for simple internal functions and callbacks. Explicitly annotate exported functions that define a stable interface; a contextually typed function or a handler object checked with `satisfies` already has an explicit contract. Reconsider existing annotations by the same criteria rather than preserving or deleting them mechanically. Native `import/first` keeps imports before executable statements while allowing module directives. Native `curly` requires braces around control-flow bodies, including `if` branches and loops; Oxfmt handles their line breaks. Keep blank lines around declarations as a code review convention, allowing adjacent type aliases and function overloads to remain grouped. Do not add a lint plugin solely to enforce these separators.
+All TypeScript packages use the shared Oxlint correctness rules and type-aware checks. Keep imports before executable statements and use braces for control-flow bodies. Handle Promise failures explicitly.
 
-Native rules retain the remaining effective ESLint checks and severities. `no-undef` stays enabled for JavaScript; TypeScript relies on the compiler for unresolved names. Strict-mode checks `no-dupe-args` and `no-octal` are omitted because modules and the TypeScript compiler reject those forms. Type-aware rules are configured explicitly rather than taken from Oxlint defaults. `require-await` is omitted: implementing an asynchronous interface without an `await` is valid, including in test doubles. Unhandled and misused Promises remain errors.
+Prefer inferred return types for simple internal functions and callbacks. Explicitly annotate exported functions that define a stable interface, unless their contract is already supplied by a contextual type or checked with `satisfies`.
+
+Keep blank lines around declarations for readability; adjacent type aliases and function overloads may remain grouped.
 
 ## Submit A Pull Request
 

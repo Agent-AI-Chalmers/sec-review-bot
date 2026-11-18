@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { format } from 'oxfmt'
+import { formatGenerated } from '@sec-review-bot/contract-codegen'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -429,7 +429,7 @@ export interface StateMachine extends MachineBody {
 }
 
 ${machines}`
-  return formatOutput(
+  return formatGenerated(
     path.resolve(
       REPO_ROOT,
       'apps',
@@ -577,7 +577,16 @@ ${text.intro(machines.map((machine) => `\`${machine.axis}\``).join(text.listSepa
 ${text.loops}
 
 ${sections.join('\n')}`
-  return formatOutput(`STATE_MACHINES.${language === 'zh' ? 'zh.md' : 'md'}`, rendered)
+  return formatGenerated(
+    path.resolve(
+      REPO_ROOT,
+      'contracts',
+      'review-runs-api',
+      'v1',
+      `STATE_MACHINES.${language === 'zh' ? 'zh.md' : 'md'}`
+    ),
+    rendered
+  )
 }
 
 export function generatedArtifacts(): GeneratedArtifact[] {
@@ -613,21 +622,4 @@ export function generatedArtifacts(): GeneratedArtifact[] {
       render: () => renderStateMachinesModule()
     }
   ]
-}
-
-async function formatOutput(file: string, source: string): Promise<string> {
-  const result = await format(file, source, {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    sortImports: false,
-    sortPackageJson: false,
-    embeddedLanguageFormatting: 'off',
-    proseWrap: 'preserve'
-  })
-  if (result.errors.length > 0) {
-    throw new Error(`Failed to format ${file}: ${JSON.stringify(result.errors)}`)
-  }
-  return result.code
 }

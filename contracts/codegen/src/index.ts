@@ -3,6 +3,8 @@ import { pluginTs, resolverTs } from '@kubb/plugin-ts'
 import { createKubb } from 'kubb'
 import { parseSync, type TSTypeAliasDeclaration } from 'oxc-parser'
 
+export { formatGenerated } from './format-generated.js'
+
 const BODY_SUFFIX = 'ResponseBody'
 const MAP_SUFFIX = 'ResponseBodyByStatus'
 

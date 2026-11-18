@@ -55,13 +55,15 @@
 
 <!-- doc-default: oxfmt-print-width; source=.oxfmtrc.json -->
 
-Oxfmt 负责格式化，也负责契约投影的最终排版。生成器应直接产生能够通过格式检查的产物，无须再次改写；重复生成应保持相同字节。Oxfmt 的 CLI 配置和生成器选项均显式设置 `printWidth: 100`，保留 fixtures 排除规则。
+使用 Oxfmt 格式化，目标行宽为 100 列，保留 fixtures 排除规则。生成产物应直接通过格式检查，无须再次改写；重复生成应保持相同字节。修改生成器时，参阅[契约工具指南](contracts/codegen/README.zh.md)。
 
 <!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
 
-Oxlint 使用根目录 `.oxlintrc.json` 中的原生规则基线和包级覆盖。所有 TypeScript 包，包括应用、服务、契约工具和 smoke probes，使用同一套类型感知正确性规则。简单内部函数和回调优先推断返回类型；定义稳定接口的导出函数应显式标注。已有上下文类型的函数，以及通过 `satisfies` 检查的处理器对象，已经有明确契约。已有标注也按相同原则重新判断，不机械保留或删除。原生 `import/first` 要求 import 位于可执行语句之前，同时允许模块指令在前。原生 `curly` 要求控制流程语句体使用大括号，包括 `if` 分支和循环，再由 Oxfmt 处理换行。声明前后留空行作为代码评审约定，相邻类型别名和函数重载可保持分组。不应仅为强制这些空行引入 lint 插件。
+所有 TypeScript 包使用共享的 Oxlint 正确性规则和类型感知检查。import 应位于可执行语句之前，控制流程语句体应使用大括号，并明确处理 Promise 失败。
 
-其余有效的 ESLint 检查及严重级别由原生规则保留。JavaScript 继续启用 `no-undef`，TypeScript 的未解析名称由编译器检查。`no-dupe-args` 和 `no-octal` 对应的语法已由模块严格模式和 TypeScript 编译器拒绝，因此不再单独配置。类型感知规则采用显式配置，不直接使用 Oxlint 默认规则。不启用 `require-await`：异步接口的实现可以不含 `await`，测试替身也适用；未处理和误用 Promise 仍按错误检查。
+简单内部函数和回调优先推断返回类型。定义稳定接口的导出函数应显式标注；已有上下文类型或通过 `satisfies` 检查的契约无需重复标注。
+
+声明前后留空行以便阅读，相邻类型别名和函数重载可保持分组。
 
 ## 提交 Pull Request
 

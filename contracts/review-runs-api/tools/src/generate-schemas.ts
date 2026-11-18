@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { format } from 'oxfmt'
+import { formatGenerated } from '@sec-review-bot/contract-codegen'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -82,26 +82,7 @@ export const inlineLocalRefsForTest = inlineLocalRefs
 /** Serialize and format one schema as the committed artifact. */
 async function renderSchema(id: string, schema: unknown): Promise<string> {
   const raw = `${JSON.stringify({ $schema: META_SCHEMA, $id: id, ...(schema as object) }, null, 2)}\n`
-  const result = await format(
-    path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', id),
-    raw,
-    {
-      semi: false,
-      singleQuote: true,
-      trailingComma: 'none',
-      printWidth: 100,
-      sortImports: false,
-      sortPackageJson: false,
-      embeddedLanguageFormatting: 'off',
-      proseWrap: 'preserve'
-    }
-  )
-  if (result.errors.length > 0) {
-    throw new Error(
-      `Failed to format ${path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', id)}: ${JSON.stringify(result.errors)}`
-    )
-  }
-  return result.code
+  return formatGenerated(path.resolve(REPO_ROOT, 'contracts', 'review-runs-api', 'v1', id), raw)
 }
 
 export async function renderObservedRunSchema(): Promise<string> {

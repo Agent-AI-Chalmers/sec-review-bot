@@ -14,6 +14,8 @@ Kubb 的 resolver 将操作响应的聚合类型命名为 `…ResponseBodyByStat
 
 生成器使用 Oxc 解析生成声明并执行局部结构调整，不依赖 TypeScript Compiler API。类型等价测试通过 TypeScript 编译器 CLI 检查最终产物。
 
+`formatGenerated()` 每次渲染都会读取产物目标目录最近的 `.oxfmtrc.json`。生成 Markdown 保留语义段落和嵌入示例；ignore patterns 只控制 CLI 文件选择，不阻止渲染已声明的投影。不支持的配置覆盖会明确报错，不会静默改变产物。在所属产物清单的 `code_inputs` 中登记此函数及每个目标配置。
+
 在本目录运行检查：
 
 ```bash

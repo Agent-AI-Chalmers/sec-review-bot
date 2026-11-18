@@ -8,7 +8,10 @@
       "code_inputs": [
         "contracts/execution-api/tools/src/generate-api-types.ts",
         "contracts/codegen/src/index.ts",
-        "contracts/codegen/package.json"
+        "contracts/codegen/package.json",
+        "contracts/codegen/src/format-generated.ts",
+        "services/review-runs/.oxfmtrc.json",
+        "services/execution-gateway/.oxfmtrc.json"
       ],
       "command": "pnpm --dir contracts/execution-api/tools run generate",
       "inputs": [
@@ -38,6 +41,12 @@
         "apps/github-integration/src/execution/execution-api-types-generated.ts",
         "services/execution-gateway/src/execution-api-version.ts",
         "apps/github-integration/src/execution/execution-api-version.ts"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/format-generated.ts",
+        "contracts/codegen/package.json",
+        "apps/github-integration/.oxfmtrc.json",
+        "services/execution-gateway/.oxfmtrc.json"
       ]
     }
   ]
