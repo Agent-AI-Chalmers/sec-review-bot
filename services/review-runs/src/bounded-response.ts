@@ -41,8 +41,13 @@ export async function readBoundedResponseBody(
   let size = 0
   try {
     while (true) {
-      const { done, value } = await reader.read()
+      const { done, value } = (await reader.read()) as {
+        done: boolean
+        value?: unknown
+      }
       if (done) break
+      if (!(value instanceof Uint8Array))
+        throw new TypeError('Expected response body bytes')
       size += value.byteLength
       if (size > maximumBytes) {
         await reader.cancel()

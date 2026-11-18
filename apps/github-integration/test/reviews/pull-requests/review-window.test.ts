@@ -11,7 +11,7 @@ function file(filename: string): PullRequestFile {
     deletions: 1,
     changes: 2,
     patch: '@@'
-  } as PullRequestFile
+  }
 }
 
 test('a non-synchronize event always uses the full pull request window', async () => {

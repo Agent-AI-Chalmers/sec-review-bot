@@ -27,7 +27,7 @@ function reviewRecord(): ReviewRecord {
       residual_risks: []
     },
     cvss: null
-  } as ReviewRecord
+  }
 }
 
 test('promoted issue comment uses the shared status vocabulary and keeps the overview', () => {

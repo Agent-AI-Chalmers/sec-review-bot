@@ -23,7 +23,7 @@ export interface ArtifactFiles {
  */
 export interface ArtifactSource {
   /** Read the files this artifact publishes. */
-  load(signal: AbortSignal): Promise<ArtifactFiles>
+  load: (signal: AbortSignal) => Promise<ArtifactFiles>
   /** The file to open first when the artifact carries it. */
   preferredFile: string
   /** Where the reader can open this workspace as its own page. */

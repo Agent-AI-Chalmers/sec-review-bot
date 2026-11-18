@@ -122,7 +122,7 @@ function positiveInteger(value: unknown, path: string): number {
 function nullableText(value: unknown, path: string): string | null {
   if (value !== null && typeof value !== 'string')
     invalid(path, 'a string or null')
-  return value as string | null
+  return value
 }
 
 function oneOf<T extends string>(
@@ -205,7 +205,7 @@ function pullRequestFile(
   }
   return {
     filename: text(item.filename, `${path}.filename`),
-    ...(patch === undefined ? {} : { patch: patch as string | null })
+    ...(patch === undefined ? {} : { patch: patch })
   }
 }
 

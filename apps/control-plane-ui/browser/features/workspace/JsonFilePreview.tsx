@@ -93,7 +93,7 @@ export function JsonFilePreview({
   const t = useMessages()
   if (!jsonLines) {
     try {
-      return <JsonTree value={JSON.parse(content)} />
+      return <JsonTree value={JSON.parse(content) as unknown} />
     } catch {
       return <Alert color="red">{t('jsonInvalid')}</Alert>
     }
@@ -108,7 +108,7 @@ export function JsonFilePreview({
         return {
           ...record,
           recordNumber: index + 1,
-          value: JSON.parse(record.raw)
+          value: JSON.parse(record.raw) as unknown
         }
       } catch {
         return { ...record, recordNumber: index + 1, value: undefined }

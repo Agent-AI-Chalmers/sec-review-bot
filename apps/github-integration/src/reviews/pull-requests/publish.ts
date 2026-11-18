@@ -329,16 +329,16 @@ async function publishPullRequestReviewSideEffect({
       if (suggestionManifest.candidates.length > 0) {
         const reviewBodyWithUnmapped = appendUnmappedSuggestionSection(
           commentBody,
-          suggestionManifest as SuggestionManifestLike
+          suggestionManifest
         )
-        review = (await publishSuggestionReview(octokit, {
+        review = await publishSuggestionReview(octokit, {
           pr,
           review_body: reviewBodyWithUnmapped,
           event: reviewEvent,
           candidates: suggestionManifest.candidates,
           marker,
           assert_publication_claim
-        })) as SuggestionReviewResult
+        })
         logInfo('suggestion_review_completed', {
           comment_count: review.count,
           event_type,

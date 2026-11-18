@@ -103,7 +103,7 @@ export function MemoryOverview({
             <SegmentedControl
               size="xs"
               value={range}
-              onChange={(value) => onRangeChange(value as OverviewRange)}
+              onChange={(value) => onRangeChange(value)}
               data={[
                 { value: '30d', label: t('range30Days') },
                 { value: '90d', label: t('range90Days') },

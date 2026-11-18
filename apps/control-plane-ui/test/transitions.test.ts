@@ -20,7 +20,7 @@ function event(overrides: Partial<RunEvent>): RunEvent {
     step_key: null,
     occurred_at: '2026-10-28T10:00:00.000Z',
     ...overrides
-  } as RunEvent
+  }
 }
 
 function run(overrides: Partial<Run> = {}): Run {

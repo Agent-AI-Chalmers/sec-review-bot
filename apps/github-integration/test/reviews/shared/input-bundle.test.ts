@@ -371,11 +371,11 @@ test('archiveInputBundle reproduces bytes for the same logical tree', async () =
     }
 
     const first = await archiveInputBundle({
-      input_bundle_root: roots[0]!,
+      input_bundle_root: roots[0],
       include_incremental_window: false
     })
     const second = await archiveInputBundle({
-      input_bundle_root: roots[1]!,
+      input_bundle_root: roots[1],
       include_incremental_window: false
     })
     archivePaths.push(new URL(first.uri).pathname, new URL(second.uri).pathname)

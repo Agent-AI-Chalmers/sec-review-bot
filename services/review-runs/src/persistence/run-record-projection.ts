@@ -45,7 +45,7 @@ export interface ReviewRunRow {
     input: JsonObject | null
     observed_at: string | null
     artifact_storage: ExecutionArtifactStorage | null
-    workflow_result: unknown | null
+    workflow_result: unknown
   }
   publication: AxisRowColumns<PublicationStatus>
   preparation: AxisRowColumns<

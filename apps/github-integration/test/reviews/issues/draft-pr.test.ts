@@ -172,7 +172,7 @@ function createOctokitMock({
         title: String(payload.title),
         head: String(payload.head),
         base: String(payload.base),
-        body: String(payload.body ?? ''),
+        body: typeof payload.body === 'string' ? payload.body : '',
         draft: Boolean(payload.draft)
       })
       return githubJson({ html_url: 'https://example.test/pull/1', number: 1 })

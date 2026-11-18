@@ -290,6 +290,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       postcss:
         specifier: ^8.5.32
         version: 8.5.32
@@ -342,6 +345,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -376,6 +382,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -407,6 +416,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       rollup:
         specifier: 4.67.4
         version: 4.67.4
@@ -441,6 +453,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       rollup:
         specifier: 4.67.4
         version: 4.67.4
@@ -475,6 +490,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       rollup:
         specifier: 4.67.4
         version: 4.67.4
@@ -499,6 +517,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -520,6 +541,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -541,6 +565,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -566,6 +593,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -692,6 +722,9 @@ importers:
       oxlint:
         specifier: 1.94.0
         version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: 7.0.2007
+        version: 7.0.2007
       tsx:
         specifier: ^4.23.15
         version: 4.23.15

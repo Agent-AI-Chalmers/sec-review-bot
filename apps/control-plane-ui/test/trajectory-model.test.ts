@@ -171,9 +171,9 @@ test('Responses function calls render once, while unmatched blocks remain inspec
       }
     }
   ])
-  expect(document.messages[0]!.content).not.toMatch(/ls-1/)
-  expect(document.messages[0]!.content).toMatch(/unmatched/)
-  expect(document.messages[0]!.toolCalls[0]!.args).toStrictEqual({
+  expect(document.messages[0].content).not.toMatch(/ls-1/)
+  expect(document.messages[0].content).toMatch(/unmatched/)
+  expect(document.messages[0].toolCalls[0].args).toStrictEqual({
     path: '/workspace'
   })
 })
@@ -190,11 +190,11 @@ test('failed analysis fixture preserves empty arguments, errors and repeated pro
     (message) => message.role === 'system'
   )
   expect(systems).toHaveLength(5)
-  expect(systems[0]!.repeatedSystemId).toBe(undefined)
+  expect(systems[0].repeatedSystemId).toBe(undefined)
   expect.assert(
     systems
       .slice(1)
-      .every((message) => message.repeatedSystemId === systems[0]!.id)
+      .every((message) => message.repeatedSystemId === systems[0].id)
   )
   const response = document.messages.find((message) => message.seq === 10)!
   expect(response.content).toBe('')
@@ -205,10 +205,10 @@ test('failed analysis fixture preserves empty arguments, errors and repeated pro
     expect.assert(call.resultMessageId)
   }
   const final = document.messages.find((message) => message.seq === 29)!
-  expect(final.toolCalls[0]!.args).toStrictEqual({
+  expect(final.toolCalls[0].args).toStrictEqual({
     path: '/workspace/project/src'
   })
-  expect(final.toolCalls[0]!.resultMessageId).toBe(undefined)
+  expect(final.toolCalls[0].resultMessageId).toBe(undefined)
 })
 
 test('system prompt references never cross branches or skip changed instructions', () => {

@@ -587,7 +587,7 @@ test('a claimed synchronize preparation recovers from the payload admission pers
   })
   const { app } = fakeApp({
     respond: () => githubJson({ id: 1 }),
-    installationOctokit: client.octokit as never
+    installationOctokit: client.octokit
   })
   const failures: string[] = []
   let claimed = false

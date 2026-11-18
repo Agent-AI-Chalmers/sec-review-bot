@@ -163,9 +163,18 @@ export async function handleRepositoryReviewDispatch({
     return
   }
 
-  const repo_full_name = String(payload.repo_full_name ?? '').trim()
-  const target_branch = String(payload.target_branch ?? '').trim()
-  const correlation_id = String(payload.correlation_id ?? '').trim()
+  const repo_full_name =
+    typeof payload.repo_full_name === 'string'
+      ? payload.repo_full_name.trim()
+      : ''
+  const target_branch =
+    typeof payload.target_branch === 'string'
+      ? payload.target_branch.trim()
+      : ''
+  const correlation_id =
+    typeof payload.correlation_id === 'string'
+      ? payload.correlation_id.trim()
+      : ''
 
   if (!repo_full_name) {
     writeJson(response, 400, {

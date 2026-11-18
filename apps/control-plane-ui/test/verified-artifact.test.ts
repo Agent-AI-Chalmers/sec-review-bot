@@ -14,6 +14,8 @@ for (const failure of ['metadata', 'storage'] as const) {
     const open = fs.open
     const close = fs.close
     const rm = fsPromises.rm
+    // Capture before spying; invoke with .call(this, error) below to retain the receiver.
+    // oxlint-disable-next-line typescript/unbound-method
     const destroy = fs.WriteStream.prototype.destroy
     const pendingOpen = Promise.withResolvers<void>()
     const releaseOpen = Promise.withResolvers<void>()

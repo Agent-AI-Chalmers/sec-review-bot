@@ -193,3 +193,21 @@ test('app HTTP handler contains rejected async dispatch handlers', async () => {
     error: 'Internal server error.'
   })
 })
+
+test('a rejected asynchronous webhook middleware becomes an HTTP error', async () => {
+  const response = captureResponse()
+  const handler = createAppHttpHandler({
+    app: unusedApp(),
+    port: 3000,
+    repository_review_dispatch_path: '/repository-review-dispatch',
+    repository_review_dispatch_handler: async () => {},
+    webhook_middleware: () => Promise.reject(new Error('webhook failed'))
+  })
+
+  await handler(requestFor('/api/github/webhooks'), response)
+
+  expect(response.statusCodeValue).toBe(500)
+  expect(response.body).toBe(
+    JSON.stringify({ error: 'Internal server error.' })
+  )
+})

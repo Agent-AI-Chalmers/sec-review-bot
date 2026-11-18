@@ -36,7 +36,11 @@ export function logIssuePayload(payload: unknown): void {
   const sender_login = asString(sender.login, '') || undefined
   const labels = Array.isArray(issue.labels)
     ? issue.labels
-        .map((label) => label?.name)
+        .map((label: unknown) =>
+          typeof label === 'object' && label !== null && 'name' in label
+            ? label.name
+            : undefined
+        )
         .filter(
           (label): label is string =>
             typeof label === 'string' && label.length > 0

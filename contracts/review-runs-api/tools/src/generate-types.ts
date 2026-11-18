@@ -75,7 +75,7 @@ export function operationRoutes(
     'patch',
     'trace'
   ]
-  const paths = (spec.paths ?? {}) as Record<string, OpenApiPathItem>
+  const paths = spec.paths ?? {}
   const routes: Array<{ operationId: string; path: string; method: string }> =
     []
   for (const [path, item] of Object.entries(paths)) {

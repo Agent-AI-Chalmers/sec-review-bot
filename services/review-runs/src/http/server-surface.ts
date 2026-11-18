@@ -64,9 +64,7 @@ type QueryScalarType = 'integer' | 'number' | 'boolean'
  * does not parse is left untouched and rejected by the schema, not guessed at.
  */
 function coerceQueryStrings(request: FastifyRequest): void {
-  const querystring = (
-    request.routeOptions?.schema as { querystring?: unknown } | undefined
-  )?.querystring
+  const querystring = request.routeOptions?.schema?.querystring
   const properties = (
     querystring as
       | { properties?: Record<string, { type?: QueryScalarType }> }
@@ -357,6 +355,8 @@ export async function registerReviewRunsRoutes(
       // only dilute the audit signal. Wrapping here means a new operation is logged without
       // repeating the call. Only identifiers are logged, never request arguments, which may
       // carry claim credentials.
+      // openapi-glue forwards this handler to Fastify, which awaits its Promise.
+      // oxlint-disable-next-line typescript/no-misused-promises
       return async (request: FastifyRequest, reply: FastifyReply) => {
         const durable = request.method !== 'GET'
         const runId = (request.params as { runId?: string }).runId

@@ -54,13 +54,22 @@ test('the recorded summarization prompt keeps its instructions and Markdown sect
   const events = raw
     .trim()
     .split('\n')
-    .map((line) => JSON.parse(line))
-  const prompt = events.find(
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          event: string
+          metadata?: { lc_source?: string }
+          message: { role: string; content: string }
+        }
+    )
+  const event = events.find(
     (event) =>
       event.event === 'message' &&
       event.metadata?.lc_source === 'summarization' &&
       event.message.role === 'user'
-  ).message.content as string
+  )
+  expect.assert(event)
+  const prompt = event.message.content
   const preview = markdownWithoutXmlTags(prompt)
   expect(preview).toContain('Context Extraction Assistant')
   expect(preview).toContain('## SESSION INTENT')

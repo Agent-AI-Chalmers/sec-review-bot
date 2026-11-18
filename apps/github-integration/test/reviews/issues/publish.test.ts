@@ -40,7 +40,7 @@ function issueReviewRecordWithPatch(): ReviewRecord {
       residual_risks: []
     },
     cvss: null
-  } as ReviewRecord
+  }
 }
 
 function buildHarness() {

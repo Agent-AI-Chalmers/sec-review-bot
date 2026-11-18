@@ -6,7 +6,7 @@ import { logError } from '../../utils/logger.js'
 export type NodeHttpMiddleware = (
   request: IncomingMessage,
   response: ServerResponse
-) => void
+) => void | Promise<void>
 
 export type RepositoryReviewDispatchHandler = (args: {
   app: App
@@ -125,7 +125,7 @@ async function handleAppHttpRequest(
   request.once('end', cleanup)
   request.once('error', cleanup)
 
-  webhook_middleware(request, response)
+  await webhook_middleware(request, response)
 }
 
 export function createAppHttpHandler({

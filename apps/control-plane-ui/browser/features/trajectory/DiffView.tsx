@@ -261,7 +261,7 @@ export function DiffView({
     <SegmentedControl
       size="xs"
       value={mode}
-      onChange={(value) => setMode(value as 'unified' | 'side-by-side')}
+      onChange={(value) => setMode(value)}
       data={[
         { label: t('diffUnified'), value: 'unified' },
         { label: t('diffSideBySide'), value: 'side-by-side' }

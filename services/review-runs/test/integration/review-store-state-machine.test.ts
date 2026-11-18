@@ -237,7 +237,7 @@ test('execution.started_at marks the instant execution began and does not move a
     const after = await store.queries.getRun(runId)
     expect(after?.execution.started_at).toBe(submittedAt)
     expect.assert(
-      Date.parse(after!.execution.updated_at) >= Date.parse(submittedAt!),
+      Date.parse(after!.execution.updated_at) >= Date.parse(submittedAt),
       'the row mtime moves past the immutable execution start'
     )
   } finally {
@@ -1083,12 +1083,9 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       runId,
       admission.preparation_token,
       {},
-      await publishedInput(
-        store,
-        runId,
-        admission.preparation_token as string,
-        { api_version: 'v1' }
-      )
+      await publishedInput(store, runId, admission.preparation_token, {
+        api_version: 'v1'
+      })
     )
     await store.preparations.fail(runId, admission.preparation_token, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
@@ -2476,7 +2473,7 @@ test('each lifecycle axis records an immutable start and end', async () => {
     const preparationStart = queued?.preparation?.started_at
     const preparationEnd = queued?.preparation?.finished_at
     expect.assert(
-      Date.parse(preparationEnd!) >= Date.parse(preparationStart!),
+      Date.parse(preparationEnd) >= Date.parse(preparationStart!),
       'preparation end is not before its start'
     )
 
@@ -5537,7 +5534,11 @@ for (const outcome of ['complete', 'retry', 'fail'] as const) {
             )
       expect(changed).toBe(true)
       const row = (
-        await pool.query(
+        await pool.query<{
+          status: string
+          claim_token: string | null
+          claimed_at: Date | null
+        }>(
           'SELECT status, claim_token, claimed_at FROM publications WHERE run_id=$1',
           [runId]
         )

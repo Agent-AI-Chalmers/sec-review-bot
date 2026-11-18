@@ -32,8 +32,7 @@ test.skipIf(!endpoint || !bucket)(
     await fs.writeFile(source, content)
     const reference = {
       uri: pathToFileURL(source).href,
-      digest:
-        `sha256:${crypto.createHash('sha256').update(content).digest('hex')}` as `sha256:${string}`,
+      digest: `sha256:${crypto.createHash('sha256').update(content).digest('hex')}`,
       media_type: 'application/tar+zstd' as const,
       size_bytes: content.byteLength
     }

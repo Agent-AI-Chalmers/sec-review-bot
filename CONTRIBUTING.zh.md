@@ -55,9 +55,11 @@
 
 Oxfmt 负责格式化，也负责契约投影的最终排版。生成器应直接产生能够通过格式检查的产物，无须再次改写；重复生成应保持相同字节。保留现有的 80 列风格及 fixtures 排除规则。
 
-Oxlint 使用根目录 `.oxlintrc.json` 中的原生规则基线和包级覆盖。Execution Gateway、Memory Catalog 和 smoke probes 保留类型感知检查，控制台保留显式函数返回类型。原生 `import/first` 要求 import 位于可执行语句之前，同时允许模块指令在前。声明前后留空行作为代码评审约定，相邻类型别名和函数重载可保持分组。不应仅为强制这些空行引入 lint 插件。
+<!-- doc-default: typescript-lint-policy; source=.oxlintrc.json -->
 
-其余有效的 ESLint 检查及严重级别由原生规则保留。JavaScript 继续启用 `no-undef`，TypeScript 的未解析名称由编译器检查。`no-dupe-args` 和 `no-octal` 对应的语法已由模块严格模式和 TypeScript 编译器拒绝，因此不再单独配置。类型感知规则采用显式映射，不直接替换成 Oxlint 默认规则。
+Oxlint 使用根目录 `.oxlintrc.json` 中的原生规则基线和包级覆盖。所有 TypeScript 包，包括应用、服务、契约工具和 smoke probes，使用同一套类型感知正确性规则。函数返回类型可以推断；重要公共接口在显式标注有助于澄清契约时应予以标注。原生 `import/first` 要求 import 位于可执行语句之前，同时允许模块指令在前。声明前后留空行作为代码评审约定，相邻类型别名和函数重载可保持分组。不应仅为强制这些空行引入 lint 插件。
+
+其余有效的 ESLint 检查及严重级别由原生规则保留。JavaScript 继续启用 `no-undef`，TypeScript 的未解析名称由编译器检查。`no-dupe-args` 和 `no-octal` 对应的语法已由模块严格模式和 TypeScript 编译器拒绝，因此不再单独配置。类型感知规则采用显式配置，不直接使用 Oxlint 默认规则。不启用 `require-await`：异步接口的实现可以不含 `await`，测试替身也适用；未处理和误用 Promise 仍按错误检查。
 
 ## 提交 Pull Request
 

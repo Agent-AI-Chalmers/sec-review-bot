@@ -1,5 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
-import type { Node, YAMLMap } from 'yaml'
+import type { Node } from 'yaml'
 
 import { MAX_SETUP_DECLARATION_TEXT } from '../execution/input.js'
 import { isRecord } from '../utils/error-utils.js'
@@ -115,7 +115,7 @@ function rejectNonStringEnvKeys(contents: Node | null): void {
     if (!isMap(env)) {
       return
     }
-    for (const item of (env as YAMLMap).items) {
+    for (const item of env.items) {
       if (isScalar(item.key) && typeof item.key.value !== 'string') {
         throw new SetupDeclarationError(
           `setup[${index}].env must map string keys to string values.`,

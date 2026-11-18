@@ -1,4 +1,9 @@
-import { createServer, type Server } from 'node:http'
+import {
+  createServer,
+  type Server,
+  type IncomingMessage,
+  type ServerResponse
+} from 'node:http'
 import path from 'node:path'
 
 import type { ArtifactStore } from './artifacts/store.js'
@@ -87,7 +92,10 @@ export function createControlPlaneUiBffServer({
   ]
   const staticRoutes = createStaticRoutes({ assets })
 
-  return createServer(async (request, response) => {
+  const handle = async (
+    request: IncomingMessage,
+    response: ServerResponse
+  ): Promise<void> => {
     applySecurityHeaders(response)
     if (request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -108,5 +116,16 @@ export function createControlPlaneUiBffServer({
       return
     }
     await staticRoutes.handle(request, response)
+  }
+  return createServer((request, response) => {
+    void handle(request, response).catch((error: unknown) => {
+      console.error('UI request failed', error)
+      if (!response.headersSent) {
+        response.writeHead(500, { 'content-type': 'application/json' })
+        response.end('{"error":"internal_server_error"}')
+      } else if (!response.writableEnded) {
+        response.destroy(error instanceof Error ? error : undefined)
+      }
+    })
   })
 }

@@ -127,7 +127,7 @@ export function RunTransitions({
           <SegmentedControl
             fullWidth
             value={axis}
-            onChange={(value) => setAxis(value as CoordinationAxis)}
+            onChange={(value) => setAxis(value)}
             data={machines.map((candidate) => ({
               value: candidate.axis,
               label: candidate.title

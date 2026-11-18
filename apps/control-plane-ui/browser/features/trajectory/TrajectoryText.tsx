@@ -32,7 +32,7 @@ function highlightNode(node: React.ReactNode, query: string): React.ReactNode {
   if (typeof node === 'string')
     return <HighlightText value={node} query={query} />
   if (Array.isArray(node))
-    return node.map((item, index) => (
+    return node.map((item: React.ReactNode, index) => (
       <React.Fragment key={index}>{highlightNode(item, query)}</React.Fragment>
     ))
   if (React.isValidElement<{ children?: React.ReactNode }>(node))

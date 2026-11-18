@@ -113,7 +113,7 @@ async function executeClaimedPreparation({
   }
 
   throw new InvalidPreparationInputError(
-    `Preparation input kind ${kind} does not match ${work.workflow}.`
+    `Preparation input kind ${typeof kind === 'string' ? kind : 'unknown'} does not match ${work.workflow}.`
   )
 }
 

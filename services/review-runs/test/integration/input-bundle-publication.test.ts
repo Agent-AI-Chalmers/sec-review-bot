@@ -233,7 +233,7 @@ test('reservation replay is immutable and connector/run ownership cannot be cros
     await f.store.preparations.fail(f.runId, f.token, {
       message: 'terminal failure'
     })
-    const result = await f.pool.query(
+    const result = await f.pool.query<{ status: string }>(
       'SELECT status FROM input_bundle_candidates WHERE run_id=$1',
       [f.runId]
     )
@@ -276,9 +276,9 @@ test('publication operations cross the authenticated HTTP contract with real Pos
   const f = await fixture()
   const { default: Fastify } = await import('fastify')
   const { registerReviewRunsRoutes, REVIEW_RUNS_FASTIFY_OPTIONS } =
-    await import(
+    (await import(
       new URL('../../dist/http/server-surface.js', import.meta.url).href
-    )
+    )) as typeof import('../../src/http/server-surface.js')
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
   try {
     await registerReviewRunsRoutes(app, {
@@ -308,7 +308,9 @@ test('publication operations cross the authenticated HTTP contract with real Pos
       payload: { token: f.token }
     })
     expect(listed.statusCode).toBe(200)
-    expect(listed.json()[0].input).toStrictEqual(f.intent.input)
+    expect(listed.json<[{ input: unknown }]>()[0].input).toStrictEqual(
+      f.intent.input
+    )
     expect(
       (
         await app.inject({

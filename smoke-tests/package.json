@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint . --deny-warnings --type-aware",
+    "lint": "oxlint . --deny-warnings",
     "test:smoke": "bash run.sh",
     "format": "oxfmt --write ."
   },

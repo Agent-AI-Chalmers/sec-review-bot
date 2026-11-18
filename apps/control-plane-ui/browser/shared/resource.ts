@@ -11,7 +11,7 @@ export interface Resource<T> {
   /** The failure of the latest attempt, cleared by the next success. */
   error: unknown
   /** Run the query again. Resolves when this attempt settles and never rejects. */
-  reload(): Promise<void>
+  reload: () => Promise<void>
 }
 
 interface ResourceState<T> {

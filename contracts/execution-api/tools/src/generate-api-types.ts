@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { compile, type JSONSchema } from 'json-schema-to-typescript'
+import { compile } from 'json-schema-to-typescript'
 import { format } from 'oxfmt'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
@@ -150,7 +150,7 @@ async function compileDeclaration(
     throw new Error(`${name}: expected an object schema`)
   }
   return (
-    await compile({ ...projected, title: name } as JSONSchema, name, {
+    await compile({ ...projected, title: name }, name, {
       bannerComment: '',
       enableConstEnums: false,
       format: false,

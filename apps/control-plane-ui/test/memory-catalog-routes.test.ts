@@ -101,18 +101,27 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
 
 test('memory edit creates a version while restore only moves the pointer', async () => {
   const requests: Array<{ path: string; body: Record<string, unknown> }> = []
-  const catalog = createServer(async (request, response) => {
-    const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    requests.push({
-      path: request.url ?? '',
-      body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
-        string,
-        unknown
-      >
+  const catalog = createServer((request, response) => {
+    void (async () => {
+      const chunks: Buffer[] = []
+      for await (const chunk of request as AsyncIterable<Buffer>)
+        chunks.push(Buffer.from(chunk))
+      requests.push({
+        path: request.url ?? '',
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+          string,
+          unknown
+        >
+      })
+      response.writeHead(201, { 'content-type': 'application/json' })
+      response.end('{"version":3}')
+    })().catch((error: unknown) => {
+      response.destroy(
+        error instanceof Error
+          ? error
+          : new Error('Test server failed', { cause: error })
+      )
     })
-    response.writeHead(201, { 'content-type': 'application/json' })
-    response.end('{"version":3}')
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   const catalogAddress = catalog.address()
@@ -163,9 +172,9 @@ test('memory edit creates a version while restore only moves the pointer', async
       '/v1/memory-tree/versions/publications/confirm',
       '/v1/memory-tree/versions'
     ])
-    expect(requests[0]!.body).toStrictEqual(requests[1]!.body)
-    expect(requests[0]!.body).toStrictEqual(requests[2]!.body)
-    const editSource = requests[0]!.body.source as Record<string, unknown>
+    expect(requests[0].body).toStrictEqual(requests[1].body)
+    expect(requests[0].body).toStrictEqual(requests[2].body)
+    const editSource = requests[0].body.source as Record<string, unknown>
     expect(editSource.actor).toBe(undefined)
     expect(editSource.operation_id).toBe('edit-1')
 
@@ -183,8 +192,8 @@ test('memory edit creates a version while restore only moves the pointer', async
       ).status
     ).toBe(201)
     expect(uploads, 'restore must not publish another object').toBe(1)
-    expect(requests[3]!.path).toBe('/v1/memory-tree/restore')
-    expect(requests[3]!.body).toStrictEqual({
+    expect(requests[3].path).toBe('/v1/memory-tree/restore')
+    expect(requests[3].body).toStrictEqual({
       operation_id: 'restore-1',
       expected_active_version: 3,
       restored_version: 1
@@ -319,23 +328,32 @@ async function memoryWriteFixture(
 }> {
   const writes: Array<{ path: string; body: unknown }> = []
   let uploads = 0
-  const catalog = createServer(async (request, response) => {
-    const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    writes.push({
-      path: request.url ?? '',
-      body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
-    })
-    const status =
-      catalogFailurePath === undefined || request.url === catalogFailurePath
-        ? catalogStatus
-        : 201
-    response.writeHead(status, { 'content-type': 'application/json' })
-    response.end(
-      JSON.stringify(
-        status === 409 ? { error: 'version_conflict' } : { created: true }
+  const catalog = createServer((request, response) => {
+    void (async () => {
+      const chunks: Buffer[] = []
+      for await (const chunk of request as AsyncIterable<Buffer>)
+        chunks.push(Buffer.from(chunk))
+      writes.push({
+        path: request.url ?? '',
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+      })
+      const status =
+        catalogFailurePath === undefined || request.url === catalogFailurePath
+          ? catalogStatus
+          : 201
+      response.writeHead(status, { 'content-type': 'application/json' })
+      response.end(
+        JSON.stringify(
+          status === 409 ? { error: 'version_conflict' } : { created: true }
+        )
       )
-    )
+    })().catch((error: unknown) => {
+      response.destroy(
+        error instanceof Error
+          ? error
+          : new Error('Test server failed', { cause: error })
+      )
+    })
   })
   await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
   t.onTestFinished(

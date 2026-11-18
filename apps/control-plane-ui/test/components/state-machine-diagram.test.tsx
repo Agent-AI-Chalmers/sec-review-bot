@@ -24,7 +24,7 @@ for (const language of ['en', 'zh'] as const) {
     renderComponent(
       <StateMachineDiagram
         machine={machine}
-        run={{ ...runs[0]!, source_platform: 'github' }}
+        run={{ ...runs[0], source_platform: 'github' }}
         events={[]}
       />,
       { language }

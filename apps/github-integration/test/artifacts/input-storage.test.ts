@@ -31,7 +31,7 @@ async function reference() {
   await fs.writeFile(source, 'bundle')
   return {
     uri: pathToFileURL(source).href,
-    digest: `sha256:${'a'.repeat(64)}` as `sha256:${string}`,
+    digest: `sha256:${'a'.repeat(64)}`,
     media_type: 'application/tar+zstd' as const,
     size_bytes: 6
   }

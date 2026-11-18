@@ -47,7 +47,7 @@ export async function verifyGitHubActionsOidcToken(
     audience: REPOSITORY_REVIEW_OIDC_AUDIENCE
   })
 
-  return payload as GitHubActionsOidcClaims
+  return payload
 }
 
 function normalizeHeaderValue(

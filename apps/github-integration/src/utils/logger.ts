@@ -24,7 +24,14 @@ function formatScalar(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean')
     return String(value)
 
-  const text = String(value)
+  const text =
+    typeof value === 'string'
+      ? value
+      : typeof value === 'bigint' ||
+          typeof value === 'symbol' ||
+          typeof value === 'function'
+        ? String(value)
+        : JSON.stringify(value)
   return /\s/.test(text) ? JSON.stringify(text) : text
 }
 
@@ -42,7 +49,7 @@ function describeError(error: Error, depth = 0): Record<string, unknown> {
       ? { cause: describeError(error.cause, depth + 1) }
       : error.cause === undefined
         ? {}
-        : { cause: String(error.cause) })
+        : { cause: formatValue(error.cause) })
   }
 }
 

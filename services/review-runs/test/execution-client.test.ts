@@ -298,7 +298,9 @@ test('a status query is split into batches the Execution API accepts', async () 
   configureExecution()
   const sent: string[][] = []
   globalThis.fetch = async (_input, init) => {
-    const body = JSON.parse(String(init?.body)) as { run_ids: string[] }
+    const body = JSON.parse(
+      typeof init?.body === 'string' ? init.body : ''
+    ) as { run_ids: string[] }
     sent.push(body.run_ids)
     return new Response(
       JSON.stringify({

@@ -11,9 +11,7 @@ function isRecord(value: unknown): value is AnyRecord {
 }
 
 export function nonEmptyText(value: unknown): string {
-  return String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return displayText(value).replace(/\s+/g, ' ').trim()
 }
 
 function finiteNumber(value: unknown): number | null {
@@ -21,7 +19,7 @@ function finiteNumber(value: unknown): number | null {
 }
 
 export function cvssSeverityRank(severity: unknown): number {
-  switch (String(severity ?? '').toLowerCase()) {
+  switch (displayText(severity).toLowerCase()) {
     case 'critical':
       return 5
     case 'high':
@@ -283,7 +281,7 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
   ]
     .map(([key, value]) => [key, nonEmptyText(value)] as const)
     .filter(([, value]) => value.length > 0)
-    .map(([key, value]) => `- ${key}: ${inlineCode(value)}`)
+    .map(([key, value]) => `- ${displayText(key)}: ${inlineCode(value)}`)
 
   const lines: string[] = []
   if (metaLines.length > 0) {

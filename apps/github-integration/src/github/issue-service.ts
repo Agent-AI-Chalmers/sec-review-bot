@@ -106,7 +106,14 @@ export function extractIssueContext(payload: unknown): IssueContext {
     issue_state: asString(issue.state),
     labels: Array.isArray(issue.labels)
       ? issue.labels
-          .map((label) => (typeof label?.name === 'string' ? label.name : null))
+          .map((label: unknown) =>
+            typeof label === 'object' &&
+            label !== null &&
+            'name' in label &&
+            typeof label.name === 'string'
+              ? label.name
+              : null
+          )
           .filter((label): label is string => Boolean(label))
       : [],
 

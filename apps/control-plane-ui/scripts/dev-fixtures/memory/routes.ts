@@ -281,7 +281,7 @@ export function createMemoryHandler(
         }
       }
     } else {
-      const sample = historySamples[sampleIndex++]!
+      const sample = historySamples[sampleIndex++]
       const extractionId = `fixture-history-${sampleIndex}`
       consumedVersionByObservation.set(`observation-${extractionId}-1`, version)
       extractionRecords.push({
@@ -329,7 +329,7 @@ export function createMemoryHandler(
     })
   }
   for (; sampleIndex < historySamples.length; sampleIndex += 1) {
-    const sample = historySamples[sampleIndex]!
+    const sample = historySamples[sampleIndex]
     extractionRecords.push({
       extraction_id: `fixture-history-${sampleIndex + 1}`,
       source_workflow: 'repository-review',
@@ -624,7 +624,8 @@ export function createMemoryHandler(
       )
     if (request.method === 'POST' && memoryWriteMatch !== null) {
       const chunks: Buffer[] = []
-      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>)
+        chunks.push(Buffer.from(chunk))
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
         string,
         unknown

@@ -15,10 +15,10 @@ interface MemoryEditSession extends EditorFiles {
 
 interface MemoryEditor {
   session: EditorFiles | undefined
-  begin(baseVersion: number): Promise<void>
-  changeFiles(files: Record<string, string>): void
-  close(): void
-  commit(): Promise<void>
+  begin: (baseVersion: number) => Promise<void>
+  changeFiles: (files: Record<string, string>) => void
+  close: () => void
+  commit: () => Promise<void>
 }
 
 /** Own the edit's base version and retry identity; the page owns operation feedback and refresh. */

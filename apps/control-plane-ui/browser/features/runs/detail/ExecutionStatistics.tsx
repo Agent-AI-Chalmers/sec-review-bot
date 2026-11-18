@@ -135,7 +135,7 @@ function phaseSections(
     )
   ].map(([key, phaseGroups]) => ({
     key,
-    label: phaseLabel(phaseGroups[0]!, t),
+    label: phaseLabel(phaseGroups[0], t),
     groups: phaseGroups
   }))
 }
@@ -189,14 +189,15 @@ function summarizeAgents(
     const key = agentGroupKey(group)
     const label = breakdownLabelFor(group)
     if (label !== null) {
-      const agentBreakdowns = breakdownGroups.get(key) ?? new Map()
+      const agentBreakdowns =
+        breakdownGroups.get(key) ?? new Map<string, StatisticsGroup[]>()
       agentBreakdowns.set(label, [...(agentBreakdowns.get(label) ?? []), group])
       breakdownGroups.set(key, agentBreakdowns)
     }
   }
   return {
     groups: [...grouped.values()].map((agentGroups) => {
-      const first = agentGroups[0]!
+      const first = agentGroups[0]
       return {
         ...first,
         case_id: null,

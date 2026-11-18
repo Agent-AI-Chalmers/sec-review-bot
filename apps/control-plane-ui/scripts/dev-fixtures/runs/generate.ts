@@ -801,14 +801,14 @@ function noticesFor(
 export const runs: FixtureRun[] = Array.from(
   { length: RUN_COUNT },
   (_, index) => {
-    const scenario = SCENARIOS[index % SCENARIOS.length]!
+    const scenario = SCENARIOS[index % SCENARIOS.length]
     // Rotate the workflow offset as scenarios advance, so every (scenario, workflow) pair occurs
     // regardless of how many scenarios there are. A plain `index % len` freezes the pairing when
     // the two lengths share a factor, which silently dropped some combinations from the fixtures.
     const workflow =
       WORKFLOWS[
         (index + Math.floor(index / WORKFLOWS.length)) % WORKFLOWS.length
-      ]!
+      ]
     const run_id = runId(index)
     const source = sourceFor(index)
     // An active run has necessarily been admitted a short time ago (it is still in flight), so
@@ -956,7 +956,7 @@ export const runs: FixtureRun[] = Array.from(
 export const stepsByRun = new Map<string, FixtureStep[]>(
   runs.map((run, index) => [
     run.run_id,
-    stepsFor(SCENARIOS[index % SCENARIOS.length]!, run.workflow, index)
+    stepsFor(SCENARIOS[index % SCENARIOS.length], run.workflow, index)
   ])
 )
 
@@ -970,7 +970,7 @@ const retriedRun = runs.find(
     (stepsByRun.get(run.run_id)?.length ?? 0) >= 2
 )
 if (retriedRun !== undefined) {
-  const retriedStep = stepsByRun.get(retriedRun.run_id)![1]!
+  const retriedStep = stepsByRun.get(retriedRun.run_id)![1]
   retriedStep.attempt_count = 2
 }
 
@@ -993,7 +993,7 @@ for (let position = 0; position < BLOCKED_RUN_COUNT; position += 1) {
     (_, runIndex) => runIndex % SCENARIOS.length === scenarioIndex
   )
   if (index < 0) break
-  const run = runs[index]!
+  const run = runs[index]
   blockedIndexes.add(index)
   run.preparation.status = 'disconnected'
   // A run in this state has necessarily been claimed at least once, so the phase has a start.
@@ -1027,7 +1027,7 @@ const executionParkedIndex = runs.findIndex(
     run.execution.status === 'succeeded'
 )
 if (executionParkedIndex >= 0) {
-  const run = runs[executionParkedIndex]!
+  const run = runs[executionParkedIndex]
   parkedIndexes.add(executionParkedIndex)
   // Execution is the parked axis; preparation completed normally, so the run got this far.
   run.execution.status = 'disconnected'
@@ -1041,7 +1041,7 @@ if (executionParkedIndex >= 0) {
   run.failure_code = null
   run.notices = noticesFor(
     {
-      ...SCENARIOS[executionParkedIndex % SCENARIOS.length]!,
+      ...SCENARIOS[executionParkedIndex % SCENARIOS.length],
       execution_status: 'disconnected',
       execution_attention_notice: 'pending'
     },
@@ -1056,7 +1056,7 @@ const publicationParkedIndex = runs.findIndex(
     !parkedIndexes.has(index) && run.publication.status === 'published'
 )
 if (publicationParkedIndex >= 0) {
-  const run = runs[publicationParkedIndex]!
+  const run = runs[publicationParkedIndex]
   parkedIndexes.add(publicationParkedIndex)
   // The axis follows its strongest step, so a disconnected axis without a disconnected step
   // describes a state the store cannot produce: every step succeeded, so nothing is unsettled
@@ -1077,7 +1077,7 @@ if (publicationParkedIndex >= 0) {
   run.failure_code = null
   run.notices = noticesFor(
     {
-      ...SCENARIOS[publicationParkedIndex % SCENARIOS.length]!,
+      ...SCENARIOS[publicationParkedIndex % SCENARIOS.length],
       publication_status: 'disconnected',
       publication_attention_notice: 'pending'
     },

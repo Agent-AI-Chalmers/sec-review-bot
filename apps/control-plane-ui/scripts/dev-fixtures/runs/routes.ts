@@ -226,7 +226,8 @@ export function createRunsHandler(): (
       }
       const runId = decodeURIComponent(giveUpMatch[1] ?? '')
       const chunks: Buffer[] = []
-      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      for await (const chunk of request as AsyncIterable<Buffer>)
+        chunks.push(Buffer.from(chunk))
       const body = ((): Record<string, unknown> => {
         try {
           return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<

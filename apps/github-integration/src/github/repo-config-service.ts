@@ -71,7 +71,7 @@ function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {
     )
   }
 
-  return parsed.sec_review_bot as ParsedSecReviewBotConfig
+  return parsed.sec_review_bot
 }
 
 export class RepositoryTriggerConfigError extends Error {

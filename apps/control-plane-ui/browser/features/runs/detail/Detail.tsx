@@ -70,7 +70,9 @@ export function Detail(): React.JSX.Element {
         </Container>
       )
     }
-    throw error
+    throw error instanceof Error
+      ? error
+      : new Error('Run request failed', { cause: error })
   }
   return (
     <Container size="lg" py="xl">

@@ -10,10 +10,13 @@ const files = (await readdir(stylesDirectory))
   .sort()
 const stylesheets = Object.fromEntries(
   await Promise.all(
-    files.map(async (file) => [
-      `browser/styles/${file}`,
-      await readFile(path.join(stylesDirectory, file), 'utf8')
-    ])
+    files.map(
+      async (file) =>
+        [
+          `browser/styles/${file}`,
+          await readFile(path.join(stylesDirectory, file), 'utf8')
+        ] as const
+    )
   )
 )
 const findings = findStyleLiterals(stylesheets)

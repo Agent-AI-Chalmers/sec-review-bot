@@ -29,8 +29,7 @@ const PATCH_KEYS = ['patchText', 'patch'] as const
 function patchKeyFor(args: Record<string, unknown>): string | undefined {
   return PATCH_KEYS.find(
     (key) =>
-      typeof args[key] === 'string' &&
-      (args[key] as string).includes('*** Begin Patch')
+      typeof args[key] === 'string' && args[key].includes('*** Begin Patch')
   )
 }
 
@@ -92,13 +91,15 @@ export function ToolArguments({
               <Group key={index} gap="xs" wrap="nowrap">
                 <Badge size="xs" variant="light" color={color}>
                   <HighlightText
-                    value={String(todo.status ?? 'pending')}
+                    value={
+                      typeof todo.status === 'string' ? todo.status : 'pending'
+                    }
                     query={query}
                   />
                 </Badge>
                 <Text size="sm">
                   <HighlightText
-                    value={String(todo.content ?? '')}
+                    value={typeof todo.content === 'string' ? todo.content : ''}
                     query={query}
                   />
                 </Text>
@@ -149,7 +150,10 @@ export function ToolArguments({
               {oldKey}
             </Text>
             <Code block>
-              <HighlightText value={String(args[oldKey] ?? '')} query={query} />
+              <HighlightText
+                value={typeof args[oldKey] === 'string' ? args[oldKey] : ''}
+                query={query}
+              />
             </Code>
           </div>
           <div className="trajectory-diff-new">
@@ -157,7 +161,10 @@ export function ToolArguments({
               {newKey}
             </Text>
             <Code block>
-              <HighlightText value={String(args[newKey] ?? '')} query={query} />
+              <HighlightText
+                value={typeof args[newKey] === 'string' ? args[newKey] : ''}
+                query={query}
+              />
             </Code>
           </div>
         </SimpleGrid>

@@ -85,7 +85,7 @@ function listRunsSpec(queryObject: Record<string, unknown>): OpenApiDocument {
         }
       }
     }
-  } as unknown as OpenApiDocument
+  }
 }
 
 test('the declared form-exploded query object projects to its property names', () => {

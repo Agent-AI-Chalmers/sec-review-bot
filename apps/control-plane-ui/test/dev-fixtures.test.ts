@@ -7,6 +7,17 @@ import {
 import type { Plugin } from 'vite'
 
 import { devFixtures } from '../scripts/dev-fixtures/index.js'
+import type {
+  Run,
+  ListRunsResponseBodyByStatus,
+  RunEvent
+} from '../browser/features/runs/api-types.generated.js'
+import type {
+  ExtractionList,
+  ObservationList,
+  CatalogOverview,
+  MemoryTreeVersionList
+} from '../browser/features/memory/api-types.generated.js'
 
 /**
  * The fixture plugin registers one connect-style middleware. Capturing it lets a real
@@ -399,9 +410,9 @@ test('dev fixtures page the run list in the order their cursor describes', async
   // paging affordance then silently disappears wherever the fixture is the only server.
   const fixture = await startFixtureServer()
   try {
-    const first = await (
+    const first = await ((
       await fetch(`${fixture.base}/api/runs?limit=50`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     const stamps = first.runs.map(
       (run: { created_at: string }) => run.created_at
     )
@@ -414,11 +425,11 @@ test('dev fixtures page the run list in the order their cursor describes', async
       'sixty-two fixtures must not fit one page of fifty'
     )
 
-    const second = await (
+    const second = await ((
       await fetch(
         `${fixture.base}/api/runs?limit=50&cursor=${first.next_cursor}`
       )
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     const firstIds = new Set(
       first.runs.map((run: { run_id: string }) => run.run_id)
     )
@@ -449,9 +460,9 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
   // filters for, so a one-column wait cannot pass early again.
   const fixture = await startFixtureServer()
   try {
-    const unfiltered = await (
+    const unfiltered = await ((
       await fetch(`${fixture.base}/api/runs?limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     const newest = unfiltered.runs[0]
     expect.assert(newest, 'the fixtures must serve at least one run')
     expect.assert(
@@ -469,19 +480,19 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
 test('run fixtures filter by source platform', async () => {
   const fixture = await startFixtureServer()
   try {
-    const github = await (
+    const github = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=github&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(github.runs[0]?.source_platform).toBe('github')
 
-    const gitlab = await (
+    const gitlab = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=gitlab&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(gitlab.runs[0]?.source_platform).toBe('gitlab')
 
-    const unknown = await (
+    const unknown = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=unknown&limit=1`)
-    ).json()
+    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
     expect(unknown.runs[0]?.source_platform).toBe('unknown')
   } finally {
     await fixture.close()
@@ -493,16 +504,16 @@ test('memory fixtures form one coherent provenance graph', async () => {
   try {
     const [extractions, observations, overview, versions] = await Promise.all([
       fetch(`${fixture.base}/api/memory/extractions?limit=100`).then(
-        (response) => response.json()
+        (response) => response.json() as Promise<ExtractionList>
       ),
       fetch(`${fixture.base}/api/memory/observations?limit=100`).then(
-        (response) => response.json()
+        (response) => response.json() as Promise<ObservationList>
       ),
-      fetch(`${fixture.base}/api/memory/overview?range=30d`).then((response) =>
-        response.json()
+      fetch(`${fixture.base}/api/memory/overview?range=30d`).then(
+        (response) => response.json() as Promise<CatalogOverview>
       ),
-      fetch(`${fixture.base}/api/memory/versions?limit=100`).then((response) =>
-        response.json()
+      fetch(`${fixture.base}/api/memory/versions?limit=100`).then(
+        (response) => response.json() as Promise<MemoryTreeVersionList>
       )
     ])
 
@@ -596,7 +607,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
         `${fixture.base}/api/runs/${encodeURIComponent(observation.source_run_id)}`
       )
       expect(runResponse.status).toBe(200)
-      const { run } = await runResponse.json()
+      const { run } = await (runResponse.json() as Promise<{ run: Run }>)
       expect(run.source_platform).toBe('github')
       expect(run.execution.status).toBe('succeeded')
       expect(run.publication.status).toBe('published')
@@ -611,7 +622,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
           version,
           'a consumed observation must name an existing version'
         )
-        expect(version.source.kind).toBe('learning')
+        expect.assert(version.source.kind === 'learning')
         expect(version.source.observation_ids).toContain(
           observation.observation_id
         )
@@ -670,7 +681,7 @@ test('fixture event responses preserve the contract reason for a failed transiti
       `${fixture.base}/api/runs/${run.run_id}/events`
     )
     expect(response.status).toBe(200)
-    const body = await response.json()
+    const body = await (response.json() as Promise<{ events: RunEvent[] }>)
     const transition = body.events.find(
       (event: { axis: string; to_status: string }) =>
         event.axis === 'preparation' && event.to_status === 'failed'

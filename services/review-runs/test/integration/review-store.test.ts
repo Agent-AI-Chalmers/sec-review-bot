@@ -6,9 +6,9 @@ import { Pool } from 'pg'
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 process.env.NODE_ENV = 'test'
-const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
+const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = (await import(
   new URL('../../dist/http/server-surface.js', import.meta.url).href
-)
+)) as typeof import('../../src/http/server-surface.js')
 
 function databaseUrl() {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -181,11 +181,17 @@ test('admission creates exactly one executions row alongside the run trunk', asy
     })
     // The split keeps execution state out of the trunk table, so every run must have exactly
     // one execution-row or a JOIN read would silently drop it.
-    const executions = await pool.query(
+    const executions = await pool.query<{
+      status: string
+      started_at: Date | null
+      claim_token: string | null
+      claimed_at: Date | null
+    }>(
       'SELECT status, started_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
       [runId]
     )
     expect(executions.rowCount).toBe(1)
+    expect.assert(executions.rows[0])
     expect(executions.rows[0].status).toBe('pending')
     expect(executions.rows[0].started_at).toBe(null)
     expect(executions.rows[0].claim_token).toBe(null)
@@ -193,10 +199,11 @@ test('admission creates exactly one executions row alongside the run trunk', asy
 
     // Publication input belongs to the publication axis, like the preparation and execution
     // inputs belong to theirs.
-    const publication = await pool.query(
+    const publication = await pool.query<{ input: unknown }>(
       'SELECT input FROM publications WHERE run_id=$1',
       [runId]
     )
+    expect.assert(publication.rows[0])
     expect(publication.rows[0].input).toStrictEqual({ repo: 'octo/example' })
 
     // The trunk keeps only identity and cross-axis fields; execution columns must not be there.

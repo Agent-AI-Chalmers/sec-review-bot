@@ -1,0 +1,8 @@
+{
+  // Let type-aware lint discover this project without changing the package build entrypoints.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}

@@ -104,24 +104,24 @@ test.each([
       screen.getByRole('dialog', { name: 'Edit memory files' })
     ).findByText('The edit could not be committed.')
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'First edit' }
     })
-    const first = vi.mocked(apiPost).mock.calls[0]![1]
+    const first = vi.mocked(apiPost).mock.calls[0][1]
     fireEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2))
-    expect(vi.mocked(apiPost).mock.calls[1]![1]).toEqual(first)
+    expect(vi.mocked(apiPost).mock.calls[1][1]).toEqual(first)
     await waitFor(() => expect(commit).toBeEnabled())
     fireEvent.change(content, { target: { value: 'Changed edit' } })
     fireEvent.click(commit)
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(3))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: baseVersion,
       files: { 'MEMORY.md': 'Changed edit' }
     })
-    expect(vi.mocked(apiPost).mock.calls[2]![1]).not.toEqual(
+    expect(vi.mocked(apiPost).mock.calls[2][1]).not.toEqual(
       expect.objectContaining({
         operation_id: (first as { operation_id: string }).operation_id
       })
@@ -148,11 +148,11 @@ test.each([
     fireEvent.click(screen.getByRole('button', { name: 'Commit version' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(4))
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
-      operation_id: expect.any(String),
+      operation_id: expect.any(String) as unknown,
       expected_active_version: 3,
       files: { 'MEMORY.md': 'First edit' }
     })
-    expect(vi.mocked(apiPost).mock.calls[3]![1]).not.toEqual(
+    expect(vi.mocked(apiPost).mock.calls[3][1]).not.toEqual(
       expect.objectContaining({
         operation_id: (first as { operation_id: string }).operation_id
       })

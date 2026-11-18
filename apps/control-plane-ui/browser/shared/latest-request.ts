@@ -1,7 +1,7 @@
 export interface LatestRequest {
   readonly signal: AbortSignal
-  isCurrent(): boolean
-  cancel(): void
+  isCurrent: () => boolean
+  cancel: () => void
 }
 
 /** Owns the latest request for one component query. Abort reduces unnecessary work; the

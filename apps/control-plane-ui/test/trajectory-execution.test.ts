@@ -205,7 +205,7 @@ for (const provenance of ['ancestry', 'agent', 'both'] as const) {
         }
       }
     ])
-    const left = document.messages[0]!
+    const left = document.messages[0]
     expect(left.toolCalls[0]?.resultMessageId).toBe(undefined)
     expect(left.toolCalls[0]?.diff).toBe(undefined)
     expect(left.searchable).not.toMatch(/sibling-only-diff/)

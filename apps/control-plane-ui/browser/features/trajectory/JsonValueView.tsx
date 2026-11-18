@@ -71,7 +71,11 @@ function JsonPrimitive({
       </code>
     )
   }
-  return <code className="json-code">{String(value)}</code>
+  return (
+    <code className="json-code">
+      {isPrimitive(value) ? String(value) : JSON.stringify(value)}
+    </code>
+  )
 }
 
 function JsonTableValue({
@@ -89,7 +93,11 @@ function JsonTableValue({
         <HighlightText value={value} query={query} />
       </span>
     )
-  return <code className="json-code">{String(value)}</code>
+  return (
+    <code className="json-code">
+      {isPrimitive(value) ? String(value) : JSON.stringify(value)}
+    </code>
+  )
 }
 
 function JsonObjectView({

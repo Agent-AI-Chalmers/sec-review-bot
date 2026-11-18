@@ -16,7 +16,7 @@ function fixture(name: string): string {
 function rowsOf(text: string): Array<[string, string]> {
   const files = parseUnifiedDiff(text)
   expect(files).toHaveLength(1)
-  return files[0]!.hunks.flatMap((hunk) =>
+  return files[0].hunks.flatMap((hunk) =>
     hunk.rows.map((row) => [row.kind, row.text] as [string, string])
   )
 }
@@ -63,7 +63,7 @@ test('a deleted file keeps the old path and is marked deleted', () => {
     ['/workspace/keep.txt', undefined],
     ['/workspace/gone.txt', 'deleted']
   ])
-  expect(files[1]!.hunks[0]!.rows.map((row) => row.kind)).toStrictEqual([
+  expect(files[1].hunks[0].rows.map((row) => row.kind)).toStrictEqual([
     'remove',
     'remove'
   ])
@@ -80,10 +80,8 @@ test('a new file with /dev/null on the old side is marked added', () => {
     ].join('\n')
   )
   expect(files).toHaveLength(1)
-  expect(files[0]!.status).toBe('added')
-  expect(files[0]!.hunks[0]!.rows).toStrictEqual([
-    { kind: 'add', text: 'hello' }
-  ])
+  expect(files[0].status).toBe('added')
+  expect(files[0].hunks[0].rows).toStrictEqual([{ kind: 'add', text: 'hello' }])
 })
 
 test('Begin Patch move and delete keep the operation metadata', () => {
@@ -100,15 +98,15 @@ test('Begin Patch move and delete keep the operation metadata', () => {
     ].join('\n')
   )
   expect(files).toHaveLength(2)
-  expect(files[0]!.path).toBe('/workspace/new.py')
-  expect(files[0]!.movedFrom).toBe('/workspace/old.py')
-  expect(files[0]!.hunks[0]!.rows).toStrictEqual([
+  expect(files[0].path).toBe('/workspace/new.py')
+  expect(files[0].movedFrom).toBe('/workspace/old.py')
+  expect(files[0].hunks[0].rows).toStrictEqual([
     { kind: 'remove', text: 'x = 1' },
     { kind: 'add', text: 'x = 2' }
   ])
-  expect(files[1]!.path).toBe('/workspace/gone.py')
-  expect(files[1]!.status).toBe('deleted')
-  expect(files[1]!.hunks[0]!.rows).toHaveLength(0)
+  expect(files[1].path).toBe('/workspace/gone.py')
+  expect(files[1].status).toBe('deleted')
+  expect(files[1].hunks[0].rows).toHaveLength(0)
 })
 
 test('Begin Patch update content without @@ is rejected, not dropped', () => {
@@ -137,8 +135,8 @@ test('operation-only files survive the empty-hunk filter', () => {
     ].join('\n')
   )
   expect(files).toHaveLength(1)
-  expect(files[0]!.path).toBe('/workspace/gone.py')
-  expect(files[0]!.status).toBe('deleted')
+  expect(files[0].path).toBe('/workspace/gone.py')
+  expect(files[0].status).toBe('deleted')
 })
 
 test('a hunk whose counts end early is rejected', () => {
@@ -203,9 +201,9 @@ test('plain text without hunks is not treated as a diff', () => {
 test('a real OpenCode edit diff parses into one file', () => {
   const files = parseUnifiedDiff(fixture('opencode-edit.diff'))
   expect(files).toHaveLength(1)
-  expect(files[0]!.path).toBe('/workspace/shescape/src/win.js')
-  expect(files[0]!.hunks).toHaveLength(1)
-  const rows = files[0]!.hunks[0]!.rows
+  expect(files[0].path).toBe('/workspace/shescape/src/win.js')
+  expect(files[0].hunks).toHaveLength(1)
+  const rows = files[0].hunks[0].rows
   expect.assert(
     rows.some(
       (row) => row.kind === 'remove' && row.text.includes('arg.replace(/"/g')

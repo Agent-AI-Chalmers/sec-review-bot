@@ -1,3 +1,4 @@
+import { displayText } from '../view-utils.js'
 import crypto from 'node:crypto'
 
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
@@ -39,7 +40,7 @@ interface DraftPullRequestSummary {
 }
 
 function stableBranchSegment(value: unknown): string {
-  const raw = String(value ?? '').trim() || 'unknown'
+  const raw = displayText(value, '').trim() || 'unknown'
   const readable =
     sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
   const digest = crypto
@@ -58,7 +59,7 @@ export function buildRepositoryDeliveryBranchName(
 }
 
 function normalizeTargetBranch(value: unknown): string {
-  const raw = String(value ?? '').trim()
+  const raw = displayText(value, '').trim()
   if (!raw) {
     return ''
   }

@@ -8,7 +8,13 @@ export function sanitizeBranchSegment(value: unknown): string {
   // and produce a branch name `git check-ref-format` rejects (createRef -> 422 ->
   // no draft PR). Replacing dots with `-` makes every dot form ref-safe.
   return (
-    String(value ?? '')
+    (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+        ? String(value)
+        : ''
+    )
       .toLowerCase()
       .replace(/[^a-z0-9_/-]+/g, '-')
       // Collapse runs of dashes and slashes separately: a doubled slash (`a//b`) is also rejected

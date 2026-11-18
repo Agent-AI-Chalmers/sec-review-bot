@@ -47,8 +47,19 @@ export function useRunsLocation(): RunsLocation {
     Record<string, string>
   >(() => {
     try {
-      return JSON.parse(
+      const stored: unknown = JSON.parse(
         window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}'
+      )
+      if (
+        typeof stored !== 'object' ||
+        stored === null ||
+        Array.isArray(stored)
+      )
+        return {}
+      return Object.fromEntries(
+        Object.entries(stored).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string'
+        )
       )
     } catch {
       return {}

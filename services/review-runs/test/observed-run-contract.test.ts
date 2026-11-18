@@ -247,7 +247,7 @@ function recordWith(
     notices: [],
     execution_input: { must: 'not leak' },
     publish_context: { repository: 'octo/example' }
-  } as ReviewRunRecord
+  }
 }
 
 test('the redacted read never carries a field the observed schema does not declare', () => {
@@ -324,7 +324,7 @@ test('what observeRun returns validates against the shared schema', () => {
         digest: `sha256:${'ab'.repeat(32)}`,
         size_bytes: 1234
       }
-    } as ReviewRunRecord['artifact_storage'])
+    })
   )
   expect(
     validate('observed-run.schema.json', withArtifact),

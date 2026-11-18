@@ -48,7 +48,10 @@ const preparingRun: ReviewRunRecord = {
 
 /** The request body a request sent, parsed from `init.body`. */
 function sentBody(init?: RequestInit): Record<string, unknown> {
-  return JSON.parse(String(init?.body)) as Record<string, unknown>
+  return JSON.parse(typeof init?.body === 'string' ? init.body : '') as Record<
+    string,
+    unknown
+  >
 }
 
 test('repository preparation can replace the admitted empty publish context', async (t) => {
@@ -66,7 +69,12 @@ test('repository preparation can replace the admitted empty publish context', as
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input)
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
       if (url.endsWith('/v1/runs') && init?.method === 'POST') {
         return Response.json({
           record: preparingRun,
@@ -238,7 +246,12 @@ test('run notice lease operations use the notice claim routes', async (t) => {
   const requests: Array<{ url: string; method: string; body?: unknown }> = []
   vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input)
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
       requests.push({
         url,
         method: init?.method ?? 'GET',
@@ -288,7 +301,12 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
   }> = []
   vi.spyOn(globalThis, 'fetch').mockImplementation(
     async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input)
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
       requests.push({
         url,
         method: init?.method ?? 'GET',

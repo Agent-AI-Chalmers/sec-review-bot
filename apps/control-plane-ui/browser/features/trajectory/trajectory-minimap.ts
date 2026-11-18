@@ -77,14 +77,14 @@ export function nearestSegment(
   let high = segments.length - 1
   while (low < high) {
     const middle = (low + high) >> 1
-    const segment = segments[middle]!
+    const segment = segments[middle]
     if (segment.top + segment.height < center) low = middle + 1
     else high = middle
   }
-  const candidate = segments[low]!
+  const candidate = segments[low]
   if (center >= candidate.top) return low
   if (low === 0) return 0
-  const previous = segments[low - 1]!
+  const previous = segments[low - 1]
   const previousDistance = Math.abs(previous.top + previous.height / 2 - center)
   const candidateDistance = Math.abs(
     candidate.top + candidate.height / 2 - center

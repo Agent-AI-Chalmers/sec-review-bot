@@ -2,6 +2,7 @@ import type { ReviewRecord } from '../review-record.js'
 import { fileChangePaths } from '../file-change.js'
 import { validateRepoRelativePath } from '../repo-path.js'
 import {
+  displayText,
   inlineCode,
   renderAnalysisNarratives,
   renderChangedFilesLines,
@@ -251,7 +252,7 @@ export function hasReviewRecordPatchReadyForPromotion(
 }
 
 export function normalizePromotionFilePath(filePath: unknown): string {
-  const rawValue = String(filePath ?? '').trim()
+  const rawValue = displayText(filePath, '').trim()
 
   if (!rawValue) {
     return ''

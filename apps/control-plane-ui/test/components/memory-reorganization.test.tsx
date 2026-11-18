@@ -177,7 +177,7 @@ test.each(['list', 'graph'])(
     const links = await screen.findAllByRole('button', {
       name: 'View observation'
     })
-    fireEvent.click(links[1]!)
+    fireEvent.click(links[1])
     expect(onRevealObservation).toHaveBeenCalledWith(3, 'extraction-2')
   }
 )

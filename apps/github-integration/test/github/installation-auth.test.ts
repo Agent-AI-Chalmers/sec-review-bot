@@ -14,7 +14,7 @@ import { fakeGitHub, githubJson } from '../github-client.js'
  * stays the SDK's and no hand-made object is cast into it. */
 function octokitReturning(result: unknown): Octokit {
   const { octokit } = fakeGitHub(() => githubJson({}))
-  octokit.auth = (async () => result) as typeof octokit.auth
+  octokit.auth = async () => result
   return octokit
 }
 

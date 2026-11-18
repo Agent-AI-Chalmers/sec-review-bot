@@ -658,7 +658,9 @@ test('version trajectories reject non-maintainer sources while unavailable refer
 
 test('reorganization trajectories support verified download and content preview', async (t) => {
   const fixture = await memoryArtifactFixture(t)
-  const record = JSON.parse(fixture.catalogReply.body)
+  const record = JSON.parse(fixture.catalogReply.body) as {
+    source: { kind: string }
+  }
   record.source.kind = 'reorganization'
   fixture.catalogReply.body = JSON.stringify(record)
   const download = await fixture.get('/versions/2/trajectory')
@@ -668,6 +670,8 @@ test('reorganization trajectories support verified download and content preview'
   )
   const preview = await fixture.get('/versions/2/trajectory/content')
   expect(preview.status).toBe(200)
-  const content = await preview.json()
+  const content = (await preview.json()) as {
+    events: { message: { content: string } }[]
+  }
   expect(content.events[0].message.content).toBe('Maintenance trajectory')
 })

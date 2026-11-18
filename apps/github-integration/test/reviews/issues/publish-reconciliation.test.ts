@@ -43,7 +43,7 @@ function reviewRecord(): ReviewRecord {
       residual_risks: []
     },
     cvss: null
-  } as ReviewRecord
+  }
 }
 
 const RUN_ID = '6f1c2f9e-0000-4000-8000-000000000001'
@@ -333,6 +333,8 @@ test('a lookup can return a primitive error without mutation or wrapping', async
     token: 'claim',
     stepKey: 'issue:summary-comment',
     find: async () => {
+      // Deliberately test non-Error failures from an external lookup.
+      // oxlint-disable-next-line typescript/only-throw-error
       throw 'lookup exploded'
     }
   })
@@ -436,6 +438,8 @@ test('a frozen lookup error is returned unchanged with explicit recording state'
       token: 'claim',
       stepKey: 'issue:summary-comment',
       find: async () => {
+        // Preserve the original failure, including primitive values.
+        // oxlint-disable-next-line typescript/only-throw-error
         throw error
       }
     })

@@ -99,9 +99,10 @@ export async function withPublicationHeartbeat(
     void renewSerially().catch(() => undefined)
   }, intervalMs)
   timer.unref?.()
+  // The timer and operation can assign active; TypeScript cannot see those callback writes.
   try {
     await operation(renewSerially)
-    if (active !== null) await active
+    if (active !== null) await (active as Promise<void>)
     try {
       await renewSerially()
     } catch {
@@ -110,7 +111,7 @@ export async function withPublicationHeartbeat(
     return !lost
   } finally {
     clearInterval(timer)
-    if (active !== null) await active
+    if (active !== null) await (active as Promise<void>)
   }
 }
 

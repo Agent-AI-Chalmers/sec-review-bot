@@ -88,7 +88,7 @@ test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
   ).toStrictEqual(Object.keys(manifest.invalid_schema_fixtures).sort())
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    validate(contractFixture(fixtureName))
+    expect(validate(contractFixture(fixtureName))).toBe(false)
     const allFailing = new Set(
       (validate.errors ?? []).map((error) =>
         error.instancePath === ''

@@ -14,9 +14,9 @@ import Fastify from 'fastify'
 // Each import of a built artifact uses a computed specifier so `tsc` typechecks this file
 // without a prior build: a literal import is unresolvable when `dist/` is absent
 // (`TS2307`), but the URL form loads the same file at runtime and is not a static reference.
-const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
+const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = (await import(
   new URL('../dist/http/server-surface.js', import.meta.url).href
-)
+)) as typeof import('../src/http/server-surface.js')
 
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
@@ -248,7 +248,7 @@ test('a request body missing a required contract field is rejected before the ha
       0
     )
     expect(
-      (response.json() as { code?: string }).code,
+      response.json<{ code?: string }>().code,
       'a body that fails the contract is INVALID_BODY, not the query filter code'
     ).toBe('INVALID_BODY')
   } finally {
@@ -275,7 +275,7 @@ test('schema validation names which part of the request failed', async () => {
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
     expect(query.statusCode).toBe(400)
-    expect((query.json() as { code?: string }).code).toBe('INVALID_QUERY')
+    expect(query.json<{ code?: string }>().code).toBe('INVALID_QUERY')
 
     // The query is one `additionalProperties: false` object, so a parameter the contract
     // does not declare is rejected before the handler runs — not silently ignored, which is
@@ -286,7 +286,7 @@ test('schema validation names which part of the request failed', async () => {
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
     expect(unknown.statusCode).toBe(400)
-    expect((unknown.json() as { code?: string }).code).toBe('INVALID_QUERY')
+    expect(unknown.json<{ code?: string }>().code).toBe('INVALID_QUERY')
     expect(
       listCalls,
       'an undeclared query parameter must be rejected before the handler'
@@ -302,9 +302,7 @@ test('schema validation names which part of the request failed', async () => {
       payload: { preparation_token: 't', publish_context: {}, input: {} }
     })
     expect(path.statusCode).toBe(400)
-    expect((path.json() as { code?: string }).code).toBe(
-      'INVALID_PATH_PARAMETER'
-    )
+    expect(path.json<{ code?: string }>().code).toBe('INVALID_PATH_PARAMETER')
   } finally {
     await app.close()
   }
@@ -527,7 +525,9 @@ test('a preparation input checkpoint is fenced by the HTTP route claim token', a
 
 test('a deterministic publication failure maps to 409 with its code', async () => {
   const { DeterministicReviewRunError, PUBLICATION_STEP_ERROR_CODES } =
-    await import(new URL('../dist/errors.js', import.meta.url).href)
+    (await import(
+      new URL('../dist/errors.js', import.meta.url).href
+    )) as typeof import('../src/errors.js')
   const app = await buildApp({
     preparations: {
       renewClaim: async () => {
@@ -680,7 +680,7 @@ test('a remote_object.id the contract does not declare is rejected', async () =>
         `id ${JSON.stringify(id)} must be rejected`
       ).toBe(400)
       expect(
-        (response.json() as { code?: string }).code,
+        response.json<{ code?: string }>().code,
         'a body that fails the contract is INVALID_BODY'
       ).toBe('INVALID_BODY')
     }
@@ -728,7 +728,7 @@ test('the query string is coerced to the declared types, and only there', async 
         response.statusCode,
         `limit=${JSON.stringify(bad)} must be rejected`
       ).toBe(400)
-      expect((response.json() as { code?: string }).code).toBe('INVALID_QUERY')
+      expect(response.json<{ code?: string }>().code).toBe('INVALID_QUERY')
     }
     expect(calls, 'a rejected query must not reach the handler').toBe(1)
   } finally {
@@ -759,7 +759,7 @@ test('run list filters reach the store as validated values with normalized dates
       from: '2026-10-01T08:00:00+08:00',
       to: '2026-10-02T08:00:00+08:00'
     }
-    for (const query of ['', `?${new URLSearchParams(filters)}`]) {
+    for (const query of ['', `?${new URLSearchParams(filters).toString()}`]) {
       const response = await app.inject({
         method: 'GET',
         url: `/v1/runs${query}`,
@@ -951,8 +951,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
     })
     expect(accepted.statusCode).toBe(200)
     expect(
-      (accepted.json() as { preparation: { status: string } }).preparation
-        .status
+      accepted.json<{ preparation: { status: string } }>().preparation.status
     ).toBe('failed')
 
     // Resuming is an operator decision too, and it goes through the same credential gate. It

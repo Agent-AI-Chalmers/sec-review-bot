@@ -214,7 +214,7 @@ export function MemoryVersionDiffContent({
         <Group gap="sm" wrap="nowrap">
           <SegmentedControl
             value={mode}
-            onChange={(value) => setMode(value as 'side-by-side' | 'unified')}
+            onChange={(value) => setMode(value)}
             data={[
               { label: t('diffSideBySide'), value: 'side-by-side' },
               { label: t('diffUnified'), value: 'unified' }

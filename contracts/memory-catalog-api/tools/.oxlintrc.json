@@ -3,34 +3,6 @@
   "overrides": [
     {
       "files": ["**/*.ts"],
-      "rules": {
-        "constructor-super": "off",
-        "getter-return": "off",
-        "no-class-assign": "off",
-        "no-const-assign": "off",
-        "no-dupe-class-members": "off",
-        "no-dupe-keys": "off",
-        "no-func-assign": "off",
-        "no-import-assign": "off",
-        "no-new-native-nonconstructor": "off",
-        "no-obj-calls": "off",
-        "no-redeclare": "off",
-        "no-setter-return": "off",
-        "no-this-before-super": "off",
-        "no-unreachable": "off",
-        "no-unsafe-negation": "off",
-        "no-var": "error",
-        "no-with": "off",
-        "prefer-const": "error",
-        "prefer-rest-params": "error",
-        "prefer-spread": "error",
-        "no-unused-vars": [
-          "error",
-          {
-            "argsIgnorePattern": "^_"
-          }
-        ]
-      },
       "globals": {
         "process": "readonly",
         "console": "readonly",
@@ -46,12 +18,6 @@
         "setImmediate": "readonly",
         "setInterval": "readonly",
         "setTimeout": "readonly"
-      }
-    },
-    {
-      "files": ["**/*.ts", "**/*.tsx"],
-      "rules": {
-        "import/first": "error"
       }
     }
   ],

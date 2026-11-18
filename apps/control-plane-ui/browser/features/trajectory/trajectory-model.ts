@@ -271,7 +271,7 @@ function linkToolResults(messages: TrajectoryMessageView[]): void {
         .sort((a, b) => b.common - a.common)
       const result =
         scored.length === 1 ||
-        (scored.length > 1 && scored[0]!.common > scored[1]!.common)
+        (scored.length > 1 && scored[0].common > scored[1].common)
           ? scored[0]?.result
           : undefined
       if (result) {
@@ -328,7 +328,7 @@ function totalRecordedUsage(
   }
   // Keep known usage for interrupted calls only when their response is unambiguous.
   for (const [callId, ids] of responses) {
-    if (!selected.has(callId) && ids.length === 1) selected.set(callId, ids[0]!)
+    if (!selected.has(callId) && ids.length === 1) selected.set(callId, ids[0])
   }
   // Viewer totals project recorded usage; accounting reports own coverage assessment.
   const covered = hasCallRecords
@@ -374,7 +374,7 @@ export function buildTrajectoryDocument(
       message.source,
       message.parentIds!.slice(0, -1)
     ])
-    const content = JSON.stringify(messageEvents[index]!.message.content)
+    const content = JSON.stringify(messageEvents[index].message.content)
     const previous = systems.get(branch)
     if (previous?.content === content) message.repeatedSystemId = previous.id
     else systems.set(branch, { content, id: message.id })

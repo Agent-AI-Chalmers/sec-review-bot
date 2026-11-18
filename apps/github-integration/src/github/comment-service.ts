@@ -68,13 +68,13 @@ function isOwnPullRequestApprovalError(error: unknown): boolean {
     errorInfo.response.data?.message,
     errorInfo.message,
     ...(Array.isArray(responseErrors)
-      ? responseErrors.map((item) => {
+      ? responseErrors.map((item: unknown) => {
           if (typeof item === 'object' && item !== null && 'message' in item) {
             return String(item.message)
           }
           return String(item)
         })
-      : [String(responseErrors ?? '')])
+      : [typeof responseErrors === 'string' ? responseErrors : ''])
   ].filter(
     (item): item is string => typeof item === 'string' && item.trim() !== ''
   )

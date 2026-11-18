@@ -39,7 +39,7 @@ export function RunJump(): React.JSX.Element {
             if (!requestedRunId) return
             setOpened(false)
             setValue('')
-            navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+            void navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
           }}
         >
           <Group gap="xs" align="flex-end" wrap="nowrap">

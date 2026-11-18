@@ -692,7 +692,7 @@ test('usage details expose totals and token subsets', async () => {
   ]
   renderComponent(<TrajectoryTimeline events={usageEvents} />)
 
-  await user.click(screen.getAllByRole('button', { name: 'Usage details' })[0]!)
+  await user.click(screen.getAllByRole('button', { name: 'Usage details' })[0])
 
   const details = await waitFor(() => {
     const element = document.querySelector<HTMLElement>(
@@ -785,9 +785,9 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
   const rightScroll = vi.fn()
   Object.defineProperty(left, 'scrollIntoView', { value: leftScroll })
   Object.defineProperty(right, 'scrollIntoView', { value: rightScroll })
-  const result = container.querySelector(
+  const result = container.querySelector<HTMLElement>(
     '#trajectory-right-result'
-  )! as HTMLElement
+  )!
   await userEvent
     .setup()
     .click(within(result).getByRole('button', { name: /back to call/i }))
@@ -795,7 +795,7 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
   expect(leftScroll).not.toHaveBeenCalled()
   expect(
     within(
-      container.querySelector('#trajectory-unresolved')! as HTMLElement
+      container.querySelector<HTMLElement>('#trajectory-unresolved')!
     ).queryByRole('button', { name: /back to call/i })
   ).not.toBeInTheDocument()
 })

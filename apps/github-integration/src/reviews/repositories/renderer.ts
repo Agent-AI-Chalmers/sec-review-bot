@@ -1,4 +1,5 @@
 import {
+  displayText,
   cvssSeverityRank,
   inlineCode,
   nonEmptyText,
@@ -86,7 +87,7 @@ function renderFoldedBlock(summary: string, bodyLines: string[]): string[] {
 
 function parseCvssBaseVector(vector: unknown): Record<string, string> {
   const parsed: Record<string, string> = {}
-  const raw = String(vector ?? '').trim()
+  const raw = displayText(vector, '').trim()
   if (!raw) {
     return parsed
   }
@@ -346,7 +347,7 @@ function blockedConfirmedCaseTitle(
 }
 
 function renderReferencePatch(patch_diff: unknown): string[] {
-  const patch = String(patch_diff ?? '').trim()
+  const patch = displayText(patch_diff, '').trim()
   if (!patch) {
     return []
   }
@@ -477,9 +478,9 @@ export function renderRepositorySecuritySummaryComment({
     (item) => item.deliverable
   ).length
   const scan_summary = workflow_result.scan_summary
-  const scan_mode = String(scan_target?.scan_mode ?? 'full').trim() || 'full'
-  const base_sha = String(scan_target?.base_sha ?? '').trim()
-  const head_sha = String(scan_target?.head_sha ?? '').trim()
+  const scan_mode = displayText(scan_target?.scan_mode, 'full').trim() || 'full'
+  const base_sha = displayText(scan_target?.base_sha, '').trim()
+  const head_sha = displayText(scan_target?.head_sha, '').trim()
 
   const reviewSummaryLines = [
     `- Scan mode: ${inlineCode(scan_mode)}`,

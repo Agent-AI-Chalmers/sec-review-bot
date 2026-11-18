@@ -90,7 +90,12 @@ test('repository dispatch forwards test_changes to repository review submission'
     response,
     oidcVerifier: oidcVerifier(),
     dispatchReview: async ({ payload }) => {
-      calls.push({ test_changes: String(payload.test_changes ?? '') || null })
+      calls.push({
+        test_changes:
+          (typeof payload.test_changes === 'string'
+            ? payload.test_changes
+            : '') || null
+      })
       return {
         run_id: 'run-1',
         replayed: false
