@@ -4,11 +4,11 @@
 // `publication-store` to reuse one UPDATE. Shared cross-axis writes belong in a small module that
 // both import, so the dependency graph stays one-directional.
 //
-// This is a dependency check, not a source-text check: it reads each module's own import
-// statements to prove which files it depends on.
+// Parse import and re-export declarations to check direct module dependencies.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
+import ts from 'typescript'
 
 const SRC = path.resolve(import.meta.dirname, '../src')
 const AXIS_STORES = [
@@ -24,10 +24,28 @@ const AXIS_STORES = [
  * this check pass no matter what was imported.
  */
 function importedModules(file: string): string[] {
-  const source = readFileSync(path.join(SRC, file), 'utf8')
-  return [
-    ...source.matchAll(/^(?:import|export)[\s\S]*?from '(\.[^']+)'/gm)
-  ].map((match) => path.basename(match[1] ?? '').replace(/\.js$/, '.ts'))
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(path.join(SRC, file), 'utf8'),
+    ts.ScriptTarget.Latest,
+    true
+  )
+  const modules: string[] = []
+  for (const statement of source.statements) {
+    if (
+      !ts.isImportDeclaration(statement) &&
+      !ts.isExportDeclaration(statement)
+    )
+      continue
+    const specifier = statement.moduleSpecifier
+    if (
+      specifier &&
+      ts.isStringLiteral(specifier) &&
+      specifier.text.startsWith('.')
+    )
+      modules.push(path.basename(specifier.text).replace(/\.js$/, '.ts'))
+  }
+  return modules
 }
 
 test('single-axis stores do not depend on each other', () => {
