@@ -255,6 +255,7 @@ test('running duration advances without a refetch', async ({
     browser,
     base: fixtureRuntime.baseURL,
     storageState: await page.context().storageState(),
+    now: await page.evaluate(() => Date.now()),
     waitUntil
   })
 })

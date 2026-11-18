@@ -142,6 +142,7 @@ export async function runRunsClockCheck({
   browser,
   base,
   storageState,
+  now,
   waitUntil
 }: {
   name: string
@@ -149,6 +150,7 @@ export async function runRunsClockCheck({
   browser: Browser
   base: string
   storageState: Awaited<ReturnType<BrowserContext['storageState']>>
+  now: number
   waitUntil: (
     predicate: () => boolean | Promise<boolean>,
     message: string,
@@ -162,7 +164,11 @@ export async function runRunsClockCheck({
   })
   try {
     const page = await context.newPage()
-    await page.clock.install()
+    await page.clock.install({ time: now })
+    assert.ok(
+      Math.abs((await page.evaluate(() => Date.now())) - now) < 60_000,
+      `${name} the new context must share its parent page's clock`
+    )
     await page.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
     await page.goto(`${base}/runs?execution_status=running`, {
       waitUntil: 'networkidle'
@@ -178,16 +184,19 @@ export async function runRunsClockCheck({
     )
     const elapsedBefore = await readElapsed()
     assert.match(elapsedBefore ?? '', /so far/)
-    await page.clock.fastForward(11_000)
+    // Remote runs may be hours or days old; always cross the displayed unit's
+    // boundary so the assertion also protects those deployments.
+    const unit = /so far: \d+([dhm])\b/.exec(elapsedBefore ?? '')?.[1]
+    const advance =
+      unit === 'd' ? 86_400_000 : unit === 'h' ? 3_600_000 : unit === 'm' ? 60_000 : 11_000
+    await page.clock.fastForward(advance)
     const elapsedAfter = await readElapsed()
     assert.match(elapsedAfter ?? '', /so far/)
-    if (/\d+s\b/.test(elapsedBefore ?? '')) {
-      assert.notStrictEqual(
-        elapsedAfter,
-        elapsedBefore,
-        `${name} an in-flight elapsed time must keep moving without a refetch`
-      )
-    }
+    assert.notStrictEqual(
+      elapsedAfter,
+      elapsedBefore,
+      `${name} an in-flight elapsed time must keep moving without a refetch`
+    )
   } finally {
     await context.close()
   }
