@@ -18,7 +18,7 @@ This directory owns the stateful API used to preview the UI without its backend 
 
 Browser component tests and the mock server both use the data generator, which imports the validator. Keep their runtime dependencies browser-compatible: they must not import Node APIs, Vite, the router, or HTTP handlers. Server integration belongs in the plugin and route modules.
 
-The mock API is validated by `test/checks/mock-api.test.ts`. Application E2E covers the assembled UI against its HTTP behavior. Package `scripts/` owns command-line checks and reports.
+The mock API is validated by `test/checks/mock-api.test.ts`. `test/checks/mock-api-boundaries.test.ts` builds the generator and validator as browser entries and rejects Node, Vite, and server-integration dependencies throughout their import graph. Application E2E covers the assembled UI against its HTTP behavior. Package `scripts/` owns command-line checks and reports.
 
 ## State lifetime
 
