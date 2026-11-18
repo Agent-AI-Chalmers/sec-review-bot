@@ -127,3 +127,69 @@ test('store reads return contract timestamps as ISO strings, not Dates', async (
     await administrator.end()
   }
 })
+
+for (const surface of ['extractions', 'observations'] as const) {
+  test(`${surface} pagination preserves microseconds within one millisecond`, async () => {
+    const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
+    const administrator = new Pool({ connectionString: databaseUrl })
+    await administrator.query(`create schema ${schema}`)
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      options: `-c search_path=${schema},public`
+    })
+    const store = new PostgresMemoryCatalogStore('unused', pool)
+    try {
+      await store.initialize()
+      for (const [id, fraction] of [
+        ['newer', '123900'],
+        ['older', '123800']
+      ] as const) {
+        const registration: ExtractionRegistration = {
+          extraction_id: id,
+          source_workflow: 'issue-review',
+          source_run_id: id,
+          source_unit_id: 'review',
+          execution_archive_digest: `sha256:${'d'.repeat(64)}`,
+          trajectory_reference: artifact(`trajectory-${id}`, 'c'),
+          observations: [{ observation_id: id, body_markdown: 'A fact.' }]
+        }
+        const publication = { registration, summary: 'Observed.' }
+        await store.reserveExtractionPublication(publication)
+        await store.confirmExtractionPublication(publication)
+        await store.registerExtraction(registration)
+        await pool.query(
+          `update ${surface} set created_at=$1 where extraction_id=$2`,
+          [`2026-01-01T00:00:00.${fraction}Z`, id]
+        )
+      }
+      const list = async (cursor: string | undefined) => {
+        if (surface === 'extractions') {
+          const page = await store.queries.listExtractions(cursor, 1, {})
+          return {
+            ids: page.extractions.map((row) => row.extraction_id),
+            timestamps: page.extractions.map((row) => row.created_at),
+            cursor: page.next_cursor
+          }
+        }
+        const page = await store.queries.listObservations(cursor, 1, {})
+        return {
+          ids: page.observations.map((row) => row.observation_id),
+          timestamps: page.observations.map((row) => row.created_at),
+          cursor: page.next_cursor
+        }
+      }
+      const first = await list(undefined)
+      expect(first.ids).toEqual(['newer'])
+      expect(first.timestamps).toEqual(['2026-01-01T00:00:00.123Z'])
+      expect(first.cursor).toEqual(expect.any(String))
+      const second = await list(first.cursor!)
+      expect(second.ids).toEqual(['older'])
+      expect(second.timestamps).toEqual(first.timestamps)
+      expect(second.cursor).toBeNull()
+    } finally {
+      await pool.end()
+      await administrator.query(`drop schema if exists ${schema} cascade`)
+      await administrator.end()
+    }
+  })
+}

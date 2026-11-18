@@ -164,6 +164,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       trajectory_reference: ArtifactReference
       observations: ExtractionObservation[]
       created_at: Date
+      cursor_created_at: string
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
@@ -171,7 +172,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
               coalesce((select jsonb_agg(jsonb_build_object('observation_id', observation_id,
                 'body_markdown', body_markdown) order by observation_id)
                 from observations where extraction_id=extraction.extraction_id), '[]'::jsonb) as observations,
-              extraction.created_at
+              extraction.created_at, extraction.created_at::text as cursor_created_at
        from extractions extraction
        where ($1::timestamptz is null or
                 (extraction.created_at, extraction.extraction_id) < ($1, $2))
@@ -195,7 +196,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       next_cursor:
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
-              createdAt: rows[rows.length - 1]!.created_at.toISOString(),
+              createdAt: rows[rows.length - 1]!.cursor_created_at,
               rowId: rows[rows.length - 1]!.extraction_id
             })
           : null
@@ -216,11 +217,13 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       body_markdown: string
       consumed_version: string | null
       created_at: Date
+      cursor_created_at: string
     }>(
       `select observation.observation_id, observation.extraction_id, extraction.source_run_id,
               extraction.source_unit_id,
               observation.body_markdown,
-              observation.consumed_version, observation.created_at
+              observation.consumed_version, observation.created_at,
+              observation.created_at::text as cursor_created_at
        from observations observation
        join extractions extraction using (extraction_id)
        where ($1::timestamptz is null or
@@ -254,7 +257,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       next_cursor:
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
-              createdAt: rows[rows.length - 1]!.created_at.toISOString(),
+              createdAt: rows[rows.length - 1]!.cursor_created_at,
               rowId: rows[rows.length - 1]!.observation_id
             })
           : null
