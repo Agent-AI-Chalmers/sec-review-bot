@@ -4,6 +4,44 @@ import { expect, test } from 'vitest'
 import { createControlPlaneUiBffServer } from '../../server/create-bff.js'
 import { loginCookie } from './support.js'
 
+test('BFF rejects malformed login bodies without issuing a session or returning a server error', async () => {
+  const ui = createControlPlaneUiBffServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  expect.assert(address && typeof address === 'object')
+  const origin = `http://127.0.0.1:${address.port}`
+  try {
+    for (const body of [
+      '{',
+      'null',
+      '[]',
+      '123',
+      '{}',
+      '{"token":null}',
+      '{"token":123}',
+      '{"token":{}}',
+      '{"token":["login-secret"]}',
+      '{"token":"wrong"}'
+    ]) {
+      const login = await fetch(`${origin}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin },
+        body
+      })
+      expect(login.status, body).toBe(401)
+      expect(await login.json(), body).toStrictEqual({ error: 'unauthorized' })
+      expect(login.headers.get('set-cookie'), body).toBe(null)
+    }
+    expect(await loginCookie(origin)).toContain('control_plane_ui_session=')
+  } finally {
+    await new Promise<void>((resolve) => ui.close(() => resolve()))
+  }
+})
+
 test('BFF marks session cookies secure for HTTPS proxy deployments', async () => {
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',

@@ -22,6 +22,7 @@ def _stream(*updates: dict[str, Any], error: Exception | None = None):
         for update in updates:
             yield {
                 "event": "on_chain_stream",
+                "run_id": "graph-run",
                 "parent_ids": [],
                 "data": {"chunk": update},
             }
@@ -201,6 +202,7 @@ async def test_invoke_uses_async_agent_stream() -> None:
         )
         yield {
             "event": "on_chain_stream",
+            "run_id": "graph-run",
             "parent_ids": [],
             "data": {
                 "chunk": {"model": {"structured_response": ProbeOutput(status="ok")}}

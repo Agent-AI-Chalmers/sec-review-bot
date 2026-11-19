@@ -47,9 +47,7 @@ export function createRunsHandler(
   const blockedRuns = (): ParkedRun[] =>
     runs.flatMap((run, index) => {
       // Only the runs this fixture deliberately parked are queued. A run whose state
-      // merely happens to be `disconnected` (the lifecycle scenarios, repeated across the
-      // page) is not an operator backlog: listing all of them turned four sample states into
-      // thirteen queue entries. The parked ones are what an operator is actually shown.
+      // merely happens to be `disconnected` in a lifecycle example is not an operator backlog.
       if (!parkedIndexes.has(index)) {
         return []
       }

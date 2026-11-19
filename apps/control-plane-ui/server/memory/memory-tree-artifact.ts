@@ -137,9 +137,12 @@ function paxEntry(name: string, body: Buffer | undefined): Buffer[] {
   }
 }
 
-async function collect(stream: AsyncIterable<Uint8Array>): Promise<Buffer> {
+async function collect(stream: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = []
   for await (const chunk of stream) {
+    if (!(chunk instanceof Uint8Array)) {
+      throw new Error('invalid_memory_tree_artifact')
+    }
     chunks.push(Buffer.from(chunk))
   }
   return Buffer.concat(chunks)
@@ -256,7 +259,7 @@ export async function readMemoryTreeArtifact(bytes: Buffer): Promise<Map<string,
           throw new Error(`Memory tree entry metadata is not canonical: ${name}`)
         }
 
-        const body = await collect(stream as unknown as AsyncIterable<Uint8Array>)
+        const body = await collect(stream)
         extractedBytes += body.length
         if (extractedBytes > MAX_MEMORY_TREE_EXTRACTED_BYTES) {
           throw new Error('Memory tree exceeds the extracted size limit.')

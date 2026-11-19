@@ -7,7 +7,8 @@ export async function executionArchive(runId: string): Promise<Buffer> {
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
+    for await (const chunk of pack) {
+      expect.assert(chunk instanceof Uint8Array)
       chunks.push(Buffer.from(chunk))
     }
   })()

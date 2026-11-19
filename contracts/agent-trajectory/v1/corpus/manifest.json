@@ -32,6 +32,11 @@
     "usage-cache-overflow.jsonl",
     "usage-reasoning-overflow.jsonl",
     "usage-total-mismatch.jsonl",
-    "usage-total-without-components.jsonl"
+    "usage-total-without-components.jsonl",
+    "null-run-id.jsonl",
+    "null-call-id.jsonl",
+    "invalid-message-id.jsonl",
+    "invalid-status.jsonl",
+    "invalid-optional-message.jsonl"
   ]
 }

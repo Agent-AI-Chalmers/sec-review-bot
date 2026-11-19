@@ -27,13 +27,13 @@ function safePath(name: string) {
   )
 }
 
-async function collectEntry(
-  stream: AsyncIterable<Uint8Array>,
-  expectedSize: number
-): Promise<Buffer> {
+async function collectEntry(stream: AsyncIterable<unknown>, expectedSize: number): Promise<Buffer> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of stream) {
+    if (!(chunk instanceof Uint8Array)) {
+      throw new Error('invalid_execution_archive')
+    }
     const bytes = Buffer.from(chunk)
     size += bytes.length
     if (size > expectedSize) {
@@ -100,10 +100,7 @@ export async function readExecutionArchive(
           if (extractedBytes > MAX_EXTRACTED_BYTES) {
             throw new Error('execution_archive_too_large')
           }
-          entries.set(
-            name,
-            await collectEntry(stream as unknown as AsyncIterable<Uint8Array>, header.size)
-          )
+          entries.set(name, await collectEntry(stream, header.size))
         }
         next()
       })().catch(reject)

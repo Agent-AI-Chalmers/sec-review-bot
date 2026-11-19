@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
@@ -19,7 +19,8 @@ async function bundle(
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
+    for await (const chunk of pack) {
+      expect.assert(chunk instanceof Uint8Array)
       chunks.push(Buffer.from(chunk))
     }
   })()
@@ -65,6 +66,36 @@ function manifest(runId = 'run-1'): string {
     ]
   })
 }
+
+test('execution archive reader rejects non-byte chunks from its parser', async () => {
+  // Array chunks preserve valid archive contents but must not be silently coerced by Buffer.from.
+  const bytes = await bundle([
+    { name: 'manifest.json', body: manifest() },
+    { name: 'result.json', body: '{"status":"completed"}' },
+    { name: 'artifact-tree/unit-1/review.jsonl', body: '{}\n' }
+  ])
+  const extract = tar.extract()
+  extract.on('entry', (_header, stream) => {
+    const iterator = stream[Symbol.asyncIterator]()
+    vi.spyOn(stream, Symbol.asyncIterator).mockImplementation(async function* () {
+      try {
+        for (let chunk = await iterator.next(); !chunk.done; chunk = await iterator.next()) {
+          expect.assert(chunk.value instanceof Uint8Array)
+          yield Array.from(chunk.value)
+        }
+      } finally {
+        await iterator.return?.()
+      }
+    })
+  })
+  const extracting = vi.spyOn(tar, 'extract').mockReturnValueOnce(extract)
+  try {
+    await expect(readExecutionArchive(bytes, 'run-1')).rejects.toThrow('invalid_execution_archive')
+  } finally {
+    extracting.mockRestore()
+    extract.destroy()
+  }
+})
 
 test('execution archive reader exposes text and marks binary files unpreviewable', async () => {
   const view = await readExecutionArchive(

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
@@ -23,7 +23,8 @@ async function memoryTreeArchive(
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {
-    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>) {
+    for await (const chunk of pack) {
+      expect.assert(chunk instanceof Uint8Array)
       chunks.push(Buffer.from(chunk))
     }
   })()
@@ -57,6 +58,34 @@ async function memoryTreeArchive(
   await collecting
   return zstdCompressSync(Buffer.concat(chunks))
 }
+
+test('memory tree reader rejects non-byte chunks from its parser', async () => {
+  // Array chunks preserve valid archive contents but must not be silently coerced by Buffer.from.
+  const artifact = await buildMemoryTreeArtifact(new Map([['MEMORY.md', '# Index\n']]))
+  const extract = tar.extract()
+  extract.on('entry', (_header, stream) => {
+    const iterator = stream[Symbol.asyncIterator]()
+    vi.spyOn(stream, Symbol.asyncIterator).mockImplementation(async function* () {
+      try {
+        for (let chunk = await iterator.next(); !chunk.done; chunk = await iterator.next()) {
+          expect.assert(chunk.value instanceof Uint8Array)
+          yield Array.from(chunk.value)
+        }
+      } finally {
+        await iterator.return?.()
+      }
+    })
+  })
+  const extracting = vi.spyOn(tar, 'extract').mockReturnValueOnce(extract)
+  try {
+    await expect(readMemoryTreeArtifact(artifact.bytes)).rejects.toThrow(
+      'invalid_memory_tree_artifact'
+    )
+  } finally {
+    extracting.mockRestore()
+    extract.destroy()
+  }
+})
 
 test('TypeScript memory tree artifacts round trip deterministically', async () => {
   const content = new Map<string, string>([

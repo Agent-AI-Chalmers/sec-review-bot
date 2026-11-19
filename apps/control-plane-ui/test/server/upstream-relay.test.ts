@@ -1,4 +1,4 @@
-import type { ServerResponse } from 'node:http'
+import { createServer, type ServerResponse } from 'node:http'
 import { expect, test } from 'vitest'
 
 import { UpstreamRequestError } from '../../server/upstream/request.js'
@@ -53,46 +53,50 @@ interface Captured {
   body: string
 }
 
-function capture(): { response: ServerResponse; written: Captured } {
-  const written: Captured = { status: 0, headers: {}, body: '' }
-  const response = {
-    writeHead(status: number, headers: Record<string, string>) {
-      written.status = status
-      written.headers = headers
-      return response
-    },
-    end(body: string | Buffer) {
-      written.body = Buffer.isBuffer(body) ? body.toString('utf8') : body
-      return response
+async function capture(write: (response: ServerResponse) => void): Promise<Captured> {
+  const server = createServer((_request, response) => write(response))
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  expect.assert(address && typeof address === 'object')
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}`)
+    return {
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: await response.text()
     }
-  } as unknown as ServerResponse
-  return { response, written }
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
 }
 
-test('a relayed upstream response keeps its status and body', () => {
-  const { response, written } = capture()
-  writeUpstreamResult(response, {
-    status: 404,
-    body: Buffer.from('{"error":"run_not_found"}')
-  })
+test('a relayed upstream response keeps its status and body', async () => {
+  const written = await capture((response) =>
+    writeUpstreamResult(response, {
+      status: 404,
+      body: Buffer.from('{"error":"run_not_found"}')
+    })
+  )
   expect(written.status).toBe(404)
   expect(written.body).toBe('{"error":"run_not_found"}')
   expect(written.headers['cache-control']).toBe(undefined)
 })
 
-test('a relayed response can be marked uncacheable', () => {
-  const { response, written } = capture()
-  writeUpstreamResult(
-    response,
-    { status: 200, body: Buffer.from('{}') },
-    { cacheControl: 'no-store' }
+test('a relayed response can be marked uncacheable', async () => {
+  const written = await capture((response) =>
+    writeUpstreamResult(
+      response,
+      { status: 200, body: Buffer.from('{}') },
+      { cacheControl: 'no-store' }
+    )
   )
   expect(written.headers['cache-control']).toBe('no-store')
 })
 
-test('a failure is sent as the console reads it', () => {
-  const { response, written } = capture()
-  sendUpstreamFailure(response, 'review_runs', new UpstreamRequestError('timeout'))
+test('a failure is sent as the console reads it', async () => {
+  const written = await capture((response) =>
+    sendUpstreamFailure(response, 'review_runs', new UpstreamRequestError('timeout'))
+  )
   expect(written.status).toBe(504)
   expect(JSON.parse(written.body)).toStrictEqual({
     error: 'review_runs_timeout'
