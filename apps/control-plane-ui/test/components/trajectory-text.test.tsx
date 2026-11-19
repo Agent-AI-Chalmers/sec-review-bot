@@ -1,17 +1,17 @@
 import React from 'react'
 import { screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent, page } from 'vitest/browser'
 import { expect, test, vi } from 'vitest'
 
+import { TrajectorySection } from '../../browser/features/trajectory/TrajectorySection.js'
 import { TrajectoryTimeline } from '../../browser/features/trajectory/TrajectoryTimeline.js'
 import { renderComponent } from './render.js'
 
 const source =
   '<role>Reviewer</role>\n\n<instructions>\n## Checks\n\n**Keep evidence.**\n\n`<literal/>`\n\n```xml\n<code>kept</code>\n```\n</instructions>'
 
-test('preview renders the body and code; source and copy retain the original text', async () => {
+test('preview renders the body and code; source retains the original text', async () => {
   const user = userEvent.setup()
-  const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
   const { container } = renderComponent(
     <TrajectoryTimeline
       events={[
@@ -28,16 +28,32 @@ test('preview renders the body and code; source and copy retain the original tex
   expect(screen.getByText('<literal/>')).toBeVisible()
   expect(screen.getByText('<code>kept</code>')).toBeVisible()
   expect(container.textContent).not.toContain('<instructions>')
-  await user.click(screen.getByRole('radio', { name: 'Source' }))
+  await user.click(page.getByText('Source', { exact: true }))
   expect(container.querySelector('pre')?.textContent).toBe(source)
   expect(screen.queryByRole('heading', { name: 'Checks' })).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Copy' }))
-  expect(copy).toHaveBeenLastCalledWith(source)
-  await user.click(screen.getByRole('radio', { name: 'Preview' }))
+  await user.click(page.getByText('Preview', { exact: true }))
   expect(screen.getByRole('heading', { name: 'Checks' })).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Copied' }))
-  expect(copy).toHaveBeenLastCalledWith(source)
-  copy.mockRestore()
+})
+
+test('copy retains the original text in preview and source modes', async () => {
+  const user = userEvent.setup()
+  const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+  try {
+    renderComponent(
+      <TrajectorySection kind="message" title="Content" value={source} force={0} openedInitially />
+    )
+    const copyButton = screen.getByRole('button', { name: 'Copy' })
+    await user.click(copyButton)
+    expect(copy).toHaveBeenLastCalledWith(source)
+    await user.click(page.getByText('Source', { exact: true }))
+    // The confirmation label expires after two seconds; content preservation must
+    // not depend on how quickly the test runner completes the mode switch.
+    await user.click(copyButton)
+    expect(copy).toHaveBeenCalledTimes(2)
+    expect(copy).toHaveBeenLastCalledWith(source)
+  } finally {
+    copy.mockRestore()
+  }
 })
 
 test('preview uses the existing Chinese preview/source terms and never creates XML elements', async () => {
@@ -62,7 +78,7 @@ test('preview uses the existing Chinese preview/source terms and never creates X
   expect(screen.getByRole('radio', { name: '预览' })).toBeChecked()
   expect(container.querySelector('script, img')).toBeNull()
   expect(container.querySelector('strong')?.textContent).toBe('正文')
-  await user.click(screen.getByRole('radio', { name: '源码' }))
+  await user.click(page.getByText('源码', { exact: true }))
   expect(container.querySelector('pre')?.textContent).toContain('<script>')
   expect(container.querySelector('script, img')).toBeNull()
 })

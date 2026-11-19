@@ -1,15 +1,11 @@
 import React from 'react'
 import { screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeAll, expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { MemoryObservationList } from '../../browser/features/memory/MemoryObservationList.js'
 import type { ObservationRecord } from '../../browser/features/memory/api-types.generated.js'
 import { renderComponent } from './render.js'
-
-beforeAll(() => {
-  Element.prototype.scrollIntoView = vi.fn()
-})
 
 function observation(index: number): ObservationRecord {
   return {

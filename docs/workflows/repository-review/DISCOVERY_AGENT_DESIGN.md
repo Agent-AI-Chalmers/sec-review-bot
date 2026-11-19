@@ -73,6 +73,6 @@ The hard limit leaves the remaining one fifth for runtime-added schemas, skill g
 
 All token boundaries come from the input token limit (`max_input_tokens`) configured for the selected deployment. Prompt size refers to the complete request, including system and user prompts, file metadata, and file contents.
 
-### Experimental Evidence
+### Strategy Evaluation
 
-The original experimental note reported a recall advantage for `single-file`. One possible explanation is that concentrating each call on one file reduces dilution of local security clues by multi-file context. Discovery provides investigation leads; later stages reconstruct cross-file chains. However, the note did not provide a date, model version, code revision, or locatable results, so it cannot establish the same benefit for other models or repositories. Compare candidate recall, false signals, total cost, and downstream reconstruction of cross-file issues with fixed inputs and models before changing strategy.
+Single-file input concentrates each call on local security clues, while multi-file input can expose relationships within a chunk. Discovery supplies investigation leads; later stages reconstruct cross-file chains. Before changing strategy, compare candidate recall, false signals, total cost, and downstream reconstruction of cross-file issues with fixed inputs and models.

@@ -118,8 +118,15 @@ def validate_trajectory_event(event: Any) -> dict[str, Any]:
         or seq > 9007199254740991
     ):
         raise ValueError("Trajectory seq must be a positive integer")
+    if "status" in event and (
+        not isinstance(event["status"], str)
+        or event["status"] not in {"completed", "failed", "interrupted"}
+    ):
+        raise ValueError("Invalid trajectory execution status")
     kind = event.get("event")
-    if kind == "message":
+    if not isinstance(kind, str):
+        raise ValueError("Unknown trajectory event")
+    if kind == "message" or "message" in event:
         message = event.get("message")
         if not isinstance(message, dict) or "type" in message:
             raise ValueError("Trajectory message must use role")
@@ -135,7 +142,7 @@ def validate_trajectory_event(event: Any) -> dict[str, Any]:
         if not isinstance(message.get("content"), (str, list)):
             raise ValueError("Trajectory content must be text or content blocks")
         validate_token_usage(message.get("usage_metadata"))
-    elif kind == "model_calls_start":
+    if kind in {"message", "model_calls_start"}:
         pass
     elif kind == "model_calls_end":
         if event.get("status") not in {"completed", "failed", "interrupted"}:
@@ -152,12 +159,15 @@ def validate_trajectory_event(event: Any) -> dict[str, Any]:
     metadata = event.get("metadata")
     if "metadata" in event and not isinstance(metadata, dict):
         raise ValueError("Invalid trajectory metadata")
-    for key in ("agent", "source", "run_id", "call_id"):
+    for key in ("agent", "source"):
         if (
             key in event
             and event[key] is not None
             and (not isinstance(event[key], str) or not event[key])
         ):
+            raise ValueError(f"Invalid trajectory {key}")
+    for key in ("run_id", "call_id", "message_id"):
+        if key in event and (not isinstance(event[key], str) or not event[key]):
             raise ValueError(f"Invalid trajectory {key}")
     if "parent_ids" in event and (
         not isinstance(event["parent_ids"], list)

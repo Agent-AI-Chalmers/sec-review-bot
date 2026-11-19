@@ -1,8 +1,7 @@
 # Real-LLM repository triage workflow smoke test.
 #
-# The candidate payloads are adapted from historical `.agent-workspace` triage
-# runs, then made intentionally scanner-shaped: dependency presence without
-# usage, dangerous APIs in tests, broad COPY with .dockerignore context, and one
+# The candidate payloads cover scanner-shaped findings: dependency presence
+# without usage, dangerous APIs in tests, broad COPY with .dockerignore context, and one
 # concrete runtime source-to-sink path. The test does not instruct the model to
 # read /skills; the normal SkillsMiddleware exposure should be enough for the
 # model to load the scanner-finding triage reference when it needs reachability

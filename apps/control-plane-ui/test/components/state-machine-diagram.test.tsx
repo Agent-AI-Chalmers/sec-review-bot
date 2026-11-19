@@ -1,12 +1,13 @@
 import React from 'react'
-import { screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent, page } from 'vitest/browser'
 import { expect, test } from 'vitest'
 
 import { StateMachineDiagram } from '../../browser/features/runs/detail/StateMachineDiagram.js'
 import { stateMachine } from '../../browser/features/runs/state-machines.generated.js'
-import { runs } from '../../scripts/dev-fixtures/runs/generate.js'
+import { createRunFixtures } from '../../mock-api/runs/generate.js'
 import { renderComponent } from './render.js'
+
+const { runs } = createRunFixtures(Date.parse('2026-11-12T12:00:00Z'))
 
 for (const language of ['en', 'zh'] as const) {
   test(`state tooltip shows the summary rather than lifecycle details (${language})`, async () => {
@@ -29,9 +30,13 @@ for (const language of ['en', 'zh'] as const) {
       { language }
     )
 
-    await user.hover(screen.getByRole('img', { name: detail.label }))
+    await user.hover(page.getByRole('img', { name: detail.label }))
 
-    const tooltip = await screen.findByRole('tooltip', {}, { timeout: 5000 })
+    const tooltipLocator = page.getByRole('tooltip')
+    // Browser assertions are asynchronous; jest-dom also declares a synchronous overload.
+    // oxlint-disable-next-line typescript/await-thenable
+    await expect.element(tooltipLocator).toBeVisible()
+    const tooltip = tooltipLocator.element()
     expect(tooltip).toHaveTextContent(detail.summary)
     expect(tooltip).not.toHaveTextContent(detail.description)
   })

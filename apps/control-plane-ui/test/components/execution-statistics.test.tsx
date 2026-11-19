@@ -1,11 +1,11 @@
 import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from 'vitest/browser'
 import { expect, test } from 'vitest'
 
 import { ExecutionStatistics } from '../../browser/features/runs/detail/ExecutionStatistics.js'
 import type { Run } from '../../browser/features/runs/api.js'
-import { reviewRunsFixture } from '../contract-fixtures.js'
+import observedRun from '../../../../contracts/review-runs-api/v1/fixtures/observed-run-agent-phases.json'
 import { renderComponent } from './render.js'
 
 const statistics: NonNullable<Run['execution_statistics']> = {
@@ -96,7 +96,7 @@ test.each(['en', 'zh'] as const)(
   'contract statistics retain draft, refinement and numbered feedback labels in %s',
   async (language) => {
     const user = userEvent.setup()
-    const run = reviewRunsFixture('observed-run-agent-phases.json') as Run
+    const run = observedRun as Run
     const labels =
       language === 'en'
         ? {
@@ -142,7 +142,7 @@ test.each(['en', 'zh'] as const)(
 
 test('feedback without an observed retry number is not presented as retry one', async () => {
   const user = userEvent.setup()
-  const run = reviewRunsFixture('observed-run-agent-phases.json') as Run
+  const run = observedRun as Run
   const feedback = run.execution_statistics!.groups.find(
     (group) => group.agent_phase === 'feedback'
   )!

@@ -37,13 +37,25 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
   if (!object(value)) {
     return invalid()
   }
-  if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 1) {
+  if (typeof value.seq !== 'number' || !Number.isSafeInteger(value.seq) || value.seq < 1) {
     return invalid()
   }
-  for (const key of ['agent', 'source', 'run_id', 'call_id']) {
+  for (const key of ['agent', 'source']) {
     if (value[key] !== undefined && value[key] !== null && !nonempty(value[key])) {
       return invalid()
     }
+  }
+  for (const key of ['run_id', 'call_id', 'message_id']) {
+    if (value[key] !== undefined && !nonempty(value[key])) {
+      return invalid()
+    }
+  }
+  if (
+    value.status !== undefined &&
+    (typeof value.status !== 'string' ||
+      !['completed', 'failed', 'interrupted'].includes(value.status))
+  ) {
+    return invalid()
   }
   if (
     value.parent_ids !== undefined &&
@@ -54,7 +66,7 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
   if (value.metadata !== undefined && !object(value.metadata)) {
     return invalid()
   }
-  if (value.event === 'message') {
+  if (value.message !== undefined || value.event === 'message') {
     const message = value.message
     if (
       !object(message) ||
@@ -111,7 +123,8 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
         return invalid()
       }
     }
-  } else if (value.event === 'model_calls_start') {
+  }
+  if (value.event === 'message' || value.event === 'model_calls_start') {
     // No additional fields to validate.
   } else if (value.event === 'model_calls_end') {
     if (
@@ -130,6 +143,7 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
   } else {
     return invalid()
   }
+  // All declared fields have been checked, including optional fields on other event variants.
   return value as unknown as TrajectoryEvent
 }
 

@@ -2,6 +2,8 @@ import { expect, test as base, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
 import createViteConfig from '../../vite.config.js'
 
+const MOCK_API_NOW = '2026-11-12T12:00:00Z'
+
 interface FixtureRuntime {
   baseURL: string
   server: ViteDevServer | undefined
@@ -40,14 +42,16 @@ export const test = base.extend<TestFixtures>({
         return
       }
 
-      process.env.CONTROL_PLANE_UI_DEV_FIXTURES = '1'
-      process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME = '2026-11-12T12:00:00Z'
+      const previousEnabled = process.env.CONTROL_PLANE_UI_MOCK_API
+      const previousNow = process.env.CONTROL_PLANE_UI_MOCK_API_NOW
+      process.env.CONTROL_PLANE_UI_MOCK_API = '1'
+      process.env.CONTROL_PLANE_UI_MOCK_API_NOW = MOCK_API_NOW
       let server: ViteDevServer | undefined
       try {
         const config = createViteConfig()
         server = await createServer({
           ...config,
-          // Import configuration once, but create fresh plugins and fixture data per test.
+          // Configuration is imported once; each server gets fresh plugins, records, and mutable state.
           configFile: false,
           server: {
             ...config.server,
@@ -65,11 +69,44 @@ export const test = base.extend<TestFixtures>({
         const baseURL = resolvedURL.replace(/\/$/, '')
         await use({ baseURL, server })
       } finally {
-        await server?.close()
+        try {
+          await server?.close()
+        } finally {
+          if (previousEnabled === undefined) {
+            delete process.env.CONTROL_PLANE_UI_MOCK_API
+          } else {
+            process.env.CONTROL_PLANE_UI_MOCK_API = previousEnabled
+          }
+          if (previousNow === undefined) {
+            delete process.env.CONTROL_PLANE_UI_MOCK_API_NOW
+          } else {
+            process.env.CONTROL_PLANE_UI_MOCK_API_NOW = previousNow
+          }
+        }
       }
     },
     { scope: 'test' }
   ],
+  page: async ({ page, fixtureRuntime }, use): Promise<void> => {
+    // Playwright's clock also virtualizes RAF. Keep native frame scheduling so
+    // CSS height transitions can start and finish on real browser frames.
+    if (fixtureRuntime.server !== undefined) {
+      await page.context().addInitScript((time: number) => {
+        const NativeDate = Date
+        const now = () => time
+        globalThis.Date = new Proxy(NativeDate, {
+          apply: () => new NativeDate(time).toString(),
+          construct: (target, args: unknown[], newTarget): Date =>
+            Reflect.construct(target, args.length === 0 ? [time] : args, newTarget) as Date,
+          get: (target, property, receiver): unknown =>
+            property === 'now' ? now : Reflect.get(target, property, receiver)
+        })
+        // Instance constructors must use the same fixed clock as the global binding.
+        Object.defineProperty(NativeDate.prototype, 'constructor', { value: globalThis.Date })
+      }, Date.parse(MOCK_API_NOW))
+    }
+    await use(page)
+  },
   baseURL: async ({ fixtureRuntime }, use): Promise<void> => {
     await use(fixtureRuntime.baseURL)
   }

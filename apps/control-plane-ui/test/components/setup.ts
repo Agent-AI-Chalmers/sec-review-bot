@@ -1,31 +1,21 @@
+import '../../browser/styles.css'
+import '@mantine/core/styles.css'
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 
 afterEach((): void => {
   cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   localStorage.clear()
   document.documentElement.removeAttribute('lang')
 })
 
-Object.defineProperty(window, 'matchMedia', {
-  configurable: true,
-  value: (query: string): MediaQueryList => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addEventListener: (): void => {},
-    removeEventListener: (): void => {},
-    addListener: (): void => {},
-    removeListener: (): void => {},
-    dispatchEvent: (): boolean => false
-  })
+beforeEach(async () => {
+  localStorage.clear()
+  // Browser files share origin storage; every test chooses a known initial locale.
+  await userEvent.hover(document.body)
+  localStorage.setItem('ui-language', 'en')
 })
-
-class ResizeObserverStub implements ResizeObserver {
-  disconnect(): void {}
-  observe(): void {}
-  unobserve(): void {}
-}
-
-globalThis.ResizeObserver = ResizeObserverStub

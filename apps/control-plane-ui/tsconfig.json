@@ -14,12 +14,12 @@
     "browser",
     "shared",
     "scripts",
+    "mock-api",
     "test/components",
     "test/e2e",
+    "test/browser-flows",
     "playwright.config.ts",
     "vite.config.ts",
-    "vitest.config.ts",
-    "test/browser",
-    "vitest.browser.config.ts"
+    "vitest.config.ts"
   ]
 }

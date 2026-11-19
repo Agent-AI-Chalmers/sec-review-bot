@@ -86,13 +86,14 @@ export function createSessionRoutes({
       }
       const supplied = ((): string => {
         try {
-          return (
-            (
-              JSON.parse(raw.toString('utf8')) as {
-                token?: string
-              }
-            ).token ?? ''
-          )
+          const body: unknown = JSON.parse(raw.toString('utf8'))
+          return typeof body === 'object' &&
+            body !== null &&
+            !Array.isArray(body) &&
+            'token' in body &&
+            typeof body.token === 'string'
+            ? body.token
+            : ''
         } catch {
           return ''
         }

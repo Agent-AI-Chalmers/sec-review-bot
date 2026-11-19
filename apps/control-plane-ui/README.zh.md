@@ -36,7 +36,7 @@
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run dev:fixtures
+pnpm dev:mock
 ```
 
 打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和记忆状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态测试数据；记忆文件树与执行轨迹操作会返回小型测试数据附件，因此无需真实存储对象也能验证浏览器下载行为。
@@ -73,13 +73,16 @@ browser/
   main.tsx            browser 入口
 server/               Node BFF
 shared/               browser 与 server 都会 import 的值
-scripts/              开发期 package 工具
+mock-api/             开发预览与本地 E2E 使用的有状态模拟 API
+scripts/              命令行检查与报告工具
 test/                 browser 与 server 测试
 ```
 
+[Mock API](mock-api/README.md) 说明开发模拟服务、共享场景数据及状态生命周期的职责边界。
+
 功能域之间不得相互 import。可复用的浏览器能力放在 `browser/features/` 或 `browser/shared/`；包级 `shared/` 仅用于真正跨越 browser/server 运行时边界的代码。
 
-测试数据按 Review Runs 的默认页大小提供数十条 run，并实现了它的游标契约，因此翻页、状态筛选、详情时间线和已结算的模型用量快照都能在没有后端的情况下走通。每条生成的 run 都会对照存储实现实际可能产生的状态做校验，所以不可能出现的组合会直接让模块导入失败，不会混成看似合理的演示数据。
+测试数据按 Review Runs 的默认页大小提供数十条 run，并实现了它的游标契约，因此翻页、状态筛选、详情时间线和已结算的模型用量快照都能在没有后端的情况下走通。每条生成的 run 都会对照存储实现实际可能产生的状态做校验，所以不可能出现的组合会直接让数据生成失败，不会混成看似合理的演示数据。
 
 如需连接正在运行的 Review Runs，先在一个终端中构建并启动 BFF：
 
@@ -108,30 +111,51 @@ Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默�
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run colors:check
-pnpm run icons:check
 pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-额外的 UI 一致性检查包括：
+颜色和图标规则纳入 `pnpm test`。也可以单独运行，或生成样式报告：
 
-- `pnpm run colors:check`：检查自定义颜色是否同时存在于浅色和深色主题中，指定的文字与背景组合是否仍然清晰，以及品牌色是否保持从浅到深排列。相邻颜色过于接近时只报告提示，不会导致 CI 失败。
-- `pnpm run icons:check`：要求浏览器图标来自 Tabler，并使用共享的 `ICON_SIZE` 尺寸等级。
+- `pnpm test test/checks/color-rules.test.ts`：检查自定义颜色是否同时存在于浅色和深色主题中，指定的文字与背景组合是否仍然清晰，以及品牌色是否保持从浅到深排列。相邻颜色过于接近时只报告提示，不会导致 CI 失败。
+- `pnpm test test/checks/icon-rules.test.ts`：要求浏览器图标来自 Tabler，并使用共享的 `ICON_SIZE` 尺寸等级。
 - `pnpm run styles:report`：列出维护中的 CSS 里直接写入的间距、圆角和字号值。该报告仅供检查，不会导致 CI 失败。
+
+这些检查从测试导入图之外读取 CSS 和 TSX 文件。修改主题 CSS 或应用图标后，请显式运行上面的对应测试或完整的 `pnpm test`；仅运行增量测试可能遗漏这些改动。
 
 ### 测试范围
 
 <!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
-- `pnpm test`：运行逻辑、接口和界面组件测试。
-- `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：只运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/api-error.test.ts`。
+- `pnpm test`：在 Node 中运行逻辑和接口测试，在 Chrome 中运行界面组件测试。
+- `pnpm run test:logic`：只运行逻辑与接口测试。`pnpm run test:component`：通过 Vitest Browser Mode 在真实 Chrome 中运行界面组件测试。开发时优先运行相关测试文件，例如 `pnpm test test/logic/api-error.test.ts`。
 - `pnpm run typecheck`：检查浏览器与服务端源码的类型，并报告类型测试结果。CI 使用此命令。需要单独查看类型测试结果时，可运行 `pnpm run test:types`。
-- `pnpm run test:affected`：开发时只重跑上次运行后受源码改动影响的测试。首次运行会为所有选中的测试建立记录；可追加文件路径缩小范围，例如 `pnpm run test:affected test/api-error.test.ts`。此命令使用实验性的依赖跟踪。修改契约、fixture、生成文件、环境或配置后，应显式运行相关测试；完成前仍需运行 `pnpm test` 和其他必要检查。
-- `pnpm run test:browser-component`：在真实 Chrome 中检查编辑器换行，无需启动应用 BFF 或模拟 API。普通渲染和交互继续使用 jsdom 组件测试，需要真实浏览器布局的行为使用此命令。它使用已安装的 Chrome，也可通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定可执行文件。CI 在桌面浏览器任务中运行此检查。
-- `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、滚动、下载等浏览器行为，以及无障碍和视觉效果。
+- `pnpm run test:affected`：开发时只重跑上次运行后受源码改动影响的测试。首次运行会为所有选中的测试建立记录；可追加文件路径缩小范围，例如 `pnpm run test:affected test/logic/api-error.test.ts`。此命令使用实验性的依赖跟踪。修改契约、fixture、生成文件、环境或配置后，应显式运行相关测试；完成前仍需运行 `pnpm test` 和其他必要检查。
+- `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、编辑器换行、滚动、下载等浏览器行为，以及无障碍和视觉效果。
+
+<!-- doc-default: control-plane-ui.test-layout; source=apps/control-plane-ui/vitest.config.ts -->
+
+测试职责按下列目录划分。`test:logic` 运行 `logic/`、`server/` 和 `checks/` 中的 Node 测试，目录拆分不会增加新的测试命令。
+
+| `test/` 下的目录 | 职责                                                                   |
+| ---------------- | ---------------------------------------------------------------------- |
+| `logic/`         | 浏览器与共享代码的纯逻辑                                               |
+| `server/`        | BFF 路由、上游代理、存储和产物；仅供服务端测试使用的辅助代码也放在这里 |
+| `checks/`        | 样式、图标、导入边界和开发测试数据校验                                 |
+| `types/`         | 仅在编译期检查的契约                                                   |
+| `components/`    | 真实浏览器组件测试和 React hook 测试                                   |
+| `e2e/`           | 应用用户流程和视觉基线                                                 |
+| `browser-flows/` | 现有可复用 E2E 流程函数                                                |
+| `fixtures/`      | 测试输入文件                                                           |
+| `support/`       | 跨测试分组共享的辅助代码，包括契约 fixture 加载                        |
+
+组件测试加载应用 CSS，并使用浏览器原生交互，替代 DOM 模拟环境；Playwright E2E 继续负责应用导航和完整用户流程。Hook 测试在同一个组件项目中验证 React 生命周期行为，无需引入另一套 DOM 环境。保护异步状态归属或错误处理的测试继续在本地使用模块和 API mock。
+
+<!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
+
+组件测试需要 Chrome。可运行 `pnpm exec playwright install --with-deps chrome` 安装，或通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定已有的可执行文件。CI 在包检查前安装 Chrome，并上传 `test-results/components/` 中的组件失败诊断。普通的 `pnpm test` 和 `pnpm run test:component` 命令已包含这些浏览器测试，不再另设浏览器组件测试套件。
 
 本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
 

@@ -34,7 +34,7 @@ From `apps/control-plane-ui`, install dependencies and start the fixture-backed 
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run dev:fixtures
+pnpm dev:mock
 ```
 
 Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and trajectory actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
@@ -71,13 +71,16 @@ browser/
   main.tsx            browser entry point
 server/               Node BFF
 shared/               values imported by both browser and server
-scripts/              development-time package tooling
+mock-api/             stateful mock API for development preview and local E2E
+scripts/              command-line package checks and reports
 test/                 browser and server tests
 ```
 
 Feature domains must not import one another. Reusable browser capabilities live under `browser/features/` or `browser/shared/`, while package-level `shared/` is reserved for code that genuinely crosses the browser/server runtime boundary.
 
-The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
+See [Mock API](mock-api/README.md) for development-server ownership, shared scenario data, and state lifetime.
+
+The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails data generation instead of appearing as plausible-looking demo data.
 
 To develop against a running Review Runs, build and start the BFF in one terminal:
 
@@ -106,30 +109,51 @@ The console supports continuously updated modern browsers. Keep your browser up 
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
-pnpm run colors:check
-pnpm run icons:check
 pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-Additional UI consistency checks:
+Color and icon rules run as part of `pnpm test`. To run them separately or generate the informational style report:
 
-- `pnpm run colors:check`: checks that custom colors exist in both themes, required text/background pairs remain readable, and the brand palette stays ordered from light to dark. Very similar neighboring shades are reported but do not fail CI.
-- `pnpm run icons:check`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
+- `pnpm test test/checks/color-rules.test.ts`: checks that custom colors exist in both themes, required text/background pairs remain readable, and the brand palette stays ordered from light to dark. Very similar neighboring shades are reported but do not fail CI.
+- `pnpm test test/checks/icon-rules.test.ts`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
 - `pnpm run styles:report`: lists spacing, border-radius, and font-size values written directly in maintained CSS. This is an informational report and does not fail CI.
+
+These checks read CSS and TSX files outside the test import graph. After editing theme CSS or application icons, explicitly run the relevant check above or the full `pnpm test`; incremental test selection alone may miss those edits.
 
 ### Test Coverage
 
 <!-- doc-default: control-plane-ui.test-projects; source=apps/control-plane-ui/package.json -->
 
-- `pnpm test`: runs logic, API, and UI component tests.
-- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests. During development, prefer a relevant test file, for example `pnpm test test/api-error.test.ts`.
+- `pnpm test`: runs logic and API tests in Node and UI component tests in Chrome.
+- `pnpm run test:logic`: runs logic and API tests. `pnpm run test:component` runs UI component tests in real Chrome with Vitest Browser Mode. During development, prefer a relevant test file, for example `pnpm test test/logic/api-error.test.ts`.
 - `pnpm run typecheck`: checks browser and server source types and reports type-test results. CI uses this command. Use `pnpm run test:types` to view the type-test results separately.
-- `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
-- `pnpm run test:browser-component`: checks editor wrapping in real Chrome without starting the application BFF or fixture API. Use jsdom component tests for ordinary rendering and interaction; reserve this command for behavior that needs browser layout. It uses installed Chrome, with `CONTROL_PLANE_UI_CHROME_PATH` available for a custom executable. CI runs it in the desktop browser job.
-- `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+- `pnpm run test:affected`: during development, reruns tests affected by source edits since their last recorded run. The first run establishes a baseline for all selected tests; append a file path to limit it, for example `pnpm run test:affected test/logic/api-error.test.ts`. This uses experimental dependency tracking. For contract, fixture, generated-file, environment, or configuration changes, explicitly run the relevant tests; finish with `pnpm test` and the other required checks.
+- `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, editor wrapping, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+
+<!-- doc-default: control-plane-ui.test-layout; source=apps/control-plane-ui/vitest.config.ts -->
+
+Test ownership follows the directories below. `test:logic` runs the Node tests in `logic/`, `server/`, and `checks/`; the directory split does not add new test commands.
+
+| Directory under `test/` | Responsibility                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `logic/`                | Pure browser and shared logic                                                    |
+| `server/`               | BFF routes, upstream relay, storage and artifacts; server-only helpers stay here |
+| `checks/`               | Styles, icons, import boundaries and development-fixture validation              |
+| `types/`                | Compiler-only contracts                                                          |
+| `components/`           | Real-browser component and React hook tests                                      |
+| `e2e/`                  | Application user flows and visual baselines                                      |
+| `browser-flows/`        | Existing reusable E2E flow functions                                             |
+| `fixtures/`             | Test input assets                                                                |
+| `support/`              | Helpers shared across test groups, including contract fixture loading            |
+
+Component tests mount components with application CSS and use native browser interactions. They replace DOM emulation; Playwright E2E remains responsible for application navigation and complete user flows. Hook tests use the same component project to exercise React lifecycle behavior without introducing another DOM environment. Module and API mocks remain local to tests that protect asynchronous ownership or error behavior.
+
+<!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
+
+Component tests require Chrome. Install it with `pnpm exec playwright install --with-deps chrome`, or set `CONTROL_PLANE_UI_CHROME_PATH` to an installed executable. CI installs Chrome before the package checks and uploads component failure diagnostics from `test-results/components/`. The ordinary `pnpm test` and `pnpm run test:component` commands include these browser tests; there is no separate browser-component suite.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
 

@@ -1,13 +1,10 @@
 import type { UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { devFixtures } from './scripts/dev-fixtures/index.js'
+import { mockApi } from './mock-api/index.js'
 
 export default function createViteConfig(): UserConfig {
   return {
-    plugins: [
-      react(),
-      ...(process.env.CONTROL_PLANE_UI_DEV_FIXTURES === '1' ? [devFixtures()] : [])
-    ],
+    plugins: [react(), ...(process.env.CONTROL_PLANE_UI_MOCK_API === '1' ? [mockApi()] : [])],
     build: {
       target: 'es2025',
       rolldownOptions: {

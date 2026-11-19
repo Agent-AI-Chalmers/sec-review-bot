@@ -141,12 +141,7 @@ export function abandonFailureMessageKey(error: unknown): Message {
   return 'abandonFailed'
 }
 
-/** Explain a failure code, or return the code itself when it is not one coordination assigns.
- *
- * `explanation` is null whenever there is no sentence to show, including when a code has a key
- * but the active language table lacks it. Testing the mapping alone was not enough: `t()` returns
- * `undefined` for a key that is not in the table, and a caller that checks only for null would
- * render an empty tooltip instead of falling back to the bare code. */
+/** Explain known failure codes and leave connector-defined codes without an explanation. */
 export function failureCodeLabel(
   code: string,
   t: Translator
@@ -154,7 +149,7 @@ export function failureCodeLabel(
   const key = KNOWN_FAILURE_CODE_KEYS[code]
   return {
     code,
-    explanation: key === undefined ? null : (t(key) ?? null)
+    explanation: key === undefined ? null : t(key)
   }
 }
 

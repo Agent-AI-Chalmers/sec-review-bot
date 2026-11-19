@@ -72,9 +72,9 @@ Review Runs and Memory Catalog each own a complete job in the main workflow: cha
 
 The UI, GitHub Integration, and Review Runs `typecheck` commands include named compiler-only tests. CI uses those package commands instead of adding a second `test:types` step that would compile the same configuration again. The UI also checks its separate browser TypeScript configuration.
 
-<!-- doc-default: ci.browser-component; source=.github/workflows/ci-browser.yml -->
+<!-- doc-default: ci.component-browser; source=.github/workflows/ci.yml -->
 
-The desktop browser job also runs UI browser component regressions. These exercise browser layout directly without the full application fixtures.
+The UI package job installs Chrome for its Vitest component project before the normal package checks. Component tests use real application CSS and browser interactions; logic and API tests remain in Node. Component failure diagnostics are uploaded from `test-results/components/`. The separate browser matrix continues to run application E2E in desktop and mobile viewports.
 
 ## Automation Validators
 

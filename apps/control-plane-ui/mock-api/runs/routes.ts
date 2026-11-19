@@ -1,0 +1,474 @@
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+import type {
+  RunEvent,
+  ListParkedRunsResponseBody,
+  ListRunPublicationStepsResponseBody,
+  ListRunEventsResponseBody
+} from '../../browser/features/runs/api-types.generated.js'
+import type { RunArtifactContentResponse } from '../../shared/artifact-content.js'
+import type { ParkedRun } from '../../browser/features/runs/api.js'
+import artifactContent from '../data/artifact-content.json' with { type: 'json' }
+import {
+  DECLARED_QUERY_PARAMS,
+  DEV_PAGE_SIZE,
+  eventsFor,
+  type FixtureRun,
+  type createRunFixtures
+} from './generate.js'
+
+const ARTIFACT_LOAD_ERROR_RUN_ID = 'fixture-artifact-load-error'
+
+export function createRunsHandler(
+  { runs, stepsByRun, parkedIndexes }: ReturnType<typeof createRunFixtures>,
+  now: () => number
+): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
+  // Runs the operator abandoned while this dev server has been running. Remembering them is
+  // what makes the abandon button actually work locally: the queue shrinks and the detail
+  // page stops offering the decision, instead of the button being permanently inert.
+  const abandoned = new Set<string>()
+  const resumedEvents = new Map<string, RunEvent[]>()
+  // Runs the operator stopped waiting for. Giving up is the third decision the queue offers, so
+  // it has to work locally too; the run leaves the queue and its disconnected axis ends as the
+  // failure Review Runs records, rather than the button failing with a 404.
+  const gaveUp = new Set<string>()
+  // The runs the mutation above parked, read from their own axes rather than from the index
+  // set that produced them. Deriving from state is what lets all three axes appear in the
+  // queue: a run parked on execution or publication is as invisible to an operator as one
+  // parked on preparation if the list is built from a preparation-only source.
+  const parkedAxis = (run: FixtureRun): 'preparation' | 'execution' | 'publication' | null =>
+    run.preparation.status === 'disconnected'
+      ? 'preparation'
+      : run.execution.status === 'disconnected'
+        ? 'execution'
+        : run.publication.status === 'disconnected'
+          ? 'publication'
+          : null
+  const blockedRuns = (): ParkedRun[] =>
+    runs.flatMap((run, index) => {
+      // Only the runs this fixture deliberately parked are queued. A run whose state
+      // merely happens to be `disconnected` in a lifecycle example is not an operator backlog.
+      if (!parkedIndexes.has(index)) {
+        return []
+      }
+      const axis = parkedAxis(run)
+      if (axis === null) {
+        return []
+      }
+      if (abandoned.has(run.run_id) || gaveUp.has(run.run_id)) {
+        return []
+      }
+      return [
+        {
+          run_id: run.run_id,
+          axis,
+          reason:
+            axis === 'preparation'
+              ? ('EXECUTION_ALREADY_ADVANCED' as const)
+              : axis === 'execution'
+                ? ('SUBMISSION_RECOVERY_EXHAUSTED' as const)
+                : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const),
+          parked_at: run.created_at
+        }
+      ]
+    })
+  const blockedRunIds = (): string[] => blockedRuns().map((block) => block.run_id)
+  return async (request, response): Promise<void> => {
+    const requestUrl = request.url
+    if (requestUrl === undefined) {
+      return
+    }
+    if (requestUrl.startsWith('/api/runs?')) {
+      const url = new URL(requestUrl, 'http://fixture.local')
+      const unknown = [...url.searchParams.keys()].filter(
+        (name) => !DECLARED_QUERY_PARAMS.has(name)
+      )
+      if (unknown.length > 0) {
+        response.statusCode = 400
+        response.end(
+          JSON.stringify({
+            error: 'unexpected query parameter',
+            code: 'INVALID_QUERY'
+          })
+        )
+        return
+      }
+      const limit = Number(url.searchParams.get('limit') ?? DEV_PAGE_SIZE)
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        response.statusCode = 400
+        response.end(
+          JSON.stringify({
+            error: 'limit is invalid.',
+            code: 'INVALID_QUERY'
+          })
+        )
+        return
+      }
+      const cursorValue = url.searchParams.get('cursor')
+      const cursor = decodeCursor(cursorValue)
+      if (cursorValue !== null && cursor === null) {
+        response.statusCode = 400
+        response.end(
+          JSON.stringify({
+            error: 'cursor is invalid.',
+            code: 'INVALID_QUERY'
+          })
+        )
+        return
+      }
+      const from = url.searchParams.get('from')
+      const to = url.searchParams.get('to')
+      const executionStatus = url.searchParams.get('execution_status')
+      const publicationStatus = url.searchParams.get('publication_status')
+      const preparationStatus = url.searchParams.get('preparation_status')
+      const sourcePlatform = url.searchParams.get('source_platform')
+      const workflow = url.searchParams.get('workflow')
+      const filtered = runs.filter(
+        (run) =>
+          (executionStatus === null || run.execution.status === executionStatus) &&
+          (publicationStatus === null || run.publication.status === publicationStatus) &&
+          // Fixtures always carry a preparation summary (see `validateRun`), matching the
+          // store, which never returns a run without one.
+          (preparationStatus === null || run.preparation?.status === preparationStatus) &&
+          (sourcePlatform === null || run.source_platform === sourcePlatform) &&
+          (from === null || run.created_at >= from) &&
+          (to === null || run.created_at < to) &&
+          (workflow === null || run.workflow === workflow) &&
+          // Matches the store's `(created_at, run_id) < (cursor)` page walk.
+          (cursor === null ||
+            run.created_at < cursor.createdAt ||
+            (run.created_at === cursor.createdAt && run.run_id < cursor.runId))
+      )
+      // The store walks pages by `(created_at, run_id)` descending, and the cursor below is
+      // that same ordering; the fixture must apply it before slicing, or the cursor compares
+      // against rows that were never ahead of it. The run list is built in scenario order,
+      // and an active run's timestamp is anchored near now rather than at its newest
+      // historical slot, so array order is not creation order. Without this sort the
+      // predicate `created_at < cursor.createdAt` matched everything and every page repeated
+      // the first one.
+      const ordered = filtered.toSorted((left, right) =>
+        left.created_at === right.created_at
+          ? right.run_id.localeCompare(left.run_id)
+          : right.created_at.localeCompare(left.created_at)
+      )
+      const page = ordered.slice(0, limit)
+      const last = page.at(-1)
+      const nextCursor =
+        last === undefined || page.length < limit
+          ? null
+          : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
+      response.end(JSON.stringify({ runs: page, next_cursor: nextCursor }))
+      return
+    }
+    const runArtifactContentMatch = /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(requestUrl)
+    if (request.method === 'GET' && runArtifactContentMatch !== null) {
+      const runId = decodeURIComponent(runArtifactContentMatch[1] ?? '')
+      if (runId === ARTIFACT_LOAD_ERROR_RUN_ID) {
+        response.statusCode = 503
+        response.end(JSON.stringify({ error: 'review_runs_unavailable' }))
+        return
+      }
+      const run = runs.find((item) => item.run_id === runId)
+      if (run?.artifact_storage?.status !== 'available') {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'artifact_unavailable' }))
+        return
+      }
+      response.end(
+        JSON.stringify({
+          ...artifactContent,
+          files: {
+            ...artifactContent.files,
+            'manifest.json': artifactContent.files['manifest.json'].replace('__RUN_ID__', runId)
+          }
+        } satisfies RunArtifactContentResponse)
+      )
+      return
+    }
+    // Before the run-detail match below, which would otherwise read this fixed segment as a
+    // run id. Mirrors `GET /v1/runs/parked`.
+    const abandonMatch = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/.exec(requestUrl)
+    // Mirrors `POST /v1/admin/runs/{runId}/resume`: the same eligibility (a run in the
+    // queue), the same credential, and the same transition to `uncertain`.
+    const resumeMatch = /^\/api\/admin\/runs\/([^/?]+)\/resume$/.exec(requestUrl)
+    // Mirrors `POST /v1/admin/runs/{runId}/give-up`: a required reason, the same credential,
+    // and the disconnected axis concluded as the failure that names the operator.
+    const giveUpMatch = /^\/api\/admin\/runs\/([^/?]+)\/give-up$/.exec(requestUrl)
+    if (request.method === 'POST' && giveUpMatch !== null) {
+      if (request.headers['x-review-runs-admin-token'] === undefined) {
+        response.statusCode = 401
+        response.end(JSON.stringify({ error: 'admin_token_required' }))
+        return
+      }
+      const runId = decodeURIComponent(giveUpMatch[1] ?? '')
+      const chunks: Buffer[] = []
+      for await (const chunk of request as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.from(chunk))
+      }
+      const body = ((): Record<string, unknown> => {
+        try {
+          return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+        } catch {
+          return {}
+        }
+      })()
+      // The decision is never anonymous: a reason is recorded on every event it writes.
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        response.statusCode = 400
+        response.end(JSON.stringify({ error: 'reason_required' }))
+        return
+      }
+      if (!blockedRunIds().includes(runId)) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_disconnected' }))
+        return
+      }
+      const run = runs.find((item) => item.run_id === runId)
+      const axis = run === undefined ? null : parkedAxis(run)
+      if (run === undefined || axis === null) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      // The same conclusion Review Runs performs: the disconnected axis ends as a failure whose
+      // code names the decision, whatever the run would still have produced is not published,
+      // and the notice says the outcome was given up on rather than that nothing happened.
+      const timestamp = new Date(now()).toISOString()
+      const reasonCode =
+        axis === 'preparation'
+          ? 'PREPARATION_GIVEN_UP_BY_OPERATOR'
+          : axis === 'execution'
+            ? 'SUBMISSION_RECOVERY_GIVEN_UP_BY_OPERATOR'
+            : 'PUBLICATION_GIVEN_UP_BY_OPERATOR'
+      if (axis === 'preparation') {
+        run.preparation.status = 'failed'
+        run.preparation.failure_code = reasonCode
+        run.preparation.finished_at = timestamp
+        run.preparation.disconnect_reason = null
+      } else if (axis === 'execution') {
+        run.execution.status = 'failed'
+        run.execution.finished_at = timestamp
+        run.failure_code = reasonCode
+      } else {
+        run.publication.status = 'failed'
+        run.publication.finished_at = timestamp
+        run.failure_code = reasonCode
+      }
+      if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
+        run.publication.status = 'skipped'
+        run.publication.finished_at = timestamp
+      }
+      run.notices = [
+        {
+          notice_id: `fixture-${run.run_id}-given-up`,
+          kind: 'failure',
+          status: 'pending',
+          axis,
+          reason_code: reasonCode,
+          comment_url: null
+        }
+      ]
+      gaveUp.add(runId)
+      response.end(JSON.stringify({ run }))
+      return
+    }
+    if (request.method === 'POST' && resumeMatch !== null) {
+      if (request.headers['x-review-runs-admin-token'] === undefined) {
+        response.statusCode = 401
+        response.end(JSON.stringify({ error: 'admin_token_required' }))
+        return
+      }
+      const runId = decodeURIComponent(resumeMatch[1] ?? '')
+      const run = runs.find((item) => item.run_id === runId)
+      if (run === undefined) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      const axis = parkedAxis(run)
+      if (axis === null || (axis === 'preparation' && run.execution.status !== 'pending')) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_resumable' }))
+        return
+      }
+      const steps = stepsByRun.get(runId) ?? []
+      // Preserve the history before resumption; deriving it from the new state would
+      // invent lifecycle edges and lose the operator's actual decision.
+      const events = eventsFor(run, steps)
+      const timestamp = new Date(now()).toISOString()
+      const toStatus = axis === 'publication' ? 'pending' : 'uncertain'
+      const reasonCode =
+        axis === 'preparation'
+          ? 'PREPARATION_RESUMED_BY_OPERATOR'
+          : axis === 'execution'
+            ? 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR'
+            : 'PUBLICATION_RESUMED_BY_OPERATOR'
+      const appendResume = (stepKey: string | null = null): void => {
+        events.push({
+          event_id: Math.max(0, ...events.map((event) => event.event_id)) + 1,
+          axis,
+          step_key: stepKey,
+          from_status: 'disconnected',
+          to_status: toStatus,
+          reason_code: reasonCode,
+          occurred_at: timestamp
+        })
+      }
+      if (axis === 'preparation') {
+        run.preparation.status = 'uncertain'
+        run.preparation.disconnect_reason = null
+        run.preparation.attempt_count = 0
+        run.preparation.failure_code = null
+        run.preparation.updated_at = timestamp
+      } else if (axis === 'execution') {
+        run.execution.status = 'uncertain'
+        run.execution.updated_at = timestamp
+      } else {
+        run.publication.status = 'pending'
+        run.publication.updated_at = timestamp
+      }
+      appendResume()
+      if (axis === 'publication') {
+        for (const step of steps) {
+          if (step.status === 'disconnected') {
+            step.status = 'pending'
+            step.attempt_count = 0
+            appendResume(step.step_key)
+          }
+        }
+      }
+      for (const notice of run.notices) {
+        if (
+          notice.kind === 'attention' &&
+          notice.axis === axis &&
+          ['pending', 'delivering'].includes(notice.status)
+        ) {
+          notice.status = 'superseded'
+        }
+      }
+      resumedEvents.set(runId, events)
+      response.end(JSON.stringify({ run }))
+      return
+    }
+    if (request.method === 'POST' && abandonMatch !== null) {
+      // Mirrors the real endpoint's contract closely enough for local use: an operator token
+      // is required, the run must be in the queue, and success removes it from the queue.
+      if (request.headers['x-review-runs-admin-token'] === undefined) {
+        response.statusCode = 401
+        response.end(JSON.stringify({ error: 'admin_token_required' }))
+        return
+      }
+      const runId = decodeURIComponent(abandonMatch[1] ?? '')
+      if (!blockedRunIds().includes(runId)) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_blocked' }))
+        return
+      }
+      const run = runs.find((item) => item.run_id === runId)
+      if (run === undefined) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      if (run.preparation.status !== 'disconnected') {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_blocked_preparation' }))
+        return
+      }
+      // The same transition Review Runs performs: conclude the axes that were still
+      // open, keep the execution result, and record why. Clearing only the marker would show
+      // the operator a run that looks untouched after an irreversible decision.
+      const timestamp = new Date(now()).toISOString()
+      run.preparation.status = 'failed'
+      run.preparation.failure_code = 'PREPARATION_ABANDONED_BY_OPERATOR'
+      run.notices = [
+        {
+          notice_id: `fixture-${run.run_id}-abandoned`,
+          kind: 'failure',
+          status: 'pending',
+          axis: 'preparation',
+          reason_code: 'PREPARATION_ABANDONED_BY_OPERATOR',
+          comment_url: null
+        }
+      ]
+      run.preparation.finished_at = timestamp
+      run.preparation.status = 'failed'
+      run.preparation.disconnect_reason = null
+      if (run.publication.status === 'pending' || run.publication.status === 'publishing') {
+        run.publication.status = 'skipped'
+        run.publication.finished_at = timestamp
+      }
+      abandoned.add(runId)
+      response.end(JSON.stringify({ run }))
+      return
+    }
+    if (requestUrl === '/api/runs/parked') {
+      // Synthetic: a blocked run is not a lifecycle stage any scenario can describe (it is
+      // the contradictory shape coordination refuses to resolve), so it is invented here
+      // rather than mutating a real run. The ids are real, so following one opens a detail
+      // page that loads.
+      response.end(
+        JSON.stringify({
+          blocks: blockedRuns()
+        } satisfies ListParkedRunsResponseBody)
+      )
+      return
+    }
+    const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(requestUrl)
+    if (stepsMatch) {
+      const runId = decodeURIComponent(stepsMatch[1] ?? '')
+      response.end(
+        JSON.stringify({
+          run_id: runId,
+          publication_steps: stepsByRun.get(runId) ?? []
+        } satisfies ListRunPublicationStepsResponseBody)
+      )
+      return
+    }
+    const eventsMatch = /^\/api\/runs\/([^/?]+)\/events$/.exec(requestUrl)
+    if (eventsMatch) {
+      const runId = decodeURIComponent(eventsMatch[1] ?? '')
+      const run = runs.find((item) => item.run_id === runId)
+      if (!run) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      response.end(
+        JSON.stringify({
+          run_id: run.run_id,
+          events: resumedEvents.get(run.run_id) ?? eventsFor(run, stepsByRun.get(run.run_id) ?? [])
+        } satisfies ListRunEventsResponseBody)
+      )
+      return
+    }
+    const runMatch = /^\/api\/runs\/([^/?]+)$/.exec(requestUrl)
+    if (runMatch) {
+      const runId = decodeURIComponent(runMatch[1] ?? '')
+      const run = runs.find((item) => item.run_id === runId)
+      if (run) {
+        // The run already carries its real axes. Forcing preparation to `disconnected` here
+        // (as this used to) mislabelled every parked run as preparation-parked, including
+        // the ones parked on execution or publication, and made their resume ineligible.
+        response.end(JSON.stringify({ run }))
+        return
+      }
+    }
+  }
+}
+
+interface Cursor {
+  createdAt: string
+  runId: string
+}
+
+function decodeCursor(value: string | null): Cursor | null {
+  if (value === null) {
+    return null
+  }
+  const [createdAt, runId, extra] = Buffer.from(value, 'base64url').toString('utf8').split('|')
+  if (createdAt === undefined || runId === undefined || extra !== undefined) {
+    return null
+  }
+  return { createdAt, runId }
+}

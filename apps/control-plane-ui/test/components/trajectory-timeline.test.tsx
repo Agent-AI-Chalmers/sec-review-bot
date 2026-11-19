@@ -1,8 +1,8 @@
 import React from 'react'
-import { readFileSync } from 'node:fs'
+import failedAnalysis from '../fixtures/trajectory-failed-analysis.jsonl?raw'
 import { readTrajectoryJsonl } from '../../shared/trajectory-events.js'
 import { screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from 'vitest/browser'
 import { expect, test, vi } from 'vitest'
 
 import { TrajectoryTimeline } from '../../browser/features/trajectory/TrajectoryTimeline.js'
@@ -632,7 +632,7 @@ test('tool results show result data without repeating call arguments', async () 
   expect(result.getByRole('button', { name: 'Back to call' })).toBeVisible()
   expect(result.getByText('replacement complete')).toBeVisible()
   const artifact = toolResult!.querySelector('[data-trajectory-section="artifact"]')
-  expect(artifact).toHaveTextContent(/changed_files.*1/)
+  expect(artifact?.textContent).toMatch(/changed_files.*1/)
   expect(result.queryByText('old_string')).not.toBeInTheDocument()
   expect(result.queryByText('unsafe')).not.toBeInTheDocument()
 })
@@ -667,12 +667,12 @@ test('usage details expose totals and token subsets', async () => {
     expect(element).not.toBeNull()
     return element!
   })
-  expect(details).toHaveTextContent(/Input\s*1,200/)
-  expect(details).toHaveTextContent(/Cache read\s*450/)
-  expect(details).toHaveTextContent(/Cache write\s*24/)
-  expect(details).toHaveTextContent(/Output\s*225/)
-  expect(details).toHaveTextContent(/Reasoning\s*34/)
-  expect(details).toHaveTextContent(/Total\s*1,425/)
+  expect(details?.textContent).toMatch(/Input\s*1,200/)
+  expect(details?.textContent).toMatch(/Cache read\s*450/)
+  expect(details?.textContent).toMatch(/Cache write\s*24/)
+  expect(details?.textContent).toMatch(/Output\s*225/)
+  expect(details?.textContent).toMatch(/Reasoning\s*34/)
+  expect(details?.textContent).toMatch(/Total\s*1,425/)
 })
 
 test('optional trajectory controls are absent without their source data', () => {
@@ -751,9 +751,7 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
 })
 
 test('failed analysis displays tool errors and prompt references without raw function JSON', async () => {
-  const failed = readTrajectoryJsonl(
-    readFileSync('test/fixtures/trajectory-failed-analysis.jsonl', 'utf8')
-  )
+  const failed = readTrajectoryJsonl(failedAnalysis)
   const { container } = renderComponent(<TrajectoryTimeline events={failed} />)
   expect(container.textContent).not.toContain('"type": "function_call"')
   expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument()

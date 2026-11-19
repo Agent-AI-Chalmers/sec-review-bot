@@ -32,10 +32,6 @@ jobs:
       - name: Browser project
         run: pnpm exec playwright test --project=${{ matrix.project }}
 
-      - name: Browser component regressions
-        if: matrix.project == 'desktop'
-        run: pnpm run test:browser-component
-
       # The runner workspace disappears after the job. Preserve Playwright's
       # report, error context, traces, and screenshots only when diagnosis is needed.
       - name: Upload browser diagnostics
