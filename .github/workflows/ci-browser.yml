@@ -41,6 +41,6 @@ jobs:
           name: control-plane-ui-${{ matrix.project }}-playwright
           path: |
             apps/control-plane-ui/playwright-report/
-            apps/control-plane-ui/test-results/
+            apps/control-plane-ui/test-results/e2e/
           retention-days: 14
           if-no-files-found: warn
