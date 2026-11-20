@@ -66,10 +66,10 @@ test('argument rendering is decided by key, not by content heuristics', () => {
 
   // A known prose key is markdown.
   const markdown = document.querySelector('.json-markdown')
-  expect(markdown?.querySelector('strong')).toHaveTextContent('Important')
+  expect(markdown?.querySelector('strong')).toMatchTextContent('Important')
   // An unknown key is data: whitespace preserved, markdown not interpreted.
   const block = document.querySelector('.json-code-block')
-  expect(block).toHaveTextContent('line two with **stars**')
+  expect(block).toMatchTextContent('line two with **stars**')
   expect(block?.querySelector('strong')).toBeNull()
 })
 
@@ -117,10 +117,10 @@ test('hunk content starting with --- or +++ is data, not a file header', () => {
   renderComponent(<TrajectoryTimeline events={trickyDiff} />)
 
   const stats = document.querySelector('.trajectory-diff-file-stats')
-  expect(stats).toHaveTextContent('+1')
-  expect(stats).toHaveTextContent('−1')
-  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent('--- old')
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+++ new')
+  expect(stats).toMatchTextContent('+1')
+  expect(stats).toMatchTextContent('−1')
+  expect(document.querySelector('[data-patch-line="remove"]')).toMatchTextContent('--- old')
+  expect(document.querySelector('[data-patch-line="add"]')).toMatchTextContent('+++ new')
 })
 
 test('a deleted file keeps its own path and does not join the previous file', () => {
@@ -173,9 +173,9 @@ test('a deleted file keeps its own path and does not join the previous file', ()
 
   const files = document.querySelectorAll('.trajectory-diff-file')
   expect(files).toHaveLength(2)
-  expect(files[1]?.querySelector('.trajectory-diff-file-path')).toHaveTextContent('gone.txt')
+  expect(files[1]?.querySelector('.trajectory-diff-file-path')).toMatchTextContent('gone.txt')
   expect(files[1]?.querySelectorAll('[data-patch-line="remove"]')).toHaveLength(2)
-  expect(files[1]).toHaveTextContent('line two')
+  expect(files[1]).toMatchTextContent('line two')
   expect(within(files[1] as HTMLElement).getByText('Deleted')).toBeVisible()
 })
 
@@ -226,12 +226,12 @@ test('Begin Patch delete and move keep their operation metadata', () => {
   const files = document.querySelectorAll('.trajectory-diff-file')
   expect(files).toHaveLength(2)
   const moved = files[0] as HTMLElement
-  expect(moved.querySelector('.trajectory-diff-file-path')).toHaveTextContent('old.py → new.py')
+  expect(moved.querySelector('.trajectory-diff-file-path')).toMatchTextContent('old.py → new.py')
   expect(within(moved).getByText('Moved')).toBeVisible()
-  expect(moved.querySelector('.trajectory-diff-file-stats')).toHaveTextContent('+1 −1')
+  expect(moved.querySelector('.trajectory-diff-file-stats')).toMatchTextContent('+1 −1')
 
   const deleted = files[1] as HTMLElement
-  expect(deleted.querySelector('.trajectory-diff-file-path')).toHaveTextContent('gone.py')
+  expect(deleted.querySelector('.trajectory-diff-file-path')).toMatchTextContent('gone.py')
   expect(within(deleted).getByText('Deleted')).toBeVisible()
   // An operation-only file has no line stats to show.
   expect(deleted.querySelector('.trajectory-diff-file-stats')).toBeNull()
@@ -282,8 +282,8 @@ test('a damaged patch falls back to raw text instead of a wrong diff', () => {
   expect(document.querySelector('[data-diff-mode]')).toBeNull()
   const raw = document.querySelector('[data-trajectory-patch]')
   expect(raw).not.toBeNull()
-  expect(raw).toHaveTextContent('@@ -1,4 +1,4 @@')
-  expect(raw).toHaveTextContent('--- a/src/a.txt')
+  expect(raw).toMatchTextContent('@@ -1,4 +1,4 @@')
+  expect(raw).toMatchTextContent('--- a/src/a.txt')
   expect(screen.getByText(/Patch structure could not be parsed/)).toBeVisible()
 })
 
@@ -378,7 +378,7 @@ test('content left after a hunk ends also falls back to raw text', () => {
 
   expect(document.querySelector('[data-diff-mode]')).toBeNull()
   const raw = document.querySelector('[data-trajectory-patch]')
-  expect(raw).toHaveTextContent('+leftover')
+  expect(raw).toMatchTextContent('+leftover')
 })
 
 test('command arguments render as a terminal block, not markdown', () => {
@@ -406,8 +406,8 @@ test('command arguments render as a terminal block, not markdown', () => {
 
   const block = document.querySelector('[data-trajectory-command]')
   expect(block).not.toBeNull()
-  expect(block).toHaveTextContent('cd /tmp')
-  expect(block).toHaveTextContent('echo done')
+  expect(block).toMatchTextContent('cd /tmp')
+  expect(block).toMatchTextContent('echo done')
   // The markdown heuristic used to collapse commands into a paragraph.
   expect(document.querySelector('.memory-markdown')).toBeNull()
 })
@@ -490,8 +490,8 @@ test('a tool-provided diff wins over the call arguments', () => {
   ]
   renderComponent(<TrajectoryTimeline events={diffEvents} />)
 
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+const fresh = 2')
-  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent('-const old = 1')
+  expect(document.querySelector('[data-patch-line="add"]')).toMatchTextContent('+const fresh = 2')
+  expect(document.querySelector('[data-patch-line="remove"]')).toMatchTextContent('-const old = 1')
   // The real diff replaces the argument preview entirely.
   expect(screen.queryByText('oldString')).not.toBeInTheDocument()
   expect(screen.queryByText('newString')).not.toBeInTheDocument()
@@ -543,7 +543,7 @@ test('a real diff can switch to side-by-side', async () => {
   expect(document.querySelector('[data-diff-mode="unified"]')).not.toBeNull()
   await user.click(screen.getByText('Side by side'))
   expect(document.querySelector('[data-diff-mode="side-by-side"]')).not.toBeNull()
-  expect(document.querySelector('[data-diff-kind="add"]')).toHaveTextContent('const fresh = 2')
+  expect(document.querySelector('[data-diff-kind="add"]')).toMatchTextContent('const fresh = 2')
   // Both sides of a paired row are marked as changed, not just the row kind.
   const pairedRow = document.querySelector('[data-diff-kind="add"]')
   expect(pairedRow?.querySelector('.trajectory-diff-cell.old.changed')).not.toBeNull()
@@ -609,8 +609,8 @@ test('apply_patch arguments render as a line-oriented patch', async () => {
   await user.click(screen.getByRole('button', { name: 'Expand all' }))
 
   expect(document.querySelector('[data-trajectory-patch]')).not.toBeNull()
-  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent('+const safe = true')
-  expect(document.querySelector('[data-patch-line="remove"]')).toHaveTextContent(
+  expect(document.querySelector('[data-patch-line="add"]')).toMatchTextContent('+const safe = true')
+  expect(document.querySelector('[data-patch-line="remove"]')).toMatchTextContent(
     '-const unsafe = true'
   )
   // The parsed file header is shown as a path, not as a raw patch line.

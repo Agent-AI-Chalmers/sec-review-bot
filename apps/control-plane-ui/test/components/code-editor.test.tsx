@@ -17,14 +17,12 @@ test('long editor lines wrap and keyboard input updates the document', async () 
     </div>
   )
   const editor = page.getByRole('textbox', { name: 'Memory content' })
-  // oxlint-disable-next-line typescript/await-thenable
   await expect.element(editor).toBeVisible()
   await expect
     .poll(() => editor.element().querySelector('.cm-line')?.getBoundingClientRect().height ?? 0)
     .toBeGreaterThan(40)
   expect(editor.element().scrollWidth - editor.element().clientWidth).toBeLessThanOrEqual(1)
   await userEvent.tab()
-  // oxlint-disable-next-line typescript/await-thenable
   await expect.element(editor).toHaveFocus()
   await userEvent.keyboard('Additional evidence')
   expect(changed).toHaveBeenCalled()
