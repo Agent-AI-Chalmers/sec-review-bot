@@ -26,6 +26,10 @@ pnpm run typecheck
 pnpm test
 ```
 
+<!-- doc-default: github-integration.dev; source=apps/github-integration/package.json -->
+
+`pnpm run dev` runs TypeScript source with `tsx watch` and restarts on imported module changes. It does not build `dist` or check types; run `pnpm run typecheck` separately. `pnpm run server` builds and runs the JavaScript output.
+
 <!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
 
 `pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.

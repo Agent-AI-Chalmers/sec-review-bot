@@ -11,7 +11,7 @@
     "clean": "rm -rf dist",
     "build": "pnpm run clean && tsc -p tsconfig.build.json",
     "server": "pnpm run build && node dist/app.js",
-    "dev": "pnpm run build && sh -c 'tsc -w -p tsconfig.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --ext js,json --delay 200ms --exec \"node dist/app.js\"'",
+    "dev": "tsx watch --clear-screen=false src/app.ts",
     "test": "rm -rf dist && node scripts/test-runner.mjs unit",
     "test:integration": "node scripts/test-runner.mjs integration",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm run test:types",
@@ -38,7 +38,6 @@
     "oxlint-tsgolint": "7.0.2007",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
-    "vitest": "5.1.1",
-    "nodemon": "^3.1.14"
+    "vitest": "5.1.1"
   }
 }
