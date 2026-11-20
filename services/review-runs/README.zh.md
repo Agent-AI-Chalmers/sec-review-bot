@@ -241,9 +241,7 @@ pnpm run test:integration
 
 <!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
 
-`pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。
-
-`pnpm run test:types` 单独报告处理函数的请求、返回值及注册表完整性的编译期契约检查，不启动服务。
+`pnpm run typecheck` 检查源码和处理函数请求、返回值及注册表完整性的类型契约；`pnpm run test:types` 单独运行类型契约检查。
 
 `pnpm test` 构建服务并运行隔离测试。开发时可用 `pnpm test test/env.test.ts` 只运行一个文件。集成测试通过 `pnpm run test:integration` 单独运行，也可以追加测试路径或测试运行选项。
 

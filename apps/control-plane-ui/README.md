@@ -135,7 +135,7 @@ These checks read CSS and TSX files outside the test import graph. After editing
 
 <!-- doc-default: control-plane-ui.test-layout; source=apps/control-plane-ui/vitest.config.ts -->
 
-Test ownership follows the directories below. `test:logic` runs the Node tests in `logic/`, `server/`, and `checks/`; the directory split does not add new test commands.
+Test ownership follows the directories below. `test:logic` runs the Node tests in `logic/`, `server/`, and `checks/`.
 
 | Directory under `test/` | Responsibility                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------- |
@@ -149,11 +149,11 @@ Test ownership follows the directories below. `test:logic` runs the Node tests i
 | `fixtures/`             | Test input assets                                                                |
 | `support/`              | Helpers shared across test groups, including contract fixture loading            |
 
-Component tests mount components with application CSS and use native browser interactions. They replace DOM emulation; Playwright E2E remains responsible for application navigation and complete user flows. Hook tests use the same component project to exercise React lifecycle behavior without introducing another DOM environment. Module and API mocks remain local to tests that protect asynchronous ownership or error behavior.
+Component tests mount components with application CSS and use native browser interactions. Hook tests use the same browser project to exercise React lifecycle behavior. Playwright E2E covers application navigation and complete user flows. Module and API mocks remain local to tests that protect asynchronous ownership or error behavior.
 
 <!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
 
-Component tests require Chrome. Install it with `pnpm exec playwright install --with-deps chrome`, or set `CONTROL_PLANE_UI_CHROME_PATH` to an installed executable. CI installs Chrome before the package checks and uploads component failure diagnostics from `test-results/components/`. The ordinary `pnpm test` and `pnpm run test:component` commands include these browser tests; there is no separate browser-component suite.
+Component tests require Chrome. Install it with `pnpm exec playwright install --with-deps chrome`, or set `CONTROL_PLANE_UI_CHROME_PATH` to an installed executable. CI installs Chrome before the package checks and uploads component failure diagnostics from `test-results/components/`. `pnpm test` and `pnpm run test:component` both include these browser tests.
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
 
@@ -193,7 +193,7 @@ The BFF also proxies execution archive downloads from private RustFS storage. It
 
 ## Memory Management
 
-The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
+The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). This code is not included in the JavaScript files downloaded by the browser. The BFF is responsible for validation, digest calculation, and canonical object keys.
 
 Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic memory updates, edit the active memory tree, and restore an existing version.
 

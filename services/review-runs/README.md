@@ -239,9 +239,7 @@ pnpm run test:integration
 
 <!-- doc-default: review-runs.test-projects; source=services/review-runs/package.json -->
 
-`pnpm run typecheck` checks source code and reports the named type tests in one compiler pass. CI uses this command; `pnpm run test:types` is also available as a direct entrypoint.
-
-`pnpm run test:types` reports compile-time contract checks for handler requests, results, and registry completeness. These tests do not start the server.
+`pnpm run typecheck` checks source code and type contracts for handler requests, results, and registry completeness. Run `pnpm run test:types` to check the type contracts separately.
 
 `pnpm test` builds the service and runs isolated tests. To run one file during development, use `pnpm test test/env.test.ts`. Run integration tests separately through `pnpm run test:integration`, which also accepts a test path or runner options.
 
