@@ -16,7 +16,7 @@ export async function runFixtureAdminFlow({
     options?: { timeoutMs?: number; intervalMs?: number }
   ) => Promise<void>
 }) {
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.getByTestId('parked-runs').waitFor()
   const parkedRunId = await page.evaluate(async () => {
     const response = await fetch('/api/runs/parked')
@@ -37,7 +37,7 @@ export async function runFixtureAdminFlow({
   await page.keyboard.press('Escape')
   await parkedDrawer.waitFor({ state: 'hidden' })
   await page.goto(`${base}/runs/${encodeURIComponent(parkedRunId)}`, {
-    waitUntil: 'networkidle'
+    waitUntil: 'domcontentloaded'
   })
   await page.getByTestId('blocked-run').waitFor()
   assert.match(
@@ -88,9 +88,9 @@ export async function runFixtureAdminFlow({
       }
     })
   })
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.locator('tbody tr td a').first().click()
-  await page.waitForSelector('.run-progress-timeline')
+  await page.locator('.run-progress-timeline').waitFor()
   const transitions = page.locator('.run-transitions')
   await transitions.locator('.transitions-entry').click()
   await transitions.locator('.transitions-body').waitFor()
@@ -106,8 +106,8 @@ export async function runFixtureAdminFlow({
   )
 
   syntheticTransitionCount = 13
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.waitForSelector('.run-progress-timeline')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.locator('.run-progress-timeline').waitFor()
   await transitions.locator('.transitions-entry').click()
   await transitions.locator('.transitions-body').waitFor()
   assert.strictEqual(
@@ -155,7 +155,7 @@ export async function runRunsErrorFlow({
     options?: { timeoutMs?: number; intervalMs?: number }
   ) => Promise<void>
 }) {
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.route('**/api/runs*', (route) =>
     route.fulfill({
@@ -168,7 +168,7 @@ export async function runRunsErrorFlow({
   await page.getByLabel('Access token').waitFor({ state: 'visible' })
   await page.unroute('**/api/runs*')
 
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.route('**/api/runs*', (route) =>
     route.fulfill({

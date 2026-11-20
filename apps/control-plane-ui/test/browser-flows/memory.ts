@@ -687,7 +687,7 @@ export async function runMemoryFilesFlow({
   await diffDialog.locator('.mantine-Modal-close').click()
   const diffPage = await context.newPage()
   await diffPage.goto(`${base}/memory/versions/2/diff`, {
-    waitUntil: 'networkidle'
+    waitUntil: 'domcontentloaded'
   })
   await diffPage.getByRole('heading', { name: 'Compare version 2 with version 1' }).waitFor()
   await diffPage.locator('.memory-diff-editor .cm-editor').first().waitFor()

@@ -212,12 +212,12 @@ export async function runFixtureRunDeliveryFlow({
   // A single-result workflow uses the same row shape. Set both filters in the URL because
   // changing the two URL-backed selects back to back can discard one navigation.
   await page.goto(`${base}/runs?workflow=issue-review&publication_status=published`, {
-    waitUntil: 'networkidle'
+    waitUntil: 'domcontentloaded'
   })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.locator('tbody tr:first-child td a').first().waitFor()
   await page.locator('tbody tr:first-child td a').first().click()
-  await page.waitForSelector('.delivery-item')
+  await page.locator('.delivery-item').waitFor()
   assert.strictEqual(
     await page.locator('.publication-summary .delivery-link').count(),
     0,

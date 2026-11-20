@@ -8,7 +8,7 @@ async function openFixturePage(page: Page, path: string, theme: Theme): Promise<
   await page.addInitScript((selectedTheme) => {
     localStorage.setItem('ui-theme', selectedTheme)
   }, theme)
-  await page.goto(path, { waitUntil: 'networkidle' })
+  await page.goto(path, { waitUntil: 'domcontentloaded' })
   await page.locator('main').waitFor()
   await page.evaluate(async () => document.fonts.ready)
   // Times keep changing even when the layout is correct. Hide only that live data;
@@ -44,18 +44,21 @@ test.beforeEach(async ({ fixtureRuntime }) => {
 test('runs list light theme', async ({ page }) => {
   await openFixturePage(page, '/runs', 'light')
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
+  await expect(page.locator('tbody tr').first()).toBeVisible()
   await expectPageSnapshot(page, 'runs-list-light.png')
 })
 
 test('runs list dark theme', async ({ page }) => {
   await openFixturePage(page, '/runs', 'dark')
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
+  await expect(page.locator('tbody tr').first()).toBeVisible()
   await expectPageSnapshot(page, 'runs-list-dark.png')
 })
 
 test('memory workspace', async ({ page }) => {
   await openFixturePage(page, '/memory', 'light')
   await page.getByRole('heading', { name: 'Memory' }).waitFor()
+  await expect(page.locator('.memory-overview-metrics')).toBeVisible()
   await expectPageSnapshot(page, 'memory-light.png')
 })
 

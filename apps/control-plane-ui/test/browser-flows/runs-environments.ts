@@ -87,7 +87,7 @@ export async function runRunsInputAndThemeChecks({
   })
   try {
     const touchPage = await touchContext.newPage()
-    await touchPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await touchPage.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
     await touchPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await waitUntil(
       async () =>
@@ -109,7 +109,7 @@ export async function runRunsInputAndThemeChecks({
     try {
       const themePage = await themeContext.newPage()
       await themePage.addInitScript((value) => localStorage.setItem('ui-theme', value), theme)
-      await themePage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+      await themePage.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
       await themePage.getByRole('heading', { name: 'Runs' }).waitFor()
       const contrast = await waitUntilValue(
         () => readContrast(themePage),
@@ -171,11 +171,11 @@ export async function runRunsClockCheck({
     )
     await page.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
     await page.goto(`${base}/runs?execution_status=running`, {
-      waitUntil: 'networkidle'
+      waitUntil: 'domcontentloaded'
     })
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
     await page.locator('tbody tr:first-child td a').first().click()
-    await page.waitForSelector('.run-progress-timeline')
+    await page.locator('.run-progress-timeline').waitFor()
     const readElapsed = () =>
       page.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(2).textContent()
     await waitUntil(
@@ -231,10 +231,10 @@ export async function runRunsChineseCheck({
     const page = await context.newPage()
     await page.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
     await page.goto(`${base}/runs?workflow=repository-review&publication_status=published`, {
-      waitUntil: 'networkidle'
+      waitUntil: 'domcontentloaded'
     })
     await page.locator('tbody tr:first-child td a').first().click()
-    await page.waitForSelector('.run-progress-timeline')
+    await page.locator('.run-progress-timeline').waitFor()
     const badges = await waitUntilValue(
       () =>
         page.$$eval('.delivery-item .mantine-Badge-root', (items) =>
@@ -252,11 +252,11 @@ export async function runRunsChineseCheck({
     }
 
     await page.goto(`${base}/runs?execution_status=running`, {
-      waitUntil: 'networkidle'
+      waitUntil: 'domcontentloaded'
     })
     await page.getByRole('heading', { name: '运行' }).waitFor()
     await page.locator('tbody tr:first-child td a').first().click()
-    await page.waitForSelector('.run-progress-timeline')
+    await page.locator('.run-progress-timeline').waitFor()
     const execution = await waitUntilValue(
       () => page.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(2).textContent(),
       (text) => text !== null && text.length > 0,

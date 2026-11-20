@@ -5,7 +5,7 @@ test('local wall-clock freezing preserves real animation frames', async ({
   fixtureRuntime
 }) => {
   test.skip(fixtureRuntime.server === undefined, 'The local fixture owns the fixed clock.')
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   const reference = await page.evaluate(async () => {
     const response = await fetch('/api/memory/tree/automation')
     return ((await response.json()) as { changed_at: string }).changed_at

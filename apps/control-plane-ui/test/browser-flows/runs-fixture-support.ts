@@ -28,7 +28,7 @@ export async function openPublishedRepositoryRun({
     options?: { timeoutMs?: number; intervalMs?: number }
   ) => Promise<void>
 }) {
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
   // A repository review publishes one step per delivery plus two summaries, so a
@@ -47,5 +47,5 @@ export async function openPublishedRepositoryRun({
     return workflowCell === 'Repository review' && publicationCell.includes('Published')
   }, `${name} the repository-review and published filters must both apply to the list`)
   await page.locator('tbody tr:first-child td a').first().click()
-  await page.waitForSelector('.run-progress-timeline')
+  await page.locator('.run-progress-timeline').waitFor()
 }

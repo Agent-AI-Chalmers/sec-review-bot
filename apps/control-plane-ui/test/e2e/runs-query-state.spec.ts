@@ -81,8 +81,9 @@ test('empty filtered results can clear the query without changing the page size'
   page
 }) => {
   await page.goto('/runs?limit=50&from=2099-01-01T00%3A00%3A00Z', {
-    waitUntil: 'networkidle'
+    waitUntil: 'domcontentloaded'
   })
+  await expect(page.getByText('No results match these filters', { exact: true })).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(0)
   await page.getByRole('button', { name: 'Clear filters', exact: true }).last().click()
   await expect(page).toHaveURL((url) => url.search === '?limit=50')

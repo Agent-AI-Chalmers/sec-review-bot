@@ -18,7 +18,7 @@ export async function runRunsTimelineFlow({
     options?: { timeoutMs?: number; intervalMs?: number }
   ) => Promise<void>
 }) {
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await chooseRunFilter(page, 'Execution', 'Running')
   await waitUntil(
     async () =>
@@ -28,7 +28,7 @@ export async function runRunsTimelineFlow({
     `${name} the Execution filter must apply before opening a run`
   )
   await page.locator('tbody tr:first-child td a').first().click()
-  await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
+  await page.locator('.run-progress-timeline').waitFor({ timeout: 10_000 })
   const runId = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
   const steps = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
     items.map((item) => ({
@@ -103,7 +103,7 @@ export async function runRunsTimelineFlow({
     )
   }
 
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await chooseRunFilter(page, 'Execution', 'Failed')
   await waitUntil(
     async () =>
@@ -111,7 +111,7 @@ export async function runRunsTimelineFlow({
     `${name} a failed row must show its failure code in the list`
   )
   await page.locator('tbody tr:first-child td a').first().click()
-  await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
+  await page.locator('.run-progress-timeline').waitFor({ timeout: 10_000 })
   const ruledOut = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
     items.map((item) => item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? '')
   )

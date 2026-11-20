@@ -19,7 +19,7 @@ async function forceOneRowPages(page: Page, path: string): Promise<void> {
 
 async function openVersionList(page: Page): Promise<void> {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions' }).click()
   await page.getByText('List', { exact: true }).click()
 }
@@ -52,7 +52,7 @@ test('a report decision reveals its observation in the version-filtered list', a
 test('the observation list pages forward and back with the shared pager', async ({ page }) => {
   await forceOneRowPages(page, 'observations')
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Observations' }).click()
   const rows = page.locator('[data-observation-row]')
   await expect(rows).toHaveCount(1)
@@ -84,7 +84,7 @@ test('version history pages in the list while the graph keeps the newest window'
 
 test('observation navigation centers the graph and can return to latest', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Observations' }).click()
   const centered = page.waitForRequest((request) =>
     request.url().includes('/memory/versions?limit=50&before_version=51')
@@ -110,7 +110,7 @@ test('the default history centers an older version and returns to the latest win
   page
 }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions' }).click()
   await expect(page.locator('.version-graph-node')).toHaveCount(50)
   await expect(page.getByText('Versions 11–60', { exact: true })).toBeVisible()
@@ -128,7 +128,7 @@ test('the default history centers an older version and returns to the latest win
 
 test('refreshing a historical graph preserves the reader scroll position', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   const autoRefresh = page.getByRole('switch', {
     name: 'Auto refresh',
     exact: true

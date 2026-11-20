@@ -3,7 +3,7 @@ import { expect, test } from './fixtures.js'
 test('viewer investigation survives navigation but clear and reload remove it', async ({
   page
 }) => {
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   const input = Array.from({ length: 24 }, (_, index) =>
     JSON.stringify({
       seq: index + 1,
@@ -49,7 +49,7 @@ test('viewer investigation survives navigation but clear and reload remove it', 
 })
 
 test('unrendered viewer drafts survive a round trip', async ({ page }) => {
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   await page.getByLabel('Paste trajectory JSONL').fill('unfinished draft')
   await page.getByRole('link', { name: 'Runs', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Runs', exact: true })).toBeVisible()

@@ -33,6 +33,7 @@ test.beforeEach(async ({ fixtureRuntime }) => {
 
 test('runs list has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
+  await expect(page.locator('tbody tr').first()).toBeVisible()
   await expectNoAccessibilityViolations(page)
 })
 
@@ -45,14 +46,14 @@ test('run detail has no detectable WCAG A/AA violations', async ({ page }) => {
 
 test('memory workspace has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
-  await page.locator('main').waitFor()
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
+  await page.locator('.memory-overview-metrics').waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
 test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions' }).click()
   await page.locator('.version-graph-node[data-current]').waitFor()
   await expectNoAccessibilityViolations(page)
@@ -79,7 +80,7 @@ test('memory loading state has no detectable WCAG A/AA violations', async ({ pag
 
 test('trajectory viewer has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   await page.locator('main').waitFor()
   await expectNoAccessibilityViolations(page)
 })
@@ -87,24 +88,24 @@ test('trajectory viewer has no detectable WCAG A/AA violations', async ({ page }
 test('stable error state has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.goto('/runs/fixture-artifact-load-error/files', {
-    waitUntil: 'networkidle'
+    waitUntil: 'domcontentloaded'
   })
   await page.getByText('The run files could not be opened.', { exact: true }).waitFor()
   await expectNoAccessibilityViolations(page)
 })
 
 test('populated memory files and observations keep readable text', async ({ page }) => {
-  await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
+  await page.goto('/memory/versions/2/tree', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.memory-markdown')).toBeVisible()
   await expectNoAccessibilityViolations(page)
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Observations', exact: true }).click()
   await expect(page.locator('.memory-table tbody tr').first()).toBeVisible()
   await expectNoAccessibilityViolations(page)
 })
 
 test('loaded trajectory tool calls keep readable text', async ({ page }) => {
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   await page.getByRole('textbox').fill(
     JSON.stringify({
       seq: 1,
