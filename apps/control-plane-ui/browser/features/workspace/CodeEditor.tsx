@@ -2,7 +2,9 @@ import React from 'react'
 import { basicSetup, EditorView } from 'codemirror'
 import { json } from '@codemirror/lang-json'
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorState, type Extension } from '@codemirror/state'
+import { Annotation, EditorState, Transaction, type Extension } from '@codemirror/state'
+
+const parentValueSync = Annotation.define<boolean>()
 
 export function CodeEditor({
   value,
@@ -39,7 +41,11 @@ export function CodeEditor({
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !readOnly) {
+          if (
+            update.docChanged &&
+            !readOnly &&
+            !update.transactions.some((transaction) => transaction.annotation(parentValueSync))
+          ) {
             onChangeRef.current(update.state.doc.toString())
           }
         })
@@ -58,7 +64,8 @@ export function CodeEditor({
       return
     }
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: value }
+      changes: { from: 0, to: view.state.doc.length, insert: value },
+      annotations: [parentValueSync.of(true), Transaction.addToHistory.of(false)]
     })
   }, [value])
 
