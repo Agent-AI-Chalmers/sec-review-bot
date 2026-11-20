@@ -5,7 +5,9 @@ import {
   Connection,
   WorkflowExecutionAlreadyStartedError,
   WorkflowIdReusePolicy,
-  WorkflowNotFoundError
+  WorkflowNotFoundError,
+  type WorkflowHandle,
+  type WorkflowExecutionDescription
 } from '@temporalio/client'
 
 import { isExecutionError, validateExecutionResult } from './execution-api-validation.js'
@@ -96,12 +98,17 @@ export class TemporalExecutionClient {
       if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
         throw error
       }
-      const existing = await this.get(request.run_id)
-      const description = await this.client.workflow.getHandle(request.run_id).describe()
-      if (description.memo?.request_fingerprint === requestFingerprint && existing) {
-        return existing
+      const handle = this.client.workflow.getHandle(request.run_id)
+      const description = await handle.describe()
+      if (description.memo?.request_fingerprint === requestFingerprint) {
+        return this.projectRecord(request.run_id, handle, description)
       }
-      throw new ExecutionRunConflictError(request.run_id, request.workflow, existing?.workflow)
+      const workflow = description.memo?.workflow
+      throw new ExecutionRunConflictError(
+        request.run_id,
+        request.workflow,
+        typeof workflow === 'string' ? workflow : undefined
+      )
     }
     return (
       (await this.get(request.run_id)) ?? {
@@ -123,6 +130,14 @@ export class TemporalExecutionClient {
       }
       throw error
     }
+    return this.projectRecord(runId, handle, description)
+  }
+
+  private async projectRecord(
+    runId: string,
+    handle: WorkflowHandle,
+    description: WorkflowExecutionDescription
+  ): Promise<ExecutionRecord> {
     const temporalStatus = statusName(description.status)
     const workflow =
       typeof description.memo?.workflow === 'string' ? description.memo.workflow : undefined
