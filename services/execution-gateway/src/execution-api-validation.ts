@@ -8,7 +8,7 @@ import type {
   ExecutionError,
   ExecutionWorkflow,
   WorkflowInputByName
-} from './execution-api-types-generated.js'
+} from './execution-api-types.generated.js'
 import { EXECUTION_API_VERSION } from './execution-api-version.js'
 
 const schemaByWorkflow: Record<ExecutionWorkflow, string> = {

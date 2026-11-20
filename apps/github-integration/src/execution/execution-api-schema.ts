@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 
-import type { WorkflowName } from './execution-api-types-generated.js'
+import type { WorkflowName } from './execution-api-types.generated.js'
 import { EXECUTION_API_VERSION } from './execution-api-version.js'
 
 const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {

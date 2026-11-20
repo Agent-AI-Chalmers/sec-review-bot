@@ -7,7 +7,7 @@ import { ExecutionRunConflictError, type ExecutionWorkflowInput } from '../src/e
 import type {
   IssueReviewInput,
   PullRequestReviewInput
-} from '../src/execution-api-types-generated.js'
+} from '../src/execution-api-types.generated.js'
 import { TemporalExecutionClient } from '../src/temporal-execution-client.js'
 import { REPOSITORY_ROOT } from './project-paths.js'
 

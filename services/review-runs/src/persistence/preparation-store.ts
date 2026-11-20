@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
 
-import type { PreparationWork as ContractPreparationWork } from '../contract-types-generated.js'
+import type { PreparationWork as ContractPreparationWork } from '../contract-types.generated.js'
 import type { ReviewRunWorkflow } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'

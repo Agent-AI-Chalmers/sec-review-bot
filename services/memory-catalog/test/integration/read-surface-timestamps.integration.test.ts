@@ -13,7 +13,7 @@ import type {
   Actor,
   ArtifactReference,
   ExtractionRegistration
-} from '../../src/contract-types-generated.js'
+} from '../../src/contract-types.generated.js'
 import { learningReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL

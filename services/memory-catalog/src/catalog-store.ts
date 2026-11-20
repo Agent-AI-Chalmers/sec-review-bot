@@ -16,7 +16,7 @@ import type {
   MemoryTreeVersionCreation,
   MemoryTreeVersionCreationResult,
   ManualVersionSource
-} from './contract-types-generated.js'
+} from './contract-types.generated.js'
 import { PostgresMemoryCatalogQueries, type MemoryCatalogQueries } from './catalog-queries.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 

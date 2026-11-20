@@ -12,7 +12,7 @@ import { buildCoordinationRouteHandlers } from './coordination-route-handlers.js
 import { ReviewRunStore } from '../persistence/review-run-store.js'
 import { buildReadRouteHandlers } from './read-route-handlers.js'
 import { DeterministicReviewRunError } from '../errors.js'
-import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from '../error-codes-generated.js'
+import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from '../error-codes.generated.js'
 import type { OperationHandlers, OperationId } from './route-handlers.js'
 
 const MAX_BODY_BYTES = 1024 * 1024

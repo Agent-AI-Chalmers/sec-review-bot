@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, afterAll, test } from 'vitest'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import type { InputBundleCandidate } from '../../src/review-runs/review-runs-api.js'
+import type { InputBundleCandidate } from '../../src/review-runs/review-runs-api.generated.js'
 import type { InputBundlePublicationStore } from '../../src/artifacts/input-bundle-publication.js'
 import type { PublishContext } from '../../src/review-runs/publish-context.js'
 

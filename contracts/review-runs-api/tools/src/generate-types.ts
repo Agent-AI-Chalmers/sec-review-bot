@@ -32,7 +32,7 @@ export const OUTPUT_PATH = path.resolve(
   'github-integration',
   'src',
   'review-runs',
-  'review-runs-api.ts'
+  'review-runs-api.generated.ts'
 )
 
 /** The "do not edit" header every generated file carries. The source path is relative to the
@@ -85,7 +85,7 @@ function renderOperationRoutes(spec: OpenApiDocument): string {
   const entries = operationRoutes(spec)
     .map(
       ({ operationId, path, method }) =>
-        `  ${operationId}: { path: '${path}', method: '${method}' }`
+        `  ${JSON.stringify(operationId)}: { path: ${JSON.stringify(path)}, method: ${JSON.stringify(method)} }`
     )
     .join(',\n')
   return `/** Each operation's contract path and HTTP method, keyed by \`operationId\` and taken from
@@ -98,34 +98,6 @@ ${entries}
 `
 }
 
-function operationTypeName(operationId: string): string {
-  return operationId.charAt(0).toUpperCase() + operationId.slice(1)
-}
-
-function renderOperationTypeMaps(spec: OpenApiDocument): string {
-  const routes = operationRoutes(spec)
-  const options = routes
-    .map(({ operationId }) => {
-      const name = operationTypeName(operationId)
-      return `  ${operationId}: ${name}Options`
-    })
-    .join('\n')
-  const responses = routes
-    .map(({ operationId }) => {
-      const name = operationTypeName(operationId)
-      return `  ${operationId}: ${name}ResponseBody`
-    })
-    .join('\n')
-  return `export interface OperationOptionsById {
-${options}
-}
-
-export interface OperationResponseById {
-${responses}
-}
-`
-}
-
 /** The committed content of the github-integration review-runs API types. */
 export async function renderReviewRunsApiTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
@@ -134,8 +106,6 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
     (await renderOpenApiTypes(SPEC_PATH)) +
     '\n\n' +
     renderOperationRoutes(spec) +
-    '\n' +
-    renderOperationTypeMaps(spec) +
     '\nexport const REVIEW_RUNS_PUBLICATION_ERROR_CODES = {\n' +
     publicationStepCodes(spec)
       .map((code) => `  ${code.toLowerCase()}: '${code}'`)
@@ -145,7 +115,7 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
 }
 
 // Generate the server's closed error-code vocabulary from the contract enum.
-export const ERROR_CODES_PATH = path.resolve(REVIEW_RUNS_ROOT, 'src', 'error-codes-generated.ts')
+export const ERROR_CODES_PATH = path.resolve(REVIEW_RUNS_ROOT, 'src', 'error-codes.generated.ts')
 
 /** Preserve every error-code enum member; reject non-string values rather than silently
  * generating an incomplete vocabulary for response validation.
@@ -200,12 +170,11 @@ export const ERROR_RESPONSE_CODES_FROM_CONTRACT = [\n${all}\n] as const
 export const CONTRACT_TYPES_PATH = path.resolve(
   REVIEW_RUNS_ROOT,
   'src',
-  'contract-types-generated.ts'
+  'contract-types.generated.ts'
 )
 
 /** Render the service contract types. */
 export async function renderContractTypes(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const body =
     headerComment() +
     `//
@@ -214,8 +183,6 @@ export async function renderContractTypes(): Promise<string> {
 // instead of a parallel schema.
 
 ${await renderOpenApiTypes(SPEC_PATH)}
-
-${renderOperationTypeMaps(spec)}
 
 export type ObservedStep = ObservedPublicationStep
 `

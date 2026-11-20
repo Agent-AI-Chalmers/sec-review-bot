@@ -1,4 +1,4 @@
-import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from '../review-runs/review-runs-api.js'
+import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from '../review-runs/review-runs-api.generated.js'
 
 export const EXECUTION_PUBLISH_ERROR_CODES = {
   ...REVIEW_RUNS_PUBLICATION_ERROR_CODES,

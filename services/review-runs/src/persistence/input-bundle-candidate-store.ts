@@ -2,7 +2,7 @@
 // external object reads/writes happen in the connector, outside this transaction.
 import type { PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
-import type { InputBundleCandidate } from '../contract-types-generated.js'
+import type { InputBundleCandidate } from '../contract-types.generated.js'
 import { transaction } from '../database/transaction.js'
 
 export async function requirePreparationClaim(

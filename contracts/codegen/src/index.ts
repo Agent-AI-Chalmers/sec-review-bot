@@ -1,128 +1,128 @@
+import { readFile } from 'node:fs/promises'
+
 import { memoryStorage } from '@kubb/core'
 import { pluginTs, resolverTs } from '@kubb/plugin-ts'
 import { createKubb } from 'kubb'
-import { parseSync, type TSTypeAliasDeclaration } from 'oxc-parser'
+import { parse } from 'yaml'
 
 export { formatGenerated } from './format-generated.js'
 
-const BODY_SUFFIX = 'ResponseBody'
-const MAP_SUFFIX = 'ResponseBodyByStatus'
+// Kubb's default aggregate names (`HealthResponse`, `HealthResponses`) collide with
+// contract schema names, so operation aggregates get distinct suffixes.
+const bodyName = (operationId: string) => resolverTs.name(`${operationId} ResponseBody`)
+const statusMapName = (operationId: string) =>
+  resolverTs.name(`${operationId} ResponseBodyByStatus`)
+const optionsName = (operationId: string) => resolverTs.name(`${operationId} Options`)
 
-function normalizeResponseTypes(source: string): string {
-  const { program, comments, errors } = parseSync('types.ts', source)
-  if (errors.length) {
-    throw new Error(`Invalid generated TypeScript: ${JSON.stringify(errors)}`)
-  }
-  const declarations = program.body.map((node) =>
-    node.type === 'ExportNamedDeclaration' ? node.declaration : node
-  )
-  const aliases = new Map(
-    declarations
-      .filter((node): node is TSTypeAliasDeclaration => node?.type === 'TSTypeAliasDeclaration')
-      .map((node) => [node.id.name, node])
-  )
-  const statementOf = (alias: TSTypeAliasDeclaration) =>
-    program.body.find(
-      (node) => node.type === 'ExportNamedDeclaration' && node.declaration === alias
-    ) ?? alias
-  const leadingComments = (alias: TSTypeAliasDeclaration) => {
-    const statement = statementOf(alias)
-    const previous = program.body.filter((node) => node.end <= statement.start).at(-1)?.end ?? 0
-    return comments.filter((comment) => comment.start >= previous && comment.end <= statement.start)
-  }
-  const edits: { start: number; end: number; text: string }[] = []
-  const removed = new Set<TSTypeAliasDeclaration>()
-  for (const [name, mapping] of aliases) {
-    if (!name.endsWith(MAP_SUFFIX)) {
-      continue
-    }
-    if (mapping.typeAnnotation.type !== 'TSTypeLiteral') {
-      throw new Error(`Expected a response status map: ${name}`)
-    }
-    const bodyName = name.slice(0, -MAP_SUFFIX.length) + BODY_SUFFIX
-    const body = aliases.get(bodyName)
-    if (body === undefined) {
-      throw new Error(`Missing ${bodyName}; check for an OpenAPI schema name collision`)
-    }
-    const members =
-      body.typeAnnotation.type === 'TSUnionType' ? body.typeAnnotation.types : [body.typeAnnotation]
-    const selected = members.map((member) => {
-      if (member.type !== 'TSTypeReference' || member.typeName.type !== 'Identifier') {
-        throw new Error(`Unexpected response body member in ${bodyName}`)
-      }
-      return member.typeName.name
-    })
-    const statusByAlias = new Map<string, string>()
-    for (const property of mapping.typeAnnotation.members) {
-      if (
-        property.type !== 'TSPropertySignature' ||
-        property.key.type !== 'Literal' ||
-        typeof property.key.value !== 'string' ||
-        property.typeAnnotation === null ||
-        property.typeAnnotation.typeAnnotation.type !== 'TSTypeReference' ||
-        property.typeAnnotation.typeAnnotation.typeName.type !== 'Identifier'
-      ) {
-        throw new Error(`Unsupported response status entry in ${name}`)
-      }
-      const statusName = property.typeAnnotation.typeAnnotation.typeName.name
-      const status = aliases.get(statusName)
-      if (status === undefined) {
-        throw new Error(`Missing response status type: ${statusName}`)
-      }
-      statusByAlias.set(statusName, property.key.value)
-      // Put the body and its documentation at the status entry. Separate StatusNNN
-      // aliases add another lookup without providing another contract boundary.
-      const documentation = leadingComments(status)
-        .map((comment) => source.slice(comment.start, comment.end))
-        .join('\n')
-      edits.push({
-        start: property.start,
-        end: property.end,
-        text:
-          (documentation ? documentation + '\n' : '') +
-          source.slice(property.start, property.typeAnnotation.typeAnnotation.start) +
-          source.slice(status.typeAnnotation.start, status.typeAnnotation.end) +
-          source.slice(property.typeAnnotation.typeAnnotation.end, property.end)
-      })
-      removed.add(status)
-    }
-    // Keep Kubb's selection, including its error-only fallback; never substitute
-    // all status keys, which would mix error bodies into successful results.
-    const keys = selected.map((member) => {
-      const key = statusByAlias.get(member)
-      if (key === undefined) {
-        throw new Error(`Response body ${bodyName} is absent from its status map`)
-      }
-      return JSON.stringify(key)
-    })
-    edits.push({
-      start: body.typeAnnotation.start,
-      end: body.typeAnnotation.end,
-      text: `${name}[${keys.join(' | ')}]`
-    })
-    for (const comment of leadingComments(body)) {
-      edits.push({
-        start: comment.start,
-        end: comment.end,
-        text: '/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */'
-      })
-    }
-  }
-  for (const alias of removed) {
-    edits.push({
-      start: leadingComments(alias)[0]?.start ?? statementOf(alias).start,
-      end: alias.end,
-      text: ''
-    })
-  }
-  // Apply edits backwards, preserving unrelated declarations and Kubb's spacing.
-  for (const edit of edits.sort((left, right) => right.start - left.start)) {
-    source = source.slice(0, edit.start) + edit.text + source.slice(edit.end)
-  }
-  return source
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'])
+
+interface OpenApiResponse {
+  $ref?: string
+  content?: Record<string, { schema?: unknown }>
 }
 
-export async function renderOpenApiTypes(specPath: string): Promise<string> {
+interface OpenApiOperation {
+  operationId?: string
+  responses?: Record<string, OpenApiResponse>
+}
+
+interface OpenApiDocument {
+  paths?: Record<string, Record<string, OpenApiOperation>>
+  components?: { responses?: Record<string, OpenApiResponse> }
+}
+
+function resolveResponse(spec: OpenApiDocument, response: OpenApiResponse): OpenApiResponse {
+  if (response.$ref === undefined) {
+    return response
+  }
+  const prefix = '#/components/responses/'
+  const target = response.$ref.startsWith(prefix)
+    ? spec.components?.responses?.[response.$ref.slice(prefix.length)]
+    : undefined
+  if (target === undefined) {
+    throw new Error(`Unsupported response reference: ${response.$ref}`)
+  }
+  return resolveResponse(spec, target)
+}
+
+/** The successful body of one operation: its 2xx statuses that carry a body, plus `void`
+ * for 2xx statuses without one. Error statuses never count as a successful body, and an
+ * operation without any 2xx status has no successful body to name, so generation fails. */
+function successBodyType(spec: OpenApiDocument, operationId: string, operation: OpenApiOperation) {
+  const withBody: string[] = []
+  let withoutBody = false
+  for (const [status, declared] of Object.entries(operation.responses ?? {})) {
+    if (/^2xx$/i.test(status)) {
+      throw new Error(`${operationId}: status ranges such as ${status} are not supported`)
+    }
+    if (!/^2\d\d$/.test(status)) {
+      continue
+    }
+    const media = Object.values(resolveResponse(spec, declared).content ?? {})
+    if (media.some((entry) => entry.schema === undefined)) {
+      // Content without a schema is a body of unknown shape, not an absent body.
+      throw new Error(`${operationId} ${status}: response content must declare a schema`)
+    }
+    if (media.length > 1) {
+      // Kubb turns these into `{ contentType; data }` entries, which are not a plain body.
+      throw new Error(`${operationId} ${status}: multiple response content types are not supported`)
+    }
+    if (media.length === 0) {
+      withoutBody = true
+    } else {
+      withBody.push(JSON.stringify(status))
+    }
+  }
+  if (withBody.length === 0 && !withoutBody) {
+    throw new Error(`${operationId}: declares no 2xx response`)
+  }
+  const members = withBody.length ? [`${statusMapName(operationId)}[${withBody.join(' | ')}]`] : []
+  if (withoutBody) {
+    members.push('void')
+  }
+  return members.join(' | ')
+}
+
+/** Per-operation request options and successful response bodies, keyed by operationId. */
+function renderOperationMaps(spec: OpenApiDocument): string {
+  const options: string[] = []
+  const responses: string[] = []
+  for (const [route, pathItem] of Object.entries(spec.paths ?? {})) {
+    if ('$ref' in pathItem) {
+      // Its operations live elsewhere; skipping them would silently drop map entries.
+      throw new Error(`${route}: path item references are not supported`)
+    }
+    for (const [method, operation] of Object.entries(pathItem)) {
+      if (!HTTP_METHODS.has(method)) {
+        continue
+      }
+      const { operationId } = operation
+      if (operationId === undefined) {
+        throw new Error(`${method.toUpperCase()} operation has no operationId`)
+      }
+      options.push(`  ${JSON.stringify(operationId)}: ${optionsName(operationId)}`)
+      responses.push(
+        `  ${JSON.stringify(operationId)}: ${successBodyType(spec, operationId, operation)}`
+      )
+    }
+  }
+  return `
+/** Request options (path, query, headers, body) of each operation, keyed by operationId. */
+export interface OperationOptionsById {
+${options.join('\n')}
+}
+
+/**
+ * Successful response body of each operation, keyed by operationId: the bodies of its 2xx
+ * statuses, with \`void\` for a 2xx status that has no body. Error bodies are never included.
+ */
+export interface OperationResponseById {
+${responses.join('\n')}
+}
+`
+}
+
+async function renderKubbTypes(specPath: string): Promise<string> {
   const kubb = createKubb({
     input: specPath,
     output: { path: 'generated' },
@@ -134,12 +134,8 @@ export async function renderOpenApiTypes(specPath: string): Promise<string> {
         enum: { type: 'inlineLiteral' },
         resolver: {
           response: {
-            responses(node) {
-              return resolverTs.name(`${node.operationId} ${MAP_SUFFIX}`)
-            },
-            response(node) {
-              return resolverTs.name(`${node.operationId} ${BODY_SUFFIX}`)
-            }
+            responses: (node) => statusMapName(node.operationId),
+            response: (node) => bodyName(node.operationId)
           }
         }
       })
@@ -159,8 +155,17 @@ export async function renderOpenApiTypes(specPath: string): Promise<string> {
     if (typeof rendered !== 'string') {
       throw new Error(`Kubb did not generate text at ${outputPath}`)
     }
-    return normalizeResponseTypes(rendered)
+    return rendered
   } finally {
     kubb.dispose()
   }
+}
+
+/** The TypeScript projection of an OpenAPI contract: Kubb's declarations, unchanged, followed
+ * by the operation maps consumers use. */
+export async function renderOpenApiTypes(specPath: string): Promise<string> {
+  const spec = parse(await readFile(specPath, 'utf8')) as OpenApiDocument
+  // Validate the operations first so unsupported responses fail with a contract-level message.
+  const maps = renderOperationMaps(spec)
+  return (await renderKubbTypes(specPath)) + maps
 }

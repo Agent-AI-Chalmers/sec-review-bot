@@ -1,10 +1,10 @@
 import React from 'react'
 import { api, parkedRuns, throwIfUnauthorized, type ParkedRun } from '../api.js'
-import type { ListRunsResponseBody } from '../api-types.generated.js'
+import type { OperationResponseById } from '../api-types.generated.js'
 import { useRefresh, type RefreshState } from '../../../shared/refresh.js'
 
 interface RunsData extends RefreshState {
-  data: ListRunsResponseBody | undefined
+  data: OperationResponseById['listRuns'] | undefined
   blocked: ParkedRun[]
   error: unknown
   auxiliaryError: unknown
@@ -14,7 +14,7 @@ interface RunsData extends RefreshState {
 export function useRunsData(query: string): RunsData {
   const [result, setResult] = React.useState<{
     query: string
-    data: ListRunsResponseBody
+    data: OperationResponseById['listRuns']
   }>()
   const [failure, setFailure] = React.useState<{
     query: string
@@ -49,7 +49,7 @@ export function useRunsData(query: string): RunsData {
         // The queue is an operator aid, not a precondition for reading runs.
       })
     try {
-      const nextData = await api<ListRunsResponseBody>(`/runs?${requestedQuery}`)
+      const nextData = await api<OperationResponseById['listRuns']>(`/runs?${requestedQuery}`)
       if (latestQuery.current === requestedQuery) {
         setResult({ query: requestedQuery, data: nextData })
       }

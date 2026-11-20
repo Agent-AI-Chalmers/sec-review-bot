@@ -14,7 +14,7 @@ import {
 import type {
   ArtifactReference,
   ExtractionRegistration
-} from '../../src/contract-types-generated.js'
+} from '../../src/contract-types.generated.js'
 import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL

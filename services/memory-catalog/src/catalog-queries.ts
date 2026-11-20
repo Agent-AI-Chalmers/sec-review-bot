@@ -14,7 +14,7 @@ import type {
   MemoryTreeVersionList,
   ObservationBacklog,
   ObservationList
-} from './contract-types-generated.js'
+} from './contract-types.generated.js'
 
 type CatalogOverviewRange = '30d' | '90d' | 'all'
 

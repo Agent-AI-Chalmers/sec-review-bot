@@ -11,7 +11,7 @@ import { expect, test } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
 
 import { PostgresMemoryCatalogStore } from '../../src/catalog-store.js'
-import type { Actor } from '../../src/contract-types-generated.js'
+import type { Actor } from '../../src/contract-types.generated.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
 if (databaseUrl === undefined) {

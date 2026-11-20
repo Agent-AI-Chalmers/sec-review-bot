@@ -5,7 +5,11 @@ import { ResponseTooLargeError, readBoundedResponseBody } from './bounded-respon
 import { integerEnv } from './env.js'
 
 import type { ReviewRunWorkflow, ExecutionArtifactStorage } from './contracts.js'
-import type { ExecutionError, RunResponse, RunStatusToken } from './execution-api-schema.js'
+import type {
+  ExecutionError,
+  RunResponse,
+  RunStatusToken
+} from './execution-api-types.generated.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type JsonObject = Record<string, unknown>

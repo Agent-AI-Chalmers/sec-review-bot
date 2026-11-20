@@ -3,7 +3,7 @@
 // The cross-package domain shapes (ReviewRunRecord, ReviewRunAdmission, PublicationWork,
 // PublicationStepRecord, ObservedStep, ObservedRun) are owned by
 // `contracts/review-runs-api/v1/openapi.yaml` and re-exported here from
-// `contract-types-generated.ts`. This module keeps only the server-internal bits that are
+// `contract-types.generated.ts`. This module keeps only the server-internal bits that are
 // not part of that contract: the small vocabulary unions, the store's create args, and the
 // Execution artifact narrowing helper.
 import type { ExecutionArtifactStorage } from './contracts.js'
@@ -16,7 +16,7 @@ import type {
   ReviewRunEvent as ContractReviewRunEvent,
   RunNoticeWork as ContractRunNoticeWork,
   ReviewRunRecord
-} from './contract-types-generated.js'
+} from './contract-types.generated.js'
 
 /** One coordination state transition, as the read endpoint reports it. */
 export type ReviewRunEvent = ContractReviewRunEvent

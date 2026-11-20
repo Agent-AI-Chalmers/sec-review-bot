@@ -15,7 +15,7 @@ import {
   executionWorkflowType,
   validateExecutionSubmission
 } from './execution-workflow-validation.js'
-import type { ExecutionArtifactStorage, ExecutionError } from './execution-api-types-generated.js'
+import type { ExecutionArtifactStorage, ExecutionError } from './execution-api-types.generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,

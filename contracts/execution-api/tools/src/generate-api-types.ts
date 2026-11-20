@@ -374,7 +374,7 @@ function inputTypesOutput(): string {
     'github-integration',
     'src',
     'execution',
-    'execution-api-types-generated.ts'
+    'execution-api-types.generated.ts'
   )
 }
 

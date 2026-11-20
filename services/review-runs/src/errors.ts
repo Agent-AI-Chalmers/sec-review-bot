@@ -12,7 +12,7 @@
  * key here — is checked by `error-codes.test.ts`, because the semantic keys are not the code
  * strings and cannot express that direction as a clean compile-time type.
  */
-import type { PublicationStepErrorCode } from './error-codes-generated.js'
+import type { PublicationStepErrorCode } from './error-codes.generated.js'
 
 /**
  * The failure code that means "the Execution may have accepted this submission, but we could not

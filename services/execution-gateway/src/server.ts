@@ -1,5 +1,5 @@
 import { validateExecutionSubmission } from './execution-workflow-validation.js'
-import type { ExecutionError } from './execution-api-types-generated.js'
+import type { ExecutionError } from './execution-api-types.generated.js'
 import { contractsRoot } from './contract-paths.js'
 import { timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'

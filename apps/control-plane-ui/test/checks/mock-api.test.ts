@@ -4,8 +4,8 @@ import type { Plugin } from 'vite'
 
 import { mockApi } from '../../mock-api/index.js'
 import type {
+  OperationResponseById,
   Run,
-  ListRunsResponseBodyByStatus,
   RunEvent
 } from '../../browser/features/runs/api-types.generated.js'
 import type {
@@ -360,7 +360,7 @@ test('mock API pages the run list in the order their cursor describes', async ()
   const fixture = await startFixtureServer()
   try {
     const first = await ((await fetch(`${fixture.base}/api/runs?limit=50`)).json() as Promise<
-      ListRunsResponseBodyByStatus['200']
+      OperationResponseById['listRuns']
     >)
     const stamps = first.runs.map((run: { created_at: string }) => run.created_at)
     expect(stamps, 'the list is newest-first, which is what the cursor walks').toStrictEqual(
@@ -370,7 +370,7 @@ test('mock API pages the run list in the order their cursor describes', async ()
 
     const second = await ((
       await fetch(`${fixture.base}/api/runs?limit=50&cursor=${first.next_cursor}`)
-    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
+    ).json() as Promise<OperationResponseById['listRuns']>)
     const firstIds = new Set(first.runs.map((run: { run_id: string }) => run.run_id))
     expect.assert(second.runs.length > 0, 'the cursor must return a second page')
     for (const run of second.runs as { run_id: string }[]) {
@@ -394,7 +394,7 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
   const fixture = await startFixtureServer()
   try {
     const unfiltered = await ((await fetch(`${fixture.base}/api/runs?limit=1`)).json() as Promise<
-      ListRunsResponseBodyByStatus['200']
+      OperationResponseById['listRuns']
     >)
     const newest = unfiltered.runs[0]
     expect.assert(newest, 'the fixtures must serve at least one run')
@@ -412,17 +412,17 @@ test('run fixtures filter by source platform', async () => {
   try {
     const github = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=github&limit=1`)
-    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
+    ).json() as Promise<OperationResponseById['listRuns']>)
     expect(github.runs[0]?.source_platform).toBe('github')
 
     const gitlab = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=gitlab&limit=1`)
-    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
+    ).json() as Promise<OperationResponseById['listRuns']>)
     expect(gitlab.runs[0]?.source_platform).toBe('gitlab')
 
     const unknown = await ((
       await fetch(`${fixture.base}/api/runs?source_platform=unknown&limit=1`)
-    ).json() as Promise<ListRunsResponseBodyByStatus['200']>)
+    ).json() as Promise<OperationResponseById['listRuns']>)
     expect(unknown.runs[0]?.source_platform).toBe('unknown')
   } finally {
     await fixture.close()

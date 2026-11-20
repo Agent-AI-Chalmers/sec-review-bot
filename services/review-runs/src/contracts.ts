@@ -5,7 +5,7 @@
  * execute the run. Review Runs only admits a validated request, persists its
  * coordination identity, and coordinates execution by reference.
  */
-import type { CreateRunOptions } from './execution-api-schema.js'
+import type { OperationOptionsById } from './execution-api-types.generated.js'
 
 /**
  * The workflows this service accepts.
@@ -14,12 +14,12 @@ import type { CreateRunOptions } from './execution-api-schema.js'
  * v1 schema map, so the OpenAPI enum is a projection of that single source. Restating the
  * names here is how this package and the Execution came to disagree about what exists.
  */
-export type ReviewRunWorkflow = CreateRunOptions['path']['workflow']
+export type ReviewRunWorkflow = OperationOptionsById['createRun']['path']['workflow']
 
 /**
  * Where a terminal run's archive went.
  *
  * The hand-maintained Execution API contract owns this shape;
- * `execution-api-schema.ts` is its generated local projection.
+ * `execution-api-types.generated.ts` is its generated local projection.
  */
-export type { ExecutionArtifactStorage } from './execution-api-schema.js'
+export type { ExecutionArtifactStorage } from './execution-api-types.generated.js'

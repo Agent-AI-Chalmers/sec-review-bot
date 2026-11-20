@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
 import { RunProgress } from '../../browser/features/runs/detail/RunProgress.js'
-import type { ListRunPublicationStepsResponseBody } from '../../browser/features/runs/api-types.generated.js'
+import type { OperationResponseById } from '../../browser/features/runs/api-types.generated.js'
 import { createRunFixtures } from '../../mock-api/runs/generate.js'
 import { renderComponent } from './render.js'
 
@@ -11,7 +11,7 @@ const { runs } = createRunFixtures(Date.parse('2026-11-12T12:00:00Z'))
 
 test('publication attempts render from the read response even without failure details', () => {
   const run = runs.find((value) => value.publication.status === 'uncertain')!
-  const response: ListRunPublicationStepsResponseBody = {
+  const response: OperationResponseById['listRunPublicationSteps'] = {
     run_id: run.run_id,
     publication_steps: [
       {
