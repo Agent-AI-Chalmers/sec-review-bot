@@ -137,7 +137,7 @@ pnpm run build
 
 <!-- doc-default: control-plane-ui.test-layout; source=apps/control-plane-ui/vitest.config.ts -->
 
-测试职责按下列目录划分。`test:logic` 运行 `logic/`、`server/` 和 `checks/` 中的 Node 测试，目录拆分不会增加新的测试命令。
+测试职责按下列目录划分。`test:logic` 运行 `logic/`、`server/` 和 `checks/` 中的 Node 测试。
 
 | `test/` 下的目录 | 职责                                                                   |
 | ---------------- | ---------------------------------------------------------------------- |
@@ -151,11 +151,11 @@ pnpm run build
 | `fixtures/`      | 测试输入文件                                                           |
 | `support/`       | 跨测试分组共享的辅助代码，包括契约 fixture 加载                        |
 
-组件测试加载应用 CSS，并使用浏览器原生交互，替代 DOM 模拟环境；Playwright E2E 继续负责应用导航和完整用户流程。Hook 测试在同一个组件项目中验证 React 生命周期行为，无需引入另一套 DOM 环境。保护异步状态归属或错误处理的测试继续在本地使用模块和 API mock。
+组件测试加载应用 CSS，并使用浏览器原生交互。Hook 测试在同一个浏览器测试项目中验证 React 生命周期行为。Playwright E2E 覆盖应用导航和完整用户流程。保护异步状态归属或错误处理的测试继续在本地使用模块和 API mock。
 
 <!-- doc-default: control-plane-ui.component-browser; source=apps/control-plane-ui/vitest.config.ts -->
 
-组件测试需要 Chrome。可运行 `pnpm exec playwright install --with-deps chrome` 安装，或通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定已有的可执行文件。CI 在包检查前安装 Chrome，并上传 `test-results/components/` 中的组件失败诊断。普通的 `pnpm test` 和 `pnpm run test:component` 命令已包含这些浏览器测试，不再另设浏览器组件测试套件。
+组件测试需要 Chrome。可运行 `pnpm exec playwright install --with-deps chrome` 安装，或通过 `CONTROL_PLANE_UI_CHROME_PATH` 指定已有的可执行文件。CI 在包检查前安装 Chrome，并上传 `test-results/components/` 中的组件失败诊断。`pnpm test` 和 `pnpm run test:component` 均包含这些浏览器测试。
 
 本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
 
@@ -195,7 +195,7 @@ BFF 还负责代理下载私有 RustFS 中的执行归档。它使用单独的 `
 
 ## 记忆管理
 
-服务端记忆文件树读取和构建代码实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入浏览器 bundle；BFF 负责校验、摘要计算和规范对象键。
+服务端记忆文件树读取和构建代码实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。这些代码不包含在浏览器下载的 JavaScript 文件中。BFF 负责校验、摘要计算和规范对象键。
 
 设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后，即可在控制台管理记忆：暂停或恢复记忆自动更新、编辑当前生效的记忆文件树，以及恢复已有版本。
 
