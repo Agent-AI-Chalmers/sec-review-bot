@@ -159,6 +159,10 @@ pnpm run build
 
 本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
 
+<!-- doc-default: control-plane-ui.playwright-report; source=apps/control-plane-ui/playwright.config.ts -->
+
+CI 中的 Playwright HTML 报告仅包含结果不符合预期的测试、flaky 测试（含重试后通过的测试）以及中断的测试。本地运行保留完整 HTML 报告。两种模式均保留终端进度输出。浏览器任务失败时，CI 上传报告、trace 和截图。
+
 ### 测试外部部署
 
 设置 `CONTROL_PLANE_UI_BASE_URL` 指向已启动的部署；需要登录时，同时设置 `CONTROL_PLANE_UI_ACCESS_TOKEN`。

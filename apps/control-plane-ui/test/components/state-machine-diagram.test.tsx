@@ -33,11 +33,9 @@ for (const language of ['en', 'zh'] as const) {
     await user.hover(page.getByRole('img', { name: detail.label }))
 
     const tooltipLocator = page.getByRole('tooltip')
-    // Browser assertions are asynchronous; jest-dom also declares a synchronous overload.
-    // oxlint-disable-next-line typescript/await-thenable
     await expect.element(tooltipLocator).toBeVisible()
     const tooltip = tooltipLocator.element()
-    expect(tooltip).toHaveTextContent(detail.summary)
-    expect(tooltip).not.toHaveTextContent(detail.description)
+    expect(tooltip).toMatchTextContent(detail.summary)
+    expect(tooltip).not.toMatchTextContent(detail.description)
   })
 }

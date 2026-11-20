@@ -23,12 +23,24 @@ if (executablePath === undefined) {
 
 export default defineConfig({
   testDir: './test/e2e',
+  // Playwright clears this directory on startup; keep Vitest artifacts in its sibling.
+  outputDir: 'test-results/e2e',
   timeout: 120_000,
   fullyParallel: isolatedLocalWorkers,
   // External deployments share data and capacity. A fixed local port also cannot
   // host more than one fixture server, so both modes run predictably in one worker.
   workers: isolatedLocalWorkers ? 3 : 1,
-  reporter: [['line'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  reporter: [
+    ['line'],
+    [
+      'html',
+      {
+        open: 'never',
+        outputFolder: 'playwright-report',
+        onlyFailures: Boolean(process.env.CI)
+      }
+    ]
+  ],
   use: {
     locale: 'en-US',
     permissions: ['clipboard-read', 'clipboard-write'],

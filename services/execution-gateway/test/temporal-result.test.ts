@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client'
+import { ExecutionRunConflictError, type ExecutionWorkflowInput } from '../src/execution.js'
 
-import type { PullRequestReviewInput } from '../src/execution-api-types-generated.js'
+import type {
+  IssueReviewInput,
+  PullRequestReviewInput
+} from '../src/execution-api-types-generated.js'
 import { TemporalExecutionClient } from '../src/temporal-execution-client.js'
 import { REPOSITORY_ROOT } from './project-paths.js'
 
@@ -135,4 +140,53 @@ test('unknown input cannot be submitted without validation', async () => {
     // @ts-expect-error Unvalidated input is not an internal submission.
     clientFor(null).start(invalid)
   ).rejects.toThrow(/Execution Workflow input does not match/)
+})
+
+function duplicateSubmission(matches: boolean) {
+  const request: ExecutionWorkflowInput = {
+    workflow: 'issue-review',
+    run_id: 'run-1',
+    input: JSON.parse(
+      readFileSync(
+        path.join(REPOSITORY_ROOT, 'contracts/execution-api/v1/fixtures/issue-review-input.json'),
+        'utf8'
+      )
+    ) as IssueReviewInput,
+    timeout_seconds: 30
+  }
+  let memo: Record<string, unknown> = {}
+  const describe = vi.fn(() => Promise.resolve({ status: 'COMPLETED', memo }))
+  const readResult = vi.fn(() => Promise.resolve({ ok: true, result, artifact_storage }))
+  const client = Reflect.construct(TemporalExecutionClient, [
+    {},
+    {
+      workflow: {
+        start: (_type: string, options: { memo: Record<string, unknown> }) => {
+          memo = { ...options.memo, ...(!matches ? { request_fingerprint: 'different' } : {}) }
+          throw new WorkflowExecutionAlreadyStartedError('already started', 'run-1', 'test')
+        },
+        getHandle: () => ({ describe, result: readResult })
+      }
+    },
+    'test'
+  ]) as TemporalExecutionClient
+  return { client, request, describe, readResult }
+}
+
+test('matching duplicate submission returns the completed result', async () => {
+  const { client, request, describe, readResult } = duplicateSubmission(true)
+  expect(await client.start(request)).toMatchObject({
+    run_id: 'run-1',
+    status: 'succeeded',
+    result
+  })
+  expect(readResult).toHaveBeenCalledOnce()
+  expect(describe).toHaveBeenCalledOnce()
+})
+
+test('conflicting duplicate submission rejects before reading the result', async () => {
+  const { client, request, describe, readResult } = duplicateSubmission(false)
+  await expect(client.start(request)).rejects.toBeInstanceOf(ExecutionRunConflictError)
+  expect(readResult).not.toHaveBeenCalled()
+  expect(describe).toHaveBeenCalledOnce()
 })

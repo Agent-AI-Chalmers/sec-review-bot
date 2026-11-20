@@ -105,10 +105,11 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
     # tag into a clean declaration error instead of an internal traceback.
     try:
         for event in yaml.parse(content, Loader=yamlcore.CoreLoader):
-            if getattr(event, "tag", None) is not None:
+            tag = getattr(event, "tag", None)
+            if tag is not None:
                 raise SetupDeclarationError(
                     "Setup declaration must not use explicit YAML tags "
-                    f"({event.tag}). Use plain scalars; the YAML 1.2 Core "
+                    f"({tag}). Use plain scalars; the YAML 1.2 Core "
                     "schema already resolves booleans, numbers, and null."
                 )
     except yaml.YAMLError as error:

@@ -112,12 +112,23 @@ export const test = base.extend<TestFixtures>({
   }
 })
 
-export async function openAuthenticatedRuns(page: Page): Promise<void> {
-  await page.goto('/runs', { waitUntil: 'networkidle' })
+export async function openAuthenticatedRuns(
+  page: Page,
+  token = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
+): Promise<void> {
+  await page.goto('/runs', { waitUntil: 'domcontentloaded' })
 
   const accessToken = page.getByLabel('Access token')
+  // The heading mounts before authentication is known. The list and parked queue
+  // share a refresh cycle; either response can still replace it with sign-in.
+  const runsReady = page.locator('[aria-busy="false"]').filter({
+    has: page
+      .getByRole('table')
+      .or(page.getByText('No runs yet', { exact: true }))
+      .or(page.getByRole('alert'))
+  })
+  await accessToken.or(runsReady).first().waitFor()
   if (await accessToken.isVisible()) {
-    const token = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
     if (token === undefined) {
       throw new Error(
         'The external deployment requires sign-in. Set CONTROL_PLANE_UI_ACCESS_TOKEN for this E2E run.'

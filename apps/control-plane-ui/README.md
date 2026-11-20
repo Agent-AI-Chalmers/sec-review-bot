@@ -157,6 +157,10 @@ Component tests require Chrome. Install it with `pnpm exec playwright install --
 
 Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
 
+<!-- doc-default: control-plane-ui.playwright-report; source=apps/control-plane-ui/playwright.config.ts -->
+
+In CI, the Playwright HTML report includes only unexpected outcomes, flaky tests (including successful retries), and interrupted tests. Local runs retain the complete HTML report. Terminal progress remains visible in both modes. CI uploads the report, traces, and screenshots when the browser job fails.
+
 ### Test An External Deployment
 
 Set `CONTROL_PLANE_UI_BASE_URL` to an already-running deployment. If sign-in is required, also set `CONTROL_PLANE_UI_ACCESS_TOKEN`.

@@ -28,6 +28,10 @@ pnpm run typecheck
 pnpm test
 ```
 
+<!-- doc-default: github-integration.dev; source=apps/github-integration/package.json -->
+
+`pnpm run dev` 使用 `tsx watch` 运行 TypeScript 源码，在导入模块变化后重启。它不构建 `dist`，也不检查类型；请单独运行 `pnpm run typecheck`。`pnpm run server` 构建并运行 JavaScript 产物。
+
 <!-- doc-default: github-integration.test-projects; source=apps/github-integration/package.json -->
 
 `pnpm run typecheck` 检查源码并报告具名类型测试，复用同一次编译检查。CI 使用此命令；也可直接运行 `pnpm run test:types`。

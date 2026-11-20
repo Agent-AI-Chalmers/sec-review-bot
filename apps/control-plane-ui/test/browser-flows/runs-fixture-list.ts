@@ -106,9 +106,9 @@ export async function runFixtureRunListFlow({
     `${name} previous page must restore the first page`
   )
 
-  await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/runs`, { waitUntil: 'domcontentloaded' })
   await page.locator('tbody tr:first-child td a').first().click()
-  await page.waitForSelector('.run-progress-timeline')
+  await page.locator('.run-progress-timeline').waitFor()
   const knownRunId = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
   assert.ok(knownRunId.length > 0)
   await page.getByRole('link', { name: 'Back to runs' }).click()
@@ -119,7 +119,7 @@ export async function runFixtureRunListFlow({
   await jump.waitFor()
   await jump.fill(knownRunId)
   await page.getByRole('button', { name: 'Go to run' }).click()
-  await page.waitForSelector('.run-progress-timeline')
+  await page.locator('.run-progress-timeline').waitFor()
   assert.strictEqual((await page.locator('.run-id').first().textContent())?.trim(), knownRunId)
 
   await page.getByRole('button', { name: 'Jump to run' }).click()

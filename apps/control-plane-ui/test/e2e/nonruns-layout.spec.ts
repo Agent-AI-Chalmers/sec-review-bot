@@ -2,7 +2,7 @@ import { expect, test } from './fixtures.js'
 
 test('narrow version selection keeps its actions on screen', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page.locator('[data-version-node="60"]').click()
   const selection = page.locator('.version-graph-selection')
@@ -16,7 +16,7 @@ test('narrow version selection keeps its actions on screen', async ({ page }) =>
 
 test('long uploaded names fit the Viewer before and after editing input', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
-  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.goto('/viewer', { waitUntil: 'domcontentloaded' })
   await page.locator('input[type="file"]').setInputFiles({
     name: 'trajectory_'.repeat(15) + '.jsonl',
     mimeType: 'application/x-ndjson',
@@ -36,7 +36,7 @@ test('long uploaded names fit the Viewer before and after editing input', async 
 
 test('memory lists keep identity and actions together at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Observations', exact: true }).click()
   const row = page.locator('.memory-table tbody tr').first()
   await expect(row).toBeVisible()
@@ -62,7 +62,7 @@ test('failed file previews retry in place', async ({ page }) => {
       await route.continue()
     }
   })
-  await page.goto('/memory/versions/2/tree', { waitUntil: 'networkidle' })
+  await page.goto('/memory/versions/2/tree', { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(page.locator('.memory-markdown')).toBeVisible()
   await expect(page).toHaveURL(/\/memory\/versions\/2\/tree$/)
@@ -72,7 +72,7 @@ test('restore failures stay inside the confirmation dialog', async ({ page }) =>
   await page.route('**/api/memory/restore', (route) =>
     route.fulfill({ status: 409, json: { error: 'conflict' } })
   )
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page.locator('[data-version-node="60"]').click()
   await page
@@ -89,7 +89,7 @@ test('restore failures stay inside the confirmation dialog', async ({ page }) =>
 test('file tree scrollbar cannot intercept the sticky modal close button', async ({ page }) => {
   // The inner scrollbar crosses the sticky header when the outer dialog scrolls.
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.goto('/memory', { waitUntil: 'domcontentloaded' })
   await page.getByRole('tab', { name: 'Versions', exact: true }).click()
   await page
     .locator('.version-graph-selection')

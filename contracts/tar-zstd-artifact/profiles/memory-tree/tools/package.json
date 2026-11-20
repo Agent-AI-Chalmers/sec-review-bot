@@ -17,16 +17,15 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
-  "dependencies": {
-    "ajv": "^8.20.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
-    "vitest": "5.1.0",
+    "vitest": "5.1.1",
     "oxfmt": "0.79.0",
     "oxlint": "1.94.0",
-    "oxlint-tsgolint": "7.0.2007"
+    "oxlint-tsgolint": "7.0.2007",
+    "ajv": "^8.20.0"
   }
 }

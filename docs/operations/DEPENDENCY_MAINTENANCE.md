@@ -8,11 +8,21 @@ This page describes how this repository handles dependency updates for the GitHu
 
 - Keep lockfiles stable by default. Upstream releases should not change local, CI, or deployment behavior until a manifest or lockfile change is reviewed.
 - Keep dependency updates separate from other changes.
-- For direct dependencies, check the code that imports them. For transitive dependencies, first find which package pulled them in.
+- Start with actual usage. For direct dependencies, inspect imports, package scripts, configuration, and deployment paths; for transitive dependencies, identify the parent package. Check that the current integration works before deciding how to upgrade it.
+- Consider removal before upgrading. Check whether the runtime or an existing dependency already supplies the required behavior, and remove unused or redundant dependencies once the replacement is verified.
+- Update related packages as a compatible set under the owning dependency's constraints. Do not independently force transitive versions or update only one component of a coupled API, SDK, or exporter stack. If a security fix falls outside upstream ranges, explicitly assess the compatibility change rather than silently adding an override.
 - Use targeted updates for security findings, known production bugs, or high-risk runtime packages.
 - Use full lockfile refreshes only for dependency-only changes when the resolver has a solution, the update set is understandable, and package-local checks pass.
 
 Dependabot is configured in [`.github/dependabot.yml`](../../.github/dependabot.yml) for `npm`, `uv`, `pip`, and GitHub Actions. Dependabot PRs are useful update probes, but grouped PRs usually update target dependencies and the lockfile changes needed for those targets; they do not necessarily raise every compatible transitive dependency to the newest resolvable version.
+
+## Review Dependency Declarations
+
+Recheck dependency declarations during maintenance and whenever imports, scripts, build steps, or deployment paths change. Remove obsolete entries and keep each dependency in the package and dependency group that uses it.
+
+- Declare packages needed by the deployed application as runtime dependencies. Put tools used only for development, tests, linting, type checking, or building in development dependencies; check the actual install and deployment process before moving them.
+- Explicitly declare packages that repository code imports or scripts invoke directly, even when another dependency already brings them in. Do not rely on accidental transitive availability.
+- Do not promote an upstream package's internal dependencies to direct dependencies just to control their versions. Remove a direct declaration when no direct consumer remains, and let the parent package own its transitive constraints.
 
 ## Review Local Dependency Overrides
 
