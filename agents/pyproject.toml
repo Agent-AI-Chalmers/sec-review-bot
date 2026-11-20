@@ -6,33 +6,36 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = "==3.14.*"
 dependencies = [
-  "deepagents>=0.7.32",
-  "langfuse>=5.0.4",
-  "langchain>=1.4.7",
-  "langchain-core>=1.7.1",
-  "langgraph>=1.2.18",
-  "langchain-anthropic>=1.7.7",
-  "langchain-google-genai>=4.4.2",
+  "deepagents>=0.7.40",
+  "langfuse>=5.2.0",
+  "langchain>=1.5.2",
+  "langchain-core>=1.8.3",
+  "langgraph>=1.2.23",
+  "langchain-anthropic>=1.7.11",
+  "langchain-google-genai>=4.5.1",
   "langchain-mcp-adapters>=0.3.2",
-  "langchain-openai>=1.7.3",
+  "langchain-openai>=1.8.3",
   "jsonschema[format-nongpl]>=4.26.0",
   "pyyaml>=6.0.3",
-  "pydantic>=2.14.1",
+  "pydantic>=2.14.3",
   "cvss>=3.6",
   "structlog>=26.1.0",
-  "temporalio>=1.36.0",
-  "boto3>=1.43.120",
+  "temporalio>=1.36.1",
+  "boto3>=1.44.6",
+  "botocore>=1.44.6,<1.45.0",
+  "referencing>=0.37.0",
+  "opentelemetry-sdk>=1.45.2,<2",
   "yamlcore>=0.1.1"
 ]
 
 [dependency-groups]
-test = ["pytest>=9.2.0", "pytest-asyncio>=1.4.1", "pytest-timeout>=2.4.0"]
-lint = ["black>=26.10.1", "ruff>=0.17.3"]
+test = ["pytest>=9.2.0", "pytest-asyncio>=1.5.0", "pytest-timeout>=2.4.0"]
+lint = ["black>=26.10.1", "ruff>=0.17.5"]
 typecheck = [
   "hatchling>=1.33.0",
   "mypy>=2.4.0",
   "pyright>=1.1.414",
-  "types-PyYAML>=6.0.12.20260906",
+  "types-PyYAML>=6.0.12.20261113",
   "types-jsonschema>=4.26.0.20261006"
 ]
 dev = [{ include-group = "test" }, { include-group = "lint" }, { include-group = "typecheck" }]
