@@ -135,7 +135,7 @@ async def bootstrap_environment(
         try:
             response = await backend.aexecute(command, timeout=step.timeout_seconds)
         # A backend failure is a bootstrap failure; no narrower type applies across backends.
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             return BootstrapResult(
                 status=BootstrapStatus.INCOMPLETE,
                 reason=f"setup step could not run ({error!r}): {step.run}",

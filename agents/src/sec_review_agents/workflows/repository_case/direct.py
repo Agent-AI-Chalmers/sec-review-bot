@@ -89,7 +89,8 @@ async def run_repository_case_review_direct(
         cvss_result: CvssStageResult | None
         try:
             cvss_result = await cvss_result_task
-        except Exception:
+        # Scoring is advisory; the stage persists observed failures.
+        except Exception:  # noqa: BLE001
             cvss_result = None
     except Exception, asyncio.CancelledError:
         cvss_result_task.cancel()

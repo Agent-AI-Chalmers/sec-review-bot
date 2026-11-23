@@ -48,6 +48,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
     extraction_id = memory_extraction_workflow_id(
         execution_archive_digest=diagnostic.digest, unit_id="review"
     )
+    trajectory_reference = reference("b")
     intent = {
         "registration": {
             "extraction_id": extraction_id,
@@ -55,7 +56,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
             "source_run_id": "run-1",
             "source_unit_id": "review",
             "execution_archive_digest": diagnostic.digest,
-            "trajectory_reference": reference("b"),
+            "trajectory_reference": trajectory_reference,
             "observations": [
                 {
                     "observation_id": "observation-1",
@@ -94,10 +95,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
         {"observation_id": "observation-2", "body_markdown": "Independent lesson."},
     ]
     assert result.summary == "Original summary."
-    assert (
-        result.trajectory_reference.as_dict()
-        == intent["registration"]["trajectory_reference"]
-    )
+    assert result.trajectory_reference.as_dict() == trajectory_reference
     catalog.confirm_extraction_publication.assert_called_once_with(intent)
 
 
@@ -141,6 +139,8 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
 async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
     monkeypatch,
 ):
+    trajectory_reference = reference("b")
+    maintenance_report = _report(["extract-1", "extract-2"])
     intent = {
         "expected_active_version": 2,
         "memory_tree_reference": reference("a"),
@@ -148,8 +148,8 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
             "kind": "learning",
             "operation_id": "maintain-1",
             "observation_ids": ["extract-1", "extract-2"],
-            "trajectory_reference": reference("b"),
-            "maintenance_report": _report(["extract-1", "extract-2"]),
+            "trajectory_reference": trajectory_reference,
+            "maintenance_report": maintenance_report,
         },
     }
     catalog = Mock()
@@ -167,16 +167,10 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
     assert result.expected_active_version == 2
     assert result.observation_ids == ("extract-1", "extract-2")
     assert result.memory_tree_reference.as_dict() == intent["memory_tree_reference"]
-    assert (
-        result.trajectory_reference.as_dict()
-        == intent["source"]["trajectory_reference"]
-    )
+    assert result.trajectory_reference.as_dict() == trajectory_reference
     # The commit body must equal the confirmed intent, so the recovered report
     # has to serialize back to exactly what was reserved.
-    assert (
-        result.maintenance_report.model_dump(mode="json")
-        == intent["source"]["maintenance_report"]
-    )
+    assert result.maintenance_report.model_dump(mode="json") == maintenance_report
     assert probe.call_count == 2
     catalog.confirm_version_publication.assert_called_once_with(intent)
     catalog.get_learning_input.assert_not_called()
@@ -197,6 +191,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
             "maintenance_report": _report(["extract-1"]),
         },
     }
+    complete_trajectory_reference = reference("d")
     complete = {
         "expected_active_version": 3,
         "memory_tree_reference": reference("c"),
@@ -204,7 +199,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
             "kind": "learning",
             "operation_id": "maintain-1",
             "observation_ids": ["extract-2"],
-            "trajectory_reference": reference("d"),
+            "trajectory_reference": complete_trajectory_reference,
             "maintenance_report": _report(["extract-2"]),
         },
     }
@@ -224,10 +219,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
     assert result.expected_active_version == 3
     assert result.observation_ids == ("extract-2",)
     assert result.memory_tree_reference.as_dict() == complete["memory_tree_reference"]
-    assert (
-        result.trajectory_reference.as_dict()
-        == complete["source"]["trajectory_reference"]
-    )
+    assert result.trajectory_reference.as_dict() == complete_trajectory_reference
     catalog.confirm_version_publication.assert_called_once_with(complete)
     catalog.get_learning_input.assert_not_called()
 

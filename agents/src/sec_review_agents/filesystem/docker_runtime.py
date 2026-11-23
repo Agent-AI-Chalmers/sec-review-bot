@@ -29,7 +29,7 @@ def is_docker_runtime_available(docker_bin: str) -> bool:
             text=True,
             timeout=2,
         )
-    except Exception:
+    except OSError, subprocess.TimeoutExpired:
         return False
 
     return result.returncode == 0

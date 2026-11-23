@@ -145,7 +145,8 @@ def build_tracing_config(
             metadata=metadata,
             run_name=agent_name,
         )
-    except Exception as error:
+    # Optional telemetry must not abort a review.
+    except Exception as error:  # noqa: BLE001
         if not _LANGFUSE_IMPORT_WARNING_EMITTED:
             _LANGFUSE_IMPORT_WARNING_EMITTED = True
             log_diagnostic(

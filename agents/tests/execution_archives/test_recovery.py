@@ -20,7 +20,7 @@ from sec_review_agents.execution_archives.publication import (
 
 @pytest.fixture
 def storage(monkeypatch):
-    objects = {}
+    objects: dict[str, tuple[bytes, str, dict[str, str]]] = {}
     client = Mock()
 
     def head_object(*, Bucket, Key):

@@ -366,7 +366,8 @@ class RepositoryCaseProcessingWorkflow:
                     case_request,
                     id=_repository_case_workflow_id(request, case_request),
                 )
-            except Exception as error:
+            # One failed child must not abort the other cases.
+            except Exception as error:  # noqa: BLE001
                 return build_blocked_repository_case_result(
                     case_request,
                     f"Case processing failed after retries: {error}",

@@ -136,7 +136,8 @@ def check_deployment(
             model=model, prompt=prompt, timeout_seconds=effective_timeout_seconds
         )
         ping_ok = True
-    except Exception as error:
+    # Provider failures belong in the probe result.
+    except Exception as error:  # noqa: BLE001
         ping_error = normalize_error(error)
 
     ping_duration_seconds = time.perf_counter() - ping_started
@@ -158,7 +159,8 @@ def check_deployment(
             structured_ok = True
         else:
             structured_error = "agent returned without structured_response"
-    except Exception as error:
+    # Provider failures belong in the probe result.
+    except Exception as error:  # noqa: BLE001
         structured_error = normalize_error(error)
 
     structured_duration_seconds = (

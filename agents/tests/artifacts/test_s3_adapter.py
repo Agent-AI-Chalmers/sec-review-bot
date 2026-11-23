@@ -322,17 +322,18 @@ def test_publication_probe_checks_complete_immutable_identity(monkeypatch):
     reference = planned_s3_artifact(local, key="memory/tree")
     assert reference.uri == "s3://sec-review/memory/tree"
     client = Mock()
+    metadata = {"sha256": "a" * 64, "size-bytes": "42"}
     head = {
         "ContentLength": 42,
         "ContentType": "application/zstd",
-        "Metadata": {"sha256": "a" * 64, "size-bytes": "42"},
+        "Metadata": metadata,
     }
     client.head_object.return_value = head
     monkeypatch.setattr(
         "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: client
     )
     assert s3_artifact_exists(reference) is True
-    head["Metadata"]["sha256"] = "b" * 64
+    metadata["sha256"] = "b" * 64
     with pytest.raises(RuntimeError, match="differs"):
         s3_artifact_exists(reference)
 

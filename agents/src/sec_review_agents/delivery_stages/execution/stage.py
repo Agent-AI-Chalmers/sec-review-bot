@@ -98,7 +98,8 @@ async def execute_delivery_entry(
             file_changes=file_changes,
             patch_diff=patch_artifact.patch_diff,
         )
-    except Exception as error:
+    # Isolate synthesis failures in the delivery result.
+    except Exception as error:  # noqa: BLE001
         return DeliveryExecutionResult(
             delivery_id=delivery_id,
             status="failed",
