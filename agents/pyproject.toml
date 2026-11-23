@@ -71,22 +71,21 @@ target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
-extend-select = ["I", "E402"]
+extend-select = ["I", "E402", "BLE001", "S110", "RUF100"]
 ignore = [
-  "B008", # FastAPI dependency defaults intentionally call Body/Depends.
-  "B017", # Temporal tests intentionally assert framework-wrapped failures.
-  "BLE001", # Boundary layers intentionally convert arbitrary failures.
   "FLY002", # Prompt/fixture blocks are clearer as joins than collapsed literals.
-  "S110", # Best-effort cleanup/serialization paths intentionally suppress failures.
   "TRY004" # Public validation paths intentionally keep ValueError contracts.
 ]
 
 [tool.black]
 target-version = ["py314"]
+# Downloaded review workspaces are external source, not maintained Python code.
+extend-exclude = '/\.agent-artifacts/'
 # Keep Black and Ruff on the same width (see [tool.ruff] above).
 line-length = 88
 
 [tool.mypy]
+check_untyped_defs = true
 exclude = "^tests/.*/cases/[^/]+/workspace/"
 
 [tool.pyright]

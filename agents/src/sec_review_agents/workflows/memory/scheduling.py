@@ -75,7 +75,8 @@ async def schedule_memory_extractions(
             )
         except WorkflowAlreadyStartedError:
             extraction["status"] = "already_started"
-        except Exception as error:
+        # Optional extraction failures belong in the scheduling result.
+        except Exception as error:  # noqa: BLE001
             workflow.logger.warning(
                 "Failed to start memory extraction %s: %s",
                 extraction_id,

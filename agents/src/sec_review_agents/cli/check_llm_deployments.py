@@ -58,7 +58,8 @@ def main() -> None:
 
     try:
         llm_config = get_llm_config_for_deployment_check(RUNNABLE_AGENT_NAMES)
-    except Exception as error:
+    # Report configuration failures through the CLI exit status.
+    except Exception as error:  # noqa: BLE001
         print(f"Failed to load deployment config: {error}")
         raise SystemExit(1)
 

@@ -533,7 +533,8 @@ class DockerSandboxBackend(BaseSandbox):
                     )
                     continue
                 responses.append(FileUploadResponse(path=target_path, error=None))
-            except Exception as error:
+            # The transfer protocol returns a per-file error.
+            except Exception as error:  # noqa: BLE001
                 responses.append(
                     FileUploadResponse(
                         path=target_path,
@@ -603,7 +604,8 @@ class DockerSandboxBackend(BaseSandbox):
                         error=None,
                     )
                 )
-            except Exception as error:
+            # The transfer protocol returns a per-file error.
+            except Exception as error:  # noqa: BLE001
                 responses.append(
                     FileDownloadResponse(
                         path=requested_path,

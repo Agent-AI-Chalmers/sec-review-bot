@@ -35,6 +35,7 @@ from sec_review_agents.runtime.memory_middleware import (
     DEFAULT_MEMORY_SYSTEM_PROMPT,
     MEMORY_INDEX_MAX_CHARS,
     MEMORY_INDEX_MAX_LINES,
+    MISSING_MEMORY_INDEX,
     SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
     MemoryMiddleware,
 )
@@ -342,6 +343,24 @@ def test_memory_middleware_uses_generic_prompt_by_default() -> None:
 
     assert middleware.system_prompt_template is DEFAULT_MEMORY_SYSTEM_PROMPT
     assert modified.system_prompt == f"Base prompt.\n\n{middleware.system_prompt()}"
+
+
+def test_memory_index_read_failure_is_diagnosed_without_aborting() -> None:
+    backend = Mock()
+    backend.read.side_effect = RuntimeError("backend unavailable")
+    middleware = MemoryMiddleware(backend=backend)
+    with patch(
+        "sec_review_agents.runtime.memory_middleware.log_diagnostic"
+    ) as diagnostic:
+        assert middleware.system_prompt() == middleware.system_prompt_template.format(
+            index_path=middleware.index_path, memory_index=MISSING_MEMORY_INDEX
+        )
+    diagnostic.assert_called_once_with(
+        "memory_index_read_failed",
+        index_path=middleware.index_path,
+        error_type="RuntimeError",
+        error="backend unavailable",
+    )
 
 
 def test_memory_middleware_accepts_complete_prompt_profile() -> None:

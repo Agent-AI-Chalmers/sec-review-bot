@@ -394,7 +394,8 @@ class RepositoryCaseReviewWorkflow:
             # failures that happen outside the activity execution.
             try:
                 cvss_result = await cvss_task
-            except Exception:
+            # Advisory scoring failures remain in stage artifacts or Temporal.
+            except Exception:  # noqa: BLE001
                 cvss_result = None
         except Exception, asyncio.CancelledError:
             if not cvss_task.done():
@@ -403,7 +404,8 @@ class RepositoryCaseReviewWorkflow:
                 await cvss_task
             except asyncio.CancelledError:
                 pass
-            except Exception:
+            # Drain scoring without replacing the original failure.
+            except Exception:  # noqa: BLE001, S110
                 pass
             raise
         result = await workflow.execute_activity(

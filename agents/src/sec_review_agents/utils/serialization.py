@@ -23,7 +23,8 @@ def json_safe(value):
     if hasattr(value, "dict"):
         try:
             return json_safe(value.dict())
-        except Exception:
+        # Fall back to a string for diagnostic serialization.
+        except Exception:  # noqa: BLE001, S110
             pass
 
     return str(value)

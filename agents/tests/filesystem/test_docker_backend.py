@@ -25,12 +25,46 @@ from sec_review_agents.filesystem.docker_runtime import (
     DockerMount,
     arun_docker_command,
     create_docker_container_resource,
+    is_docker_runtime_available,
     start_container,
 )
 from sec_review_agents.filesystem.limits import (
     DEFAULT_COMMAND_TIMEOUT_MS,
 )
 from sec_review_agents.runtime.backend_cleanup import aclose_backend
+
+
+@pytest.mark.parametrize(
+    "error", [OSError("unavailable"), subprocess.TimeoutExpired("docker", 2)]
+)
+def test_docker_probe_reports_expected_process_failures(error: Exception) -> None:
+    with (
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.shutil.which",
+            return_value="/usr/bin/docker",
+        ),
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.subprocess.run",
+            side_effect=error,
+        ),
+    ):
+        assert not is_docker_runtime_available("docker")
+
+
+def test_docker_probe_does_not_hide_programming_errors() -> None:
+    """A broken probe must fail tests rather than skip them as Docker-unavailable."""
+    with (
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.shutil.which",
+            return_value="/usr/bin/docker",
+        ),
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.subprocess.run",
+            side_effect=TypeError("broken probe"),
+        ),
+        pytest.raises(TypeError, match="broken probe"),
+    ):
+        is_docker_runtime_available("docker")
 
 
 class _AsyncProcess:

@@ -5,6 +5,7 @@ from deepagents.backends.protocol import BackendProtocol
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
 
+from sec_review_agents.observability.diagnostics import log_diagnostic
 from sec_review_agents.runtime.system_messages import append_to_system_message
 
 MEMORY_INDEX_PATH = "/memory/MEMORY.md"
@@ -112,7 +113,14 @@ class MemoryMiddleware(AgentMiddleware):
                     limit=self.index_max_lines,
                 )
             )
-        except Exception:
+        # Optional backend failures must not abort a review.
+        except Exception as error:  # noqa: BLE001
+            log_diagnostic(
+                "memory_index_read_failed",
+                index_path=self.index_path,
+                error_type=type(error).__name__,
+                error=str(error),
+            )
             content = None
         if content is None:
             return MISSING_MEMORY_INDEX

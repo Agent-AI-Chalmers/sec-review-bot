@@ -44,7 +44,8 @@ def _message_type(message: Any) -> str:
             resolved = get_type()
             if isinstance(resolved, str) and resolved.strip():
                 return resolved
-        except Exception:
+        # Fall back to other message representations.
+        except Exception:  # noqa: BLE001, S110
             pass
 
     if isinstance(message, dict):
