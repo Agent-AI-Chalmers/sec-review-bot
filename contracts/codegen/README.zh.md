@@ -8,11 +8,7 @@
 
 使用本工具的包通过 `workspace:*` 声明依赖。在仓库根目录运行 `pnpm install --frozen-lockfile`，按统一锁文件安装即可。本包导出 TypeScript 源码；调用方与契约工具一样，通过 `node --import tsx` 运行，无需单独构建。
 
-Kubb 的 resolver 将操作响应的聚合类型命名为 `…ResponseBodyByStatus` 和 `…ResponseBody`，以区别于 `HealthResponse` 等契约 schema 名称。状态码映射直接包含响应体及其生成说明，不再保留中间的 `StatusNNN` 别名。聚合类型通过索引精确选取 Kubb 选择的状态码：有成功响应时选择成功响应，否则沿用其响应体回退规则。它表示响应体，而不是携带状态码判别字段的 HTTP 响应对象。
-
-渲染器通过 Kubb 支持的 resolver 定制命名，并对状态码映射及聚合类型进行基于语法结构的规范化。不支持的输出会导致生成失败，不会静默保留另一种数据结构。它不会改写无关的 schema 声明或契约数据。
-
-生成器使用 Oxc 解析生成声明并执行局部结构调整，不依赖 TypeScript Compiler API。类型等价测试通过 TypeScript 编译器 CLI 检查最终产物。
+`renderOpenApiTypes()` 原样输出 Kubb 的声明，并在其后追加两个以 `operationId` 为键的操作映射。使用方只通过这两个映射获取操作级类型。`OperationOptionsById` 给出每个操作的请求参数（path、query、headers、body）。`OperationResponseById` 给出成功响应体：各 2xx 状态码的响应体，没有响应体的 2xx 状态码记为 `void`。错误响应体永远不算成功；Kubb 自带的 `…ResponseBody` 聚合类型在没有带响应体的成功状态码时会回退到错误响应体，其生成说明也不以此为准。以下情况生成会直接失败，不会产出有误导性的响应体类型：操作没有任何 2xx 状态码；2xx 的 content 没有声明 schema；某个 2xx 状态码有多种内容类型；使用 `2XX` 这类状态码范围；响应引用指向 `components.responses` 以外的位置；整个 path item 使用 `$ref` 引用。Kubb 的 resolver 将各操作的聚合类型命名为 `…ResponseBodyByStatus` 和 `…ResponseBody`，避免与 `HealthResponse` 等契约 schema 名称冲突。测试通过编译器检查最终类型的含义，不要求特定的声明写法。
 
 `formatGenerated()` 每次渲染都会读取产物目标目录最近的 `.oxfmtrc.json`。生成 Markdown 保留语义段落和嵌入示例；ignore patterns 只控制 CLI 文件选择，不阻止渲染已声明的投影。不支持的配置覆盖会明确报错，不会静默改变产物。在所属产物清单的 `code_inputs` 中登记此函数及每个目标配置。
 

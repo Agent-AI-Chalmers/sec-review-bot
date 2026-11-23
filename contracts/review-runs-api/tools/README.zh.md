@@ -36,5 +36,4 @@ tools/
   test/
     generated-artifacts.test.ts       manifest ↔ 生成器 ↔ CI 过滤器
     contract-generation-guards.test.ts  生成器在无法如实表达的输入上失败
-    response-types.test.ts            每个响应别名都能索引其状态码映射
 ```

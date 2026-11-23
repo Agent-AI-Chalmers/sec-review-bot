@@ -11,7 +11,7 @@ import {
   S3Client
 } from '@aws-sdk/client-s3'
 import { mockClient } from 'aws-sdk-client-mock'
-import type { InputBundleCandidate } from '../../src/review-runs/review-runs-api.js'
+import type { InputBundleCandidate } from '../../src/review-runs/review-runs-api.generated.js'
 import type { InputBundlePublicationStore } from '../../src/artifacts/input-bundle-publication.js'
 import type { PublishContext } from '../../src/review-runs/publish-context.js'
 

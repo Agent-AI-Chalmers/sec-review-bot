@@ -3,9 +3,9 @@ import { expectTypeOf, test } from 'vitest'
 
 import type {
   operationRoutes,
-  GetInternalRunResponseBody,
-  OperationOptionsById
-} from '../../src/review-runs/review-runs-api.js'
+  OperationOptionsById,
+  OperationResponseById
+} from '../../src/review-runs/review-runs-api.generated.js'
 import type { ReviewRunsClient } from '../../src/review-runs/client.js'
 
 test('publication step initialization requires the run, claim, and step keys', () => {
@@ -15,9 +15,9 @@ test('publication step initialization requires the run, claim, and step keys', (
 })
 
 test('getRun preserves the possibility of absence', () => {
-  expectTypeOf<
-    Awaited<ReturnType<ReviewRunsClient['getRun']>>
-  >().toEqualTypeOf<GetInternalRunResponseBody | null>()
+  expectTypeOf<Awaited<ReturnType<ReviewRunsClient['getRun']>>>().toEqualTypeOf<
+    OperationResponseById['getInternalRun'] | null
+  >()
 })
 
 test('every contract operation has a route', () => {

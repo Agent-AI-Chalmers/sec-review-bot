@@ -5,11 +5,9 @@
 //
 // The generator and the test that fails when the committed file lags both call
 // `renderExecutionApiTypes`, so they cannot disagree about what "current" means.
-import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { formatGenerated, renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
-import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { renderWorkflowInputDeclarations } from './generate-api-types.js'
@@ -18,13 +16,17 @@ import { REPO_ROOT } from './repo-root.js'
 export { REPO_ROOT }
 export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'services', 'review-runs')
 export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'execution-api', 'v1', 'openapi.yaml')
-export const REVIEW_RUNS_OUTPUT_PATH = path.join(REVIEW_RUNS_ROOT, 'src', 'execution-api-schema.ts')
+export const REVIEW_RUNS_OUTPUT_PATH = path.join(
+  REVIEW_RUNS_ROOT,
+  'src',
+  'execution-api-types.generated.ts'
+)
 export const GATEWAY_OUTPUT_PATH = path.join(
   REPO_ROOT,
   'services',
   'execution-gateway',
   'src',
-  'execution-api-types-generated.ts'
+  'execution-api-types.generated.ts'
 )
 
 const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path relative to the repository root). Do not edit.
@@ -33,32 +35,10 @@ const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path r
 // \`pnpm --dir contracts/execution-api/tools run generate\`.
 `
 
-function renderOperationOptionsById(spec: unknown): string {
-  const paths = (spec as { paths?: Record<string, Record<string, unknown>> }).paths
-  if (paths === undefined) {
-    throw new Error('Execution API has no paths')
-  }
-  const entries: string[] = []
-  for (const pathItem of Object.values(paths)) {
-    for (const operation of Object.values(pathItem)) {
-      const operationId = (operation as { operationId?: unknown }).operationId
-      if (typeof operationId !== 'string') {
-        continue
-      }
-      const typeName = operationId.charAt(0).toUpperCase() + operationId.slice(1)
-      entries.push(`  ${operationId}: ${typeName}Options`)
-    }
-  }
-  return `export interface OperationOptionsById {\n${entries.join('\n')}\n}`
-}
-
-/** The committed content of `src/execution-api-schema.ts`. */
+/** The committed content of `src/execution-api-types.generated.ts`. */
 export async function renderExecutionApiTypes(outputPath: string): Promise<string> {
-  const spec = parse(await readFile(SPEC_PATH, 'utf8')) as unknown
   const composedTypes = `
 ${await renderWorkflowInputDeclarations()}
-
-${renderOperationOptionsById(spec)}
 
 export interface WorkflowInputByName {
   'issue-review': IssueReviewInput

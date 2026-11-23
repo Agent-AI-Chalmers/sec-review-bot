@@ -22,8 +22,8 @@
         "contracts/execution-api/v1/schemas/common.schema.json"
       ],
       "outputs": [
-        "services/review-runs/src/execution-api-schema.ts",
-        "services/execution-gateway/src/execution-api-types-generated.ts"
+        "services/review-runs/src/execution-api-types.generated.ts",
+        "services/execution-gateway/src/execution-api-types.generated.ts"
       ]
     },
     {
@@ -38,7 +38,7 @@
         "contracts/execution-api/v1/schemas/common.schema.json"
       ],
       "outputs": [
-        "apps/github-integration/src/execution/execution-api-types-generated.ts",
+        "apps/github-integration/src/execution/execution-api-types.generated.ts",
         "services/execution-gateway/src/execution-api-version.ts",
         "apps/github-integration/src/execution/execution-api-version.ts"
       ],

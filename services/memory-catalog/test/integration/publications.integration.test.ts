@@ -11,7 +11,7 @@ import {
 import type {
   ArtifactReference,
   ExtractionPublicationIntent
-} from '../../src/contract-types-generated.js'
+} from '../../src/contract-types.generated.js'
 import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 function artifact(character: string): ArtifactReference {

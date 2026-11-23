@@ -2,7 +2,7 @@ import type {
   RunResponse,
   ExecutionWorkflow,
   WorkflowInputByName
-} from './execution-api-types-generated.js'
+} from './execution-api-types.generated.js'
 
 // Derive each workflow/input pair from the generated API mapping. The Temporal
 // contract adds the handoff fields; runtime validation checks both contracts.

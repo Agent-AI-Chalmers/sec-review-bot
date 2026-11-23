@@ -1,10 +1,6 @@
 import { expectTypeOf, test } from 'vitest'
 
-import type {
-  InitializePublicationStepsOptions,
-  ListRunsOptions,
-  SubmitPreparedRunOptions
-} from '../src/contract-types-generated.js'
+import type { OperationOptionsById } from '../src/contract-types.generated.js'
 import type { OperationHandlers, OperationRequest } from '../src/http/route-handlers.js'
 
 // This file is compiler-analyzed only; the registry is a type fixture, never executed.
@@ -12,13 +8,13 @@ declare const handlers: OperationHandlers
 
 test('submission handlers read exactly the contract body', () => {
   expectTypeOf<OperationRequest<'submitPreparedRun'>['body']>().toEqualTypeOf<
-    SubmitPreparedRunOptions['body']
+    OperationOptionsById['submitPreparedRun']['body']
   >()
 })
 
 test('publication step handlers read exactly the contract body', () => {
   expectTypeOf<OperationRequest<'initializePublicationSteps'>['body']>().toEqualTypeOf<
-    InitializePublicationStepsOptions['body']
+    OperationOptionsById['initializePublicationSteps']['body']
   >()
 })
 
@@ -63,6 +59,6 @@ test('inferred handler requests and success values retain their operation types'
 
 test('list filters are top-level query parameters', () => {
   expectTypeOf<OperationRequest<'listRuns'>['query']>().toEqualTypeOf<
-    NonNullable<ListRunsOptions['query']>['filter']
+    NonNullable<OperationOptionsById['listRuns']['query']>['filter']
   >()
 })

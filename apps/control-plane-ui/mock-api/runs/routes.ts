@@ -1,10 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import type {
-  RunEvent,
-  ListParkedRunsResponseBody,
-  ListRunPublicationStepsResponseBody,
-  ListRunEventsResponseBody
+  OperationResponseById,
+  RunEvent
 } from '../../browser/features/runs/api-types.generated.js'
 import type { RunArtifactContentResponse } from '../../shared/artifact-content.js'
 import type { ParkedRun } from '../../browser/features/runs/api.js'
@@ -410,7 +408,7 @@ export function createRunsHandler(
       response.end(
         JSON.stringify({
           blocks: blockedRuns()
-        } satisfies ListParkedRunsResponseBody)
+        } satisfies OperationResponseById['listParkedRuns'])
       )
       return
     }
@@ -421,7 +419,7 @@ export function createRunsHandler(
         JSON.stringify({
           run_id: runId,
           publication_steps: stepsByRun.get(runId) ?? []
-        } satisfies ListRunPublicationStepsResponseBody)
+        } satisfies OperationResponseById['listRunPublicationSteps'])
       )
       return
     }
@@ -438,7 +436,7 @@ export function createRunsHandler(
         JSON.stringify({
           run_id: run.run_id,
           events: resumedEvents.get(run.run_id) ?? eventsFor(run, stepsByRun.get(run.run_id) ?? [])
-        } satisfies ListRunEventsResponseBody)
+        } satisfies OperationResponseById['listRunEvents'])
       )
       return
     }

@@ -1,4 +1,4 @@
-import type { MaintenanceReport } from '../src/contract-types-generated.js'
+import type { MaintenanceReport } from '../src/contract-types.generated.js'
 
 export function learningReport(extractionIds: string[]): MaintenanceReport {
   return {

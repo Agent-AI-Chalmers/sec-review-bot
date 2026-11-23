@@ -723,6 +723,12 @@ export type ParkedRun = {
   parked_at: string
 }
 
+export type GetHealthStatus200 = {
+  status: string
+}
+
+export type GetHealthStatus500 = ErrorResponse
+
 export type GetHealthOptions = {
   body?: never
   path?: never
@@ -731,14 +737,24 @@ export type GetHealthOptions = {
 }
 
 export type GetHealthResponseBodyByStatus = {
-  '200': {
-    status: string
-  }
-  '500': ErrorResponse
+  '200': GetHealthStatus200
+  '500': GetHealthStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetHealthResponseBody = GetHealthResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetHealthResponseBody = GetHealthStatus200
+
+export type GetReadinessStatus200 = {
+  status: 'ok'
+}
+
+export type GetReadinessStatus500 = ErrorResponse
+
+export type GetReadinessStatus503 = {
+  status: 'unavailable'
+}
 
 export type GetReadinessOptions = {
   body?: never
@@ -748,17 +764,15 @@ export type GetReadinessOptions = {
 }
 
 export type GetReadinessResponseBodyByStatus = {
-  '200': {
-    status: 'ok'
-  }
-  '500': ErrorResponse
-  '503': {
-    status: 'unavailable'
-  }
+  '200': GetReadinessStatus200
+  '500': GetReadinessStatus500
+  '503': GetReadinessStatus503
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetReadinessResponseBody = GetReadinessResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetReadinessResponseBody = GetReadinessStatus200
 
 export type ListRunsQuery = {
   /**
@@ -811,6 +825,17 @@ export type ListRunsQuery = {
   }
 }
 
+export type ListRunsStatus200 = {
+  runs: ObservedRun[]
+  next_cursor: string | null
+}
+
+export type ListRunsStatus400 = ErrorResponse
+
+export type ListRunsStatus401 = ErrorResponse
+
+export type ListRunsStatus500 = ErrorResponse
+
 export type ListRunsOptions = {
   body?: never
   path?: never
@@ -819,17 +844,26 @@ export type ListRunsOptions = {
 }
 
 export type ListRunsResponseBodyByStatus = {
-  '200': {
-    runs: ObservedRun[]
-    next_cursor: string | null
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': ListRunsStatus200
+  '400': ListRunsStatus400
+  '401': ListRunsStatus401
+  '500': ListRunsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListRunsResponseBody = ListRunsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListRunsResponseBody = ListRunsStatus200
+
+export type AdmitRunStatus200 = ReviewRunAdmission
+
+export type AdmitRunStatus400 = ErrorResponse
+
+export type AdmitRunStatus401 = ErrorResponse
+
+export type AdmitRunStatus413 = ErrorResponse
+
+export type AdmitRunStatus500 = ErrorResponse
 
 export type AdmitRunBody = {
   workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
@@ -863,15 +897,17 @@ export type AdmitRunOptions = {
 }
 
 export type AdmitRunResponseBodyByStatus = {
-  '200': ReviewRunAdmission
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': AdmitRunStatus200
+  '400': AdmitRunStatus400
+  '401': AdmitRunStatus401
+  '413': AdmitRunStatus413
+  '500': AdmitRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type AdmitRunResponseBody = AdmitRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type AdmitRunResponseBody = AdmitRunStatus200
 
 export type GetRunPath = {
   /**
@@ -882,6 +918,18 @@ export type GetRunPath = {
   runId: string
 }
 
+export type GetRunStatus200 = {
+  run: ObservedRun
+}
+
+export type GetRunStatus400 = ErrorResponse
+
+export type GetRunStatus401 = ErrorResponse
+
+export type GetRunStatus404 = ErrorResponse
+
+export type GetRunStatus500 = ErrorResponse
+
 export type GetRunOptions = {
   body?: never
   path: GetRunPath
@@ -890,17 +938,17 @@ export type GetRunOptions = {
 }
 
 export type GetRunResponseBodyByStatus = {
-  '200': {
-    run: ObservedRun
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '500': ErrorResponse
+  '200': GetRunStatus200
+  '400': GetRunStatus400
+  '401': GetRunStatus401
+  '404': GetRunStatus404
+  '500': GetRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetRunResponseBody = GetRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetRunResponseBody = GetRunStatus200
 
 export type ListRunPublicationStepsPath = {
   /**
@@ -911,6 +959,19 @@ export type ListRunPublicationStepsPath = {
   runId: string
 }
 
+export type ListRunPublicationStepsStatus200 = {
+  run_id: string
+  publication_steps: ObservedPublicationStep[]
+}
+
+export type ListRunPublicationStepsStatus400 = ErrorResponse
+
+export type ListRunPublicationStepsStatus401 = ErrorResponse
+
+export type ListRunPublicationStepsStatus404 = ErrorResponse
+
+export type ListRunPublicationStepsStatus500 = ErrorResponse
+
 export type ListRunPublicationStepsOptions = {
   body?: never
   path: ListRunPublicationStepsPath
@@ -919,18 +980,17 @@ export type ListRunPublicationStepsOptions = {
 }
 
 export type ListRunPublicationStepsResponseBodyByStatus = {
-  '200': {
-    run_id: string
-    publication_steps: ObservedPublicationStep[]
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '500': ErrorResponse
+  '200': ListRunPublicationStepsStatus200
+  '400': ListRunPublicationStepsStatus400
+  '401': ListRunPublicationStepsStatus401
+  '404': ListRunPublicationStepsStatus404
+  '500': ListRunPublicationStepsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListRunPublicationStepsResponseBody = ListRunPublicationStepsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListRunPublicationStepsResponseBody = ListRunPublicationStepsStatus200
 
 export type ListRunEventsPath = {
   /**
@@ -941,6 +1001,19 @@ export type ListRunEventsPath = {
   runId: string
 }
 
+export type ListRunEventsStatus200 = {
+  run_id: string
+  events: ReviewRunEvent[]
+}
+
+export type ListRunEventsStatus400 = ErrorResponse
+
+export type ListRunEventsStatus401 = ErrorResponse
+
+export type ListRunEventsStatus404 = ErrorResponse
+
+export type ListRunEventsStatus500 = ErrorResponse
+
 export type ListRunEventsOptions = {
   body?: never
   path: ListRunEventsPath
@@ -949,18 +1022,17 @@ export type ListRunEventsOptions = {
 }
 
 export type ListRunEventsResponseBodyByStatus = {
-  '200': {
-    run_id: string
-    events: ReviewRunEvent[]
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '500': ErrorResponse
+  '200': ListRunEventsStatus200
+  '400': ListRunEventsStatus400
+  '401': ListRunEventsStatus401
+  '404': ListRunEventsStatus404
+  '500': ListRunEventsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListRunEventsResponseBody = ListRunEventsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListRunEventsResponseBody = ListRunEventsStatus200
 
 export type SubmitPreparedRunPath = {
   /**
@@ -970,6 +1042,20 @@ export type SubmitPreparedRunPath = {
    */
   runId: string
 }
+
+export type SubmitPreparedRunStatus200 = {
+  run_id: string
+  workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+  status: 'queued'
+}
+
+export type SubmitPreparedRunStatus400 = ErrorResponse
+
+export type SubmitPreparedRunStatus401 = ErrorResponse
+
+export type SubmitPreparedRunStatus413 = ErrorResponse
+
+export type SubmitPreparedRunStatus500 = ErrorResponse
 
 export type SubmitPreparedRunBody = {
   /**
@@ -993,19 +1079,17 @@ export type SubmitPreparedRunOptions = {
 }
 
 export type SubmitPreparedRunResponseBodyByStatus = {
-  '200': {
-    run_id: string
-    workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-    status: 'queued'
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': SubmitPreparedRunStatus200
+  '400': SubmitPreparedRunStatus400
+  '401': SubmitPreparedRunStatus401
+  '413': SubmitPreparedRunStatus413
+  '500': SubmitPreparedRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type SubmitPreparedRunResponseBody = SubmitPreparedRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type SubmitPreparedRunResponseBody = SubmitPreparedRunStatus200
 
 export type RenewPreparationClaimPath = {
   /**
@@ -1015,6 +1099,16 @@ export type RenewPreparationClaimPath = {
    */
   runId: string
 }
+
+export type RenewPreparationClaimStatus200 = boolean
+
+export type RenewPreparationClaimStatus400 = ErrorResponse
+
+export type RenewPreparationClaimStatus401 = ErrorResponse
+
+export type RenewPreparationClaimStatus413 = ErrorResponse
+
+export type RenewPreparationClaimStatus500 = ErrorResponse
 
 export type RenewPreparationClaimBody = {
   /**
@@ -1032,15 +1126,23 @@ export type RenewPreparationClaimOptions = {
 }
 
 export type RenewPreparationClaimResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': RenewPreparationClaimStatus200
+  '400': RenewPreparationClaimStatus400
+  '401': RenewPreparationClaimStatus401
+  '413': RenewPreparationClaimStatus413
+  '500': RenewPreparationClaimStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewPreparationClaimResponseBody = RenewPreparationClaimResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type RenewPreparationClaimResponseBody = RenewPreparationClaimStatus200
+
+export type ClaimNextPreparationStatus200 = PreparationWork | null
+
+export type ClaimNextPreparationStatus401 = ErrorResponse
+
+export type ClaimNextPreparationStatus500 = ErrorResponse
 
 export type ClaimNextPreparationOptions = {
   body?: never
@@ -1050,13 +1152,15 @@ export type ClaimNextPreparationOptions = {
 }
 
 export type ClaimNextPreparationResponseBodyByStatus = {
-  '200': PreparationWork | null
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': ClaimNextPreparationStatus200
+  '401': ClaimNextPreparationStatus401
+  '500': ClaimNextPreparationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextPreparationResponseBody = ClaimNextPreparationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ClaimNextPreparationResponseBody = ClaimNextPreparationStatus200
 
 export type CheckpointPreparationInputPath = {
   /**
@@ -1066,6 +1170,16 @@ export type CheckpointPreparationInputPath = {
    */
   runId: string
 }
+
+export type CheckpointPreparationInputStatus200 = unknown
+
+export type CheckpointPreparationInputStatus400 = ErrorResponse
+
+export type CheckpointPreparationInputStatus401 = ErrorResponse
+
+export type CheckpointPreparationInputStatus413 = ErrorResponse
+
+export type CheckpointPreparationInputStatus500 = ErrorResponse
 
 export type CheckpointPreparationInputBody = {
   /**
@@ -1086,16 +1200,17 @@ export type CheckpointPreparationInputOptions = {
 }
 
 export type CheckpointPreparationInputResponseBodyByStatus = {
-  '200': unknown
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': CheckpointPreparationInputStatus200
+  '400': CheckpointPreparationInputStatus400
+  '401': CheckpointPreparationInputStatus401
+  '413': CheckpointPreparationInputStatus413
+  '500': CheckpointPreparationInputStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CheckpointPreparationInputResponseBody =
-  CheckpointPreparationInputResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type CheckpointPreparationInputResponseBody = CheckpointPreparationInputStatus200
 
 export type FailPreparationPath = {
   /**
@@ -1105,6 +1220,22 @@ export type FailPreparationPath = {
    */
   runId: string
 }
+
+export type FailPreparationStatus200 = {
+  /**
+   * @description False when the failure is terminal or exhausted its retry budget.
+   * @type boolean
+   */
+  retry_scheduled: boolean
+}
+
+export type FailPreparationStatus400 = ErrorResponse
+
+export type FailPreparationStatus401 = ErrorResponse
+
+export type FailPreparationStatus413 = ErrorResponse
+
+export type FailPreparationStatus500 = ErrorResponse
 
 export type FailPreparationBody = {
   /**
@@ -1137,21 +1268,23 @@ export type FailPreparationOptions = {
 }
 
 export type FailPreparationResponseBodyByStatus = {
-  '200': {
-    /**
-     * @description False when the failure is terminal or exhausted its retry budget.
-     * @type boolean
-     */
-    retry_scheduled: boolean
-  }
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': FailPreparationStatus200
+  '400': FailPreparationStatus400
+  '401': FailPreparationStatus401
+  '413': FailPreparationStatus413
+  '500': FailPreparationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPreparationResponseBody = FailPreparationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type FailPreparationResponseBody = FailPreparationStatus200
+
+export type ClaimNextRunNoticeStatus200 = RunNoticeWork | null
+
+export type ClaimNextRunNoticeStatus401 = ErrorResponse
+
+export type ClaimNextRunNoticeStatus500 = ErrorResponse
 
 export type ClaimNextRunNoticeOptions = {
   body?: never
@@ -1161,13 +1294,15 @@ export type ClaimNextRunNoticeOptions = {
 }
 
 export type ClaimNextRunNoticeResponseBodyByStatus = {
-  '200': RunNoticeWork | null
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': ClaimNextRunNoticeStatus200
+  '401': ClaimNextRunNoticeStatus401
+  '500': ClaimNextRunNoticeStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextRunNoticeResponseBody = ClaimNextRunNoticeResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ClaimNextRunNoticeResponseBody = ClaimNextRunNoticeStatus200
 
 export type RenewRunNoticeClaimPath = {
   /**
@@ -1176,6 +1311,16 @@ export type RenewRunNoticeClaimPath = {
    */
   noticeId: string
 }
+
+export type RenewRunNoticeClaimStatus200 = boolean
+
+export type RenewRunNoticeClaimStatus400 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus401 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus413 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus500 = ErrorResponse
 
 export type RenewRunNoticeClaimBody = {
   /**
@@ -1193,15 +1338,17 @@ export type RenewRunNoticeClaimOptions = {
 }
 
 export type RenewRunNoticeClaimResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': RenewRunNoticeClaimStatus200
+  '400': RenewRunNoticeClaimStatus400
+  '401': RenewRunNoticeClaimStatus401
+  '413': RenewRunNoticeClaimStatus413
+  '500': RenewRunNoticeClaimStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewRunNoticeClaimResponseBody = RenewRunNoticeClaimResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type RenewRunNoticeClaimResponseBody = RenewRunNoticeClaimStatus200
 
 export type CompleteRunNoticePath = {
   /**
@@ -1210,6 +1357,16 @@ export type CompleteRunNoticePath = {
    */
   noticeId: string
 }
+
+export type CompleteRunNoticeStatus200 = boolean
+
+export type CompleteRunNoticeStatus400 = ErrorResponse
+
+export type CompleteRunNoticeStatus401 = ErrorResponse
+
+export type CompleteRunNoticeStatus413 = ErrorResponse
+
+export type CompleteRunNoticeStatus500 = ErrorResponse
 
 export type CompleteRunNoticeBody =
   | {
@@ -1244,15 +1401,27 @@ export type CompleteRunNoticeOptions = {
 }
 
 export type CompleteRunNoticeResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': CompleteRunNoticeStatus200
+  '400': CompleteRunNoticeStatus400
+  '401': CompleteRunNoticeStatus401
+  '413': CompleteRunNoticeStatus413
+  '500': CompleteRunNoticeStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompleteRunNoticeResponseBody = CompleteRunNoticeResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type CompleteRunNoticeResponseBody = CompleteRunNoticeStatus200
+
+export type ClaimNextPublicationStatus200 = PublicationWork | null
+
+export type ClaimNextPublicationStatus400 = ErrorResponse
+
+export type ClaimNextPublicationStatus401 = ErrorResponse
+
+export type ClaimNextPublicationStatus413 = ErrorResponse
+
+export type ClaimNextPublicationStatus500 = ErrorResponse
 
 export type ClaimNextPublicationBody = {
   /**
@@ -1270,15 +1439,17 @@ export type ClaimNextPublicationOptions = {
 }
 
 export type ClaimNextPublicationResponseBodyByStatus = {
-  '200': PublicationWork | null
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': ClaimNextPublicationStatus200
+  '400': ClaimNextPublicationStatus400
+  '401': ClaimNextPublicationStatus401
+  '413': ClaimNextPublicationStatus413
+  '500': ClaimNextPublicationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ClaimNextPublicationResponseBody = ClaimNextPublicationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ClaimNextPublicationResponseBody = ClaimNextPublicationStatus200
 
 export type RenewPublicationClaimPath = {
   /**
@@ -1288,6 +1459,16 @@ export type RenewPublicationClaimPath = {
    */
   runId: string
 }
+
+export type RenewPublicationClaimStatus200 = boolean
+
+export type RenewPublicationClaimStatus400 = ErrorResponse
+
+export type RenewPublicationClaimStatus401 = ErrorResponse
+
+export type RenewPublicationClaimStatus413 = ErrorResponse
+
+export type RenewPublicationClaimStatus500 = ErrorResponse
 
 export type RenewPublicationClaimBody = {
   /**
@@ -1305,15 +1486,17 @@ export type RenewPublicationClaimOptions = {
 }
 
 export type RenewPublicationClaimResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': RenewPublicationClaimStatus200
+  '400': RenewPublicationClaimStatus400
+  '401': RenewPublicationClaimStatus401
+  '413': RenewPublicationClaimStatus413
+  '500': RenewPublicationClaimStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RenewPublicationClaimResponseBody = RenewPublicationClaimResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type RenewPublicationClaimResponseBody = RenewPublicationClaimStatus200
 
 export type InitializePublicationStepsPath = {
   /**
@@ -1323,6 +1506,18 @@ export type InitializePublicationStepsPath = {
    */
   runId: string
 }
+
+export type InitializePublicationStepsStatus200 = unknown
+
+export type InitializePublicationStepsStatus400 = ErrorResponse
+
+export type InitializePublicationStepsStatus401 = ErrorResponse
+
+export type InitializePublicationStepsStatus409 = ErrorResponse
+
+export type InitializePublicationStepsStatus413 = ErrorResponse
+
+export type InitializePublicationStepsStatus500 = ErrorResponse
 
 export type InitializePublicationStepsBody = {
   /**
@@ -1341,17 +1536,18 @@ export type InitializePublicationStepsOptions = {
 }
 
 export type InitializePublicationStepsResponseBodyByStatus = {
-  '200': unknown
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '409': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': InitializePublicationStepsStatus200
+  '400': InitializePublicationStepsStatus400
+  '401': InitializePublicationStepsStatus401
+  '409': InitializePublicationStepsStatus409
+  '413': InitializePublicationStepsStatus413
+  '500': InitializePublicationStepsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type InitializePublicationStepsResponseBody =
-  InitializePublicationStepsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type InitializePublicationStepsResponseBody = InitializePublicationStepsStatus200
 
 export type RequirePublicationStepClaimPath = {
   /**
@@ -1367,6 +1563,18 @@ export type RequirePublicationStepClaimPath = {
    */
   stepKey: string
 }
+
+export type RequirePublicationStepClaimStatus200 = unknown
+
+export type RequirePublicationStepClaimStatus400 = ErrorResponse
+
+export type RequirePublicationStepClaimStatus401 = ErrorResponse
+
+export type RequirePublicationStepClaimStatus409 = ErrorResponse
+
+export type RequirePublicationStepClaimStatus413 = ErrorResponse
+
+export type RequirePublicationStepClaimStatus500 = ErrorResponse
 
 export type RequirePublicationStepClaimBody = {
   /**
@@ -1384,17 +1592,18 @@ export type RequirePublicationStepClaimOptions = {
 }
 
 export type RequirePublicationStepClaimResponseBodyByStatus = {
-  '200': unknown
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '409': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': RequirePublicationStepClaimStatus200
+  '400': RequirePublicationStepClaimStatus400
+  '401': RequirePublicationStepClaimStatus401
+  '409': RequirePublicationStepClaimStatus409
+  '413': RequirePublicationStepClaimStatus413
+  '500': RequirePublicationStepClaimStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type RequirePublicationStepClaimResponseBody =
-  RequirePublicationStepClaimResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type RequirePublicationStepClaimResponseBody = RequirePublicationStepClaimStatus200
 
 export type CompletePublicationStepPath = {
   /**
@@ -1410,6 +1619,16 @@ export type CompletePublicationStepPath = {
    */
   stepKey: string
 }
+
+export type CompletePublicationStepStatus200 = boolean
+
+export type CompletePublicationStepStatus400 = ErrorResponse
+
+export type CompletePublicationStepStatus401 = ErrorResponse
+
+export type CompletePublicationStepStatus413 = ErrorResponse
+
+export type CompletePublicationStepStatus500 = ErrorResponse
 
 export type CompletePublicationStepBody = {
   /**
@@ -1435,15 +1654,17 @@ export type CompletePublicationStepOptions = {
 }
 
 export type CompletePublicationStepResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': CompletePublicationStepStatus200
+  '400': CompletePublicationStepStatus400
+  '401': CompletePublicationStepStatus401
+  '413': CompletePublicationStepStatus413
+  '500': CompletePublicationStepStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompletePublicationStepResponseBody = CompletePublicationStepResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type CompletePublicationStepResponseBody = CompletePublicationStepStatus200
 
 export type SettleExhaustedPublicationStepPath = {
   /**
@@ -1459,6 +1680,16 @@ export type SettleExhaustedPublicationStepPath = {
    */
   stepKey: string
 }
+
+export type SettleExhaustedPublicationStepStatus200 = boolean
+
+export type SettleExhaustedPublicationStepStatus400 = ErrorResponse
+
+export type SettleExhaustedPublicationStepStatus401 = ErrorResponse
+
+export type SettleExhaustedPublicationStepStatus413 = ErrorResponse
+
+export type SettleExhaustedPublicationStepStatus500 = ErrorResponse
 
 export type SettleExhaustedPublicationStepBody = {
   /**
@@ -1489,16 +1720,17 @@ export type SettleExhaustedPublicationStepOptions = {
 }
 
 export type SettleExhaustedPublicationStepResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': SettleExhaustedPublicationStepStatus200
+  '400': SettleExhaustedPublicationStepStatus400
+  '401': SettleExhaustedPublicationStepStatus401
+  '413': SettleExhaustedPublicationStepStatus413
+  '500': SettleExhaustedPublicationStepStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type SettleExhaustedPublicationStepResponseBody =
-  SettleExhaustedPublicationStepResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type SettleExhaustedPublicationStepResponseBody = SettleExhaustedPublicationStepStatus200
 
 export type FailPublicationStepPath = {
   /**
@@ -1514,6 +1746,16 @@ export type FailPublicationStepPath = {
    */
   stepKey: string
 }
+
+export type FailPublicationStepStatus200 = boolean
+
+export type FailPublicationStepStatus400 = ErrorResponse
+
+export type FailPublicationStepStatus401 = ErrorResponse
+
+export type FailPublicationStepStatus413 = ErrorResponse
+
+export type FailPublicationStepStatus500 = ErrorResponse
 
 export type FailPublicationStepBody = {
   /**
@@ -1542,15 +1784,17 @@ export type FailPublicationStepOptions = {
 }
 
 export type FailPublicationStepResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': FailPublicationStepStatus200
+  '400': FailPublicationStepStatus400
+  '401': FailPublicationStepStatus401
+  '413': FailPublicationStepStatus413
+  '500': FailPublicationStepStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPublicationStepResponseBody = FailPublicationStepResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type FailPublicationStepResponseBody = FailPublicationStepStatus200
 
 export type CompletePublicationPath = {
   /**
@@ -1560,6 +1804,16 @@ export type CompletePublicationPath = {
    */
   runId: string
 }
+
+export type CompletePublicationStatus200 = boolean
+
+export type CompletePublicationStatus400 = ErrorResponse
+
+export type CompletePublicationStatus401 = ErrorResponse
+
+export type CompletePublicationStatus413 = ErrorResponse
+
+export type CompletePublicationStatus500 = ErrorResponse
 
 export type CompletePublicationBody = {
   /**
@@ -1577,15 +1831,17 @@ export type CompletePublicationOptions = {
 }
 
 export type CompletePublicationResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': CompletePublicationStatus200
+  '400': CompletePublicationStatus400
+  '401': CompletePublicationStatus401
+  '413': CompletePublicationStatus413
+  '500': CompletePublicationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type CompletePublicationResponseBody = CompletePublicationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type CompletePublicationResponseBody = CompletePublicationStatus200
 
 export type FailPublicationPath = {
   /**
@@ -1595,6 +1851,16 @@ export type FailPublicationPath = {
    */
   runId: string
 }
+
+export type FailPublicationStatus200 = boolean
+
+export type FailPublicationStatus400 = ErrorResponse
+
+export type FailPublicationStatus401 = ErrorResponse
+
+export type FailPublicationStatus413 = ErrorResponse
+
+export type FailPublicationStatus500 = ErrorResponse
 
 export type FailPublicationBody = {
   /**
@@ -1617,15 +1883,17 @@ export type FailPublicationOptions = {
 }
 
 export type FailPublicationResponseBodyByStatus = {
-  '200': boolean
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': FailPublicationStatus200
+  '400': FailPublicationStatus400
+  '401': FailPublicationStatus401
+  '413': FailPublicationStatus413
+  '500': FailPublicationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type FailPublicationResponseBody = FailPublicationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type FailPublicationResponseBody = FailPublicationStatus200
 
 export type GetInternalRunPath = {
   /**
@@ -1636,6 +1904,16 @@ export type GetInternalRunPath = {
   runId: string
 }
 
+export type GetInternalRunStatus200 = ReviewRunRecord
+
+export type GetInternalRunStatus400 = ErrorResponse
+
+export type GetInternalRunStatus401 = ErrorResponse
+
+export type GetInternalRunStatus404 = ErrorResponse
+
+export type GetInternalRunStatus500 = ErrorResponse
+
 export type GetInternalRunOptions = {
   body?: never
   path: GetInternalRunPath
@@ -1644,15 +1922,17 @@ export type GetInternalRunOptions = {
 }
 
 export type GetInternalRunResponseBodyByStatus = {
-  '200': ReviewRunRecord
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '500': ErrorResponse
+  '200': GetInternalRunStatus200
+  '400': GetInternalRunStatus400
+  '401': GetInternalRunStatus401
+  '404': GetInternalRunStatus404
+  '500': GetInternalRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetInternalRunResponseBody = GetInternalRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetInternalRunResponseBody = GetInternalRunStatus200
 
 export type ListInternalPublicationStepsPath = {
   /**
@@ -1663,6 +1943,16 @@ export type ListInternalPublicationStepsPath = {
   runId: string
 }
 
+export type ListInternalPublicationStepsStatus200 = PublicationStepRecord[]
+
+export type ListInternalPublicationStepsStatus400 = ErrorResponse
+
+export type ListInternalPublicationStepsStatus401 = ErrorResponse
+
+export type ListInternalPublicationStepsStatus404 = ErrorResponse
+
+export type ListInternalPublicationStepsStatus500 = ErrorResponse
+
 export type ListInternalPublicationStepsOptions = {
   body?: never
   path: ListInternalPublicationStepsPath
@@ -1671,16 +1961,25 @@ export type ListInternalPublicationStepsOptions = {
 }
 
 export type ListInternalPublicationStepsResponseBodyByStatus = {
-  '200': PublicationStepRecord[]
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '500': ErrorResponse
+  '200': ListInternalPublicationStepsStatus200
+  '400': ListInternalPublicationStepsStatus400
+  '401': ListInternalPublicationStepsStatus401
+  '404': ListInternalPublicationStepsStatus404
+  '500': ListInternalPublicationStepsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListInternalPublicationStepsResponseBody =
-  ListInternalPublicationStepsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListInternalPublicationStepsResponseBody = ListInternalPublicationStepsStatus200
+
+export type ListParkedRunsStatus200 = {
+  blocks: ParkedRun[]
+}
+
+export type ListParkedRunsStatus401 = ErrorResponse
+
+export type ListParkedRunsStatus500 = ErrorResponse
 
 export type ListParkedRunsOptions = {
   body?: never
@@ -1690,15 +1989,15 @@ export type ListParkedRunsOptions = {
 }
 
 export type ListParkedRunsResponseBodyByStatus = {
-  '200': {
-    blocks: ParkedRun[]
-  }
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': ListParkedRunsStatus200
+  '401': ListParkedRunsStatus401
+  '500': ListParkedRunsStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListParkedRunsResponseBody = ListParkedRunsResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListParkedRunsResponseBody = ListParkedRunsStatus200
 
 export type AbandonBlockedPreparationPath = {
   /**
@@ -1708,6 +2007,20 @@ export type AbandonBlockedPreparationPath = {
    */
   runId: string
 }
+
+export type AbandonBlockedPreparationStatus200 = ReviewRunRecord
+
+export type AbandonBlockedPreparationStatus400 = ErrorResponse
+
+export type AbandonBlockedPreparationStatus401 = ErrorResponse
+
+export type AbandonBlockedPreparationStatus404 = ErrorResponse
+
+export type AbandonBlockedPreparationStatus409 = ErrorResponse
+
+export type AbandonBlockedPreparationStatus413 = ErrorResponse
+
+export type AbandonBlockedPreparationStatus500 = ErrorResponse
 
 export type AbandonBlockedPreparationBody = {
   /**
@@ -1726,18 +2039,19 @@ export type AbandonBlockedPreparationOptions = {
 }
 
 export type AbandonBlockedPreparationResponseBodyByStatus = {
-  '200': ReviewRunRecord
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '409': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': AbandonBlockedPreparationStatus200
+  '400': AbandonBlockedPreparationStatus400
+  '401': AbandonBlockedPreparationStatus401
+  '404': AbandonBlockedPreparationStatus404
+  '409': AbandonBlockedPreparationStatus409
+  '413': AbandonBlockedPreparationStatus413
+  '500': AbandonBlockedPreparationStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type AbandonBlockedPreparationResponseBody =
-  AbandonBlockedPreparationResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type AbandonBlockedPreparationResponseBody = AbandonBlockedPreparationStatus200
 
 export type GiveUpDisconnectedRunPath = {
   /**
@@ -1747,6 +2061,20 @@ export type GiveUpDisconnectedRunPath = {
    */
   runId: string
 }
+
+export type GiveUpDisconnectedRunStatus200 = ReviewRunRecord
+
+export type GiveUpDisconnectedRunStatus400 = ErrorResponse
+
+export type GiveUpDisconnectedRunStatus401 = ErrorResponse
+
+export type GiveUpDisconnectedRunStatus404 = ErrorResponse
+
+export type GiveUpDisconnectedRunStatus409 = ErrorResponse
+
+export type GiveUpDisconnectedRunStatus413 = ErrorResponse
+
+export type GiveUpDisconnectedRunStatus500 = ErrorResponse
 
 export type GiveUpDisconnectedRunBody = {
   /**
@@ -1765,17 +2093,19 @@ export type GiveUpDisconnectedRunOptions = {
 }
 
 export type GiveUpDisconnectedRunResponseBodyByStatus = {
-  '200': ReviewRunRecord
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '409': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': GiveUpDisconnectedRunStatus200
+  '400': GiveUpDisconnectedRunStatus400
+  '401': GiveUpDisconnectedRunStatus401
+  '404': GiveUpDisconnectedRunStatus404
+  '409': GiveUpDisconnectedRunStatus409
+  '413': GiveUpDisconnectedRunStatus413
+  '500': GiveUpDisconnectedRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GiveUpDisconnectedRunResponseBody = GiveUpDisconnectedRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GiveUpDisconnectedRunResponseBody = GiveUpDisconnectedRunStatus200
 
 export type ResumeDisconnectedRunPath = {
   /**
@@ -1786,6 +2116,16 @@ export type ResumeDisconnectedRunPath = {
   runId: string
 }
 
+export type ResumeDisconnectedRunStatus200 = ReviewRunRecord
+
+export type ResumeDisconnectedRunStatus401 = ErrorResponse
+
+export type ResumeDisconnectedRunStatus404 = ErrorResponse
+
+export type ResumeDisconnectedRunStatus409 = ErrorResponse
+
+export type ResumeDisconnectedRunStatus500 = ErrorResponse
+
 export type ResumeDisconnectedRunOptions = {
   body?: never
   path: ResumeDisconnectedRunPath
@@ -1794,15 +2134,23 @@ export type ResumeDisconnectedRunOptions = {
 }
 
 export type ResumeDisconnectedRunResponseBodyByStatus = {
-  '200': ReviewRunRecord
-  '401': ErrorResponse
-  '404': ErrorResponse
-  '409': ErrorResponse
-  '500': ErrorResponse
+  '200': ResumeDisconnectedRunStatus200
+  '401': ResumeDisconnectedRunStatus401
+  '404': ResumeDisconnectedRunStatus404
+  '409': ResumeDisconnectedRunStatus409
+  '500': ResumeDisconnectedRunStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ResumeDisconnectedRunResponseBody = ResumeDisconnectedRunResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ResumeDisconnectedRunResponseBody = ResumeDisconnectedRunStatus200
+
+export type GetPreparationHeartbeatIntervalStatus200 = number
+
+export type GetPreparationHeartbeatIntervalStatus401 = ErrorResponse
+
+export type GetPreparationHeartbeatIntervalStatus500 = ErrorResponse
 
 export type GetPreparationHeartbeatIntervalOptions = {
   body?: never
@@ -1812,14 +2160,21 @@ export type GetPreparationHeartbeatIntervalOptions = {
 }
 
 export type GetPreparationHeartbeatIntervalResponseBodyByStatus = {
-  '200': number
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': GetPreparationHeartbeatIntervalStatus200
+  '401': GetPreparationHeartbeatIntervalStatus401
+  '500': GetPreparationHeartbeatIntervalStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetPreparationHeartbeatIntervalResponseBody =
-  GetPreparationHeartbeatIntervalResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetPreparationHeartbeatIntervalResponseBody = GetPreparationHeartbeatIntervalStatus200
+
+export type GetPublicationHeartbeatIntervalStatus200 = number
+
+export type GetPublicationHeartbeatIntervalStatus401 = ErrorResponse
+
+export type GetPublicationHeartbeatIntervalStatus500 = ErrorResponse
 
 export type GetPublicationHeartbeatIntervalOptions = {
   body?: never
@@ -1829,14 +2184,21 @@ export type GetPublicationHeartbeatIntervalOptions = {
 }
 
 export type GetPublicationHeartbeatIntervalResponseBodyByStatus = {
-  '200': number
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': GetPublicationHeartbeatIntervalStatus200
+  '401': GetPublicationHeartbeatIntervalStatus401
+  '500': GetPublicationHeartbeatIntervalStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetPublicationHeartbeatIntervalResponseBody =
-  GetPublicationHeartbeatIntervalResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetPublicationHeartbeatIntervalResponseBody = GetPublicationHeartbeatIntervalStatus200
+
+export type GetRunNoticeHeartbeatIntervalStatus200 = number
+
+export type GetRunNoticeHeartbeatIntervalStatus401 = ErrorResponse
+
+export type GetRunNoticeHeartbeatIntervalStatus500 = ErrorResponse
 
 export type GetRunNoticeHeartbeatIntervalOptions = {
   body?: never
@@ -1846,14 +2208,15 @@ export type GetRunNoticeHeartbeatIntervalOptions = {
 }
 
 export type GetRunNoticeHeartbeatIntervalResponseBodyByStatus = {
-  '200': number
-  '401': ErrorResponse
-  '500': ErrorResponse
+  '200': GetRunNoticeHeartbeatIntervalStatus200
+  '401': GetRunNoticeHeartbeatIntervalStatus401
+  '500': GetRunNoticeHeartbeatIntervalStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetRunNoticeHeartbeatIntervalResponseBody =
-  GetRunNoticeHeartbeatIntervalResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type GetRunNoticeHeartbeatIntervalResponseBody = GetRunNoticeHeartbeatIntervalStatus200
 
 export type ReserveInputBundleCandidatePath = {
   /**
@@ -1862,6 +2225,16 @@ export type ReserveInputBundleCandidatePath = {
    */
   runId: string
 }
+
+export type ReserveInputBundleCandidateStatus200 = InputBundleCandidate
+
+export type ReserveInputBundleCandidateStatus400 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus401 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus413 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus500 = ErrorResponse
 
 export type ReserveInputBundleCandidateBody = {
   /**
@@ -1886,16 +2259,17 @@ export type ReserveInputBundleCandidateOptions = {
 }
 
 export type ReserveInputBundleCandidateResponseBodyByStatus = {
-  '200': InputBundleCandidate
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': ReserveInputBundleCandidateStatus200
+  '400': ReserveInputBundleCandidateStatus400
+  '401': ReserveInputBundleCandidateStatus401
+  '413': ReserveInputBundleCandidateStatus413
+  '500': ReserveInputBundleCandidateStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ReserveInputBundleCandidateResponseBody =
-  ReserveInputBundleCandidateResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ReserveInputBundleCandidateResponseBody = ReserveInputBundleCandidateStatus200
 
 export type ListInputBundleCandidatesPath = {
   /**
@@ -1904,6 +2278,16 @@ export type ListInputBundleCandidatesPath = {
    */
   runId: string
 }
+
+export type ListInputBundleCandidatesStatus200 = InputBundleCandidate[]
+
+export type ListInputBundleCandidatesStatus400 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus401 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus413 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus500 = ErrorResponse
 
 export type ListInputBundleCandidatesBody = {
   /**
@@ -1921,16 +2305,17 @@ export type ListInputBundleCandidatesOptions = {
 }
 
 export type ListInputBundleCandidatesResponseBodyByStatus = {
-  '200': InputBundleCandidate[]
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': ListInputBundleCandidatesStatus200
+  '400': ListInputBundleCandidatesStatus400
+  '401': ListInputBundleCandidatesStatus401
+  '413': ListInputBundleCandidatesStatus413
+  '500': ListInputBundleCandidatesStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ListInputBundleCandidatesResponseBody =
-  ListInputBundleCandidatesResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type ListInputBundleCandidatesResponseBody = ListInputBundleCandidatesStatus200
 
 export type SettleInputBundleCandidatePath = {
   /**
@@ -1939,6 +2324,16 @@ export type SettleInputBundleCandidatePath = {
    */
   runId: string
 }
+
+export type SettleInputBundleCandidateStatus200 = InputBundleCandidate
+
+export type SettleInputBundleCandidateStatus400 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus401 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus413 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus500 = ErrorResponse
 
 export type SettleInputBundleCandidateBody = {
   /**
@@ -1962,16 +2357,99 @@ export type SettleInputBundleCandidateOptions = {
 }
 
 export type SettleInputBundleCandidateResponseBodyByStatus = {
-  '200': InputBundleCandidate
-  '400': ErrorResponse
-  '401': ErrorResponse
-  '413': ErrorResponse
-  '500': ErrorResponse
+  '200': SettleInputBundleCandidateStatus200
+  '400': SettleInputBundleCandidateStatus400
+  '401': SettleInputBundleCandidateStatus401
+  '413': SettleInputBundleCandidateStatus413
+  '500': SettleInputBundleCandidateStatus500
 }
 
-/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type SettleInputBundleCandidateResponseBody =
-  SettleInputBundleCandidateResponseBodyByStatus['200']
+/**
+ * @description Union of all possible responses
+ */
+export type SettleInputBundleCandidateResponseBody = SettleInputBundleCandidateStatus200
+/** Request options (path, query, headers, body) of each operation, keyed by operationId. */
+export interface OperationOptionsById {
+  getHealth: GetHealthOptions
+  getReadiness: GetReadinessOptions
+  listRuns: ListRunsOptions
+  admitRun: AdmitRunOptions
+  getRun: GetRunOptions
+  listRunPublicationSteps: ListRunPublicationStepsOptions
+  listRunEvents: ListRunEventsOptions
+  submitPreparedRun: SubmitPreparedRunOptions
+  renewPreparationClaim: RenewPreparationClaimOptions
+  claimNextPreparation: ClaimNextPreparationOptions
+  checkpointPreparationInput: CheckpointPreparationInputOptions
+  failPreparation: FailPreparationOptions
+  claimNextRunNotice: ClaimNextRunNoticeOptions
+  renewRunNoticeClaim: RenewRunNoticeClaimOptions
+  completeRunNotice: CompleteRunNoticeOptions
+  claimNextPublication: ClaimNextPublicationOptions
+  renewPublicationClaim: RenewPublicationClaimOptions
+  initializePublicationSteps: InitializePublicationStepsOptions
+  requirePublicationStepClaim: RequirePublicationStepClaimOptions
+  completePublicationStep: CompletePublicationStepOptions
+  settleExhaustedPublicationStep: SettleExhaustedPublicationStepOptions
+  failPublicationStep: FailPublicationStepOptions
+  completePublication: CompletePublicationOptions
+  failPublication: FailPublicationOptions
+  getInternalRun: GetInternalRunOptions
+  listInternalPublicationSteps: ListInternalPublicationStepsOptions
+  listParkedRuns: ListParkedRunsOptions
+  abandonBlockedPreparation: AbandonBlockedPreparationOptions
+  giveUpDisconnectedRun: GiveUpDisconnectedRunOptions
+  resumeDisconnectedRun: ResumeDisconnectedRunOptions
+  getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalOptions
+  getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalOptions
+  getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalOptions
+  reserveInputBundleCandidate: ReserveInputBundleCandidateOptions
+  listInputBundleCandidates: ListInputBundleCandidatesOptions
+  settleInputBundleCandidate: SettleInputBundleCandidateOptions
+}
+
+/**
+ * Successful response body of each operation, keyed by operationId: the bodies of its 2xx
+ * statuses, with `void` for a 2xx status that has no body. Error bodies are never included.
+ */
+export interface OperationResponseById {
+  getHealth: GetHealthResponseBodyByStatus['200']
+  getReadiness: GetReadinessResponseBodyByStatus['200']
+  listRuns: ListRunsResponseBodyByStatus['200']
+  admitRun: AdmitRunResponseBodyByStatus['200']
+  getRun: GetRunResponseBodyByStatus['200']
+  listRunPublicationSteps: ListRunPublicationStepsResponseBodyByStatus['200']
+  listRunEvents: ListRunEventsResponseBodyByStatus['200']
+  submitPreparedRun: SubmitPreparedRunResponseBodyByStatus['200']
+  renewPreparationClaim: RenewPreparationClaimResponseBodyByStatus['200']
+  claimNextPreparation: ClaimNextPreparationResponseBodyByStatus['200']
+  checkpointPreparationInput: void
+  failPreparation: FailPreparationResponseBodyByStatus['200']
+  claimNextRunNotice: ClaimNextRunNoticeResponseBodyByStatus['200']
+  renewRunNoticeClaim: RenewRunNoticeClaimResponseBodyByStatus['200']
+  completeRunNotice: CompleteRunNoticeResponseBodyByStatus['200']
+  claimNextPublication: ClaimNextPublicationResponseBodyByStatus['200']
+  renewPublicationClaim: RenewPublicationClaimResponseBodyByStatus['200']
+  initializePublicationSteps: void
+  requirePublicationStepClaim: void
+  completePublicationStep: CompletePublicationStepResponseBodyByStatus['200']
+  settleExhaustedPublicationStep: SettleExhaustedPublicationStepResponseBodyByStatus['200']
+  failPublicationStep: FailPublicationStepResponseBodyByStatus['200']
+  completePublication: CompletePublicationResponseBodyByStatus['200']
+  failPublication: FailPublicationResponseBodyByStatus['200']
+  getInternalRun: GetInternalRunResponseBodyByStatus['200']
+  listInternalPublicationSteps: ListInternalPublicationStepsResponseBodyByStatus['200']
+  listParkedRuns: ListParkedRunsResponseBodyByStatus['200']
+  abandonBlockedPreparation: AbandonBlockedPreparationResponseBodyByStatus['200']
+  giveUpDisconnectedRun: GiveUpDisconnectedRunResponseBodyByStatus['200']
+  resumeDisconnectedRun: ResumeDisconnectedRunResponseBodyByStatus['200']
+  getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalResponseBodyByStatus['200']
+  getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalResponseBodyByStatus['200']
+  getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalResponseBodyByStatus['200']
+  reserveInputBundleCandidate: ReserveInputBundleCandidateResponseBodyByStatus['200']
+  listInputBundleCandidates: ListInputBundleCandidatesResponseBodyByStatus['200']
+  settleInputBundleCandidate: SettleInputBundleCandidateResponseBodyByStatus['200']
+}
 
 export type Run = ObservedRun
 export type RunEvent = ReviewRunEvent

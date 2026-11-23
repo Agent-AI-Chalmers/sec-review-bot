@@ -1,4 +1,4 @@
-import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from './review-runs-api.js'
+import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from './review-runs-api.generated.js'
 import { asErrorWithResponse, errorCode } from '../utils/error-utils.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
 import { isDeterministicExecutionPublishError } from '../execution/publish-error.js'

@@ -5,7 +5,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 
 import { ExecutionRunConflictError, type ExecutionWorkflowInput } from '../../src/execution.js'
-import type { IssueReviewInput } from '../../src/execution-api-types-generated.js'
+import type { IssueReviewInput } from '../../src/execution-api-types.generated.js'
 import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
 
 const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS

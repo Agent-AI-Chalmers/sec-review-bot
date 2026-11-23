@@ -172,7 +172,7 @@ test('the workflow byte limit is projected from common.schema.json', () => {
       'github-integration',
       'src',
       'execution',
-      'execution-api-types-generated.ts'
+      'execution-api-types.generated.ts'
     ),
     'utf8'
   )

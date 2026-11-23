@@ -1,4 +1,4 @@
-import type { ReviewRecord } from '../execution/execution-api-types-generated.js'
+import type { ReviewRecord } from '../execution/execution-api-types.generated.js'
 import { assertReviewRecord } from '../execution/execution-api-schema.js'
 
 export type { ReviewRecord }

@@ -1,10 +1,6 @@
 import React from 'react'
 import { api, type PublicationStep, type Run, type RunEvent } from '../api.js'
-import type {
-  GetRunResponseBody,
-  ListRunPublicationStepsResponseBody,
-  ListRunEventsResponseBody
-} from '../api-types.generated.js'
+import type { OperationResponseById } from '../api-types.generated.js'
 import { isRunTerminal } from '../format.js'
 import { useRefresh } from '../../../shared/refresh.js'
 
@@ -39,11 +35,11 @@ export function useRunDetail(runId: string): RunDetailData {
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue, eventValue] = await Promise.all([
-        api<GetRunResponseBody>(`/runs/${encodeURIComponent(runId)}`),
-        api<ListRunPublicationStepsResponseBody>(
+        api<OperationResponseById['getRun']>(`/runs/${encodeURIComponent(runId)}`),
+        api<OperationResponseById['listRunPublicationSteps']>(
           `/runs/${encodeURIComponent(runId)}/publication-steps`
         ),
-        api<ListRunEventsResponseBody>(`/runs/${encodeURIComponent(runId)}/events`)
+        api<OperationResponseById['listRunEvents']>(`/runs/${encodeURIComponent(runId)}/events`)
       ])
       setLoaded({
         runId,

@@ -6,7 +6,7 @@ import type {
   RepositoryScanScope,
   RepositoryScanTarget,
   ReviewIntent
-} from './execution-api-types-generated.js'
+} from './execution-api-types.generated.js'
 
 // GitHub integration prepared input shapes.
 //
@@ -22,7 +22,7 @@ export {
   MAX_WORKFLOW_INPUT_BYTES,
   MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES,
   MAX_SCAN_TARGET_COMMIT_SHAS
-} from './execution-api-types-generated.js'
+} from './execution-api-types.generated.js'
 
 export type {
   InputBundleArtifactRef,

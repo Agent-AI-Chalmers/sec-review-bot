@@ -147,6 +147,14 @@
         "typescript/unbound-method": "error",
         "import/first": "error"
       }
+    },
+    {
+      // Kubb emits one alias per response status, so statuses sharing a body
+      // produce `A | A`-shaped unions in generated contract types.
+      "files": ["**/*.generated.ts"],
+      "rules": {
+        "typescript/no-duplicate-type-constituents": "off"
+      }
     }
   ],
   "options": {

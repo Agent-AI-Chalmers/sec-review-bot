@@ -34,5 +34,4 @@ tools/
   test/
     generated-artifacts.test.ts       manifest ↔ generators ↔ CI filter
     contract-generation-guards.test.ts  generators fail on input they cannot represent
-    response-types.test.ts            every response alias indexes its status map
 ```

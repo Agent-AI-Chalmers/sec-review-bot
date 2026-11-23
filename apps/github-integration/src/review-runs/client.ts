@@ -2,7 +2,7 @@
 // contract details out of GitHub workflows and coordinators.
 import { TextDecoder } from 'node:util'
 
-import { operationRoutes } from './review-runs-api.js'
+import { operationRoutes } from './review-runs-api.generated.js'
 import type {
   OperationOptionsById,
   OperationResponseById,
@@ -12,7 +12,7 @@ import type {
   ReviewRunAdmission,
   ReviewRunRecord,
   RunNoticeWork
-} from './review-runs-api.js'
+} from './review-runs-api.generated.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 import { integerEnv } from '../utils/env.js'
 
@@ -181,11 +181,6 @@ type Operation<Id extends OperationId> = OperationOptionsById[Id]
  * accepted here and silently stripped or ignored by the service. */
 type RequestBody<Id extends OperationId> = Operation<Id> extends { body: infer Body } ? Body : never
 
-/** The success body the contract declares for an operation, keyed by status code. */
-type SuccessBody<Id extends OperationId> = unknown extends OperationResponseById[Id]
-  ? void
-  : OperationResponseById[Id]
-
 class HttpReviewRunsClient {
   readonly connectorId = process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
 
@@ -201,7 +196,7 @@ class HttpReviewRunsClient {
     params: Record<PathParam<PathOf<Id> & string>, string>,
     body?: RequestBody<Id>,
     nullOn404 = false
-  ): Promise<SuccessBody<Id>> {
+  ): Promise<OperationResponseById[Id]> {
     const path = contractPath(operation, params)
     const controller = new AbortController()
     const timeout = setTimeout(
@@ -222,7 +217,7 @@ class HttpReviewRunsClient {
       if (!response.ok) {
         if (nullOn404 && response.status === 404) {
           await response.body?.cancel()
-          return null as SuccessBody<Id>
+          return null as OperationResponseById[Id]
         }
       }
       let text: string
@@ -247,15 +242,15 @@ class HttpReviewRunsClient {
           { code: parsed.code ?? null, status: response.status }
         )
       }
-      // A success body may legitimately be empty: three operations (`failPreparation`,
-      // `initializePublicationSteps`, `requirePublicationStepClaim`) declare a 200 with no
-      // content, and the server answers with `reply.code(200).send()` — a zero-byte body. The
-      // contract's `SuccessBody` for those operations is `void`, so the caller expects
+      // A success body may legitimately be empty: some operations (for example
+      // `initializePublicationSteps`) declare a 200 with no content, and the server answers
+      // with `reply.code(200).send()` — a zero-byte body. The contract's
+      // `OperationResponseById` entry for those operations is `void`, so the caller expects
       // `undefined`. Parsing unconditionally threw `SyntaxError: Unexpected end of JSON input`
       // on every such call, which carried no `code` or HTTP status and was therefore
       // misclassified as a retryable publication fault — the exact "loops forever" failure the
       // terminal-code alignment exists to prevent. Parse only when there is a body.
-      return (text === '' ? undefined : JSON.parse(text)) as SuccessBody<Id>
+      return (text === '' ? undefined : JSON.parse(text)) as OperationResponseById[Id]
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw Object.assign(new Error(`Review Runs ${operation} request timed out.`), {
