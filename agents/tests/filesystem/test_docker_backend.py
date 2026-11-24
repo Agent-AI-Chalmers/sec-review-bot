@@ -26,7 +26,6 @@ from sec_review_agents.filesystem.docker_runtime import (
     arun_docker_command,
     create_docker_container_resource,
     is_docker_runtime_available,
-    start_container,
 )
 from sec_review_agents.filesystem.limits import (
     DEFAULT_COMMAND_TIMEOUT_MS,
@@ -218,9 +217,7 @@ async def test_docker_backend_aclose_is_idempotent() -> None:
         patch.object(
             backend, "_normalize_mount_ownership", new_callable=AsyncMock
         ) as normalize,
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.remove_container"
-        ) as remove_container,
+        patch.object(backend.container, "_remove_container") as remove_container,
     ):
         await backend.aclose()
         await backend.aclose()
@@ -263,35 +260,31 @@ def test_sandbox_backend_rejects_unknown_mode() -> None:
 def test_start_container_marks_only_read_only_mounts_readonly(monkeypatch) -> None:
     """Container startup must enforce the repository-owned hardening baseline."""
     monkeypatch.setenv("AGENT_DOCKER_RUN_LABEL", "attempt-test")
-    with patch(
-        "sec_review_agents.filesystem.docker_runtime.run_docker_command",
-    ) as run_command:
-        start_container(
-            container_name="test-container",
-            image="test-image",
-            shell="/bin/sh",
-            start_command="sleep 1",
-            mounts=[
-                DockerMount(
-                    host_path="/host/read-only",
-                    container_path="/readonly",
-                    writable=False,
-                ),
-                DockerMount(
-                    host_path="/host/workspace",
-                    container_path="/workspace",
-                    writable=True,
-                ),
-            ],
-            working_directory="/workspace",
-            environment={},
-            auto_remove=True,
-            network_mode="none",
-            user=None,
-            timeout_ms=None,
-        )
+    backend = _backend(
+        mounts=[
+            DockerMount(
+                host_path="/host/read-only",
+                container_path="/readonly",
+                writable=False,
+            ),
+            DockerMount(
+                host_path="/host/workspace",
+                container_path="/workspace",
+                writable=True,
+            ),
+        ],
+    )
+    with (
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.run_docker_command",
+        ) as run_command,
+        patch("sec_review_agents.filesystem.docker_runtime.exec_shell"),
+    ):
+        backend.container.ensure_started()
 
-    args = run_command.call_args.args[0]
+    args = next(
+        call.args[0] for call in run_command.call_args_list if call.args[0][1] == "run"
+    )
     assert args[args.index("--label") + 1] == "sec-review.run=attempt-test"
     read_only_mount = next(value for value in args if "dst=/readonly" in value)
     writable_mount = next(value for value in args if "dst=/workspace" in value)
@@ -381,16 +374,12 @@ def test_container_resource_removes_container_when_start_configuration_fails() -
     backend = _backend(container_name="test-container")
 
     with (
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.start_container",
-        ) as start_container_mock,
+        patch.object(backend.container, "_start_container") as start_container_mock,
         patch(
             "sec_review_agents.filesystem.docker_runtime.configure_git_safe_directory",
             side_effect=RuntimeError("git config failed"),
         ),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.remove_container",
-        ) as remove_container_mock,
+        patch.object(backend.container, "_remove_container") as remove_container_mock,
         pytest.raises(RuntimeError, match="git config failed"),
     ):
         backend.container.ensure_started()
@@ -902,8 +891,9 @@ async def test_docker_backend_aclose_can_be_retried_after_a_cleanup_failure() ->
     backend.container._initialized = True
 
     with (
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.remove_container",
+        patch.object(
+            backend.container,
+            "_remove_container",
             side_effect=[RuntimeError("docker daemon gone"), None],
         ) as remove_container,
         patch.object(backend, "_normalize_mount_ownership", new_callable=AsyncMock),
@@ -930,7 +920,7 @@ async def test_docker_backend_aclose_records_removal_when_ownership_cleanup_fail
     backend.container._initialized = True
 
     with (
-        patch("sec_review_agents.filesystem.docker_runtime.remove_container"),
+        patch.object(backend.container, "_remove_container"),
         patch.object(
             backend,
             "_normalize_mount_ownership",
