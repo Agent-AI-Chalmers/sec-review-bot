@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -17,7 +18,25 @@ _AGENT_MCP_CONNECTIONS: dict[str, Callable[[Any], dict[str, Any]]] = {
 }
 
 
-def resolve_agent_mcp_connections(
+async def _prepare_connection(
+    builder: Callable[[Any], dict[str, Any]], backend: Any
+) -> dict[str, Any]:
+    # Cancelling to_thread does not stop its worker. Keep ownership until it exits.
+    task = asyncio.create_task(asyncio.to_thread(builder, backend))
+    cancellation = None
+    while not task.done():
+        try:
+            await asyncio.wait({task})
+        except asyncio.CancelledError as error:
+            cancellation = error
+    if cancellation is not None:
+        if not task.cancelled():
+            task.exception()  # Retrieve a worker failure without replacing cancellation.
+        raise cancellation
+    return task.result()
+
+
+async def resolve_agent_mcp_connections(
     tool_names: tuple[str, ...],
     backend: Any,
 ) -> dict[str, Any]:
@@ -34,5 +53,5 @@ def resolve_agent_mcp_connections(
         return {}
     connections: dict[str, Any] = {}
     for builder in builders:
-        connections.update(builder(backend))
+        connections.update(await _prepare_connection(builder, backend))
     return connections
