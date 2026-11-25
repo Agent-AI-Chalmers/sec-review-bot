@@ -37,14 +37,14 @@ def agent_call(request, monkeypatch, tmp_path: Path):
         assert supplied_backend is backend
         return {name: {"transport": "stdio", "command": name}}
 
-    monkeypatch.setattr(
-        resolver,
-        "codegraph_mcp_connections_for_backend",
+    monkeypatch.setitem(
+        resolver._AGENT_MCP_CONNECTIONS,
+        "codegraph",
         lambda backend: connection("codegraph", backend),
     )
-    monkeypatch.setattr(
-        resolver,
-        "playwright_mcp_connections_for_backend",
+    monkeypatch.setitem(
+        resolver._AGENT_MCP_CONNECTIONS,
+        "playwright",
         lambda backend: connection("playwright", backend),
     )
     kwargs = {

@@ -10,7 +10,10 @@ from sec_review_agents.filesystem.docker_backend import (
     DockerSandboxBackend,
 )
 from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
-from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
+from sec_review_agents.mcp.resolver import (
+    _AGENT_MCP_CONNECTIONS,
+    resolve_agent_mcp_connections,
+)
 
 
 def _docker_backend() -> DockerSandboxBackend:
@@ -49,8 +52,9 @@ async def test_mcp_connections_resolve_declared_codegraph_tool(monkeypatch) -> N
         calls.append(received_backend)
         return {"codegraph": {"transport": "stdio"}}
 
-    monkeypatch.setattr(
-        "sec_review_agents.mcp.resolver.codegraph_mcp_connections_for_backend",
+    monkeypatch.setitem(
+        _AGENT_MCP_CONNECTIONS,
+        "codegraph",
         fake_codegraph_connections,
     )
 
@@ -72,8 +76,9 @@ async def test_mcp_connections_resolve_declared_playwright_tool(
         calls.append(received_backend)
         return {"playwright": {"transport": "stdio"}}
 
-    monkeypatch.setattr(
-        "sec_review_agents.mcp.resolver.playwright_mcp_connections_for_backend",
+    monkeypatch.setitem(
+        _AGENT_MCP_CONNECTIONS,
+        "playwright",
         fake_playwright_connections,
     )
 
@@ -188,5 +193,72 @@ async def test_cancellation_waits_for_worker_completion(monkeypatch, fails):
     finally:
         release.set()
     with pytest.raises(asyncio.CancelledError):
+        await task
+    assert finished.is_set()
+
+
+@pytest.mark.asyncio
+async def test_preparations_run_concurrently_in_declaration_order(monkeypatch):
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
+    barrier = threading.Barrier(2, timeout=5)
+
+    def builder(name):
+        def build(backend):
+            barrier.wait()
+            return {name: {"transport": "stdio"}}
+
+        return build
+
+    for name in ("codegraph", "playwright"):
+        monkeypatch.setitem(_AGENT_MCP_CONNECTIONS, name, builder(name))
+    result = await resolve_agent_mcp_connections(("playwright", "codegraph"), object())
+    assert list(result) == ["playwright", "codegraph"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_failure_joins_sibling_worker_before_returning(monkeypatch, cancel):
+    """A failed preparation must join siblings before backend teardown can start.
+
+    Repeated cancellation during that wait must preserve ownership of workers
+    and take precedence over the original preparation failure.
+    """
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
+    started, release, finished = [threading.Event() for _ in range(3)]
+    failed = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def failing(backend):
+        assert started.wait(5)
+        loop.call_soon_threadsafe(failed.set)
+        raise RuntimeError("prepare failed")
+
+    def sibling(backend):
+        started.set()
+        try:
+            assert release.wait(5)
+            return {}
+        finally:
+            finished.set()
+
+    monkeypatch.setitem(_AGENT_MCP_CONNECTIONS, "codegraph", failing)
+    monkeypatch.setitem(_AGENT_MCP_CONNECTIONS, "playwright", sibling)
+    task = asyncio.create_task(
+        resolve_agent_mcp_connections(("codegraph", "playwright"), object())
+    )
+    try:
+        await failed.wait()
+        await asyncio.sleep(0)
+        assert not task.done()
+        if cancel:
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+    finally:
+        release.set()
+    expected = asyncio.CancelledError if cancel else RuntimeError
+    with pytest.raises(expected):
         await task
     assert finished.is_set()
