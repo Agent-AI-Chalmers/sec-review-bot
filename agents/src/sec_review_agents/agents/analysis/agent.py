@@ -86,7 +86,7 @@ async def run_analysis_agent(
     if model_turn_diagnostics_enabled():
         agent_middleware.append(ModelTurnDiagnosticsMiddleware(agent_name=agent_name))
 
-    connections = resolve_agent_mcp_connections(ANALYSIS_AGENT_MCP_TOOLS, backend)
+    connections = await resolve_agent_mcp_connections(ANALYSIS_AGENT_MCP_TOOLS, backend)
     async with managed_mcp_tools_async(connections) as mcp_tools:
         result = await run_agent_runtime_graph(
             model=model,

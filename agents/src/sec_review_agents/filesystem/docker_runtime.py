@@ -83,24 +83,9 @@ class DockerContainerResource:
                     f"Docker sandbox {self.container_name} has already been closed."
                 )
 
-            remove_container(
-                container_name=self.container_name,
-                timeout_ms=self.timeout_ms,
-            )
+            self._remove_container()
             try:
-                start_container(
-                    container_name=self.container_name,
-                    image=self.image,
-                    shell=self.shell,
-                    start_command=self.start_command,
-                    mounts=self.mounts,
-                    working_directory=self.working_directory,
-                    environment=self.environment,
-                    auto_remove=self.auto_remove,
-                    network_mode=self.network_mode,
-                    user=self.user,
-                    timeout_ms=self.timeout_ms,
-                )
+                self._start_container()
                 configure_git_safe_directory(
                     container_name=self.container_name,
                     shell=self.shell,
@@ -108,10 +93,7 @@ class DockerContainerResource:
                     timeout_ms=self.timeout_ms,
                 )
             except Exception:
-                remove_container(
-                    container_name=self.container_name,
-                    timeout_ms=self.timeout_ms,
-                )
+                self._remove_container()
                 raise
             self._initialized = True
 
@@ -134,16 +116,73 @@ class DockerContainerResource:
                 self._closed = True
                 return
 
-            remove_container(
-                container_name=self.container_name,
-                timeout_ms=self.timeout_ms,
-            )
+            self._remove_container()
             # Both flags describe observed state, so they are set only once the container is
-            # actually gone. Marking closed before `remove_container` succeeded made a failed
+            # actually gone. Marking closed before removal succeeded made a failed
             # removal permanent: every later `close()` returned early while the container kept
             # running, and the caller had no way to tell.
             self._initialized = False
             self._closed = True
+
+    def _start_container(self) -> None:
+        args = [default_docker_bin(), "run", "-d"]
+
+        if self.auto_remove:
+            args.append("--rm")
+
+        args.extend(
+            ["--name", self.container_name, "--workdir", self.working_directory]
+        )
+        # Callers may group containers for inspection or cleanup with a run identifier.
+        # This is independent of any workflow or benchmark; unset means no added label.
+        # Select the group with: docker ps -a --filter label=sec-review.run=<identifier>
+        if run_label := env_value("AGENT_DOCKER_RUN_LABEL"):
+            args.extend(["--label", f"sec-review.run={run_label}"])
+
+        # These are explicit project guarantees rather than daemon-dependent
+        # defaults. Resource values remain configurable for heavyweight reviews.
+        args.extend(["--cap-drop", "ALL"])
+        # The default container user is root for image compatibility. These two
+        # capabilities are the minimum needed for host-owned writable bind mounts
+        # and the existing end-of-run ownership normalization.
+        args.extend(["--cap-add", "DAC_OVERRIDE"])
+        args.extend(["--cap-add", "CHOWN"])
+        args.extend(["--security-opt", "no-new-privileges:true"])
+        args.extend(["--pids-limit", env_value("AGENT_DOCKER_PIDS_LIMIT") or "512"])
+        args.extend(["--memory", env_value("AGENT_DOCKER_MEMORY") or "4g"])
+        args.extend(["--cpus", env_value("AGENT_DOCKER_CPUS") or "2"])
+        if seccomp_profile := env_value("AGENT_DOCKER_SECCOMP_PROFILE"):
+            args.extend(["--security-opt", f"seccomp={seccomp_profile}"])
+        if apparmor_profile := env_value("AGENT_DOCKER_APPARMOR_PROFILE"):
+            args.extend(["--security-opt", f"apparmor={apparmor_profile}"])
+
+        if self.network_mode:
+            args.extend(["--network", self.network_mode])
+        if self.user:
+            args.extend(["--user", self.user])
+
+        for key, value in self.environment.items():
+            args.extend(["--env", f"{key}={value}"])
+
+        for mount in self.mounts:
+            mount_spec = [
+                "type=bind",
+                f"src={mount.host_path}",
+                f"dst={mount.container_path}",
+            ]
+            if not mount.writable:
+                mount_spec.append("readonly")
+            args.extend(["--mount", ",".join(mount_spec)])
+
+        args.extend([self.image, self.shell, "-c", self.start_command])
+        run_docker_command(args, timeout_ms=self.timeout_ms)
+
+    def _remove_container(self) -> None:
+        run_docker_command(
+            [default_docker_bin(), "rm", "-f", self.container_name],
+            timeout_ms=self.timeout_ms,
+            expect_success=False,
+        )
 
 
 def create_docker_container_resource(
@@ -261,83 +300,6 @@ async def arun_docker_command(
         raise RuntimeError(output or f"Command failed: {' '.join(args)}")
 
     return result
-
-
-def remove_container(
-    *,
-    container_name: str,
-    timeout_ms: int | None,
-) -> subprocess.CompletedProcess[str]:
-    return run_docker_command(
-        [default_docker_bin(), "rm", "-f", container_name],
-        timeout_ms=timeout_ms,
-        expect_success=False,
-    )
-
-
-def start_container(
-    *,
-    container_name: str,
-    image: str,
-    shell: str,
-    start_command: str,
-    mounts: list[DockerMount],
-    working_directory: str,
-    environment: dict[str, str],
-    auto_remove: bool,
-    network_mode: str | None,
-    user: str | None,
-    timeout_ms: int | None,
-) -> subprocess.CompletedProcess[str]:
-    args = [default_docker_bin(), "run", "-d"]
-
-    if auto_remove:
-        args.append("--rm")
-
-    args.extend(["--name", container_name, "--workdir", working_directory])
-    # Callers may group containers for inspection or cleanup with a run identifier.
-    # This is independent of any workflow or benchmark; unset means no added label.
-    # Select the group with: docker ps -a --filter label=sec-review.run=<identifier>
-    if run_label := env_value("AGENT_DOCKER_RUN_LABEL"):
-        args.extend(["--label", f"sec-review.run={run_label}"])
-
-    # These are explicit project guarantees rather than daemon-dependent
-    # defaults. Resource values remain configurable for heavyweight reviews.
-    args.extend(["--cap-drop", "ALL"])
-    # The default container user is root for image compatibility. These two
-    # capabilities are the minimum needed for host-owned writable bind mounts
-    # and the existing end-of-run ownership normalization.
-    args.extend(["--cap-add", "DAC_OVERRIDE"])
-    args.extend(["--cap-add", "CHOWN"])
-    args.extend(["--security-opt", "no-new-privileges:true"])
-    args.extend(["--pids-limit", env_value("AGENT_DOCKER_PIDS_LIMIT") or "512"])
-    args.extend(["--memory", env_value("AGENT_DOCKER_MEMORY") or "4g"])
-    args.extend(["--cpus", env_value("AGENT_DOCKER_CPUS") or "2"])
-    if seccomp_profile := env_value("AGENT_DOCKER_SECCOMP_PROFILE"):
-        args.extend(["--security-opt", f"seccomp={seccomp_profile}"])
-    if apparmor_profile := env_value("AGENT_DOCKER_APPARMOR_PROFILE"):
-        args.extend(["--security-opt", f"apparmor={apparmor_profile}"])
-
-    if network_mode:
-        args.extend(["--network", network_mode])
-    if user:
-        args.extend(["--user", user])
-
-    for key, value in environment.items():
-        args.extend(["--env", f"{key}={value}"])
-
-    for mount in mounts:
-        mount_spec = [
-            "type=bind",
-            f"src={mount.host_path}",
-            f"dst={mount.container_path}",
-        ]
-        if not mount.writable:
-            mount_spec.append("readonly")
-        args.extend(["--mount", ",".join(mount_spec)])
-
-    args.extend([image, shell, "-c", start_command])
-    return run_docker_command(args, timeout_ms=timeout_ms)
 
 
 def exec_shell(
