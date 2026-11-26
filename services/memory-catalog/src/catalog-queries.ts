@@ -189,14 +189,12 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       ]
     )
     const rows = result.rows.slice(0, limit)
+    const last = rows.at(-1)
     return {
       extractions: rows.map(projectExtraction),
       next_cursor:
-        result.rows.length > limit && rows.length > 0
-          ? encodeCursor({
-              createdAt: rows[rows.length - 1]!.cursor_created_at,
-              rowId: rows[rows.length - 1]!.extraction_id
-            })
+        result.rows.length > limit && last !== undefined
+          ? encodeCursor({ createdAt: last.cursor_created_at, rowId: last.extraction_id })
           : null
     }
   }
@@ -241,6 +239,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       ]
     )
     const rows = result.rows.slice(0, limit)
+    const last = rows.at(-1)
     return {
       observations: rows.map((row) => ({
         observation_id: row.observation_id,
@@ -252,11 +251,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         created_at: row.created_at.toISOString()
       })),
       next_cursor:
-        result.rows.length > limit && rows.length > 0
-          ? encodeCursor({
-              createdAt: rows[rows.length - 1]!.cursor_created_at,
-              rowId: rows[rows.length - 1]!.observation_id
-            })
+        result.rows.length > limit && last !== undefined
+          ? encodeCursor({ createdAt: last.cursor_created_at, rowId: last.observation_id })
           : null
     }
   }
@@ -507,12 +503,11 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       [beforeVersion ?? null, limit + 1]
     )
     const rows = result.rows.slice(0, limit)
+    const last = rows.at(-1)
     return {
       versions: rows.map(projectVersion),
       next_before_version:
-        result.rows.length > limit && rows.length > 0
-          ? Number(rows[rows.length - 1]?.version)
-          : null
+        result.rows.length > limit && last !== undefined ? Number(last.version) : null
     }
   }
 }
