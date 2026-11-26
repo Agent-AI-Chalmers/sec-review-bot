@@ -5,6 +5,37 @@ import pytest
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 
 
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("*.env", {"/app.env"}),
+        (".*env", {"/.env"}),
+        ("**/*.py", {"/app.py", "/nested/test.py"}),
+        (
+            "*.{py,env}",
+            {"/app.py", "/app.env", "/nested/test.py", "/.hidden/secret.py"},
+        ),
+        ("**/.*env", {"/.env"}),
+        ("!(app).py", set()),
+    ],
+)
+def test_glob_preserves_hidden_file_and_pattern_boundaries(
+    tmp_path: Path, pattern: str, expected: set[str]
+) -> None:
+    """Check hidden basenames separately from traversal through hidden directories.
+
+    Unanchored patterns match basenames at any depth, including hidden directories.
+    Negated extglobs are unsupported; do not silently treat them as exclusions.
+    """
+    for name in [".env", "app.env", "app.py", "nested/test.py", ".hidden/secret.py"]:
+        target = tmp_path / name
+        target.parent.mkdir(exist_ok=True)
+        target.write_text("fixture")
+    result = LocalFilesystemBackend(tmp_path).glob(pattern)
+    assert result.error is None
+    assert {match["path"] for match in result.matches or []} == expected
+
+
 @pytest.mark.parametrize("directory", [False, True])
 @pytest.mark.asyncio
 async def test_read_only_delete_rejects_sync_and_async(tmp_path: Path, directory: bool):
