@@ -999,7 +999,7 @@ export function createRunFixtures(now: number) {
     // and the publication would simply be published. The parked step is the one that ran out of
     // reconciliation attempts; the rest keep the result they already delivered.
     const parkedSteps = stepsByRun.get(run.run_id) ?? []
-    const lastStep = parkedSteps[parkedSteps.length - 1]
+    const lastStep = parkedSteps.at(-1)
     if (lastStep !== undefined) {
       lastStep.status = 'disconnected'
       lastStep.attempt_count = 3

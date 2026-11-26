@@ -116,7 +116,7 @@ export async function readExecutionArchive(
   if (
     !manifestBytes ||
     !resultBytes ||
-    ![...entries.keys()].some((name) => name.startsWith('artifact-tree/'))
+    !entries.keys().some((name) => name.startsWith('artifact-tree/'))
   ) {
     throw new Error('invalid_execution_archive')
   }

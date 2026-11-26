@@ -15,8 +15,7 @@ export function HighlightText({
   if (!needle) {
     return <>{value}</>
   }
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const parts = value.split(new RegExp(`(${escaped})`, 'gi'))
+  const parts = value.split(new RegExp(`(${RegExp.escape(needle)})`, 'gi'))
   return (
     <>
       {parts.map((part, index) =>

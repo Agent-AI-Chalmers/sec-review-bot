@@ -176,15 +176,19 @@ function summarizeAgents(
   breakdownLabelFor: (group: StatisticsGroup) => string | null
 ): AgentSummary {
   const grouped = Map.groupBy(groups, agentGroupKey)
-  const breakdownGroups = new Map<string, Map<string, StatisticsGroup[]>>()
-  for (const group of groups) {
-    const key = agentGroupKey(group)
-    const label = breakdownLabelFor(group)
-    if (label !== null) {
-      const agentBreakdowns = breakdownGroups.get(key) ?? new Map<string, StatisticsGroup[]>()
-      agentBreakdowns.set(label, [...(agentBreakdowns.get(label) ?? []), group])
-      breakdownGroups.set(key, agentBreakdowns)
-    }
+  const breakdownSections = (agentGroups: StatisticsGroup[]): UsageSection[] => {
+    const labeled = agentGroups.flatMap((group) => {
+      const label = breakdownLabelFor(group)
+      return label === null ? [] : [{ label, group }]
+    })
+    return Map.groupBy(labeled, (entry) => entry.label)
+      .entries()
+      .map(([label, entries]) => ({
+        key: label,
+        label,
+        groups: entries.map((entry) => entry.group)
+      }))
+      .toArray()
   }
   return {
     groups: [...grouped.values()].map((agentGroups) => {
@@ -209,14 +213,7 @@ function summarizeAgents(
       }
     }),
     breakdowns: new Map(
-      [...breakdownGroups].map(([key, breakdown]) => [
-        key,
-        [...breakdown].map(([label, breakdownItems]) => ({
-          key: label,
-          label,
-          groups: breakdownItems
-        }))
-      ])
+      grouped.entries().map(([key, agentGroups]) => [key, breakdownSections(agentGroups)])
     )
   }
 }
