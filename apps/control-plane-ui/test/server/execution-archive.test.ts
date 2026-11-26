@@ -14,6 +14,7 @@ async function bundle(
     name: string
     body?: Buffer | string
     type?: tar.Header['type']
+    linkname?: string
   }>
 ): Promise<Buffer> {
   const pack = tar.pack()
@@ -35,6 +36,7 @@ async function bundle(
       const header = {
         name: item.name,
         type: item.type ?? 'file',
+        linkname: item.linkname,
         size: body?.length ?? 0,
         mtime: new Date(0),
         uid: 0,
@@ -151,7 +153,8 @@ test('execution archive reader rejects links and missing manifest entries', asyn
       await bundle([
         { name: 'manifest.json', body: manifest() },
         { name: 'result.json', body: '{}' },
-        { name: 'artifact-tree/unit-1/review.jsonl', type: 'symlink' }
+        // A complete link header ensures this exercises reader rejection, not packer behavior.
+        { name: 'artifact-tree/unit-1/review.jsonl', type: 'symlink', linkname: 'result.json' }
       ]),
       'run-1'
     )

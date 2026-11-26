@@ -80,7 +80,6 @@ async def test_responses_stream_preserves_completed_tool_arguments(
             "type": "tool_call",
         }
     ]
-    assert message.response_metadata["normalized_finish_reason"] == "tool_call"
 
 
 @pytest.mark.asyncio

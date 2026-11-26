@@ -933,6 +933,10 @@ export type CreateMemoryTreeVersionStatus413 = ErrorResponse
 
 export type CreateMemoryTreeVersionStatus500 = ErrorResponse
 
+export type CreateMemoryTreeVersionStatus201Headers = {
+  Location?: string
+}
+
 export type CreateMemoryTreeVersionBody = MemoryTreeVersionCreation
 
 export type CreateMemoryTreeVersionOptions = {
