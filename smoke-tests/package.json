@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1161.0"
+    "@aws-sdk/client-s3": "^3.1177.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -14,11 +14,11 @@
     "format": "oxfmt --write ."
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
-    "typescript": "7.0.2",
-    "oxfmt": "0.79.0",
-    "oxlint": "1.94.0",
-    "oxlint-tsgolint": "7.0.2007"
+    "@types/node": "^26.6.7",
+    "oxfmt": "0.80.0",
+    "oxlint": "1.95.0",
+    "oxlint-tsgolint": "7.0.2008",
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=26.13.0 <27"

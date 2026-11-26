@@ -38,7 +38,6 @@ export type ExecutionArchive = {
 
 /**
  * @description Where a terminal run's archive went, or why it is not there.
- *
  * The Execution API provider only attaches this once a run reaches a terminal state, and reports a failed
  * upload as a status rather than an error, because archive storage is execution metadata and not
  * the business result.
@@ -71,7 +70,6 @@ export type ExecutionError = {
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -92,7 +90,6 @@ export type HealthResponse = {
 
 /**
  * @description One run as the Execution API provider reports it.
- *
  * Optional result, diagnostic, and post-processing fields are omitted rather
  * than null until they exist, which is why the route serializes with
  * `exclude_none`.
@@ -120,7 +117,6 @@ export type RunStatusQuery = {
 
 /**
  * @description One run's status, without its record.
- *
  * A polling caller asks whether anything changed far more often than it needs results, so
  * this carries no result: the full record is fetched once per terminal run.
  * @type object
@@ -153,7 +149,6 @@ export type HealthStatus200 = HealthResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -181,7 +176,6 @@ export type GetRunStatusesStatus200 = RunStatusResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -190,7 +184,6 @@ export type GetRunStatusesStatus400 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -199,7 +192,6 @@ export type GetRunStatusesStatus413 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -241,7 +233,6 @@ export type GetRunPath = {
 
 /**
  * @description One run as the Execution API provider reports it.
- *
  * Optional result, diagnostic, and post-processing fields are omitted rather
  * than null until they exist, which is why the route serializes with
  * `exclude_none`.
@@ -251,7 +242,6 @@ export type GetRunStatus200 = RunResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -260,7 +250,6 @@ export type GetRunStatus404 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -291,7 +280,6 @@ export type CreateRunPath = {
 
 /**
  * @description One run as the Execution API provider reports it.
- *
  * Optional result, diagnostic, and post-processing fields are omitted rather
  * than null until they exist, which is why the route serializes with
  * `exclude_none`.
@@ -301,7 +289,6 @@ export type CreateRunStatus202 = RunResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -310,7 +297,6 @@ export type CreateRunStatus400 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -319,7 +305,6 @@ export type CreateRunStatus409 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object
@@ -328,7 +313,6 @@ export type CreateRunStatus413 = ExecutionErrorResponse
 
 /**
  * @description An error body.
- *
  * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
  * concerned, so a caller can attribute a failure without echoing its own request back.
  * @type object

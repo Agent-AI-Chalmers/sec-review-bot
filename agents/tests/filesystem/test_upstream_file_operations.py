@@ -73,6 +73,32 @@ def routed_backend(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("*.env", {"app.env"}),
+        (".*env", {".env"}),
+        ("**/*.py", {"app.py", "nested/test.py"}),
+        ("!(app).py", set()),
+    ],
+)
+async def test_routed_glob_keeps_hidden_file_boundaries(
+    routed_backend, pattern: str, expected: set[str]
+):
+    """Shell helpers must preserve glob behavior after translating workspace routes."""
+    backend, workspace, root, _ = routed_backend
+    for name in [".env", "app.env", "app.py", "nested/test.py", ".hidden/secret.py"]:
+        target = workspace / name
+        target.parent.mkdir(exist_ok=True)
+        target.write_text("fixture")
+    result = await backend.aglob(pattern, root)
+    assert result.error is None
+    assert {match["path"] for match in result.matches or []} == {
+        root + "/" + name for name in expected
+    }
+
+
+@pytest.mark.asyncio
 async def test_upstream_helpers_preserve_route_mapping(routed_backend):
     backend, workspace, root, _ = routed_backend
     path = root + "/nested/app.py"

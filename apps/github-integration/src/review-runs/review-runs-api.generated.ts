@@ -171,7 +171,6 @@ export type ArtifactStorage =
 
 /**
  * @description Delivery state of one user-visible coordination notice.
- *
  * @type object
  */
 export type RunNoticeSummary = {
@@ -306,7 +305,6 @@ export type PreparationWork = {
 
 /**
  * @description One pending user-visible notice, claimed by the component that can deliver it.
- *
  * @type object
  */
 export type RunNoticeWork = {
