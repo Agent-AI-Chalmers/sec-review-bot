@@ -338,7 +338,7 @@ async function materializeWorkspaceFromRealGitHistory({
       await auth?.cleanup()
     }
 
-    const head_ref = refs[refs.length - 1]
+    const head_ref = refs.at(-1)
     if (!head_ref) {
       throw new Error('materializeWorkspaceFromRealGitHistory requires at least one ref.')
     }

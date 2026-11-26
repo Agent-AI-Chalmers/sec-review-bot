@@ -264,23 +264,22 @@ function deliveryIdForDelivery(delivery: PublishedDeliveryEntryLike) {
 }
 
 function coordinationNotesForDeliveries(deliveries: PublishedDeliveryEntryLike[]): string[] {
-  const byFile = new Map<string, PublishedDeliveryEntryLike[]>()
-  for (const delivery of deliveries) {
-    for (const filePath of fileChangePaths(delivery.file_changes)) {
-      const items = byFile.get(filePath) ?? []
-      items.push(delivery)
-      byFile.set(filePath, items)
-    }
-  }
+  const byFile = Map.groupBy(
+    deliveries.flatMap((delivery) =>
+      fileChangePaths(delivery.file_changes).map((filePath) => ({ filePath, delivery }))
+    ),
+    (entry) => entry.filePath
+  )
 
   const notes: string[] = []
-  for (const [filePath, items] of [...byFile.entries()].sort(([left], [right]) =>
+  for (const [filePath, entries] of [...byFile].sort(([left], [right]) =>
     left.localeCompare(right)
   )) {
-    if (items.length < 2) {
+    if (entries.length < 2) {
       continue
     }
-    const links = items
+    const links = entries
+      .map((entry) => entry.delivery)
       .sort((left, right) =>
         deliveryIdForDelivery(left).localeCompare(deliveryIdForDelivery(right))
       )

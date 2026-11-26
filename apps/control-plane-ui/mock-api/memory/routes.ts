@@ -461,8 +461,7 @@ export function createMemoryHandler(
       response.end(
         JSON.stringify({
           versions: page,
-          next_before_version:
-            matching.length > limit ? Number(page[page.length - 1]?.version) : null
+          next_before_version: matching.length > limit ? Number(page.at(-1)?.version) : null
         })
       )
       return

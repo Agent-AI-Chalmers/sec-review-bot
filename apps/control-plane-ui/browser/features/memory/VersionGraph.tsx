@@ -32,15 +32,13 @@ function layoutVersions(versions: VersionGraphItem[]): {
   height: number
 } {
   const items = new Map(versions.map((item) => [item.version, item]))
-  const children = new Map<number, VersionGraphItem[]>()
-  for (const item of versions) {
-    if (item.predecessor_version === null || !items.has(item.predecessor_version)) {
-      continue
-    }
-    const siblings = children.get(item.predecessor_version) ?? []
-    siblings.push(item)
-    children.set(item.predecessor_version, siblings)
-  }
+  const children = Map.groupBy(
+    versions.filter(
+      (item): item is VersionGraphItem & { predecessor_version: number } =>
+        item.predecessor_version !== null && items.has(item.predecessor_version)
+    ),
+    (item) => item.predecessor_version
+  )
   for (const siblings of children.values()) {
     siblings.sort((left, right) => left.version - right.version)
   }

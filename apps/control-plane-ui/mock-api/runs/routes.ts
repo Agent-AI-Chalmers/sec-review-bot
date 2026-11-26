@@ -78,9 +78,10 @@ export function createRunsHandler(
     }
     if (requestUrl.startsWith('/api/runs?')) {
       const url = new URL(requestUrl, 'http://fixture.local')
-      const unknown = [...url.searchParams.keys()].filter(
-        (name) => !DECLARED_QUERY_PARAMS.has(name)
-      )
+      const unknown = url.searchParams
+        .keys()
+        .filter((name) => !DECLARED_QUERY_PARAMS.has(name))
+        .toArray()
       if (unknown.length > 0) {
         response.statusCode = 400
         response.end(

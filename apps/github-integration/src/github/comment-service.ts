@@ -57,6 +57,37 @@ interface CreatePullRequestReviewUnlessMarkerExistsArgs extends CreatePullReques
   assert_publication_claim: () => Promise<void>
 }
 
+// Bound the final payload, including the retry marker and truncation notice.
+const MAX_COMMENT_BODY_LENGTH = 65_536
+const HTML_ESCAPES: Partial<Record<string, string>> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' }
+
+function boundedCommentBody(body: string, marker = ''): string {
+  if (body.length <= MAX_COMMENT_BODY_LENGTH) {
+    return body
+  }
+
+  const suffix = `\n</pre>\n\nComment shortened for GitHub. Consult the run's persisted review record for complete review results.\n\n${marker}`
+  const prefix = '<pre>\n'
+  const budget = MAX_COMMENT_BODY_LENGTH - prefix.length - suffix.length
+  if (budget < 0) {
+    throw new Error('Publication marker exceeds the GitHub comment body budget.')
+  }
+
+  // An escaped preview cannot leave an open Markdown fence, HTML tag, or
+  // partially applicable suggestion. Iterate code points to preserve Unicode.
+  const preview: string[] = []
+  let length = 0
+  for (const character of body) {
+    const escaped = HTML_ESCAPES[character] ?? character
+    if (length + escaped.length > budget) {
+      break
+    }
+    preview.push(escaped)
+    length += escaped.length
+  }
+  return `${prefix}${preview.join('')}${suffix}`
+}
+
 function isOwnPullRequestApprovalError(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   if (errorInfo.response?.status !== 422) {
@@ -169,7 +200,7 @@ export async function createIssueCommentUnlessMarkerExists(
 
   const created = await createIssueComment(
     octokit,
-    { owner_login, repo_name, issue_number, body },
+    { owner_login, repo_name, issue_number, body: boundedCommentBody(body, marker) },
     assert_publication_claim
   )
   return {
@@ -281,7 +312,14 @@ export async function createPullRequestReviewUnlessMarkerExists(
     }
   }
 
-  const created = await createPullRequestReview(octokit, args)
+  const created = await createPullRequestReview(octokit, {
+    ...args,
+    body: boundedCommentBody(args.body, args.marker),
+    comments: args.comments.map((comment) => ({
+      ...comment,
+      body: boundedCommentBody(comment.body)
+    }))
+  })
   return {
     ...created,
     reused: false

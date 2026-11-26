@@ -18,6 +18,11 @@ test('view utils use a longer code span fence around embedded backticks', () => 
   expect(inlineCode('`quoted`')).toBe('`` `quoted` ``')
 })
 
+test('view utils handle many backtick runs without exceeding the function argument limit', () => {
+  const text = 'a`'.repeat(200_000) + 'end``tail'
+  expect(inlineCode(text)).toBe(`\`\`\`${text}\`\`\``)
+})
+
 test('view utils render changed files with a safe inline code fence', () => {
   expect(renderChangedFilesLines(['src/uses`tick.ts'])).toStrictEqual([
     'Changed files:',

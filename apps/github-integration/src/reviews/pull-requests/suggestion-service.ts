@@ -317,7 +317,7 @@ function splitWorkspaceHunkIntoSuggestionBlocks(
 
     if (plus_lines.length === 0 && minus_line_numbers.length > 0) {
       const start_line = minus_line_numbers[0] ?? 0
-      const line = minus_line_numbers[minus_line_numbers.length - 1] ?? 0
+      const line = minus_line_numbers.at(-1) ?? 0
       if (start_line > 0 && line >= start_line) {
         blocks.push({
           start_line,
@@ -339,7 +339,7 @@ function splitWorkspaceHunkIntoSuggestionBlocks(
 
     if (minus_line_numbers.length > 0) {
       const start_line = minus_line_numbers[0] ?? 0
-      const line = minus_line_numbers[minus_line_numbers.length - 1] ?? 0
+      const line = minus_line_numbers.at(-1) ?? 0
       if (start_line > 0 && line >= start_line) {
         blocks.push({
           start_line,

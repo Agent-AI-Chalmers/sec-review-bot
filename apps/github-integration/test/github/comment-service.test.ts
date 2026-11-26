@@ -239,3 +239,77 @@ test('approval fallback rechecks publication ownership before creating a comment
   expect(counts.createReview).toBe(2)
   expect(ownershipChecks).toBe(2)
 })
+
+test.each([65_535, 65_536, 65_537, 200_000])(
+  'issue publication bounds a %i-character body and preserves retry identity',
+  async (length) => {
+    const marker = '<!-- run-length-test -->'
+    const body = 'x'.repeat(length - marker.length) + marker
+    let postedBody = ''
+    const { octokit } = fakeGitHub((request) => {
+      if (request.method === 'GET') {
+        return githubJson(
+          postedBody
+            ? [
+                {
+                  id: 1,
+                  html_url: 'url',
+                  body: postedBody,
+                  user: { login: 'sec-review-bot[bot]', type: 'Bot' }
+                }
+              ]
+            : []
+        )
+      }
+      postedBody = (request.body as { body: string }).body
+      expect(postedBody.length).toBeLessThanOrEqual(65_536)
+      return githubJson({ id: 1, html_url: 'url' })
+    })
+    const args = {
+      owner_login: 'octo',
+      repo_name: 'example',
+      issue_number: 1,
+      body,
+      marker,
+      assert_publication_claim: assertPublicationClaim
+    }
+    await createIssueCommentUnlessMarkerExists(octokit, args)
+    expect(postedBody).toContain(marker)
+    if (length <= 65_536) {
+      expect(postedBody).toBe(body)
+    } else {
+      expect(postedBody).toContain('Comment shortened for GitHub.')
+    }
+    expect((await createIssueCommentUnlessMarkerExists(octokit, args)).reused).toBe(true)
+  }
+)
+
+test('review publication safely previews oversized Markdown and inline suggestions', async () => {
+  const marker = '<!-- run-large-review -->'
+  const body = '<details>\n```suggestion\n' + '<&😀'.repeat(30_000) + marker
+  const { octokit, requests } = fakeGitHub(({ method }) =>
+    method === 'GET' ? githubJson([]) : githubJson({ id: 1, html_url: 'url', state: 'COMMENTED' })
+  )
+  await createPullRequestReviewUnlessMarkerExists(octokit, {
+    owner_login: 'octo',
+    repo_name: 'example',
+    pr_number: 1,
+    commit_id: 'head',
+    body,
+    marker,
+    comments: [{ path: 'file.ts', body, line: 1, side: 'RIGHT' }],
+    assert_publication_claim: assertPublicationClaim
+  })
+  const payload = requests.find((request) => request.method === 'POST')?.body as {
+    body: string
+    comments: [{ body: string }]
+  }
+  for (const preview of [payload.body, payload.comments[0].body]) {
+    expect(preview.length).toBeLessThanOrEqual(65_536)
+    expect(preview.isWellFormed()).toBe(true)
+    expect(preview.startsWith('<pre>\n&lt;details&gt;')).toBe(true)
+    expect(preview).toContain('&lt;&amp;😀')
+    expect(preview).toContain('\n</pre>\n')
+  }
+  expect(payload.body.endsWith(marker)).toBe(true)
+})
