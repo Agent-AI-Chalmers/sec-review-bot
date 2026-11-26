@@ -470,13 +470,12 @@ class TriageWorkbenchState:
         group = self.groups[group_id]
         normalized_item_ids = _dedupe_ids(item_ids)
         self._validate_known_item_ids(normalized_item_ids)
+        moved = set(normalized_item_ids)
         for other_group in self.groups.values():
             if other_group.group_id == group_id:
                 continue
             other_group.item_ids = [
-                item_id
-                for item_id in other_group.item_ids
-                if item_id not in normalized_item_ids
+                item_id for item_id in other_group.item_ids if item_id not in moved
             ]
         group.item_ids = normalized_item_ids
 

@@ -36,6 +36,11 @@ COMMENT ON COLUMN review_runs.created_at IS
 COMMENT ON COLUMN review_runs.updated_at IS
   'Row mtime for the trunk row: last time identity metadata or an ingress checkpoint changed. Lifetime progress and per-axis input live on the axis tables.';
 
+-- Serves the run list's keyset pagination: newest first within one connector, with run_id as
+-- the tie breaker, so a page reads its rows from the index instead of sorting every run.
+CREATE INDEX review_runs_list_idx
+  ON review_runs (connector_id, created_at DESC, run_id DESC);
+
 -- Preparation is a separately claimable unit of work. Its protocol deliberately
 -- contains no provider-specific columns: connectors own the interpretation of
 -- their preparation inputs and the external side effects used to construct them.

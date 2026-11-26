@@ -162,6 +162,10 @@ function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
   return files
 }
 
+// Sticky, so each escape is matched in place rather than on a fresh copy of the path tail.
+// The closing quote is not an octal digit, so a match never reaches past the quoted body.
+const OCTAL_ESCAPE = /[0-3][0-7]{2}/y
+
 function decodeGitPatchPath(value: string): string {
   // Git terminates unquoted headers containing spaces with a tab. Literal
   // tabs in filenames are quoted and escaped instead.
@@ -186,7 +190,8 @@ function decodeGitPatchPath(value: string): string {
   for (let index = 1; index < value.length - 1; index++) {
     const char = value[index]!
     if (char === '\\') {
-      const octal = /^[0-3][0-7]{2}/.exec(value.slice(index + 1, -1))
+      OCTAL_ESCAPE.lastIndex = index + 1
+      const octal = OCTAL_ESCAPE.exec(value)
       if (octal) {
         bytes.push(Number.parseInt(octal[0], 8))
         index += 3
@@ -413,6 +418,8 @@ function buildSuggestionManifest({
     return manifest
   }
 
+  // GitHub lists each PR file once, so a filename identifies one entry.
+  const prFilesByName = new Map(files.map((file) => [file.filename, file]))
   for (const workspacePatchFile of workspacePatchFiles) {
     if (workspacePatchFile.path_error) {
       const reason = workspacePatchFile.path_error
@@ -420,7 +427,7 @@ function buildSuggestionManifest({
       manifest.unmapped_changes.push({ path: workspacePatchFile.path, reason })
       continue
     }
-    const prFile = files.find((file) => file.filename === workspacePatchFile.path)
+    const prFile = prFilesByName.get(workspacePatchFile.path)
     if (!prFile || typeof prFile.patch !== 'string' || prFile.patch.trim() === '') {
       const reason = 'File is not visible as a patchable PR diff file.'
       skipReasons.add(`File ${workspacePatchFile.path} is not visible as a patchable PR diff file.`)

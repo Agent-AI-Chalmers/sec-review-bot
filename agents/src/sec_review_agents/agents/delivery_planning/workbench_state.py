@@ -398,20 +398,20 @@ class DeliveryWorkbenchState:
         item_ids: list[str],
     ) -> None:
         known_item_ids = self._known_item_ids(item_ids)
+        moved = set(known_item_ids)
         for other_group in self.groups.values():
             if other_group.group_id == group_id:
                 continue
             other_group.item_ids = [
-                item_id
-                for item_id in other_group.item_ids
-                if item_id not in set(known_item_ids)
+                item_id for item_id in other_group.item_ids if item_id not in moved
             ]
         self.groups[group_id].item_ids = known_item_ids
 
     def _known_item_ids(self, item_ids: list[str]) -> list[str]:
         normalized = _dedupe_ids(item_ids)
         self._validate_known_item_ids(normalized)
-        return [item_id for item_id in self.ordered_item_ids if item_id in normalized]
+        requested = set(normalized)
+        return [item_id for item_id in self.ordered_item_ids if item_id in requested]
 
     def _validate_known_item_ids(self, item_ids: list[str] | None) -> None:
         unknown_item_ids = [

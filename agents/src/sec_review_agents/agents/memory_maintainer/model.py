@@ -1,3 +1,4 @@
+from collections import Counter
 from collections.abc import Sequence
 from typing import Annotated, Literal, Self
 
@@ -74,9 +75,10 @@ def memory_maintenance_output_model(
             reported = [
                 decision.observation_id for decision in self.observation_decisions
             ]
-            duplicates = sorted({item for item in reported if reported.count(item) > 1})
-            missing = [item for item in expected if item not in reported]
-            unknown = sorted(set(reported) - set(expected))
+            counts = Counter(reported)
+            duplicates = sorted(item for item, count in counts.items() if count > 1)
+            missing = [item for item in expected if item not in counts]
+            unknown = sorted(counts.keys() - set(expected))
             problems = [
                 f"{label}: {', '.join(items)}"
                 for label, items in (

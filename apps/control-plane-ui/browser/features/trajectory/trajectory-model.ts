@@ -228,14 +228,17 @@ function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
 }
 
 function linkToolResults(messages: TrajectoryMessageView[]): void {
-  const results = messages.filter((message) => message.toolCallId)
+  const resultsByCallId = Map.groupBy(
+    messages.filter((message) => message.toolCallId),
+    (message) => message.toolCallId
+  )
   const proposed = new Map<ToolCallView, TrajectoryMessageView>()
   const resultRequests = new Map<string, number>()
   for (const message of messages) {
     for (const call of message.toolCalls) {
       // Tool IDs may repeat in parallel subagents; select the closest execution branch.
-      const candidates = results.filter((result) => {
-        if (result.toolCallId !== call.id || result.seq <= message.seq) {
+      const candidates = (resultsByCallId.get(call.id) ?? []).filter((result) => {
+        if (result.seq <= message.seq) {
           return false
         }
         if (message.agent && result.agent && message.agent !== result.agent) {
@@ -327,10 +330,18 @@ function totalRecordedUsage(
     }
   }
   // Viewer totals project recorded usage; accounting reports own coverage assessment.
+  // First message wins on a repeated id, matching the earlier linear search.
+  const messagesById = new Map<string | undefined, TrajectoryMessageView>()
+  for (const message of messages) {
+    if (!messagesById.has(message.id)) {
+      messagesById.set(message.id, message)
+    }
+  }
   const covered = hasCallRecords
-    ? [...responses.keys()].map((callId) =>
-        messages.find((message) => message.id === selected.get(callId))
-      )
+    ? responses
+        .keys()
+        .map((callId) => messagesById.get(selected.get(callId)))
+        .toArray()
     : messages.filter((message) => message.role === 'assistant')
   for (const key of [
     'input',
