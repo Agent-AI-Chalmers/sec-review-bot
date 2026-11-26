@@ -47,7 +47,9 @@ export function displayText(value: unknown, fallback = ''): string {
 
 export function inlineCode(value: unknown, fallback = 'unknown'): string {
   const text = displayText(value, fallback)
-  const longestRun = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
+  const longestRun = text
+    .matchAll(/`+/g)
+    .reduce((longest, match) => Math.max(longest, match[0].length), 0)
   const fence = '`'.repeat(longestRun + 1)
   const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
   return `${fence}${padding}${text}${padding}${fence}`
